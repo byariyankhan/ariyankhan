@@ -1,0 +1,74 @@
+.legal-wrap{
+  max-width:780px; margin:0 auto;
+  padding:120px 24px 80px;
+}
+.legal-badge{
+  display:inline-block;
+  font-family:'Barlow Condensed',sans-serif;
+  font-size:11px; font-weight:700; letter-spacing:3px;
+  color:var(--yellow); text-transform:uppercase;
+  border:1px solid var(--border);
+  padding:4px 14px; border-radius:20px;
+  margin-bottom:20px;
+}
+.legal-h1{
+  font-family:'Barlow Condensed',sans-serif;
+  font-size:clamp(36px,8vw,60px); font-weight:900;
+  letter-spacing:2px; text-transform:uppercase;
+  line-height:1.1; margin-bottom:12px;
+}
+.legal-h1 span{ color:var(--yellow); }
+.legal-meta{
+  font-size:13px; color:var(--muted); margin-bottom:48px;
+  padding-bottom:24px;
+  border-bottom:1px solid var(--border);
+}
+.legal-section{ margin-bottom:40px; }
+.legal-section h2{
+  font-family:'Barlow Condensed',sans-serif;
+  font-size:20px; font-weight:700; letter-spacing:1.5px;
+  text-transform:uppercase; color:var(--yellow);
+  margin-bottom:12px;
+  display:flex; align-items:center; gap:10px;
+}
+.legal-section h2::before{
+  content:'';
+  display:inline-block; width:3px; height:18px;
+  background:var(--yellow); border-radius:2px;
+  flex-shrink:0;
+}
+.legal-section p{
+  font-size:15px; line-height:1.8; color:rgba(255,255,255,.72);
+  margin-bottom:12px;
+}
+.legal-section ul{
+  list-style:none; padding:0;
+  display:flex; flex-direction:column; gap:8px;
+}
+.legal-section ul li{
+  font-size:15px; line-height:1.7; color:rgba(255,255,255,.72);
+  padding-left:20px; position:relative;
+}
+.legal-section ul li::before{
+  content:'▸'; color:var(--yellow);
+  position:absolute; left:0; top:0;
+  font-size:12px; line-height:1.9;
+}
+.legal-contact-box{
+  background:var(--panel); border:1px solid var(--border);
+  border-radius:12px; padding:24px 28px; margin-top:16px;
+}
+.legal-contact-box p{ margin:0; font-size:14px; }
+.legal-contact-box a{
+  color:var(--yellow); text-decoration:none; font-weight:600;
+}
+.legal-contact-box a:hover{ text-decoration:underline; }
+.highlight-box{
+  background:rgba(245,197,24,.06);
+  border:1px solid rgba(245,197,24,.2);
+  border-left:3px solid var(--yellow);
+  border-radius:0 8px 8px 0;
+  padding:16px 20px;
+  margin:16px 0;
+}
+.highlight-box p{ margin:0; font-size:14px; color:rgba(255,255,255,.8); }

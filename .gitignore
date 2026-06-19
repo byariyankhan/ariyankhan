@@ -1,0 +1,11 @@
+# Credentials — never commit
+.env
+mail-config.local.php
+
+# Deploy utilities (local only)
+ftp_download.ps1
+
+# OS junk
+.DS_Store
+Thumbs.db
+desktop.ini
