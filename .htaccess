@@ -35,7 +35,8 @@ RewriteRule ^ - [R=404,L]
 <IfModule mod_deflate.c>
   AddOutputFilterByType DEFLATE text/html text/css text/javascript
   AddOutputFilterByType DEFLATE application/javascript application/json
-  AddOutputFilterByType DEFLATE image/svg+xml
+  AddOutputFilterByType DEFLATE image/svg+xml image/webp
+  AddOutputFilterByType DEFLATE font/woff2 font/woff application/font-woff2
 </IfModule>
 
 # ── Browser caching ──────────────────────────────

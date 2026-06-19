@@ -4,7 +4,6 @@
 User-agent: *
 Allow: /
 Disallow: /send-mail.php
-Disallow: /.htaccess
 
 # Google
 User-agent: Googlebot
