@@ -237,7 +237,7 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="css/style.css?v=6" />
-    <link rel="stylesheet" href="css/service.css?v=41" />
+    <link rel="stylesheet" href="css/service.css?v=43" />
     <link rel="stylesheet" href="css/service-profile.css?v=3" />
   </head>
   <body>
@@ -331,74 +331,168 @@
           </p>
         </div>
 
-        <div class="what-i-do-grid">
-          <article class="what-i-do-card">
-            <div class="what-i-do-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" focusable="false">
-                <path d="m4 6 5-2 6 2 5-2v14l-5 2-6-2-5 2Z" />
-                <path d="M9 4v14" />
-                <path d="M15 6v14" />
-              </svg>
+        <div class="what-i-do-grid" data-service-card-accordion>
+          <article class="what-i-do-card what-i-do-card--accordion">
+            <button
+              class="what-i-do-card-toggle"
+              type="button"
+              aria-expanded="false"
+              aria-controls="map-animation-country-highlights"
+            >
+              <span class="what-i-do-card-head">
+                <span class="what-i-do-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" focusable="false">
+                    <path d="m4 6 5-2 6 2 5-2v14l-5 2-6-2-5 2Z" />
+                    <path d="M9 4v14" />
+                    <path d="M15 6v14" />
+                  </svg>
+                </span>
+                <span class="what-i-do-card-title">Country Highlights</span>
+              </span>
+              <span class="what-i-do-card-chevron" aria-hidden="true"></span>
+            </button>
+            <div class="what-i-do-card-panel" id="map-animation-country-highlights" aria-hidden="true">
+              <p>
+                Map animation video editing helps viewers understand geography fast. I use animated
+                country highlights, borders, labels, and region emphasis to guide attention without
+                making the map feel crowded.
+              </p>
             </div>
-            <h3>Country Highlights</h3>
-            <p>Animated fills and borders that draw viewer attention to specific regions.</p>
           </article>
-          <article class="what-i-do-card">
-            <div class="what-i-do-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" focusable="false">
-                <path d="M3 12h18" />
-                <path d="m15 6 6 6-6 6" />
-                <circle cx="7" cy="12" r="2" />
-              </svg>
+          <article class="what-i-do-card what-i-do-card--accordion">
+            <button
+              class="what-i-do-card-toggle"
+              type="button"
+              aria-expanded="false"
+              aria-controls="map-animation-route-path"
+            >
+              <span class="what-i-do-card-head">
+                <span class="what-i-do-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" focusable="false">
+                    <path d="M3 12h18" />
+                    <path d="m15 6 6 6-6 6" />
+                    <circle cx="7" cy="12" r="2" />
+                  </svg>
+                </span>
+                <span class="what-i-do-card-title">Route Path Animation</span>
+              </span>
+              <span class="what-i-do-card-chevron" aria-hidden="true"></span>
+            </button>
+            <div class="what-i-do-card-panel" id="map-animation-route-path" aria-hidden="true">
+              <p>
+                Animated route paths make movement easier to follow in history, travel, and
+                documentary videos. I build paths for migrations, military advances, trade routes,
+                and journeys with smooth timing.
+              </p>
             </div>
-            <h3>Route Path Animation</h3>
-            <p>
-              Military advances, trade routes, migrations, and travel paths animated frame by frame.
-            </p>
           </article>
-          <article class="what-i-do-card">
-            <div class="what-i-do-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" focusable="false">
-                <rect x="3" y="3" width="18" height="18" rx="2" />
-                <path d="M3 9h18" />
-                <path d="M9 21V9" />
-              </svg>
+          <article class="what-i-do-card what-i-do-card--accordion">
+            <button
+              class="what-i-do-card-toggle"
+              type="button"
+              aria-expanded="false"
+              aria-controls="map-animation-border-changes"
+            >
+              <span class="what-i-do-card-head">
+                <span class="what-i-do-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" focusable="false">
+                    <rect x="3" y="3" width="18" height="18" rx="2" />
+                    <path d="M3 9h18" />
+                    <path d="M9 21V9" />
+                  </svg>
+                </span>
+                <span class="what-i-do-card-title">Border Change Sequences</span>
+              </span>
+              <span class="what-i-do-card-chevron" aria-hidden="true"></span>
+            </button>
+            <div class="what-i-do-card-panel" id="map-animation-border-changes" aria-hidden="true">
+              <p>
+                Historical map animation needs clear territory changes. I animate border shifts,
+                state formation, disputed regions, and time-based transitions so viewers can follow
+                complex geopolitical changes.
+              </p>
             </div>
-            <h3>Border Change Sequences</h3>
-            <p>Historical territory shifts and border evolutions animated over time.</p>
           </article>
-          <article class="what-i-do-card">
-            <div class="what-i-do-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" focusable="false">
-                <circle cx="11" cy="11" r="7" />
-                <path d="m21 21-4.35-4.35" />
-                <path d="M11 8v6" />
-                <path d="M8 11h6" />
-              </svg>
+          <article class="what-i-do-card what-i-do-card--accordion">
+            <button
+              class="what-i-do-card-toggle"
+              type="button"
+              aria-expanded="false"
+              aria-controls="map-animation-city-zooms"
+            >
+              <span class="what-i-do-card-head">
+                <span class="what-i-do-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" focusable="false">
+                    <circle cx="11" cy="11" r="7" />
+                    <path d="m21 21-4.35-4.35" />
+                    <path d="M11 8v6" />
+                    <path d="M8 11h6" />
+                  </svg>
+                </span>
+                <span class="what-i-do-card-title">City &amp; Region Zooms</span>
+              </span>
+              <span class="what-i-do-card-chevron" aria-hidden="true"></span>
+            </button>
+            <div class="what-i-do-card-panel" id="map-animation-city-zooms" aria-hidden="true">
+              <p>
+                Zooms help viewers move from world context to a specific place. I create cinematic
+                city, country, and region zoom-ins that support narration and keep map sequences
+                connected to the story.
+              </p>
             </div>
-            <h3>City &amp; Region Zooms</h3>
-            <p>Cinematic zoom-ins that take viewers from world view to specific city or region.</p>
           </article>
-          <article class="what-i-do-card">
-            <div class="what-i-do-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" focusable="false">
-                <rect x="4" y="5" width="16" height="14" rx="2" />
-                <path d="M8 5l2 4" />
-                <path d="M14 5l2 4" />
-                <path d="M4 9h16" />
-              </svg>
+          <article class="what-i-do-card what-i-do-card--accordion">
+            <button
+              class="what-i-do-card-toggle"
+              type="button"
+              aria-expanded="false"
+              aria-controls="map-animation-4k-export"
+            >
+              <span class="what-i-do-card-head">
+                <span class="what-i-do-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" focusable="false">
+                    <rect x="4" y="5" width="16" height="14" rx="2" />
+                    <path d="M8 5l2 4" />
+                    <path d="M14 5l2 4" />
+                    <path d="M4 9h16" />
+                  </svg>
+                </span>
+                <span class="what-i-do-card-title">Cinematic 4K Export</span>
+              </span>
+              <span class="what-i-do-card-chevron" aria-hidden="true"></span>
+            </button>
+            <div class="what-i-do-card-panel" id="map-animation-4k-export" aria-hidden="true">
+              <p>
+                I render map animation sequences in clean, high-resolution formats for YouTube,
+                documentaries, and education videos. Each export is prepared for sharp playback and
+                smooth compositing inside the final edit.
+              </p>
             </div>
-            <h3>Cinematic 4K Export</h3>
-            <p>All sequences rendered at 4K and composited into your edit in Premiere Pro.</p>
           </article>
-          <article class="what-i-do-card">
-            <div class="what-i-do-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" focusable="false">
-                <path d="m13 2-8 12h7l-1 8 8-12h-7l1-8Z" />
-              </svg>
+          <article class="what-i-do-card what-i-do-card--accordion">
+            <button
+              class="what-i-do-card-toggle"
+              type="button"
+              aria-expanded="false"
+              aria-controls="map-animation-after-effects"
+            >
+              <span class="what-i-do-card-head">
+                <span class="what-i-do-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" focusable="false">
+                    <path d="m13 2-8 12h7l-1 8 8-12h-7l1-8Z" />
+                  </svg>
+                </span>
+                <span class="what-i-do-card-title">After Effects Motion</span>
+              </span>
+              <span class="what-i-do-card-chevron" aria-hidden="true"></span>
+            </button>
+            <div class="what-i-do-card-panel" id="map-animation-after-effects" aria-hidden="true">
+              <p>
+                I build custom After Effects map motion with smooth easing, labels, overlays, and
+                branded styling. The result is a reusable visual language for geography, history,
+                geopolitics, and documentary content.
+              </p>
             </div>
-            <h3>After Effects Motion</h3>
-            <p>Custom-built templates with smooth easing, labels, and branded overlays.</p>
           </article>
         </div>
 
@@ -517,69 +611,117 @@
           </p>
         </div>
 
-        <div class="how-it-works-grid">
-          <article class="process-step-card">
-            <div class="process-step-header">
-              <div class="process-step-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24" focusable="false">
-                  <path d="M12 16V4" />
-                  <path d="m7 9 5-5 5 5" />
-                  <path d="M5 14v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4" />
-                </svg>
-              </div>
-              <span class="process-step-number">01</span>
+        <div class="how-it-works-grid" data-process-step-accordion>
+          <article class="process-step-card process-step-card--accordion">
+            <button
+              class="process-step-toggle"
+              type="button"
+              aria-expanded="false"
+              aria-controls="map-animation-process-brief"
+            >
+              <span class="process-step-toggle-main">
+                <span class="process-step-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" focusable="false">
+                    <path d="M12 16V4" />
+                    <path d="m7 9 5-5 5 5" />
+                    <path d="M5 14v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4" />
+                  </svg>
+                </span>
+                <span class="process-step-title">Share Brief</span>
+              </span>
+              <span class="process-step-toggle-side">
+                <span class="process-step-number">01</span>
+                <span class="process-step-chevron" aria-hidden="true"></span>
+              </span>
+            </button>
+            <div class="process-step-panel" id="map-animation-process-brief" aria-hidden="true">
+              <p>
+                Send your script or voiceover, location list, route details, reference maps, and
+                visual direction so the map animation video editing process has accurate context.
+              </p>
             </div>
-            <h3>Share Brief</h3>
-            <p>
-              Send your script or voiceover, location list, route details, reference maps, and
-              preferred visual style.
-            </p>
           </article>
-          <article class="process-step-card">
-            <div class="process-step-header">
-              <div class="process-step-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24" focusable="false">
-                  <path d="m4 6 5-2 6 2 5-2v14l-5 2-6-2-5 2Z" />
-                  <path d="M9 4v14" />
-                  <path d="M15 6v14" />
-                </svg>
-              </div>
-              <span class="process-step-number">02</span>
+          <article class="process-step-card process-step-card--accordion">
+            <button
+              class="process-step-toggle"
+              type="button"
+              aria-expanded="false"
+              aria-controls="map-animation-process-build"
+            >
+              <span class="process-step-toggle-main">
+                <span class="process-step-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" focusable="false">
+                    <path d="m4 6 5-2 6 2 5-2v14l-5 2-6-2-5 2Z" />
+                    <path d="M9 4v14" />
+                    <path d="M15 6v14" />
+                  </svg>
+                </span>
+                <span class="process-step-title">Animation Build</span>
+              </span>
+              <span class="process-step-toggle-side">
+                <span class="process-step-number">02</span>
+                <span class="process-step-chevron" aria-hidden="true"></span>
+              </span>
+            </button>
+            <div class="process-step-panel" id="map-animation-process-build" aria-hidden="true">
+              <p>
+                I build animated map sequences in After Effects with country highlights, route paths,
+                zooms, labels, overlays, and timing matched to your narration or documentary edit.
+              </p>
             </div>
-            <h3>Animation Build</h3>
-            <p>
-              I build each map sequence in After Effects — highlights, routes, zooms, and overlays
-              timed to your audio.
-            </p>
           </article>
-          <article class="process-step-card">
-            <div class="process-step-header">
-              <div class="process-step-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24" focusable="false">
-                  <path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7Z" />
-                  <circle cx="12" cy="12" r="3" />
-                </svg>
-              </div>
-              <span class="process-step-number">03</span>
+          <article class="process-step-card process-step-card--accordion">
+            <button
+              class="process-step-toggle"
+              type="button"
+              aria-expanded="false"
+              aria-controls="map-animation-process-review"
+            >
+              <span class="process-step-toggle-main">
+                <span class="process-step-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" focusable="false">
+                    <path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7Z" />
+                    <circle cx="12" cy="12" r="3" />
+                  </svg>
+                </span>
+                <span class="process-step-title">Review Cut</span>
+              </span>
+              <span class="process-step-toggle-side">
+                <span class="process-step-number">03</span>
+                <span class="process-step-chevron" aria-hidden="true"></span>
+              </span>
+            </button>
+            <div class="process-step-panel" id="map-animation-process-review" aria-hidden="true">
+              <p>
+                You review the map animation sequence and send notes on timing, labels, colors,
+                route accuracy, or camera movement. I refine the animation before final render.
+              </p>
             </div>
-            <h3>Review Cut</h3>
-            <p>
-              You review the sequences and send feedback on timing, labels, colors, or routing
-              adjustments.
-            </p>
           </article>
-          <article class="process-step-card">
-            <div class="process-step-header">
-              <div class="process-step-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24" focusable="false"><path d="M3 12h4l3-8 4 16 3-8h4" /></svg>
-              </div>
-              <span class="process-step-number">04</span>
+          <article class="process-step-card process-step-card--accordion">
+            <button
+              class="process-step-toggle"
+              type="button"
+              aria-expanded="false"
+              aria-controls="map-animation-process-delivery"
+            >
+              <span class="process-step-toggle-main">
+                <span class="process-step-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" focusable="false"><path d="M3 12h4l3-8 4 16 3-8h4" /></svg>
+                </span>
+                <span class="process-step-title">Final Delivery</span>
+              </span>
+              <span class="process-step-toggle-side">
+                <span class="process-step-number">04</span>
+                <span class="process-step-chevron" aria-hidden="true"></span>
+              </span>
+            </button>
+            <div class="process-step-panel" id="map-animation-process-delivery" aria-hidden="true">
+              <p>
+                Receive 4K map animation exports or a fully composited edit for YouTube,
+                documentary projects, geography explainers, history channels, or distribution.
+              </p>
             </div>
-            <h3>Final Delivery</h3>
-            <p>
-              Receive 4K rendered map segments or a fully composited edit, ready for YouTube,
-              broadcast, or distribution.
-            </p>
           </article>
         </div>
       </section>
@@ -897,7 +1039,7 @@
     <script src="js/service-profile.js?v=3"></script>
     <script src="js/site-nav.js?v=4"></script>
     <script src="js/site-footer.js?v=4"></script>
-    <script src="js/main.js?v=12"></script>
+    <script src="js/main.js?v=14"></script>
     <script>
       initHeroPortfolioSlider();
       buildPortfolioGrid("map-animation");

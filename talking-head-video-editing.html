@@ -231,7 +231,7 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="css/style.css?v=6" />
-    <link rel="stylesheet" href="css/service.css?v=41" />
+    <link rel="stylesheet" href="css/service.css?v=43" />
     <link rel="stylesheet" href="css/service-profile.css?v=3" />
   </head>
   <body>
@@ -324,67 +324,163 @@
           </p>
         </div>
 
-        <div class="what-i-do-grid">
-          <article class="what-i-do-card">
-            <div class="what-i-do-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" focusable="false">
-                <path d="M5 6h14M5 12h10M5 18h7" />
-                <path d="m15 15 3 3 3-3" />
-              </svg>
+        <div class="what-i-do-grid" data-service-card-accordion>
+          <article class="what-i-do-card what-i-do-card--accordion">
+            <button
+              class="what-i-do-card-toggle"
+              type="button"
+              aria-expanded="false"
+              aria-controls="talking-head-smart-cuts"
+            >
+              <span class="what-i-do-card-head">
+                <span class="what-i-do-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" focusable="false">
+                    <path d="M5 6h14M5 12h10M5 18h7" />
+                    <path d="m15 15 3 3 3-3" />
+                  </svg>
+                </span>
+                <span class="what-i-do-card-title">Smart Cuts &amp; Pacing</span>
+              </span>
+              <span class="what-i-do-card-chevron" aria-hidden="true"></span>
+            </button>
+            <div class="what-i-do-card-panel" id="talking-head-smart-cuts" aria-hidden="true">
+              <p>
+                For talking head video editing, pacing decides whether viewers stay or leave. I
+                remove dead air, tighten pauses, and shape each cut so YouTube videos feel clear,
+                natural, and easy to watch.
+              </p>
             </div>
-            <h3>Smart Cuts &amp; Pacing</h3>
-            <p>Jump cuts that remove dead air and keep viewers watching.</p>
           </article>
-          <article class="what-i-do-card">
-            <div class="what-i-do-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" focusable="false">
-                <path d="M7 10V8a5 5 0 0 1 10 0v2" />
-                <rect x="5" y="10" width="14" height="10" rx="2" />
-              </svg>
+          <article class="what-i-do-card what-i-do-card--accordion">
+            <button
+              class="what-i-do-card-toggle"
+              type="button"
+              aria-expanded="false"
+              aria-controls="talking-head-captions"
+            >
+              <span class="what-i-do-card-head">
+                <span class="what-i-do-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" focusable="false">
+                    <path d="M7 10V8a5 5 0 0 1 10 0v2" />
+                    <rect x="5" y="10" width="14" height="10" rx="2" />
+                  </svg>
+                </span>
+                <span class="what-i-do-card-title">Captions &amp; Text</span>
+              </span>
+              <span class="what-i-do-card-chevron" aria-hidden="true"></span>
+            </button>
+            <div class="what-i-do-card-panel" id="talking-head-captions" aria-hidden="true">
+              <p>
+                Captions help talking head YouTube videos work with or without sound. I add readable
+                animated captions, lower thirds, and key text callouts that match your brand and
+                reinforce the main message.
+              </p>
             </div>
-            <h3>Captions &amp; Text</h3>
-            <p>Animated captions and lower thirds for every video.</p>
           </article>
-          <article class="what-i-do-card">
-            <div class="what-i-do-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" focusable="false">
-                <rect x="5" y="5" width="14" height="14" rx="2" />
-                <path d="M9 5v4l3 2 3-2V5" />
-              </svg>
+          <article class="what-i-do-card what-i-do-card--accordion">
+            <button
+              class="what-i-do-card-toggle"
+              type="button"
+              aria-expanded="false"
+              aria-controls="talking-head-b-roll"
+            >
+              <span class="what-i-do-card-head">
+                <span class="what-i-do-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" focusable="false">
+                    <rect x="5" y="5" width="14" height="14" rx="2" />
+                    <path d="M9 5v4l3 2 3-2V5" />
+                  </svg>
+                </span>
+                <span class="what-i-do-card-title">B-Roll &amp; Visual Variety</span>
+              </span>
+              <span class="what-i-do-card-chevron" aria-hidden="true"></span>
+            </button>
+            <div class="what-i-do-card-panel" id="talking-head-b-roll" aria-hidden="true">
+              <p>
+                Strong B-roll makes camera-facing video editing feel less static. I add screen
+                recordings, product shots, stock visuals, and cutaways where they explain the point
+                and keep viewers visually engaged.
+              </p>
             </div>
-            <h3>B-Roll &amp; Visual Variety</h3>
-            <p>Stock footage and screen recordings to support your message.</p>
           </article>
-          <article class="what-i-do-card">
-            <div class="what-i-do-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" focusable="false">
-                <circle cx="12" cy="12" r="8" />
-                <path d="M9 10h.01M15 10h.01M8.5 14a4.5 4.5 0 0 0 7 0" />
-              </svg>
+          <article class="what-i-do-card what-i-do-card--accordion">
+            <button
+              class="what-i-do-card-toggle"
+              type="button"
+              aria-expanded="false"
+              aria-controls="talking-head-color-grading"
+            >
+              <span class="what-i-do-card-head">
+                <span class="what-i-do-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" focusable="false">
+                    <circle cx="12" cy="12" r="8" />
+                    <path d="M9 10h.01M15 10h.01M8.5 14a4.5 4.5 0 0 0 7 0" />
+                  </svg>
+                </span>
+                <span class="what-i-do-card-title">Color Grading</span>
+              </span>
+              <span class="what-i-do-card-chevron" aria-hidden="true"></span>
+            </button>
+            <div class="what-i-do-card-panel" id="talking-head-color-grading" aria-hidden="true">
+              <p>
+                A consistent grade makes every talking head edit feel more professional. I balance
+                skin tones, exposure, contrast, and color so your channel has a cleaner visual
+                identity from video to video.
+              </p>
             </div>
-            <h3>Color Grading</h3>
-            <p>Consistent cinematic look across your whole channel.</p>
           </article>
-          <article class="what-i-do-card">
-            <div class="what-i-do-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" focusable="false">
-                <path d="M5 7v10" />
-                <path d="m8 7 6 5-6 5V7Z" />
-                <path d="M17 7v10" />
-                <path d="M20 7v10" />
-              </svg>
+          <article class="what-i-do-card what-i-do-card--accordion">
+            <button
+              class="what-i-do-card-toggle"
+              type="button"
+              aria-expanded="false"
+              aria-controls="talking-head-audio-cleanup"
+            >
+              <span class="what-i-do-card-head">
+                <span class="what-i-do-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" focusable="false">
+                    <path d="M5 7v10" />
+                    <path d="m8 7 6 5-6 5V7Z" />
+                    <path d="M17 7v10" />
+                    <path d="M20 7v10" />
+                  </svg>
+                </span>
+                <span class="what-i-do-card-title">Audio Cleanup</span>
+              </span>
+              <span class="what-i-do-card-chevron" aria-hidden="true"></span>
+            </button>
+            <div class="what-i-do-card-panel" id="talking-head-audio-cleanup" aria-hidden="true">
+              <p>
+                Clean audio is essential for professional talking head video editing. I reduce
+                background noise, level voice volume, smooth harsh sounds, and sync music so viewers
+                can focus on the speaker.
+              </p>
             </div>
-            <h3>Audio Cleanup</h3>
-            <p>Noise removal, levelling, and background music sync.</p>
           </article>
-          <article class="what-i-do-card">
-            <div class="what-i-do-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" focusable="false">
-                <path d="m13 2-8 12h7l-1 8 8-12h-7l1-8Z" />
-              </svg>
+          <article class="what-i-do-card what-i-do-card--accordion">
+            <button
+              class="what-i-do-card-toggle"
+              type="button"
+              aria-expanded="false"
+              aria-controls="talking-head-motion-graphics"
+            >
+              <span class="what-i-do-card-head">
+                <span class="what-i-do-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" focusable="false">
+                    <path d="m13 2-8 12h7l-1 8 8-12h-7l1-8Z" />
+                  </svg>
+                </span>
+                <span class="what-i-do-card-title">Motion Graphics</span>
+              </span>
+              <span class="what-i-do-card-chevron" aria-hidden="true"></span>
+            </button>
+            <div class="what-i-do-card-panel" id="talking-head-motion-graphics" aria-hidden="true">
+              <p>
+                Motion graphics should support the message, not distract from it. I use branded
+                overlays, subtle transitions, intros, outros, and visual emphasis to make talking
+                head videos feel polished and modern.
+              </p>
             </div>
-            <h3>Motion Graphics</h3>
-            <p>Branded intros, outros, and animated overlays.</p>
           </article>
         </div>
 
@@ -498,69 +594,117 @@
           </p>
         </div>
 
-        <div class="how-it-works-grid">
-          <article class="process-step-card">
-            <div class="process-step-header">
-              <div class="process-step-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24" focusable="false">
-                  <path d="M12 16V4" />
-                  <path d="m7 9 5-5 5 5" />
-                  <path d="M5 14v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4" />
-                </svg>
-              </div>
-              <span class="process-step-number">01</span>
+        <div class="how-it-works-grid" data-process-step-accordion>
+          <article class="process-step-card process-step-card--accordion">
+            <button
+              class="process-step-toggle"
+              type="button"
+              aria-expanded="false"
+              aria-controls="talking-head-process-raw-footage"
+            >
+              <span class="process-step-toggle-main">
+                <span class="process-step-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" focusable="false">
+                    <path d="M12 16V4" />
+                    <path d="m7 9 5-5 5 5" />
+                    <path d="M5 14v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4" />
+                  </svg>
+                </span>
+                <span class="process-step-title">Send Raw Footage</span>
+              </span>
+              <span class="process-step-toggle-side">
+                <span class="process-step-number">01</span>
+                <span class="process-step-chevron" aria-hidden="true"></span>
+              </span>
+            </button>
+            <div class="process-step-panel" id="talking-head-process-raw-footage" aria-hidden="true">
+              <p>
+                Upload your talking head raw footage to a shared Drive or Dropbox folder with notes,
+                references, and style guides so the edit starts with clear direction.
+              </p>
             </div>
-            <h3>Send Raw Footage</h3>
-            <p>
-              Upload your raw recordings to a shared Drive or Dropbox folder. Include any notes,
-              references, or style guides.
-            </p>
           </article>
-          <article class="process-step-card">
-            <div class="process-step-header">
-              <div class="process-step-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24" focusable="false">
-                  <circle cx="7" cy="7" r="2" />
-                  <circle cx="17" cy="17" r="2" />
-                  <path d="M19 5 5 19" />
-                </svg>
-              </div>
-              <span class="process-step-number">02</span>
+          <article class="process-step-card process-step-card--accordion">
+            <button
+              class="process-step-toggle"
+              type="button"
+              aria-expanded="false"
+              aria-controls="talking-head-process-editing"
+            >
+              <span class="process-step-toggle-main">
+                <span class="process-step-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" focusable="false">
+                    <circle cx="7" cy="7" r="2" />
+                    <circle cx="17" cy="17" r="2" />
+                    <path d="M19 5 5 19" />
+                  </svg>
+                </span>
+                <span class="process-step-title">Editing Begins</span>
+              </span>
+              <span class="process-step-toggle-side">
+                <span class="process-step-number">02</span>
+                <span class="process-step-chevron" aria-hidden="true"></span>
+              </span>
+            </button>
+            <div class="process-step-panel" id="talking-head-process-editing" aria-hidden="true">
+              <p>
+                I handle the talking head video editing: tighter cuts, clean audio, color correction,
+                captions, and B-roll that match your channel's pacing and visual identity.
+              </p>
             </div>
-            <h3>Editing Begins</h3>
-            <p>
-              I cut, color, caption, and add B-roll. Every video follows your channel's visual
-              identity and pacing.
-            </p>
           </article>
-          <article class="process-step-card">
-            <div class="process-step-header">
-              <div class="process-step-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24" focusable="false">
-                  <path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7Z" />
-                  <circle cx="12" cy="12" r="3" />
-                </svg>
-              </div>
-              <span class="process-step-number">03</span>
+          <article class="process-step-card process-step-card--accordion">
+            <button
+              class="process-step-toggle"
+              type="button"
+              aria-expanded="false"
+              aria-controls="talking-head-process-review"
+            >
+              <span class="process-step-toggle-main">
+                <span class="process-step-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" focusable="false">
+                    <path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7Z" />
+                    <circle cx="12" cy="12" r="3" />
+                  </svg>
+                </span>
+                <span class="process-step-title">First Cut Review</span>
+              </span>
+              <span class="process-step-toggle-side">
+                <span class="process-step-number">03</span>
+                <span class="process-step-chevron" aria-hidden="true"></span>
+              </span>
+            </button>
+            <div class="process-step-panel" id="talking-head-process-review" aria-hidden="true">
+              <p>
+                You receive the first cut for review and leave timestamp-based feedback. I refine the
+                pacing, captions, B-roll, and story flow so the video feels polished.
+              </p>
             </div>
-            <h3>First Cut Review</h3>
-            <p>
-              You receive the first edit for review. Leave timestamps-based feedback &mdash;
-              revisions included, no extra charge.
-            </p>
           </article>
-          <article class="process-step-card">
-            <div class="process-step-header">
-              <div class="process-step-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24" focusable="false"><path d="M3 12h4l3-8 4 16 3-8h4" /></svg>
-              </div>
-              <span class="process-step-number">04</span>
+          <article class="process-step-card process-step-card--accordion">
+            <button
+              class="process-step-toggle"
+              type="button"
+              aria-expanded="false"
+              aria-controls="talking-head-process-delivery"
+            >
+              <span class="process-step-toggle-main">
+                <span class="process-step-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" focusable="false"><path d="M3 12h4l3-8 4 16 3-8h4" /></svg>
+                </span>
+                <span class="process-step-title">Final Delivery</span>
+              </span>
+              <span class="process-step-toggle-side">
+                <span class="process-step-number">04</span>
+                <span class="process-step-chevron" aria-hidden="true"></span>
+              </span>
+            </button>
+            <div class="process-step-panel" id="talking-head-process-delivery" aria-hidden="true">
+              <p>
+                Receive publish-ready talking head videos exported for YouTube, Shorts, Reels, or any
+                platform you publish on, with clean files ready to upload.
+              </p>
             </div>
-            <h3>Final Delivery</h3>
-            <p>
-              Receive export-ready files optimized for YouTube, Shorts, Reels, or any platform you
-              publish on.
-            </p>
           </article>
         </div>
       </section>
@@ -875,7 +1019,7 @@
     <script src="js/service-profile.js?v=3"></script>
     <script src="js/site-nav.js?v=4"></script>
     <script src="js/site-footer.js?v=4"></script>
-    <script src="js/main.js?v=12"></script>
+    <script src="js/main.js?v=14"></script>
     <script>
       initHeroPortfolioSlider();
       buildPortfolioGrid("talking-head");

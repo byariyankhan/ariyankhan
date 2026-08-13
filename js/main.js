@@ -964,6 +964,88 @@ document.querySelectorAll('.faq-q').forEach(button => {
   button.addEventListener('click', () => toggleFaq(button.closest('.faq-item')));
 });
 
+/* Service card accordions */
+function setServiceCardState(card, isOpen) {
+  if (!card) return;
+
+  const button = card.querySelector('.what-i-do-card-toggle');
+  const panel = card.querySelector('.what-i-do-card-panel');
+  const p = panel?.querySelector('p');
+  if (!button || !panel) return;
+
+  if (p && !p.dataset.fullText) p.dataset.fullText = p.textContent;
+
+  card.classList.toggle('open', isOpen);
+  button.setAttribute('aria-expanded', String(isOpen));
+  panel.setAttribute('aria-hidden', String(!isOpen));
+
+  if (!p) return;
+  if (isOpen) {
+    runTypewriter(p, p.dataset.fullText);
+  } else {
+    if (p._twTimer) { clearTimeout(p._twTimer); p._twTimer = null; }
+    p.textContent = p.dataset.fullText ?? p.textContent;
+  }
+}
+
+document.querySelectorAll('[data-service-card-accordion] .what-i-do-card--accordion').forEach(card => {
+  const button = card.querySelector('.what-i-do-card-toggle');
+  if (!button) return;
+
+  setServiceCardState(card, card.classList.contains('open'));
+  button.addEventListener('click', () => {
+    const wasOpen = card.classList.contains('open');
+    const group = card.closest('[data-service-card-accordion]');
+
+    group
+      ?.querySelectorAll('.what-i-do-card--accordion')
+      .forEach(accordionCard => setServiceCardState(accordionCard, false));
+
+    if (!wasOpen) setServiceCardState(card, true);
+  });
+});
+
+/* Process step accordions */
+function setProcessStepState(card, isOpen) {
+  if (!card) return;
+
+  const button = card.querySelector('.process-step-toggle');
+  const panel = card.querySelector('.process-step-panel');
+  const p = panel?.querySelector('p');
+  if (!button || !panel) return;
+
+  if (p && !p.dataset.fullText) p.dataset.fullText = p.textContent;
+
+  card.classList.toggle('open', isOpen);
+  button.setAttribute('aria-expanded', String(isOpen));
+  panel.setAttribute('aria-hidden', String(!isOpen));
+
+  if (!p) return;
+  if (isOpen) {
+    runTypewriter(p, p.dataset.fullText);
+  } else {
+    if (p._twTimer) { clearTimeout(p._twTimer); p._twTimer = null; }
+    p.textContent = p.dataset.fullText ?? p.textContent;
+  }
+}
+
+document.querySelectorAll('[data-process-step-accordion] .process-step-card--accordion').forEach(card => {
+  const button = card.querySelector('.process-step-toggle');
+  if (!button) return;
+
+  setProcessStepState(card, card.classList.contains('open'));
+  button.addEventListener('click', () => {
+    const wasOpen = card.classList.contains('open');
+    const group = card.closest('[data-process-step-accordion]');
+
+    group
+      ?.querySelectorAll('.process-step-card--accordion')
+      .forEach(accordionCard => setProcessStepState(accordionCard, false));
+
+    if (!wasOpen) setProcessStepState(card, true);
+  });
+});
+
 /* ══════════════════════════════════════════════════
    PORTFOLIO — Video Player & Grid Builder
 ══════════════════════════════════════════════════ */

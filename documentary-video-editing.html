@@ -231,7 +231,7 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="css/style.css?v=6" />
-    <link rel="stylesheet" href="css/service.css?v=41" />
+    <link rel="stylesheet" href="css/service.css?v=43" />
     <link rel="stylesheet" href="css/service-profile.css?v=3" />
   </head>
   <body>
@@ -323,67 +323,163 @@
             documentary edit ready for your audience.
           </p>
         </div>
-        <div class="what-i-do-grid">
-          <article class="what-i-do-card">
-            <div class="what-i-do-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" focusable="false">
-                <path d="M4 5h16" />
-                <path d="M4 12h12" />
-                <path d="M4 19h8" />
-              </svg>
+        <div class="what-i-do-grid" data-service-card-accordion>
+          <article class="what-i-do-card what-i-do-card--accordion">
+            <button
+              class="what-i-do-card-toggle"
+              type="button"
+              aria-expanded="false"
+              aria-controls="documentary-story-structure"
+            >
+              <span class="what-i-do-card-head">
+                <span class="what-i-do-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" focusable="false">
+                    <path d="M4 5h16" />
+                    <path d="M4 12h12" />
+                    <path d="M4 19h8" />
+                  </svg>
+                </span>
+                <span class="what-i-do-card-title">Story Structure</span>
+              </span>
+              <span class="what-i-do-card-chevron" aria-hidden="true"></span>
+            </button>
+            <div class="what-i-do-card-panel" id="documentary-story-structure" aria-hidden="true">
+              <p>
+                Documentary video editing starts with finding the clearest story inside the raw
+                footage. I organize interviews, voiceover, b-roll, and research into a narrative
+                flow that feels focused and easy to follow.
+              </p>
             </div>
-            <h3>Story Structure</h3>
-            <p>Clear narrative flow built from interviews, b-roll, voiceover, and research.</p>
           </article>
-          <article class="what-i-do-card">
-            <div class="what-i-do-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" focusable="false">
-                <path d="M5 7v10" />
-                <path d="m8 7 6 5-6 5V7Z" />
-                <path d="M17 7v10" />
-                <path d="M20 7v10" />
-              </svg>
+          <article class="what-i-do-card what-i-do-card--accordion">
+            <button
+              class="what-i-do-card-toggle"
+              type="button"
+              aria-expanded="false"
+              aria-controls="documentary-cinematic-pacing"
+            >
+              <span class="what-i-do-card-head">
+                <span class="what-i-do-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" focusable="false">
+                    <path d="M5 7v10" />
+                    <path d="m8 7 6 5-6 5V7Z" />
+                    <path d="M17 7v10" />
+                    <path d="M20 7v10" />
+                  </svg>
+                </span>
+                <span class="what-i-do-card-title">Cinematic Pacing</span>
+              </span>
+              <span class="what-i-do-card-chevron" aria-hidden="true"></span>
+            </button>
+            <div class="what-i-do-card-panel" id="documentary-cinematic-pacing" aria-hidden="true">
+              <p>
+                A strong documentary edit needs rhythm, silence, and timing in the right places. I
+                shape scenes with natural cuts, purposeful pauses, and transitions that keep viewers
+                engaged without making the story feel rushed.
+              </p>
             </div>
-            <h3>Cinematic Pacing</h3>
-            <p>Natural cuts, pauses, transitions, and timing that keep viewers watching.</p>
           </article>
-          <article class="what-i-do-card">
-            <div class="what-i-do-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" focusable="false">
-                <rect x="5" y="5" width="14" height="14" rx="2" />
-                <path d="M9 5v4l3 2 3-2V5" />
-              </svg>
+          <article class="what-i-do-card what-i-do-card--accordion">
+            <button
+              class="what-i-do-card-toggle"
+              type="button"
+              aria-expanded="false"
+              aria-controls="documentary-b-roll-archives"
+            >
+              <span class="what-i-do-card-head">
+                <span class="what-i-do-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" focusable="false">
+                    <rect x="5" y="5" width="14" height="14" rx="2" />
+                    <path d="M9 5v4l3 2 3-2V5" />
+                  </svg>
+                </span>
+                <span class="what-i-do-card-title">B-Roll &amp; Archives</span>
+              </span>
+              <span class="what-i-do-card-chevron" aria-hidden="true"></span>
+            </button>
+            <div class="what-i-do-card-panel" id="documentary-b-roll-archives" aria-hidden="true">
+              <p>
+                B-roll and archive material make documentary storytelling more visual. I place stock
+                footage, screen material, photos, and supporting clips where they add context,
+                clarity, and emotional weight.
+              </p>
             </div>
-            <h3>B-Roll &amp; Archives</h3>
-            <p>Supporting visuals, stock footage, and screen material placed with purpose.</p>
           </article>
-          <article class="what-i-do-card">
-            <div class="what-i-do-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" focusable="false">
-                <circle cx="12" cy="12" r="8" />
-                <path d="M9 10h.01M15 10h.01M8.5 14a4.5 4.5 0 0 0 7 0" />
-              </svg>
+          <article class="what-i-do-card what-i-do-card--accordion">
+            <button
+              class="what-i-do-card-toggle"
+              type="button"
+              aria-expanded="false"
+              aria-controls="documentary-color-grading"
+            >
+              <span class="what-i-do-card-head">
+                <span class="what-i-do-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" focusable="false">
+                    <circle cx="12" cy="12" r="8" />
+                    <path d="M9 10h.01M15 10h.01M8.5 14a4.5 4.5 0 0 0 7 0" />
+                  </svg>
+                </span>
+                <span class="what-i-do-card-title">Color Grading</span>
+              </span>
+              <span class="what-i-do-card-chevron" aria-hidden="true"></span>
+            </button>
+            <div class="what-i-do-card-panel" id="documentary-color-grading" aria-hidden="true">
+              <p>
+                I balance mixed footage so interviews, b-roll, and archival clips feel like one
+                polished film. A clean documentary color grade improves visual consistency and gives
+                the final video a more cinematic tone.
+              </p>
             </div>
-            <h3>Color Grading</h3>
-            <p>Consistent documentary look across interviews, b-roll, and mixed footage.</p>
           </article>
-          <article class="what-i-do-card">
-            <div class="what-i-do-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" focusable="false"><path d="M4 12h3l3-8 4 16 3-8h3" /></svg>
+          <article class="what-i-do-card what-i-do-card--accordion">
+            <button
+              class="what-i-do-card-toggle"
+              type="button"
+              aria-expanded="false"
+              aria-controls="documentary-audio-cleanup"
+            >
+              <span class="what-i-do-card-head">
+                <span class="what-i-do-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" focusable="false"><path d="M4 12h3l3-8 4 16 3-8h3" /></svg>
+                </span>
+                <span class="what-i-do-card-title">Audio Cleanup</span>
+              </span>
+              <span class="what-i-do-card-chevron" aria-hidden="true"></span>
+            </button>
+            <div class="what-i-do-card-panel" id="documentary-audio-cleanup" aria-hidden="true">
+              <p>
+                Professional documentary editing depends on clear dialogue and balanced sound. I
+                clean interviews, level narration, reduce noise, and mix music so the story feels
+                immersive without overpowering the message.
+              </p>
             </div>
-            <h3>Audio Cleanup</h3>
-            <p>Dialogue cleanup, leveling, sound design, and music balance.</p>
           </article>
-          <article class="what-i-do-card">
-            <div class="what-i-do-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" focusable="false">
-                <rect x="3" y="5" width="18" height="14" rx="2" />
-                <path d="M7 11h5" />
-                <path d="M7 15h10" />
-              </svg>
+          <article class="what-i-do-card what-i-do-card--accordion">
+            <button
+              class="what-i-do-card-toggle"
+              type="button"
+              aria-expanded="false"
+              aria-controls="documentary-titles-graphics"
+            >
+              <span class="what-i-do-card-head">
+                <span class="what-i-do-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" focusable="false">
+                    <rect x="3" y="5" width="18" height="14" rx="2" />
+                    <path d="M7 11h5" />
+                    <path d="M7 15h10" />
+                  </svg>
+                </span>
+                <span class="what-i-do-card-title">Titles &amp; Graphics</span>
+              </span>
+              <span class="what-i-do-card-chevron" aria-hidden="true"></span>
+            </button>
+            <div class="what-i-do-card-panel" id="documentary-titles-graphics" aria-hidden="true">
+              <p>
+                Titles, lower thirds, captions, maps, and callouts help viewers understand names,
+                places, dates, and context. I keep graphics clean and documentary-friendly so they
+                support the story instead of distracting from it.
+              </p>
             </div>
-            <h3>Titles &amp; Graphics</h3>
-            <p>Clean lower thirds, captions, callouts, maps, and branded overlays.</p>
           </article>
         </div>
         <div class="who-this-is-for">
@@ -493,68 +589,117 @@
             From raw footage to a publish-ready documentary, here's how the edit moves forward.
           </p>
         </div>
-        <div class="how-it-works-grid">
-          <article class="process-step-card">
-            <div class="process-step-header">
-              <div class="process-step-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24" focusable="false">
-                  <path d="M12 16V4" />
-                  <path d="m7 9 5-5 5 5" />
-                  <path d="M5 14v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4" />
-                </svg>
-              </div>
-              <span class="process-step-number">01</span>
+        <div class="how-it-works-grid" data-process-step-accordion>
+          <article class="process-step-card process-step-card--accordion">
+            <button
+              class="process-step-toggle"
+              type="button"
+              aria-expanded="false"
+              aria-controls="documentary-process-footage"
+            >
+              <span class="process-step-toggle-main">
+                <span class="process-step-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" focusable="false">
+                    <path d="M12 16V4" />
+                    <path d="m7 9 5-5 5 5" />
+                    <path d="M5 14v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4" />
+                  </svg>
+                </span>
+                <span class="process-step-title">Send Footage</span>
+              </span>
+              <span class="process-step-toggle-side">
+                <span class="process-step-number">01</span>
+                <span class="process-step-chevron" aria-hidden="true"></span>
+              </span>
+            </button>
+            <div class="process-step-panel" id="documentary-process-footage" aria-hidden="true">
+              <p>
+                Share your documentary raw footage, interviews, voiceover, b-roll, research links,
+                script, and brand assets so the documentary video editing process starts with context.
+              </p>
             </div>
-            <h3>Send Footage</h3>
-            <p>
-              Share raw videos, audio, references, notes, script, and any brand assets or research
-              links.
-            </p>
           </article>
-          <article class="process-step-card">
-            <div class="process-step-header">
-              <div class="process-step-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24" focusable="false">
-                  <path d="M4 5h16" />
-                  <path d="M4 12h12" />
-                  <path d="M4 19h8" />
-                </svg>
-              </div>
-              <span class="process-step-number">02</span>
+          <article class="process-step-card process-step-card--accordion">
+            <button
+              class="process-step-toggle"
+              type="button"
+              aria-expanded="false"
+              aria-controls="documentary-process-story-build"
+            >
+              <span class="process-step-toggle-main">
+                <span class="process-step-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" focusable="false">
+                    <path d="M4 5h16" />
+                    <path d="M4 12h12" />
+                    <path d="M4 19h8" />
+                  </svg>
+                </span>
+                <span class="process-step-title">Story Build</span>
+              </span>
+              <span class="process-step-toggle-side">
+                <span class="process-step-number">02</span>
+                <span class="process-step-chevron" aria-hidden="true"></span>
+              </span>
+            </button>
+            <div class="process-step-panel" id="documentary-process-story-build" aria-hidden="true">
+              <p>
+                I build the documentary edit by organizing scenes, trimming dead space, shaping
+                interviews, adding b-roll, and creating a clear story structure for YouTube or brands.
+              </p>
             </div>
-            <h3>Story Build</h3>
-            <p>
-              I structure the narrative, trim dead space, organize scenes, and build the first edit.
-            </p>
           </article>
-          <article class="process-step-card">
-            <div class="process-step-header">
-              <div class="process-step-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24" focusable="false">
-                  <path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7Z" />
-                  <circle cx="12" cy="12" r="3" />
-                </svg>
-              </div>
-              <span class="process-step-number">03</span>
+          <article class="process-step-card process-step-card--accordion">
+            <button
+              class="process-step-toggle"
+              type="button"
+              aria-expanded="false"
+              aria-controls="documentary-process-review"
+            >
+              <span class="process-step-toggle-main">
+                <span class="process-step-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" focusable="false">
+                    <path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7Z" />
+                    <circle cx="12" cy="12" r="3" />
+                  </svg>
+                </span>
+                <span class="process-step-title">Review Cut</span>
+              </span>
+              <span class="process-step-toggle-side">
+                <span class="process-step-number">03</span>
+                <span class="process-step-chevron" aria-hidden="true"></span>
+              </span>
+            </button>
+            <div class="process-step-panel" id="documentary-process-review" aria-hidden="true">
+              <p>
+                You review the first documentary cut and send timestamped feedback on pacing,
+                visuals, narration, and story clarity. I refine the edit until it feels cohesive.
+              </p>
             </div>
-            <h3>Review Cut</h3>
-            <p>
-              You review the edit and send timestamped feedback for pacing, visuals, and story
-              clarity.
-            </p>
           </article>
-          <article class="process-step-card">
-            <div class="process-step-header">
-              <div class="process-step-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24" focusable="false"><path d="M3 12h4l3-8 4 16 3-8h4" /></svg>
-              </div>
-              <span class="process-step-number">04</span>
+          <article class="process-step-card process-step-card--accordion">
+            <button
+              class="process-step-toggle"
+              type="button"
+              aria-expanded="false"
+              aria-controls="documentary-process-delivery"
+            >
+              <span class="process-step-toggle-main">
+                <span class="process-step-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" focusable="false"><path d="M3 12h4l3-8 4 16 3-8h4" /></svg>
+                </span>
+                <span class="process-step-title">Final Delivery</span>
+              </span>
+              <span class="process-step-toggle-side">
+                <span class="process-step-number">04</span>
+                <span class="process-step-chevron" aria-hidden="true"></span>
+              </span>
+            </button>
+            <div class="process-step-panel" id="documentary-process-delivery" aria-hidden="true">
+              <p>
+                You receive export-ready documentary video files optimized for YouTube, websites,
+                presentations, campaigns, or any platform where the finished story needs to publish.
+              </p>
             </div>
-            <h3>Final Delivery</h3>
-            <p>
-              You receive export-ready files optimized for YouTube, websites, presentations, or
-              campaigns.
-            </p>
           </article>
         </div>
       </section>
@@ -873,7 +1018,7 @@
     <script src="js/service-profile.js?v=3"></script>
     <script src="js/site-nav.js?v=4"></script>
     <script src="js/site-footer.js?v=4"></script>
-    <script src="js/main.js?v=12"></script>
+    <script src="js/main.js?v=14"></script>
     <script>
       initHeroPortfolioSlider();
       buildPortfolioGrid("documentary");
