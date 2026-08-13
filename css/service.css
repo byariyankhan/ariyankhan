@@ -1346,6 +1346,78 @@
   color: rgba(255, 255, 255, 0.6);
   padding-top: 2px;
 }
+.pain-card.open {
+  border-color: rgba(245, 197, 24, 0.45);
+  box-shadow: 0 8px 32px rgba(245, 197, 24, 0.07);
+}
+.pain-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.pain-summary {
+  order: 1;
+}
+.pain-more-toggle {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  order: 2;
+  margin-top: 10px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: rgba(245, 197, 24, 0.88);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: color 0.22s ease;
+}
+.pain-more-toggle::after {
+  content: "+";
+  margin-left: 8px;
+  font-size: 15px;
+  line-height: 0.8;
+}
+.pain-card.open .pain-more-toggle::after {
+  content: "-";
+}
+.pain-more-toggle:hover,
+.pain-more-toggle:focus-visible {
+  color: var(--yellow);
+}
+.pain-more-toggle:focus-visible {
+  outline: none;
+}
+.pain-more {
+  order: 3;
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition:
+    max-height 0.3s ease,
+    opacity 0.22s ease,
+    padding-top 0.26s ease;
+}
+.pain-card.open .pain-more {
+  order: 2;
+  max-height: 220px;
+  padding-top: 14px;
+  opacity: 1;
+}
+.pain-card.open .pain-more-toggle {
+  order: 3;
+  margin-top: 14px;
+}
+.pain-more p {
+  color: rgba(255, 255, 255, 0.48);
+  font-size: 14px;
+  line-height: 1.65;
+}
 @media (min-width: 768px) {
   .pain-grid { grid-template-columns: 1fr 1fr; gap: 14px; }
   .service-pain { padding: 72px 40px; }

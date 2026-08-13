@@ -1046,6 +1046,48 @@ document.querySelectorAll('[data-process-step-accordion] .process-step-card--acc
   });
 });
 
+/* Pain point read-more reveals */
+function setPainMoreState(card, isOpen) {
+  if (!card) return;
+
+  const button = card.querySelector('.pain-more-toggle');
+  const panel = card.querySelector('.pain-more');
+  const p = panel?.querySelector('p');
+  if (!button || !panel) return;
+
+  if (p && !p.dataset.fullText) p.dataset.fullText = p.textContent;
+
+  card.classList.toggle('open', isOpen);
+  button.setAttribute('aria-expanded', String(isOpen));
+  button.textContent = isOpen ? 'Read less' : 'Read more';
+  panel.setAttribute('aria-hidden', String(!isOpen));
+
+  if (!p) return;
+  if (isOpen) {
+    runTypewriter(p, p.dataset.fullText);
+  } else {
+    if (p._twTimer) { clearTimeout(p._twTimer); p._twTimer = null; }
+    p.textContent = p.dataset.fullText ?? p.textContent;
+  }
+}
+
+document.querySelectorAll('.pain-card .pain-more-toggle').forEach(button => {
+  const card = button.closest('.pain-card');
+  if (!card) return;
+
+  setPainMoreState(card, card.classList.contains('open'));
+  button.addEventListener('click', () => {
+    const wasOpen = card.classList.contains('open');
+    const group = card.closest('.pain-grid');
+
+    group
+      ?.querySelectorAll('.pain-card')
+      .forEach(painCard => setPainMoreState(painCard, false));
+
+    if (!wasOpen) setPainMoreState(card, true);
+  });
+});
+
 /* ══════════════════════════════════════════════════
    PORTFOLIO — Video Player & Grid Builder
 ══════════════════════════════════════════════════ */
