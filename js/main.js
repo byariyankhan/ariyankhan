@@ -964,41 +964,6 @@ document.querySelectorAll('.faq-q').forEach(button => {
   button.addEventListener('click', () => toggleFaq(button.closest('.faq-item')));
 });
 
-/* Service section accordions */
-function getServiceDetailPanels(section) {
-  return Array.from(
-    section.querySelectorAll('.what-i-do-grid, .who-this-is-for, .pain-grid, .how-it-works-grid')
-  );
-}
-
-function setServiceDetailState(section, isOpen) {
-  if (!section) return;
-
-  const button = section.querySelector('.service-detail-toggle');
-  const panels = getServiceDetailPanels(section);
-
-  section.classList.toggle('open', isOpen);
-  if (button) button.setAttribute('aria-expanded', String(isOpen));
-  panels.forEach(panel => panel.setAttribute('aria-hidden', String(!isOpen)));
-}
-
-const serviceDetailSections = Array.from(
-  document.querySelectorAll('.service-page [data-service-detail-section]')
-);
-
-serviceDetailSections.forEach(section => {
-  const button = section.querySelector('.service-detail-toggle');
-  if (!button) return;
-
-  setServiceDetailState(section, section.classList.contains('open'));
-
-  button.addEventListener('click', () => {
-    const wasOpen = section.classList.contains('open');
-    serviceDetailSections.forEach(detailSection => setServiceDetailState(detailSection, false));
-    if (!wasOpen) setServiceDetailState(section, true);
-  });
-});
-
 /* ══════════════════════════════════════════════════
    PORTFOLIO — Video Player & Grid Builder
 ══════════════════════════════════════════════════ */

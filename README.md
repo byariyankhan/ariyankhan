@@ -46,10 +46,10 @@ bash deploy.sh --dry-run               # preview without uploading
 | File | Purpose |
 |------|---------|
 | `css/style.css` | Global styles, variables, homepage layout |
-| `css/service.css` | Shared service page layout/styles + service section accordion visuals |
+| `css/service.css` | Shared service page layout/styles |
 | `js/service-profile.js` | Shared service profile component + shared profile data |
 | `js/portfolio-data.js` | PORTFOLIO array — all video cards |
-| `js/main.js` | Menu, FAQ, service section accordions, stars, contact form, `buildPortfolioGrid()` |
+| `js/main.js` | Menu, FAQ, stars, contact form, `buildPortfolioGrid()` |
 | `js/site-nav.js` | `<site-nav>` web component |
 | `js/site-footer.js` | `<site-footer>` web component |
 | `sitemap.xml` | All pages. Update when adding new pages |
@@ -117,16 +117,11 @@ Use one canonical person entity across the whole site:
 .service-introduction
   LEFT: about-this-service
   RIGHT: <service-profile ...>
-.what-i-do       service section accordion, open by default
-.service-pain    service section accordion
-.how-it-works    service section accordion
 .featured-work  →  buildPortfolioGrid('key')
 .service-faq    →  FAQ accordion
 .explore-services → exactly 4 explore pills, NO self-link
 <site-footer>
 ```
-
-Service section accordions are controlled globally by `css/service.css` (`.service-detail-section`) and `js/main.js` (`data-service-detail-section`). Keep the content inside each service page, and add the shared class/data attribute when a future long section should collapse.
 
 ---
 
@@ -215,3 +210,4 @@ Update ALL pages that load the changed file.
 - Do not add self-links in explore pills
 - Do not create duplicate content across SEO pages (Google penalty)
 - Do not add `site-config.js`
+
