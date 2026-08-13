@@ -65,7 +65,7 @@ bash deploy.sh --dry-run               # preview without uploading
 <script src="js/portfolio-data.js?v=2"></script>
 <script src="js/site-nav.js?v=2"></script>
 <script src="js/site-footer.js?v=2"></script>
-<script src="js/main.js?v=12"></script>
+<script src="js/main.js?v=13"></script>
 <script>buildPortfolioGrid('service-key');</script>
 ```
 
