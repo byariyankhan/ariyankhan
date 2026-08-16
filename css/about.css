@@ -254,13 +254,6 @@
 .about-profile-sub {
   font-size: 13px;
   color: rgba(255,255,255,.5);
-  margin-bottom: 8px;
-}
-
-.about-profile-location {
-  font-size: 12px;
-  line-height: 1.55;
-  color: rgba(255,255,255,.62);
   margin-bottom: 16px;
 }
 

@@ -847,9 +847,6 @@ async function handleSubmit(btn) {
     }
 
     setSubmitState(btn, 'is-success', 'Message Sent!');
-    if (typeof fbq === 'function') {
-      fbq('track', 'Lead');
-    }
 
     ['cf-name', 'cf-email', 'cf-whatsapp', 'cf-message'].forEach(id => {
       const field = document.getElementById(id);
@@ -1493,8 +1490,8 @@ function makePfCard(item) {
 (function () {
   if (typeof PORTFOLIO === 'undefined' || PORTFOLIO.length === 0) return;
 
-  const track = document.getElementById('marqueeTrack');
-  if (!track) return;
+  const tracks = document.querySelectorAll('.work-marquee[id^="marqueeTrack"]');
+  if (!tracks.length) return;
 
   function interleaveByCategory(items) {
     // Group items by service category
@@ -1529,7 +1526,7 @@ function makePfCard(item) {
   // Doubled so the CSS marquee animation loops seamlessly (scrolls exactly 50% then resets)
   const doubled = [...interleaved, ...interleaved];
 
-  track.innerHTML = doubled.map(item => {
+  const trackHtml = doubled.map(item => {
     const meta = SERVICE_META[item.service];
     const isYoutube = item.platform === 'youtube';
     const thumb = isYoutube
@@ -1547,7 +1544,10 @@ function makePfCard(item) {
     </a>`;
   }).join('');
 
-  track.setAttribute('aria-busy', 'false');
+  tracks.forEach(track => {
+    track.innerHTML = trackHtml;
+    track.setAttribute('aria-busy', 'false');
+  });
 })();
 
 /* ── Service pre-selection via URL param ──────────────────────────────────

@@ -46,16 +46,16 @@
     });
   }
 
-  function renderFooterComponent() {
+  function renderFooterComponent(basePath) {
     return `
 <footer class="site-footer">
   <nav class="footer-social" data-social-links="footer" aria-label="Social media links"></nav>
   <p class="footer-legal">
-    <a href="privacy-policy.html">Privacy Policy</a>
+    <a href="${basePath}privacy-policy.html">Privacy Policy</a>
     <span class="footer-divider" aria-hidden="true">|</span>
-    <a href="terms-and-conditions.html">Terms &amp; Conditions</a>
+    <a href="${basePath}terms-and-conditions.html">Terms &amp; Conditions</a>
   </p>
-  <p class="footer-copy">&copy; ${new Date().getFullYear()} <a href="index.html" class="footer-copy-link">Ariyan Khan</a>. All Rights Reserved.</p>
+  <p class="footer-copy">&copy; ${new Date().getFullYear()} <a href="${basePath}index.html" class="footer-copy-link">Ariyan Khan</a>. All Rights Reserved.</p>
 </footer>`.trim();
   }
 
@@ -63,8 +63,10 @@
     connectedCallback() {
       if (this.dataset.rendered === 'true') return;
 
+      const basePath = this.dataset.basePath || '';
+
       this.style.display = 'contents';
-      this.innerHTML = renderFooterComponent();
+      this.innerHTML = renderFooterComponent(basePath);
       hydrateSocialLinkGroups(this);
       this.dataset.rendered = 'true';
     }

@@ -22,6 +22,7 @@ Email: hi@ariyankhan.com
 
 ## Primary Pages
 - Home: https://ariyankhan.com/
+- About: https://ariyankhan.com/about.html
 - Talking Head Video Editing: https://ariyankhan.com/talking-head-video-editing.html
 - Documentary Video Editing: https://ariyankhan.com/documentary-video-editing.html
 - Short Form Video Editing: https://ariyankhan.com/short-form-video-editing.html
@@ -34,3 +35,7 @@ Email: hi@ariyankhan.com
 
 ## Utility Pages
 - 404 Page: https://ariyankhan.com/404.html
+
+## Extended Information
+- Full details: https://ariyankhan.com/llms-full.txt
+

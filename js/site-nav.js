@@ -22,6 +22,7 @@
   function buildNavComponent(isHomePage, homePath) {
     const logoHref = isHomePage ? '#home' : homePath;
     const contactHref = buildHref('contact', isHomePage, homePath);
+    const basePath = homePath.replace(/index\.html$/, '');
 
     const desktopLinks = NAV_ITEMS.map(item =>
       `<a href="${escapeAttr(buildHref(item.id, isHomePage, homePath))}" class="nav-link">${item.label}</a>`
@@ -34,7 +35,7 @@
     return `
 <nav class="site-nav">
   <a href="${escapeAttr(logoHref)}" class="nav-logo">
-    <div class="logo-mark"><img src="images/logo-avatar.webp" alt="" width="34" height="34" decoding="async"></div>
+    <div class="logo-mark"><img src="${escapeAttr(basePath)}images/logo-avatar.webp" alt="" width="34" height="34" decoding="async"></div>
     <span class="logo-text">ARIYAN <span>KHAN</span></span>
   </a>
 

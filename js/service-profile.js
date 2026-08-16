@@ -16,12 +16,6 @@ class ServiceProfile extends HTMLElement {
     const previewId = this.getAttribute('preview-id') || '';
     const role = this.getAttribute('editor-role') || 'Professional Video Editor';
     const orderHref = service ? `index.html?service=${service}#contact` : 'index.html#contact';
-    const statOneValue = this.getAttribute('stat-1-value') || '';
-    const statOneLabel = this.getAttribute('stat-1-label') || '';
-    const statTwoValue = this.getAttribute('stat-2-value') || '';
-    const statTwoLabel = this.getAttribute('stat-2-label') || '';
-    const statThreeValue = this.getAttribute('stat-3-value') || '';
-    const statThreeLabel = this.getAttribute('stat-3-label') || '';
     const previewSrc = previewId
       ? `https://img.youtube.com/vi/${previewId}/maxresdefault.jpg`
       : imageSrc;
@@ -50,11 +44,6 @@ class ServiceProfile extends HTMLElement {
               <small>${SITE.rating} &middot; ${SITE.heroReviews} reviews</small>
               <span aria-label="5 stars">&#9733;&#9733;&#9733;&#9733;&#9733;</span>
             </div>
-          </div>
-          <div class="service-profile-stats" aria-label="Service highlights">
-            <div><strong>${statOneValue}</strong><span>${statOneLabel}</span></div>
-            <div><strong>${statTwoValue}</strong><span>${statTwoLabel}</span></div>
-            <div><strong>${statThreeValue}</strong><span>${statThreeLabel}</span></div>
           </div>
           <a class="service-profile-button" href="${orderHref}">${SITE.orderLabel} <span aria-hidden="true">&rarr;</span></a>
         </div>
