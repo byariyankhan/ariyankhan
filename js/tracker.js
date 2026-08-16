@@ -22,23 +22,18 @@
     stages.forEach((stage, index) => {
       const state = index < currentStage ? 'done' : index === currentStage ? 'current' : 'upcoming';
 
-      const card = document.createElement('div');
-      card.className = `stcard tracker-stcard tracker-stcard--${state}`;
+      const step = document.createElement('div');
+      step.className = `hstep hstep--${state}`;
 
-      const num = document.createElement('div');
-      num.className = 'stcard-num';
-      num.textContent = `Stage 0${index + 1}`;
+      const dot = document.createElement('span');
+      dot.className = 'hstep-dot';
 
-      const name = document.createElement('h3');
-      name.className = 'stcard-name';
-      name.textContent = stage.label;
+      const label = document.createElement('span');
+      label.className = 'hstep-label';
+      label.textContent = stage.label;
 
-      const desc = document.createElement('p');
-      desc.className = 'stcard-desc';
-      desc.textContent = stage.desc;
-
-      card.append(num, name, desc);
-      stagesEl.appendChild(card);
+      step.append(dot, label);
+      stagesEl.appendChild(step);
     });
   }
 

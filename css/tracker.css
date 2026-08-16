@@ -53,17 +53,32 @@
   text-transform:uppercase; margin:0 0 22px; text-align:center;
 }
 
-/* Reuses the homepage's .stage-cards / .stcard component (css/style.css)
-   so the tracker's progress view matches "Editing Stages" exactly.
-   These modifiers add live done/current/upcoming state on top of it. */
-.tracker-stcard--done{ border-left-color:var(--yellow); }
-.tracker-stcard--current{
-  border-left-color:var(--yellow);
-  background:var(--panel2);
-  box-shadow:0 0 0 1px rgba(255,237,84,.15), 0 12px 34px rgba(255,237,84,.08);
+/* Horizontal progress stepper — dots connected left-to-right, stage name
+   only (no per-stage description), so the whole path stays scannable
+   in one glance instead of a long dimmed-text list. */
+.tracker-hstepper{ display:flex; align-items:flex-start; gap:2px; margin:32px 0 0; }
+.hstep{ position:relative; flex:1; min-width:0; display:flex; flex-direction:column; align-items:center; text-align:center; }
+.hstep::before{
+  content:''; position:absolute; top:6px; left:-50%; width:100%; height:2px;
+  background:#2a2a2a; z-index:0;
 }
-.tracker-stcard--current .stcard-name{ color:var(--yellow); }
-.tracker-stcard--upcoming{ opacity:.45; }
+.hstep:first-child::before{ content:none; }
+.hstep-dot{
+  width:14px; height:14px; border-radius:50%;
+  background:#2a2a2a; border:2px solid #2a2a2a;
+  margin-bottom:10px; position:relative; z-index:1;
+}
+.hstep-label{ font-size:11px; font-weight:600; line-height:1.3; color:var(--muted); padding:0 2px; }
+.hstep--done .hstep-dot, .hstep--current .hstep-dot{ background:var(--yellow); border-color:var(--yellow); }
+.hstep--done::before, .hstep--current::before{ background:var(--yellow); }
+.hstep--done .hstep-label{ color:var(--text); }
+.hstep--current .hstep-label{ color:var(--yellow); font-weight:800; }
+
+@media (min-width:600px){
+  .hstep-dot{ width:16px; height:16px; }
+  .hstep::before{ top:7px; }
+  .hstep-label{ font-size:13px; }
+}
 
 .tracker-note{
   margin:18px 0 0; padding:16px 18px;
