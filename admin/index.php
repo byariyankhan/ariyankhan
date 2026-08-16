@@ -68,7 +68,7 @@ function e(string $value): string {
 <link rel="icon" type="image/x-icon" href="../favicon/favicon.ico">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../css/style.css?v=9">
-<link rel="stylesheet" href="../css/tracker.css?v=1">
+<link rel="stylesheet" href="../css/tracker.css?v=2">
 </head>
 <body class="tracker-body">
 <div id="stars"></div>
@@ -85,7 +85,7 @@ function e(string $value): string {
     <p class="tracker-notice"><?= e($notice) ?></p>
   <?php endif; ?>
 
-  <section class="tracker-admin-section">
+  <div class="tracker-admin-section">
     <h2>New Project</h2>
     <form method="post" class="tracker-inline-form">
       <input type="hidden" name="action" value="create">
@@ -95,9 +95,9 @@ function e(string $value): string {
       </label>
       <button type="submit" class="tracker-btn">Create &amp; Generate Code</button>
     </form>
-  </section>
+  </div>
 
-  <section class="tracker-admin-section">
+  <div class="tracker-admin-section">
     <h2>Projects</h2>
     <?php if (!$projects): ?>
       <p class="tracker-muted">No projects yet.</p>
@@ -145,7 +145,7 @@ function e(string $value): string {
         </table>
       </div>
     <?php endif; ?>
-  </section>
+  </div>
 </main>
 </body>
 </html>
