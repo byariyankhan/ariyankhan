@@ -242,6 +242,12 @@ an update — nav button "Track Order" → `track.html`.
    (via the same PHPMailer/`mail-config.local.php` setup as the contact
    form) with the tracking link and code. Leaving the email blank just
    skips sending — the project is still created either way.
+8. If a project has a client email, changing its stage from `/admin/` shows
+   a "Notify client by email" checkbox (checked by default) next to the
+   stage dropdown. When checked and the stage actually changes, the client
+   gets a short update email naming the new stage, with the tracking link
+   and code again. No email is sent if the stage is unchanged, if there's
+   no client email on file, or if the checkbox is unchecked.
 
 **Setup (one-time, done directly on the server — not via git):**
 ```bash

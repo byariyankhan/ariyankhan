@@ -158,6 +158,13 @@
 }
 .tracker-project-field--wide{ grid-column:1 / -1; }
 
+.tracker-notify-check{
+  display:flex; align-items:center; gap:6px; margin-top:10px;
+  font-size:12px; font-weight:500; letter-spacing:0; text-transform:none;
+  color:var(--muted); cursor:pointer;
+}
+.tracker-notify-check input{ width:14px; height:14px; accent-color:var(--yellow); cursor:pointer; margin:0; }
+
 .tracker-stage-form select{
   width:100%;
   background:rgba(255,255,255,.03); color:var(--text); border:1px solid #1f1f1f; border-radius:8px;

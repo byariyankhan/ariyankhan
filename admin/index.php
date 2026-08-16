@@ -54,25 +54,44 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $id = (int) ($_POST['id'] ?? 0);
     $stage = (int) ($_POST['stage'] ?? 0);
     $stage = max(0, min(TRACKER_MAX_STAGE, $stage));
+    $notify_client = isset($_POST['notify_client']);
 
-    $stmt = $db->prepare('SELECT stage_dates FROM projects WHERE id = :id');
+    $stmt = $db->prepare('SELECT stage, stage_dates, project_label, code, client_name, client_email FROM projects WHERE id = :id');
     $stmt->execute(['id' => $id]);
-    $stage_dates = json_decode((string) $stmt->fetchColumn(), true);
-    if (!is_array($stage_dates)) {
-      $stage_dates = [];
-    }
-    if (!isset($stage_dates[(string) $stage])) {
-      $stage_dates[(string) $stage] = gmdate('Y-m-d');
-    }
+    $existing = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    $stmt = $db->prepare('UPDATE projects SET stage = :stage, stage_dates = :stage_dates, updated_at = :now WHERE id = :id');
-    $stmt->execute([
-      'stage' => $stage,
-      'stage_dates' => json_encode($stage_dates, JSON_FORCE_OBJECT),
-      'now' => gmdate('c'),
-      'id' => $id,
-    ]);
-    $notice = 'Stage updated';
+    if ($existing) {
+      $previous_stage = (int) $existing['stage'];
+      $stage_dates = json_decode((string) $existing['stage_dates'], true);
+      if (!is_array($stage_dates)) {
+        $stage_dates = [];
+      }
+      if (!isset($stage_dates[(string) $stage])) {
+        $stage_dates[(string) $stage] = gmdate('Y-m-d');
+      }
+
+      $stmt = $db->prepare('UPDATE projects SET stage = :stage, stage_dates = :stage_dates, updated_at = :now WHERE id = :id');
+      $stmt->execute([
+        'stage' => $stage,
+        'stage_dates' => json_encode($stage_dates, JSON_FORCE_OBJECT),
+        'now' => gmdate('c'),
+        'id' => $id,
+      ]);
+      $notice = 'Stage updated';
+
+      $client_email = (string) ($existing['client_email'] ?? '');
+      if ($notify_client && $client_email !== '' && $stage !== $previous_stage) {
+        $stage_label = TRACKER_STAGES[$stage]['label'] ?? '';
+        $sent = tracker_send_stage_update_email(
+          $client_email,
+          (string) ($existing['client_name'] ?? ''),
+          (string) ($existing['project_label'] ?? ''),
+          (string) $existing['code'],
+          $stage_label
+        );
+        $notice .= $sent ? ' — client notified by email' : ' — notification email failed';
+      }
+    }
   }
 
   if ($action === 'update_note') {
@@ -124,7 +143,7 @@ function e(string $value): string {
 <link rel="icon" type="image/x-icon" href="../favicon/favicon.ico">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../css/style.css?v=9">
-<link rel="stylesheet" href="../css/tracker.css?v=11">
+<link rel="stylesheet" href="../css/tracker.css?v=12">
 </head>
 <body class="tracker-body">
 <div id="stars"></div>
@@ -202,6 +221,12 @@ function e(string $value): string {
                       </option>
                     <?php endforeach; ?>
                   </select>
+                  <?php if (($project['client_email'] ?? '') !== ''): ?>
+                    <label class="tracker-notify-check">
+                      <input type="checkbox" name="notify_client" value="1" checked>
+                      Notify client by email
+                    </label>
+                  <?php endif; ?>
                 </form>
               </div>
 

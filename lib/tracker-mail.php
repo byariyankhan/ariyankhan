@@ -1,6 +1,6 @@
 <?php
 /* ══════════════════════════════════════════════════
-   Project Tracker — client order-confirmation email
+   Project Tracker — client notification emails
    Reuses the same mail-config.local.php / PHPMailer
    setup as send-mail.php, kept separate so the
    contact-form handler stays untouched.
@@ -30,7 +30,7 @@ function tracker_mail_config(): array {
   ];
 }
 
-function tracker_send_order_email(string $to_email, string $to_name, string $project_label, string $code): bool {
+function tracker_mail_ready(array $config): bool {
   $autoload_path = __DIR__ . '/../vendor/autoload.php';
   if (!is_file($autoload_path)) {
     error_log('tracker-mail: missing Composer autoload');
@@ -41,10 +41,53 @@ function tracker_send_order_email(string $to_email, string $to_name, string $pro
     error_log('tracker-mail: PHPMailer class not found');
     return false;
   }
-
-  $config = tracker_mail_config();
   if ($config['driver'] === 'smtp' && (empty($config['smtp_host']) || empty($config['smtp_user']) || empty($config['smtp_pass']))) {
     error_log('tracker-mail: SMTP config incomplete');
+    return false;
+  }
+  return true;
+}
+
+function tracker_mail_new(array $config, string $to_email, string $to_name): PHPMailer {
+  $mail = new PHPMailer(true);
+
+  if ($config['driver'] === 'smtp') {
+    $mail->isSMTP();
+    $mail->Host = $config['smtp_host'];
+    $mail->SMTPAuth = true;
+    $mail->Username = $config['smtp_user'];
+    $mail->Password = $config['smtp_pass'];
+    $mail->SMTPSecure = $config['smtp_port'] === 465
+      ? PHPMailer::ENCRYPTION_SMTPS
+      : PHPMailer::ENCRYPTION_STARTTLS;
+    $mail->Port = $config['smtp_port'];
+    $mail->Timeout = 10;
+
+    if ($config['allow_self_signed']) {
+      $mail->SMTPOptions = [
+        'ssl' => [
+          'verify_peer'       => false,
+          'verify_peer_name'  => false,
+          'allow_self_signed' => true,
+        ],
+      ];
+    }
+  } else {
+    $mail->isMail();
+  }
+
+  $mail->CharSet = 'UTF-8';
+  $from_email = $config['driver'] === 'smtp' ? $config['smtp_user'] : $to_email;
+  $mail->setFrom($from_email, 'Ariyan Khan');
+  $mail->addAddress($to_email, $to_name !== '' ? $to_name : $to_email);
+  $mail->isHTML(false);
+
+  return $mail;
+}
+
+function tracker_send_order_email(string $to_email, string $to_name, string $project_label, string $code): bool {
+  $config = tracker_mail_config();
+  if (!tracker_mail_ready($config)) {
     return false;
   }
 
@@ -53,39 +96,7 @@ function tracker_send_order_email(string $to_email, string $to_name, string $pro
   $mail = null;
 
   try {
-    $mail = new PHPMailer(true);
-
-    if ($config['driver'] === 'smtp') {
-      $mail->isSMTP();
-      $mail->Host = $config['smtp_host'];
-      $mail->SMTPAuth = true;
-      $mail->Username = $config['smtp_user'];
-      $mail->Password = $config['smtp_pass'];
-      $mail->SMTPSecure = $config['smtp_port'] === 465
-        ? PHPMailer::ENCRYPTION_SMTPS
-        : PHPMailer::ENCRYPTION_STARTTLS;
-      $mail->Port = $config['smtp_port'];
-      $mail->Timeout = 10;
-
-      if ($config['allow_self_signed']) {
-        $mail->SMTPOptions = [
-          'ssl' => [
-            'verify_peer'       => false,
-            'verify_peer_name'  => false,
-            'allow_self_signed' => true,
-          ],
-        ];
-      }
-    } else {
-      $mail->isMail();
-    }
-
-    $mail->CharSet = 'UTF-8';
-    $from_email = $config['driver'] === 'smtp' ? $config['smtp_user'] : $to_email;
-    $mail->setFrom($from_email, 'Ariyan Khan');
-    $mail->addAddress($to_email, $to_name !== '' ? $to_name : $to_email);
-
-    $mail->isHTML(false);
+    $mail = tracker_mail_new($config, $to_email, $to_name);
     $mail->Subject = "Your order is confirmed — {$label}";
 
     $greeting = $to_name !== '' ? "Hi {$to_name}," : 'Hi,';
@@ -101,7 +112,38 @@ function tracker_send_order_email(string $to_email, string $to_name, string $pro
     return true;
   } catch (Throwable $e) {
     $detail = $mail instanceof PHPMailer ? trim((string) $mail->ErrorInfo) : $e->getMessage();
-    error_log('tracker-mail: send failed - ' . $detail);
+    error_log('tracker-mail: order confirmation send failed - ' . $detail);
+    return false;
+  }
+}
+
+function tracker_send_stage_update_email(string $to_email, string $to_name, string $project_label, string $code, string $stage_label): bool {
+  $config = tracker_mail_config();
+  if (!tracker_mail_ready($config)) {
+    return false;
+  }
+
+  $track_url = rtrim($config['site_url'], '/') . '/track.html';
+  $label = $project_label !== '' ? $project_label : 'your project';
+  $mail = null;
+
+  try {
+    $mail = tracker_mail_new($config, $to_email, $to_name);
+    $mail->Subject = "Project update: {$stage_label} — {$label}";
+
+    $greeting = $to_name !== '' ? "Hi {$to_name}," : 'Hi,';
+    $mail->Body =
+      "{$greeting}\n\n" .
+      "Your project \"{$label}\" just moved to a new stage: {$stage_label}.\n\n" .
+      "You can see full progress anytime here:\n{$track_url}\n\n" .
+      "Your tracking code: {$code}\n\n" .
+      "Thanks,\nAriyan Khan\n";
+
+    $mail->send();
+    return true;
+  } catch (Throwable $e) {
+    $detail = $mail instanceof PHPMailer ? trim((string) $mail->ErrorInfo) : $e->getMessage();
+    error_log('tracker-mail: stage update send failed - ' . $detail);
     return false;
   }
 }
