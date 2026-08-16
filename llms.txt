@@ -2,16 +2,26 @@
 # https://ariyankhan.com
 
 ## About
-Ariyan Khan is a professional freelance video editor working with top creators and brands across the United States and worldwide.
+Ariyan Khan is a freelance video editor and content creator based in Dhaka, Bangladesh,
+working remotely with YouTube creators, coaches, founders, and brands across the United
+States, Canada, United Kingdom, Ireland, Australia, New Zealand, Switzerland, and Europe.
 He specializes in high-retention YouTube videos, cinematic documentaries, short form content
 (TikTok, Instagram Reels, YouTube Shorts), and animated map / geopolitical videos.
-5M+ total views generated for clients. 48-hour standard delivery. 314+ satisfied clients.
+5M+ total views generated for clients. 314+ satisfied clients. 60%+ average audience retention.
 
 ## Services
-- Talking Head Video Editing: Documentary-style YouTube edits with B-roll, captions, color grading, sound design
-- Documentary Video Editing: Cinematic long-form documentaries, interview assembly, narrative structure
-- Short Form Video Editing: TikTok, Instagram Reels, YouTube Shorts — scroll-stopping, high-retention edits
+- Talking Head Video Editing: High-retention YouTube edits with B-roll, captions, color grading, sound design
+- Documentary Video Editing: Cinematic long-form documentaries, interview assembly, narrative structure (4K, 2 revisions, 3-5 day delivery)
+- Short Form Video Editing: TikTok, Instagram Reels, YouTube Shorts — scroll-stopping, high-retention edits (24h turnaround)
 - Map Animation & Geopolitical Visuals: Animated country maps, route animations, geographic storytelling
+
+## Audience-Specific Services
+- Video Editing for Founders & Personal Brands
+- Video Editing for Online Coaches & Course Creators
+- Corporate Talking Head Video Editing
+- Video Editing for Podcasters
+- Video Editing for Doctors & Healthcare Professionals
+- Video Editing for Fitness & Wellness Creators
 
 ## Tools
 Adobe Premiere Pro, DaVinci Resolve, Adobe After Effects
@@ -28,6 +38,23 @@ Email: hi@ariyankhan.com
 - Short Form Video Editing: https://ariyankhan.com/short-form-video-editing.html
 - Map Animation & Geopolitical Visuals: https://ariyankhan.com/map-animation-video-editing.html
 
+## Audience-Specific Service Pages
+- Founders & Personal Brands: https://ariyankhan.com/service/video-editor-for-founders.html
+- Online Coaches & Course Creators: https://ariyankhan.com/service/video-editor-for-coaches.html
+- Corporate Teams: https://ariyankhan.com/service/corporate-video-editing.html
+- Podcasters: https://ariyankhan.com/service/video-editor-for-podcasters.html
+- Doctors & Healthcare Professionals: https://ariyankhan.com/service/video-editor-for-healthcare-professionals.html
+- Fitness & Wellness Creators: https://ariyankhan.com/service/video-editor-for-fitness-creators.html
+
+## Blog
+- Blog Home: https://ariyankhan.com/blog/
+- Why Your YouTube Videos Need a Professional Editor: https://ariyankhan.com/blog/why-your-youtube-videos-need-a-professional-editor.html
+- What to Look for When Hiring a Documentary Video Editor: https://ariyankhan.com/blog/what-to-look-for-when-hiring-a-documentary-video-editor.html
+- How Much Does Talking Head Video Editing Cost: https://ariyankhan.com/blog/how-much-does-talking-head-video-editing-cost.html
+- What You Get When You Hire a Professional Video Editor: https://ariyankhan.com/blog/what-you-get-when-you-hire-a-professional-video-editor.html
+- Freelance Video Editor vs Video Editing Agency: https://ariyankhan.com/blog/freelance-video-editor-vs-video-editing-agency.html
+- Hire a Video Editor Directly vs Fiverr & Upwork: https://ariyankhan.com/blog/hire-video-editor-directly-vs-fiverr-upwork.html
+- When Should You Hire a Video Editor for Your YouTube Channel: https://ariyankhan.com/blog/when-should-you-hire-a-video-editor-for-youtube.html
 
 ## Legal Pages
 - Privacy Policy: https://ariyankhan.com/privacy-policy.html
@@ -35,7 +62,7 @@ Email: hi@ariyankhan.com
 
 ## Utility Pages
 - 404 Page: https://ariyankhan.com/404.html
+- Sitemap: https://ariyankhan.com/sitemap.xml
 
 ## Extended Information
 - Full details: https://ariyankhan.com/llms-full.txt
-

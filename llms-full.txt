@@ -4,46 +4,65 @@
 
 ## Identity
 Name: Ariyan Khan
-Title: Freelance Video Editor & Documentary Content Creator
-Location: Working remotely, serving clients primarily in the United States, UK, and Europe
+Title: Freelance Video Editor & Content Creator
+Location: Dhaka, Bangladesh — working remotely
+Serves clients in: United States, Canada, United Kingdom, Ireland, Australia, New Zealand, Switzerland, Europe
 Languages: English (fluent), Bengali (native)
-Availability: Open to new projects, responds within 1 hour
+Availability: Open to new projects
 
 ## Summary
-Ariyan Khan is a professional freelance video editor helping YouTube creators, brands, founders, coaches, educators, and agencies grow through high-retention video content. He specializes in four core areas: talking head YouTube videos, cinematic documentaries, short-form social content (TikTok, Instagram Reels, YouTube Shorts), and animated map/geopolitical visuals. With 5M+ total views generated for clients, 314+ satisfied clients worldwide, and an average 60%+ audience retention rate on edited videos, Ariyan delivers broadcast-quality work with a standard 48-hour turnaround.
+Ariyan Khan is a freelance video editor based in Dhaka, Bangladesh, helping YouTube creators,
+brands, founders, coaches, educators, podcasters, healthcare professionals, and agencies grow
+through high-retention video content. He specializes in four core editing styles — talking head
+YouTube videos, cinematic documentaries, short-form social content (TikTok, Instagram Reels,
+YouTube Shorts), and animated map/geopolitical visuals — plus audience-specific services for
+founders, coaches, corporate teams, podcasters, healthcare professionals, and fitness creators.
+5M+ total views generated for clients, 314+ satisfied clients, and an average 60%+ audience
+retention rate on edited videos.
 
-## Services
+## Core Services
 
 ### Talking Head Video Editing
-- Documentary-style talking head edits for YouTube and social media
-- Includes: B-roll integration, animated captions, motion graphics, sound design, color grading
-- Best for: YouTube creators, coaches, educators, founders, personal brands
-- Typical turnaround: 48 hours
+- High-retention edits for YouTube creators, coaches, educators, and founders
+- Includes: smart cuts and pacing, captions, B-roll, color grading, audio cleanup, motion graphics
+- Turnaround: varies by length and complexity — discussed per project
 - URL: https://ariyankhan.com/talking-head-video-editing.html
 
 ### Documentary Video Editing
 - Professional long-form documentary editing with cinematic quality
-- Includes: Narrative structure, interview assembly, cinematic color grade, sound mix, copyright-free content
-- Best for: Documentary filmmakers, history channels, educational content, broadcast
-- Typical turnaround: 3-5 days
-- Delivery: 4K export, 2 revision rounds included
+- Includes: narrative structure, interview assembly, cinematic color grade, sound mix
+- Delivery: 4K export, 2 revision rounds included, 3-5 day delivery
 - URL: https://ariyankhan.com/documentary-video-editing.html
 
 ### Short Form Video Editing
 - Scroll-stopping edits for vertical platforms
 - Platforms: TikTok, Instagram Reels, YouTube Shorts
-- Includes: Strong hooks, fast-paced cuts, captions, trending transitions, platform-native pacing
-- Best for: Influencers, brands, social media managers, content creators
-- Typical turnaround: 24 hours
-- 100+ reels delivered
+- Includes: strong hooks, fast-paced cuts, animated captions, sound design, 9:16 delivery
+- Turnaround: usually within 24 hours
 - URL: https://ariyankhan.com/short-form-video-editing.html
 
 ### Map Animation & Geopolitical Visuals
 - Cinematic animated maps for visual storytelling
-- Includes: Country highlights, route animations, zoom transitions, geopolitical context
-- Best for: Documentary makers, history & geography YouTube channels, explainer videos
-- Typical turnaround: 3-5 days
+- Includes: country highlights, route animations, zoom transitions, geopolitical context
+- Best for: documentary makers, history & geography YouTube channels, explainer videos
 - URL: https://ariyankhan.com/map-animation-video-editing.html
+
+## Audience-Specific Services
+These are narrower landing pages for specific audiences, each a variant of one of the four
+core editing styles above (same craft, tailored to that audience's workflow and questions):
+
+- Founders & Personal Brands (talking head): multi-platform repurposing for YouTube/LinkedIn/Shorts
+  https://ariyankhan.com/service/video-editor-for-founders.html
+- Online Coaches & Course Creators (talking head): lesson/module batch editing, webcam + screen recording sync
+  https://ariyankhan.com/service/video-editor-for-coaches.html
+- Corporate Teams (talking head): internal training, leadership messages, brand-consistent templates, NDA-friendly
+  https://ariyankhan.com/service/corporate-video-editing.html
+- Podcasters (talking head): multi-guest reframing, chapter markers, highlight clips for Shorts/Reels/TikTok
+  https://ariyankhan.com/service/video-editor-for-podcasters.html
+- Doctors & Healthcare Professionals (talking head): disclaimer supers, confidential footage handling, visual explainers
+  https://ariyankhan.com/service/video-editor-for-healthcare-professionals.html
+- Fitness & Wellness Creators (short form): form-check slow-motion, rep-synced cuts, on-screen counters
+  https://ariyankhan.com/service/video-editor-for-fitness-creators.html
 
 ## Tools & Software
 - Primary: Adobe Premiere Pro
@@ -56,14 +75,14 @@ Ariyan Khan is a professional freelance video editor helping YouTube creators, b
 2. Rough Cut — Building the story structure, finding the strongest moments, setting pacing and narrative flow.
 3. Fine Cut + Graphics — Precision editing with motion graphics, captions, B-roll, lower thirds, and transitions.
 4. Color + Audio — Cinematic color grading, professional audio mix, noise reduction, and music.
-5. Delivery + Revisions — Export in required format, platform-optimized. 2 revision rounds included. Source files available on request.
+5. Delivery + Revisions — Export in required format, platform-optimized. Source files available on request.
 
 ## Key Stats
 - 5,000,000+ total views generated for clients
-- 314+ satisfied clients worldwide
+- 314+ satisfied clients
 - 60%+ average audience retention on edited videos
-- 48-hour standard turnaround on most edits
-- 2 free revision rounds per project
+- Short-form edits: usually delivered within 24 hours
+- Documentary edits: 4K export, 2 revision rounds included, 3-5 day delivery
 
 ## Pricing
 - Budget tiers: Under $100, $100-$300, $300-$600, $600+
@@ -73,19 +92,26 @@ Ariyan Khan is a professional freelance video editor helping YouTube creators, b
 ## Frequently Asked Questions
 
 ### Can I request revisions?
-Yes! Every project includes 2 rounds of free revisions to ensure the final output meets your exact vision. Additional revision rounds are available for a small fee.
+Documentary projects include 2 rounds of free revisions. Other services include a first-cut
+review and revision round before final delivery. Additional revision rounds are available for
+a small fee.
 
 ### What is your delivery time?
-Delivery time depends on the length and complexity of your footage. Short-form and talking-head edits are usually faster (24-48h), while documentaries may take 3-5 days. Timeline is always discussed before starting.
+Delivery time depends on the length and complexity of the footage and which service it is.
+Short-form edits are usually delivered within 24 hours, documentaries take 3-5 days, and
+talking-head or audience-specific edits are scoped per project.
 
 ### Can you match my existing editing style?
-Absolutely. Send a reference video and Ariyan will analyze and replicate the color grade, pacing, motion graphics, and overall feel to maintain consistency with your channel's brand.
+Yes. Send a reference video and Ariyan will match the color grade, pacing, captions, motion
+graphics, and overall feel to keep it consistent with your existing channel or brand.
 
 ### Do you provide source files?
-Yes, Adobe Premiere Pro project files are available upon request for an additional fee. Final video is delivered in any required format — 4K, 1080p, vertical (9:16), square, or custom aspect ratios.
+Yes, Adobe Premiere Pro project files are available upon request for an additional fee. Final
+video is delivered in any required format — 4K, 1080p, vertical (9:16), square, or custom
+aspect ratios.
 
 ### How do I get started?
-Fill out the contact form at https://ariyankhan.com/#contact with your project details. Ariyan responds within 1 hour to discuss scope, timeline, pricing, and next steps.
+Fill out the contact form at https://ariyankhan.com/#contact with your project details.
 
 ## Social Profiles
 - YouTube: https://www.youtube.com/@ariyankhan
@@ -96,6 +122,17 @@ Fill out the contact form at https://ariyankhan.com/#contact with your project d
 - X (Twitter): https://x.com/byariyankhan
 - Upwork: https://www.upwork.com/freelancers/ariyankhan
 
+## Blog
+Practical articles on hiring, cost, and working with a video editor.
+- Blog Home: https://ariyankhan.com/blog/
+- Why Your YouTube Videos Need a Professional Editor: https://ariyankhan.com/blog/why-your-youtube-videos-need-a-professional-editor.html
+- What to Look for When Hiring a Documentary Video Editor: https://ariyankhan.com/blog/what-to-look-for-when-hiring-a-documentary-video-editor.html
+- How Much Does Talking Head Video Editing Cost: https://ariyankhan.com/blog/how-much-does-talking-head-video-editing-cost.html
+- What You Get When You Hire a Professional Video Editor: https://ariyankhan.com/blog/what-you-get-when-you-hire-a-professional-video-editor.html
+- Freelance Video Editor vs Video Editing Agency: https://ariyankhan.com/blog/freelance-video-editor-vs-video-editing-agency.html
+- Hire a Video Editor Directly vs Fiverr & Upwork: https://ariyankhan.com/blog/hire-video-editor-directly-vs-fiverr-upwork.html
+- When Should You Hire a Video Editor for Your YouTube Channel: https://ariyankhan.com/blog/when-should-you-hire-a-video-editor-for-youtube.html
+
 ## All Pages
 - Home: https://ariyankhan.com/
 - About: https://ariyankhan.com/about.html
@@ -103,5 +140,12 @@ Fill out the contact form at https://ariyankhan.com/#contact with your project d
 - Documentary Video Editing: https://ariyankhan.com/documentary-video-editing.html
 - Short Form Video Editing: https://ariyankhan.com/short-form-video-editing.html
 - Map Animation & Geopolitical Visuals: https://ariyankhan.com/map-animation-video-editing.html
+- Video Editing for Founders & Personal Brands: https://ariyankhan.com/service/video-editor-for-founders.html
+- Video Editing for Online Coaches & Course Creators: https://ariyankhan.com/service/video-editor-for-coaches.html
+- Corporate Talking Head Video Editing: https://ariyankhan.com/service/corporate-video-editing.html
+- Video Editing for Podcasters: https://ariyankhan.com/service/video-editor-for-podcasters.html
+- Video Editing for Doctors & Healthcare Professionals: https://ariyankhan.com/service/video-editor-for-healthcare-professionals.html
+- Video Editing for Fitness & Wellness Creators: https://ariyankhan.com/service/video-editor-for-fitness-creators.html
+- Blog: https://ariyankhan.com/blog/
 - Privacy Policy: https://ariyankhan.com/privacy-policy.html
 - Terms and Conditions: https://ariyankhan.com/terms-and-conditions.html
