@@ -68,30 +68,25 @@
   background:#2a2a2a; border:2px solid #2a2a2a;
   margin-bottom:10px; position:relative; z-index:1;
 }
-.hstep-label{ font-size:11px; font-weight:600; line-height:1.3; color:var(--muted); padding:0 2px; }
+.hstep-label{ font-size:10px; font-weight:600; line-height:1.3; color:var(--muted); padding:0 2px; }
 .hstep--done .hstep-dot, .hstep--current .hstep-dot{ background:var(--yellow); border-color:var(--yellow); }
 .hstep--done::before, .hstep--current::before{ background:var(--yellow); }
 .hstep--done .hstep-label{ color:var(--text); }
-.hstep--current .hstep-label{ color:var(--yellow); font-weight:800; }
+.hstep--current .hstep-label{ color:var(--yellow); font-weight:700; }
+/* Payment note (admin-written) shown under the current stage's own label,
+   instead of a separate box elsewhere on the page. */
+.hstep-note{
+  display:block; margin-top:4px;
+  font-size:9px; font-weight:500; line-height:1.3; color:var(--text);
+  word-break:break-word;
+}
 
 @media (min-width:600px){
   .hstep-dot{ width:16px; height:16px; }
   .hstep::before{ top:7px; }
-  .hstep-label{ font-size:13px; }
+  .hstep-label{ font-size:12px; }
+  .hstep-note{ font-size:11px; }
 }
-
-.tracker-note{ text-align:center; margin:0 0 26px; }
-.tracker-note-pill{
-  display:inline-flex; align-items:baseline; justify-content:center; flex-wrap:wrap;
-  gap:6px; max-width:100%;
-  padding:6px 16px;
-  background:var(--yellow-dim); border:1px solid var(--border); border-radius:50px;
-}
-.tracker-note-label{
-  font-size:10px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase;
-  color:var(--yellow); margin:0;
-}
-.tracker-note-text{ font-size:12px; color:var(--text); margin:0; }
 
 /* ── Admin ── */
 .tracker-body{ background:var(--bg); color:var(--text); font-family:'Inter',sans-serif; min-height:100vh; }

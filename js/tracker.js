@@ -6,8 +6,6 @@
   const resultEl = document.getElementById('trackerResult');
   const labelEl = document.getElementById('trackerProjectLabel');
   const stagesEl = document.getElementById('trackerStages');
-  const noteEl = document.getElementById('trackerNote');
-  const noteTextEl = document.getElementById('trackerNoteText');
 
   if (!form) return;
 
@@ -17,7 +15,7 @@
     resultEl.hidden = true;
   }
 
-  function renderStages(stages, currentStage) {
+  function renderStages(stages, currentStage, note) {
     stagesEl.innerHTML = '';
     stages.forEach((stage, index) => {
       const state = index < currentStage ? 'done' : index === currentStage ? 'current' : 'upcoming';
@@ -33,6 +31,14 @@
       label.textContent = stage.label;
 
       step.append(dot, label);
+
+      if (state === 'current' && note) {
+        const noteEl = document.createElement('span');
+        noteEl.className = 'hstep-note';
+        noteEl.textContent = note;
+        step.append(noteEl);
+      }
+
       stagesEl.appendChild(step);
     });
   }
@@ -69,18 +75,9 @@
         return;
       }
 
-      labelEl.textContent = json.projectLabel;
-      renderStages(json.stages, json.stage);
-
       const note = typeof json.note === 'string' ? json.note.trim() : '';
-      if (note) {
-        noteTextEl.textContent = note;
-        noteEl.hidden = false;
-      } else {
-        noteTextEl.textContent = '';
-        noteEl.hidden = true;
-      }
-
+      labelEl.textContent = json.projectLabel;
+      renderStages(json.stages, json.stage, note);
       resultEl.hidden = false;
     } catch (err) {
       showError('Could not reach the server. Please check your connection and try again.');
