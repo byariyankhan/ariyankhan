@@ -132,37 +132,63 @@
 .tracker-inline-form input{ text-transform:none; letter-spacing:0; font-weight:500; }
 .tracker-muted{ color:var(--muted); font-size:14px; }
 
-.tracker-table-wrap{ overflow-x:auto; border:1px solid #1f1f1f; border-radius:14px; }
-.tracker-table{ width:100%; border-collapse:collapse; font-size:14px; }
-.tracker-table th{
-  text-align:left; padding:12px 16px; font-size:11px; letter-spacing:1.5px; text-transform:uppercase;
-  color:var(--muted); border-bottom:1px solid #1f1f1f; white-space:nowrap;
+.tracker-code{ font-family:'Barlow Condensed',sans-serif; font-weight:700; letter-spacing:1px; color:var(--yellow); }
+
+/* Admin project list — one card per project, fields stacked, so nothing
+   needs horizontal scrolling to reach (the old wide table did). */
+.tracker-project-list{ display:flex; flex-direction:column; gap:16px; }
+.tracker-project-card{
+  background:var(--panel); border:1px solid #1f1f1f; border-radius:14px;
+  padding:20px;
 }
-.tracker-table td{ padding:12px 16px; border-bottom:1px solid #1a1a1a; vertical-align:middle; }
-.tracker-table tr:last-child td{ border-bottom:none; }
-.tracker-code{ font-family:'Barlow Condensed',sans-serif; font-weight:700; letter-spacing:1px; color:var(--yellow); white-space:nowrap; }
+.tracker-project-head{
+  display:flex; align-items:flex-start; justify-content:space-between; gap:12px;
+  flex-wrap:wrap; margin-bottom:18px;
+}
+.tracker-project-title{
+  font-family:'Barlow Condensed',sans-serif; font-size:19px; font-weight:800;
+  margin:4px 0 0;
+}
+.tracker-project-client{ color:var(--muted); font-size:13px; margin:6px 0 0; }
+
+.tracker-project-fields{ display:grid; grid-template-columns:1fr; gap:16px; }
+.tracker-project-field label{
+  display:block; font-size:11px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase;
+  color:var(--muted); margin-bottom:8px;
+}
+.tracker-project-field--wide{ grid-column:1 / -1; }
+
 .tracker-stage-form select{
+  width:100%;
   background:rgba(255,255,255,.03); color:var(--text); border:1px solid #1f1f1f; border-radius:8px;
-  padding:8px 10px; font-family:inherit; font-size:13px;
+  padding:10px 12px; font-family:inherit; font-size:14px;
 }
 /* Native dropdown popups don't inherit the select's background — set it
    explicitly on the options too, or unselected rows render white-on-white. */
 .tracker-stage-form select option{
   background:#161616; color:var(--text);
 }
-.tracker-note-form{ display:flex; flex-direction:column; gap:8px; min-width:220px; }
+.tracker-note-form{ display:flex; flex-direction:column; gap:8px; }
 .tracker-note-form textarea{
   width:100%; resize:vertical; min-height:44px;
   background:rgba(255,255,255,.03); color:var(--text); border:1px solid #1f1f1f; border-radius:8px;
-  padding:8px 10px; font-family:inherit; font-size:13px; line-height:1.5;
+  padding:10px 12px; font-family:inherit; font-size:14px; line-height:1.5;
 }
 .tracker-note-form textarea::placeholder{ color:rgba(255,255,255,.3); }
 .tracker-note-form .tracker-btn{ align-self:flex-start; }
 .tracker-date-form{ display:flex; align-items:center; gap:8px; }
 .tracker-date-form input[type="date"]{
-  color-scheme:dark;
+  flex:1; color-scheme:dark;
   background:rgba(255,255,255,.03); color:var(--text); border:1px solid #1f1f1f; border-radius:8px;
-  padding:8px 10px; font-family:inherit; font-size:13px;
+  padding:10px 12px; font-family:inherit; font-size:14px;
+}
+.tracker-project-foot{
+  margin:18px 0 0; padding-top:14px; border-top:1px solid #1a1a1a;
+  color:var(--muted); font-size:12px;
+}
+
+@media (min-width:640px){
+  .tracker-project-fields{ grid-template-columns:1fr 1fr; }
 }
 
 @media (max-width:480px){

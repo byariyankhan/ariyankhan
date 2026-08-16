@@ -124,7 +124,7 @@ function e(string $value): string {
 <link rel="icon" type="image/x-icon" href="../favicon/favicon.ico">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../css/style.css?v=9">
-<link rel="stylesheet" href="../css/tracker.css?v=10">
+<link rel="stylesheet" href="../css/tracker.css?v=11">
 </head>
 <body class="tracker-body">
 <div id="stars"></div>
@@ -166,73 +166,69 @@ function e(string $value): string {
     <?php if (!$projects): ?>
       <p class="tracker-muted">No projects yet.</p>
     <?php else: ?>
-      <div class="tracker-table-wrap">
-        <table class="tracker-table">
-          <thead>
-            <tr>
-              <th>Code</th>
-              <th>Project</th>
-              <th>Client</th>
-              <th>Stage</th>
-              <th>Payment note</th>
-              <th>Delivery date</th>
-              <th>Created</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            <?php foreach ($projects as $project): ?>
-              <tr>
-                <td class="tracker-code"><?= e($project['code']) ?></td>
-                <td><?= e($project['project_label'] !== '' ? $project['project_label'] : '(untitled)') ?></td>
-                <td class="tracker-muted">
-                  <?php if (($project['client_name'] ?? '') !== '' || ($project['client_email'] ?? '') !== ''): ?>
-                    <?= e((string) ($project['client_name'] ?? '')) ?><?php if (($project['client_email'] ?? '') !== ''): ?><br><?= e((string) $project['client_email']) ?><?php endif; ?>
-                  <?php else: ?>
-                    —
-                  <?php endif; ?>
-                </td>
-                <td>
-                  <form method="post" class="tracker-stage-form">
-                    <input type="hidden" name="action" value="update_stage">
-                    <input type="hidden" name="id" value="<?= (int) $project['id'] ?>">
-                    <select name="stage" onchange="this.form.submit()">
-                      <?php foreach (TRACKER_STAGES as $index => $info): ?>
-                        <option value="<?= $index ?>" <?= ((int) $project['stage'] === $index) ? 'selected' : '' ?>>
-                          <?= e($info['label']) ?>
-                        </option>
-                      <?php endforeach; ?>
-                    </select>
-                  </form>
-                </td>
-                <td>
-                  <form method="post" class="tracker-note-form">
-                    <input type="hidden" name="action" value="update_note">
-                    <input type="hidden" name="id" value="<?= (int) $project['id'] ?>">
-                    <textarea name="note" rows="2" maxlength="300" placeholder="e.g. 50% advance ($150) received"><?= e((string) ($project['note'] ?? '')) ?></textarea>
-                    <button type="submit" class="tracker-btn tracker-btn--ghost tracker-btn--small">Save Note</button>
-                  </form>
-                </td>
-                <td>
-                  <form method="post" class="tracker-date-form">
-                    <input type="hidden" name="action" value="update_delivery">
-                    <input type="hidden" name="id" value="<?= (int) $project['id'] ?>">
-                    <input type="date" name="delivery_date" value="<?= e((string) ($project['delivery_date'] ?? '')) ?>">
-                    <button type="submit" class="tracker-btn tracker-btn--ghost tracker-btn--small">Save</button>
-                  </form>
-                </td>
-                <td class="tracker-muted"><?= e(substr((string) $project['created_at'], 0, 10)) ?></td>
-                <td>
-                  <form method="post" onsubmit="return confirm('Delete this project?');">
-                    <input type="hidden" name="action" value="delete">
-                    <input type="hidden" name="id" value="<?= (int) $project['id'] ?>">
-                    <button type="submit" class="tracker-btn tracker-btn--ghost tracker-btn--small">Delete</button>
-                  </form>
-                </td>
-              </tr>
-            <?php endforeach; ?>
-          </tbody>
-        </table>
+      <div class="tracker-project-list">
+        <?php foreach ($projects as $project): ?>
+          <div class="tracker-project-card">
+            <div class="tracker-project-head">
+              <div>
+                <span class="tracker-code"><?= e($project['code']) ?></span>
+                <h3 class="tracker-project-title"><?= e($project['project_label'] !== '' ? $project['project_label'] : '(untitled)') ?></h3>
+                <?php if (($project['client_name'] ?? '') !== '' || ($project['client_email'] ?? '') !== ''): ?>
+                  <p class="tracker-project-client">
+                    <?= e((string) ($project['client_name'] ?? '')) ?>
+                    <?php if (($project['client_email'] ?? '') !== ''): ?>
+                      <?= (($project['client_name'] ?? '') !== '') ? ' · ' : '' ?><?= e((string) $project['client_email']) ?>
+                    <?php endif; ?>
+                  </p>
+                <?php endif; ?>
+              </div>
+              <form method="post" onsubmit="return confirm('Delete this project?');">
+                <input type="hidden" name="action" value="delete">
+                <input type="hidden" name="id" value="<?= (int) $project['id'] ?>">
+                <button type="submit" class="tracker-btn tracker-btn--ghost tracker-btn--small">Delete</button>
+              </form>
+            </div>
+
+            <div class="tracker-project-fields">
+              <div class="tracker-project-field">
+                <label>Stage</label>
+                <form method="post" class="tracker-stage-form">
+                  <input type="hidden" name="action" value="update_stage">
+                  <input type="hidden" name="id" value="<?= (int) $project['id'] ?>">
+                  <select name="stage" onchange="this.form.submit()">
+                    <?php foreach (TRACKER_STAGES as $index => $info): ?>
+                      <option value="<?= $index ?>" <?= ((int) $project['stage'] === $index) ? 'selected' : '' ?>>
+                        <?= e($info['label']) ?>
+                      </option>
+                    <?php endforeach; ?>
+                  </select>
+                </form>
+              </div>
+
+              <div class="tracker-project-field">
+                <label>Delivery date</label>
+                <form method="post" class="tracker-date-form">
+                  <input type="hidden" name="action" value="update_delivery">
+                  <input type="hidden" name="id" value="<?= (int) $project['id'] ?>">
+                  <input type="date" name="delivery_date" value="<?= e((string) ($project['delivery_date'] ?? '')) ?>">
+                  <button type="submit" class="tracker-btn tracker-btn--ghost tracker-btn--small">Save</button>
+                </form>
+              </div>
+
+              <div class="tracker-project-field tracker-project-field--wide">
+                <label>Payment note</label>
+                <form method="post" class="tracker-note-form">
+                  <input type="hidden" name="action" value="update_note">
+                  <input type="hidden" name="id" value="<?= (int) $project['id'] ?>">
+                  <textarea name="note" rows="2" maxlength="300" placeholder="e.g. 50% advance ($150) received"><?= e((string) ($project['note'] ?? '')) ?></textarea>
+                  <button type="submit" class="tracker-btn tracker-btn--ghost tracker-btn--small">Save Note</button>
+                </form>
+              </div>
+            </div>
+
+            <p class="tracker-project-foot">Created <?= e(substr((string) $project['created_at'], 0, 10)) ?></p>
+          </div>
+        <?php endforeach; ?>
       </div>
     <?php endif; ?>
   </div>
