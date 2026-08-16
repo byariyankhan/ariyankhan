@@ -1,37 +1,44 @@
 (() => {
   const NAV_ITEMS = [
-    { id: 'home', label: 'Home', number: '01' },
-    { id: 'services', label: 'Services', number: '02' },
-    { id: 'stages', label: 'Editing Stages', number: '03' },
-    { id: 'work', label: 'Recent Work', number: '04' },
-    { id: 'faq', label: 'FAQ', number: '05' },
-    { id: 'contact', label: 'Contact', number: '06' },
+    { id: 'home', label: 'Home', number: '01', type: 'anchor' },
+    { id: 'services', label: 'Services', number: '02', type: 'anchor' },
+    { id: 'stages', label: 'Editing Stages', number: '03', type: 'anchor' },
+    { id: 'work', label: 'Recent Work', number: '04', type: 'anchor' },
+    { label: 'Blog', number: '05', type: 'page', path: 'blog/' },
+    { label: 'About', number: '06', type: 'page', path: 'about.html' },
+    { id: 'faq', label: 'FAQ', number: '07', type: 'anchor' },
+    { id: 'contact', label: 'Contact', number: '08', type: 'anchor' },
+    { label: 'Track Order', number: '09', type: 'page', path: 'track.html' },
   ];
 
   function escapeAttr(value) {
     return String(value).replace(/"/g, '&quot;');
   }
 
-  // On the homepage, links are anchor scrolls (#services).
-  // On subpages, links go back to the homepage first (index.html#services).
-  function buildHref(itemId, isHomePage, homePath) {
-    if (isHomePage) return itemId === 'home' ? '#home' : `#${itemId}`;
-    return itemId === 'home' ? homePath : `${homePath}#${itemId}`;
+  // Anchor items scroll on the homepage (#services) or jump back to the
+  // homepage first on subpages (index.html#services). Page items always
+  // point at their own page, resolved relative to the site root.
+  function buildHref(item, isHomePage, homePath, basePath) {
+    if (item.type === 'page') {
+      return `${basePath}${item.path}`;
+    }
+    if (isHomePage) return item.id === 'home' ? '#home' : `#${item.id}`;
+    return item.id === 'home' ? homePath : `${homePath}#${item.id}`;
   }
 
   function buildNavComponent(isHomePage, homePath) {
-    const logoHref = isHomePage ? '#home' : homePath;
-    const contactHref = buildHref('contact', isHomePage, homePath);
     const basePath = homePath.replace(/index\.html$/, '');
-    const trackHref = `${basePath}track.html`;
+    const logoHref = isHomePage ? '#home' : homePath;
+    const contactItem = NAV_ITEMS.find(item => item.id === 'contact');
+    const contactHref = buildHref(contactItem, isHomePage, homePath, basePath);
 
     const desktopLinks = NAV_ITEMS.map(item =>
-      `<a href="${escapeAttr(buildHref(item.id, isHomePage, homePath))}" class="nav-link">${item.label}</a>`
-    ).join('\n') + `\n<a href="${escapeAttr(trackHref)}" class="nav-link">Track Order</a>`;
+      `<a href="${escapeAttr(buildHref(item, isHomePage, homePath, basePath))}" class="nav-link">${item.label}</a>`
+    ).join('\n');
 
     const mobileLinks = NAV_ITEMS.map(item =>
-      `<a href="${escapeAttr(buildHref(item.id, isHomePage, homePath))}" class="menu-link"><span class="ml-num">${item.number}</span><span class="ml-label">${item.label}</span></a>`
-    ).join('\n') + `\n<a href="${escapeAttr(trackHref)}" class="menu-link"><span class="ml-num">07</span><span class="ml-label">Track Order</span></a>`;
+      `<a href="${escapeAttr(buildHref(item, isHomePage, homePath, basePath))}" class="menu-link"><span class="ml-num">${item.number}</span><span class="ml-label">${item.label}</span></a>`
+    ).join('\n');
 
     return `
 <nav class="site-nav">
