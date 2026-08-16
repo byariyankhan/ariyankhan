@@ -110,6 +110,11 @@
   background:rgba(255,255,255,.03); color:var(--text); border:1px solid #1f1f1f; border-radius:8px;
   padding:8px 10px; font-family:inherit; font-size:13px;
 }
+/* Native dropdown popups don't inherit the select's background — set it
+   explicitly on the options too, or unselected rows render white-on-white. */
+.tracker-stage-form select option{
+  background:#161616; color:var(--text);
+}
 
 @media (max-width:480px){
   .tracker-page{ padding-top:120px; }
