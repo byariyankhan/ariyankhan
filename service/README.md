@@ -83,8 +83,12 @@ Every page here is one level deep (`service/<page>.html`), so:
 4. Keep `service="<key>"` on `<service-profile>` and `buildPortfolioGrid("<key>")`
    pointed at whichever of the 4 main service keys this audience page is a variant
    of (talking-head / documentary / short-form / map-animation).
-5. Add a `<url>` entry to `../sitemap.xml`.
-6. Bump the `?v=` cache-busting number on any shared CSS/JS file you actually
+5. Keep the "Explore More Services" block limited to the 4 main service pages
+   (`../talking-head-video-editing.html`, `../documentary-video-editing.html`,
+   `../short-form-video-editing.html`, `../map-animation-video-editing.html`) —
+   do not add links to other pages in `service/`.
+6. Add a `<url>` entry to `../sitemap.xml`.
+7. Bump the `?v=` cache-busting number on any shared CSS/JS file you actually
    edited (not on files you only reused unchanged) — see the root `README.md` for
    the convention — and update it on every page that loads that file.
 
@@ -108,9 +112,9 @@ It was built as a standalone page anyway per explicit direction. If it doesn't e
 its own search traffic over time, revisit folding it into the coaches page as
 originally recommended.
 
-Pages in this folder cross-link to each other (Explore Services), but **not** from
-the 4 main service pages — those only cross-link to each other. Keeps the main
-pages focused and avoids surfacing niche pages before they've proven themselves.
+Every page's "Explore More Services" links **only to the 4 main service pages**
+(with `../` prefix) — never to another niche page in this folder, and the 4 main
+pages never link into `service/` either. Niche pages don't cross-link each other.
 
 ## Planned (not yet built)
 
