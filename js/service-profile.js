@@ -3,7 +3,7 @@ const SITE = {
   name:         'Ariyan Khan',
   avatar:       'images/ariyan-khan-profile.webp?v=2',
   rating:       '4.9',
-  heroReviews:  '81+',
+  heroReviews:  '400+',
   orderLabel:   'Order Now',
 };
 
@@ -15,7 +15,8 @@ class ServiceProfile extends HTMLElement {
     const imageAlt = this.getAttribute('image-alt') || '';
     const previewId = this.getAttribute('preview-id') || '';
     const role = this.getAttribute('editor-role') || 'Professional Video Editor';
-    const orderHref = service ? `index.html?service=${service}#contact` : 'index.html#contact';
+    const basePath = this.getAttribute('base-path') || '';
+    const orderHref = service ? `${basePath}index.html?service=${service}#contact` : `${basePath}index.html#contact`;
     const previewSrc = previewId
       ? `https://img.youtube.com/vi/${previewId}/maxresdefault.jpg`
       : imageSrc;
@@ -34,7 +35,7 @@ class ServiceProfile extends HTMLElement {
         <div class="service-profile-body">
           <div class="service-profile-header">
             <div class="service-profile-avatar-wrap">
-              <img src="${SITE.avatar}" alt="${SITE.name}" class="service-profile-avatar" width="64" height="64" loading="lazy">
+              <img src="${basePath}${SITE.avatar}" alt="${SITE.name}" class="service-profile-avatar" width="64" height="64" loading="lazy">
             </div>
             <div class="service-profile-meta">
               <div class="service-profile-name">${SITE.name}</div>
