@@ -47,6 +47,12 @@ retention rate on edited videos.
 - Best for: documentary makers, history & geography YouTube channels, explainer videos
 - URL: https://ariyankhan.com/map-animation-video-editing.html
 
+### Remote Video Editor
+- Full-service remote video editing for clients hiring across time zones
+- Includes: secure cloud-based file transfer, async communication, timestamped remote review, flexible international payment (PayPal, Wise, bank transfer)
+- Best for: YouTube creators, startups, marketing teams, and businesses hiring an editor without an in-person meeting
+- URL: https://ariyankhan.com/service/remote-video-editor.html
+
 ## Audience-Specific Services
 These are narrower landing pages for specific audiences, each a variant of one of the four
 core editing styles above (same craft, tailored to that audience's workflow and questions):
@@ -140,9 +146,10 @@ Practical articles on hiring, cost, and working with a video editor.
 - Documentary Video Editing: https://ariyankhan.com/documentary-video-editing.html
 - Short Form Video Editing: https://ariyankhan.com/short-form-video-editing.html
 - Map Animation & Geopolitical Visuals: https://ariyankhan.com/map-animation-video-editing.html
+- Remote Video Editor: https://ariyankhan.com/service/remote-video-editor.html
 - Video Editing for Founders & Personal Brands: https://ariyankhan.com/service/video-editor-for-founders.html
 - Video Editing for Online Coaches & Course Creators: https://ariyankhan.com/service/video-editor-for-coaches.html
-- Corporate Talking Head Video Editing: https://ariyankhan.com/service/corporate-video-editing.html
+- Corporate Video Editing for Talking Head Content: https://ariyankhan.com/service/corporate-video-editing.html
 - Video Editing for Podcasters: https://ariyankhan.com/service/video-editor-for-podcasters.html
 - Video Editing for Doctors & Healthcare Professionals: https://ariyankhan.com/service/video-editor-for-healthcare-professionals.html
 - Video Editing for Fitness & Wellness Creators: https://ariyankhan.com/service/video-editor-for-fitness-creators.html
