@@ -4,11 +4,9 @@
     { id: 'services', label: 'Services', number: '02', type: 'anchor' },
     { id: 'stages', label: 'Editing Stages', number: '03', type: 'anchor' },
     { id: 'work', label: 'Recent Work', number: '04', type: 'anchor' },
-    { label: 'Blog', number: '05', type: 'page', path: 'blog/' },
-    { label: 'About', number: '06', type: 'page', path: 'about.html' },
-    { id: 'faq', label: 'FAQ', number: '07', type: 'anchor' },
-    { id: 'contact', label: 'Contact', number: '08', type: 'anchor' },
-    { label: 'Track Order', number: '09', type: 'page', path: 'track.html' },
+    { id: 'faq', label: 'FAQ', number: '05', type: 'anchor' },
+    { id: 'contact', label: 'Contact', number: '06', type: 'anchor' },
+    { label: 'Track Order', number: '07', type: 'page', path: 'track.html' },
   ];
 
   function escapeAttr(value) {
