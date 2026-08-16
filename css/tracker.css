@@ -65,6 +65,16 @@
 .tracker-stcard--current .stcard-name{ color:var(--yellow); }
 .tracker-stcard--upcoming{ opacity:.45; }
 
+.tracker-note{
+  margin:18px 0 0; padding:16px 18px;
+  background:rgba(255,237,84,.06); border:1px solid var(--border); border-radius:12px;
+}
+.tracker-note-label{
+  font-size:11px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase;
+  color:var(--yellow); margin:0 0 6px;
+}
+.tracker-note-text{ font-size:14px; line-height:1.6; color:var(--text); margin:0; white-space:pre-wrap; }
+
 /* ── Admin ── */
 .tracker-body{ background:var(--bg); color:var(--text); font-family:'Inter',sans-serif; min-height:100vh; }
 .tracker-auth-wrap{ min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px; }
@@ -115,6 +125,14 @@
 .tracker-stage-form select option{
   background:#161616; color:var(--text);
 }
+.tracker-note-form{ display:flex; flex-direction:column; gap:8px; min-width:220px; }
+.tracker-note-form textarea{
+  width:100%; resize:vertical; min-height:44px;
+  background:rgba(255,255,255,.03); color:var(--text); border:1px solid #1f1f1f; border-radius:8px;
+  padding:8px 10px; font-family:inherit; font-size:13px; line-height:1.5;
+}
+.tracker-note-form textarea::placeholder{ color:rgba(255,255,255,.3); }
+.tracker-note-form .tracker-btn{ align-self:flex-start; }
 
 @media (max-width:480px){
   .tracker-page{ padding-top:120px; }

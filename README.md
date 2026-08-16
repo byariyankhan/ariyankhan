@@ -222,11 +222,15 @@ an update — nav button "Track Order" → `track.html`.
    `7K4M-9XPQ` (confusable characters like `0/O/1/I/L` excluded).
 2. Ariyan sends that code to the client (email/WhatsApp).
 3. The client goes to `ariyankhan.com/track.html`, types the code, and sees
-   a 4-stage progress bar: Footage Received → Editing In Progress → In
-   Review → Delivered.
+   a 6-stage progress bar: Footage Received → Payment (Advance) → Editing
+   In Progress → In Review → Payment (Full) → Delivered.
 4. Ariyan updates the stage from the same `/admin/` dashboard as work
    progresses — the client's page reflects it immediately on next lookup
    (no notification is sent; the client checks on demand).
+5. Each project also has a free-text "payment note" Ariyan can set from
+   `/admin/` (e.g. "50% advance ($150) received") — shown to the client on
+   `track.html` under the progress bar whenever it's non-empty. Stage list
+   lives in `TRACKER_STAGES` in `lib/tracker-db.php`.
 
 **Setup (one-time, done directly on the server — not via git):**
 ```bash

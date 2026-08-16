@@ -33,11 +33,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   if ($action === 'update_stage') {
     $id = (int) ($_POST['id'] ?? 0);
     $stage = (int) ($_POST['stage'] ?? 0);
-    $stage = max(0, min(3, $stage));
+    $stage = max(0, min(TRACKER_MAX_STAGE, $stage));
 
     $stmt = $db->prepare('UPDATE projects SET stage = :stage, updated_at = :now WHERE id = :id');
     $stmt->execute(['stage' => $stage, 'now' => gmdate('c'), 'id' => $id]);
     $notice = 'Stage updated';
+  }
+
+  if ($action === 'update_note') {
+    $id = (int) ($_POST['id'] ?? 0);
+    $note = trim((string) ($_POST['note'] ?? ''));
+
+    $stmt = $db->prepare('UPDATE projects SET note = :note, updated_at = :now WHERE id = :id');
+    $stmt->execute(['note' => $note, 'now' => gmdate('c'), 'id' => $id]);
+    $notice = 'Note updated';
   }
 
   if ($action === 'delete') {
@@ -68,7 +77,7 @@ function e(string $value): string {
 <link rel="icon" type="image/x-icon" href="../favicon/favicon.ico">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../css/style.css?v=9">
-<link rel="stylesheet" href="../css/tracker.css?v=4">
+<link rel="stylesheet" href="../css/tracker.css?v=5">
 </head>
 <body class="tracker-body">
 <div id="stars"></div>
@@ -109,6 +118,7 @@ function e(string $value): string {
               <th>Code</th>
               <th>Project</th>
               <th>Stage</th>
+              <th>Payment note</th>
               <th>Created</th>
               <th></th>
             </tr>
@@ -129,6 +139,14 @@ function e(string $value): string {
                         </option>
                       <?php endforeach; ?>
                     </select>
+                  </form>
+                </td>
+                <td>
+                  <form method="post" class="tracker-note-form">
+                    <input type="hidden" name="action" value="update_note">
+                    <input type="hidden" name="id" value="<?= (int) $project['id'] ?>">
+                    <textarea name="note" rows="2" maxlength="300" placeholder="e.g. 50% advance ($150) received"><?= e((string) ($project['note'] ?? '')) ?></textarea>
+                    <button type="submit" class="tracker-btn tracker-btn--ghost tracker-btn--small">Save Note</button>
                   </form>
                 </td>
                 <td class="tracker-muted"><?= e(substr((string) $project['created_at'], 0, 10)) ?></td>

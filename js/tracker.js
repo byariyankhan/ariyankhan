@@ -6,6 +6,8 @@
   const resultEl = document.getElementById('trackerResult');
   const labelEl = document.getElementById('trackerProjectLabel');
   const stagesEl = document.getElementById('trackerStages');
+  const noteEl = document.getElementById('trackerNote');
+  const noteTextEl = document.getElementById('trackerNoteText');
 
   if (!form) return;
 
@@ -74,6 +76,16 @@
 
       labelEl.textContent = json.projectLabel;
       renderStages(json.stages, json.stage);
+
+      const note = typeof json.note === 'string' ? json.note.trim() : '';
+      if (note) {
+        noteTextEl.textContent = note;
+        noteEl.hidden = false;
+      } else {
+        noteTextEl.textContent = '';
+        noteEl.hidden = true;
+      }
+
       resultEl.hidden = false;
     } catch (err) {
       showError('Could not reach the server. Please check your connection and try again.');

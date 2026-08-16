@@ -10,18 +10,28 @@ const TRACKER_STAGES = [
     'desc' => 'Your raw footage has been received and reviewed — getting familiar with the material before editing begins.',
   ],
   1 => [
+    'label' => 'Payment (Advance)',
+    'desc' => 'Advance payment confirmed. Editing begins once this step is complete.',
+  ],
+  2 => [
     'label' => 'Editing In Progress',
     'desc' => 'Cutting, pacing, and shaping your video — building the structure, adding B-roll, captions, and sound design.',
   ],
-  2 => [
+  3 => [
     'label' => 'In Review',
     'desc' => 'Your first cut is ready and out for your feedback — waiting on notes or approval before the final pass.',
   ],
-  3 => [
+  4 => [
+    'label' => 'Payment (Full)',
+    'desc' => 'Final payment confirmed. Your video is being prepared for delivery.',
+  ],
+  5 => [
     'label' => 'Delivered',
     'desc' => 'Your finished video has been delivered, exported, and ready to publish.',
   ],
 ];
+
+const TRACKER_MAX_STAGE = 5;
 
 const TRACKER_CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; // no 0/O/1/I/L
 
@@ -48,6 +58,11 @@ function tracker_db(): PDO {
       updated_at TEXT NOT NULL
     )
   ');
+
+  $columns = $db->query('PRAGMA table_info(projects)')->fetchAll(PDO::FETCH_COLUMN, 1);
+  if (!in_array('note', $columns, true)) {
+    $db->exec('ALTER TABLE projects ADD COLUMN note TEXT NOT NULL DEFAULT ""');
+  }
 
   return $db;
 }
