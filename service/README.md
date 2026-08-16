@@ -31,6 +31,7 @@ existing page instead, or write a blog article (`../blog/`) targeting that keywo
 service/
 ├── README.md                              ← this file
 ├── video-editor-for-founders.html         ← Founders & Personal Brands (variant of talking-head)
+├── video-editor-for-coaches.html          ← Online Coaches & Course Creators (variant of talking-head)
 └── (future pages, one per audience segment)
 ```
 
@@ -90,7 +91,12 @@ Every page here is one level deep (`service/<page>.html`), so:
 | Page | Audience | Variant of |
 |---|---|---|
 | `video-editor-for-founders.html` | Startup founders, LinkedIn creators, SaaS/B2B, coaches & consultants | `talking-head-video-editing.html` |
+| `video-editor-for-coaches.html` | Online coaches, course creators, educational YouTube channels | `talking-head-video-editing.html` |
+
+Pages in this folder cross-link to each other (Explore Services), but **not** from
+the 4 main service pages — those only cross-link to each other. Keeps the main
+pages focused and avoids surfacing niche pages before they've proven themselves.
 
 ## Planned (not yet built)
 
-- Coaches & Educators (online coaches, course creators, educational YouTube channels)
+- None currently queued — add the next audience segment here when identified.
