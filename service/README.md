@@ -34,6 +34,7 @@ service/
 ├── video-editor-for-coaches.html          ← Online Coaches & Course Creators (variant of talking-head)
 ├── corporate-video-editing.html           ← Corporate / Internal Teams (variant of talking-head)
 ├── video-editor-for-podcasters.html       ← Podcasters going to YouTube (variant of talking-head)
+├── video-editor-for-healthcare-professionals.html ← Doctors & healthcare professionals (variant of talking-head)
 └── (future pages, one per audience segment)
 ```
 
@@ -96,6 +97,14 @@ Every page here is one level deep (`service/<page>.html`), so:
 | `video-editor-for-coaches.html` | Online coaches, course creators, educational YouTube channels | `talking-head-video-editing.html` |
 | `corporate-video-editing.html` | HR/L&D teams, marketing departments, company leadership, internal comms | `talking-head-video-editing.html` |
 | `video-editor-for-podcasters.html` | Interview/panel podcast hosts and networks turning episodes into YouTube uploads | `talking-head-video-editing.html` |
+| `video-editor-for-healthcare-professionals.html` | Physicians, dentists, nurse practitioners, therapists making patient-education content | `talking-head-video-editing.html` |
+
+**Note on the healthcare page:** a full opportunity-research pass flagged this one as
+overlapping `video-editor-for-coaches.html`'s "Educational Channels" audience closely
+enough to recommend folding it into that page instead of shipping a separate URL.
+It was built as a standalone page anyway per explicit direction. If it doesn't earn
+its own search traffic over time, revisit folding it into the coaches page as
+originally recommended.
 
 Pages in this folder cross-link to each other (Explore Services), but **not** from
 the 4 main service pages — those only cross-link to each other. Keeps the main
