@@ -335,13 +335,15 @@
   --what-i-do-pad-bottom: 36px;
 }
 .service-page .what-i-do {
+  max-width: 1500px;
+  margin: 0 auto;
   padding: var(--what-i-do-gap-top) var(--what-i-do-pad-x) var(--what-i-do-pad-bottom);
   background: var(--bg);
 }
 .what-i-do-intro {
   max-width: 900px;
-  margin: 0 auto 48px;
-  text-align: center;
+  margin: 0 0 48px;
+  text-align: left;
 }
 .section-label {
   display: inline-flex;
@@ -375,7 +377,7 @@
 }
 .what-i-do-text {
   max-width: 760px;
-  margin: 28px auto 0;
+  margin: 28px 0 0;
   color: rgba(255, 255, 255, 0.55);
   font-size: clamp(16px, 1.2vw, 22px);
   line-height: 1.55;
@@ -384,8 +386,7 @@
   display: grid;
   grid-template-columns: 1fr;
   gap: 14px;
-  max-width: 1500px;
-  margin: 0 auto;
+  margin: 0;
 }
 .what-i-do-grid[data-service-card-accordion] {
   align-items: start;
@@ -572,8 +573,7 @@
 .who-this-is-for {
   display: grid;
   gap: clamp(20px, 2vw, 28px);
-  max-width: 1500px;
-  margin: 58px auto 0;
+  margin: 58px 0 0;
   padding: clamp(24px, 2.4vw, 34px);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 14px;
@@ -745,6 +745,8 @@
 }
 
 .service-page .how-it-works {
+  max-width: 1500px;
+  margin: 0 auto;
   padding: 56px 30px 40px;
   background:
     radial-gradient(ellipse 58% 48% at 50% 28%, rgba(245, 197, 24, 0.07), transparent 72%),
@@ -752,8 +754,8 @@
 }
 .how-it-works-intro {
   max-width: 900px;
-  margin: 0 auto 62px;
-  text-align: center;
+  margin: 0 0 62px;
+  text-align: left;
 }
 .how-it-works-title {
   margin: 0;
@@ -770,7 +772,7 @@
 }
 .how-it-works-text {
   max-width: 760px;
-  margin: 28px auto 0;
+  margin: 28px 0 0;
   color: rgba(255, 255, 255, 0.5);
   font-size: clamp(16px, 1.2vw, 21px);
   line-height: 1.55;
@@ -779,9 +781,8 @@
   display: grid;
   grid-template-columns: 1fr;
   gap: 22px;
-  max-width: 1400px;
   min-width: 0;
-  margin: 0 auto;
+  margin: 0;
 }
 .how-it-works-grid[data-process-step-accordion] {
   align-items: start;
@@ -1287,9 +1288,9 @@
   margin: 0 auto;
 }
 .service-pain .service-section-header {
-  text-align: center;
+  text-align: left;
   max-width: 660px;
-  margin: 0 auto 40px;
+  margin: 0 0 40px;
 }
 .pain-grid {
   display: grid;
