@@ -10,6 +10,7 @@ if (empty($_SESSION['tracker_admin'])) {
 }
 
 require __DIR__ . '/../lib/tracker-db.php';
+require __DIR__ . '/../lib/tracker-mail.php';
 
 $db = tracker_db();
 $notice = '';
@@ -19,16 +20,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
   if ($action === 'create') {
     $label = trim((string) ($_POST['project_label'] ?? ''));
+    $client_name = trim((string) ($_POST['client_name'] ?? ''));
+    $client_email = trim((string) ($_POST['client_email'] ?? ''));
+    if ($client_email !== '' && !filter_var($client_email, FILTER_VALIDATE_EMAIL)) {
+      $client_email = '';
+    }
+
     $now = gmdate('c');
     $code = tracker_generate_code();
     $stage_dates = json_encode(['0' => gmdate('Y-m-d')], JSON_FORCE_OBJECT);
 
     $stmt = $db->prepare(
-      'INSERT INTO projects (code, project_label, stage, stage_dates, created_at, updated_at)
-       VALUES (:code, :label, 0, :stage_dates, :now, :now)'
+      'INSERT INTO projects (code, project_label, stage, stage_dates, client_name, client_email, created_at, updated_at)
+       VALUES (:code, :label, 0, :stage_dates, :client_name, :client_email, :now, :now)'
     );
-    $stmt->execute(['code' => $code, 'label' => $label, 'stage_dates' => $stage_dates, 'now' => $now]);
+    $stmt->execute([
+      'code' => $code,
+      'label' => $label,
+      'stage_dates' => $stage_dates,
+      'client_name' => $client_name,
+      'client_email' => $client_email,
+      'now' => $now,
+    ]);
+
     $notice = "Created project with code {$code}";
+    if ($client_email !== '') {
+      $sent = tracker_send_order_email($client_email, $client_name, $label, $code);
+      $notice .= $sent ? " — confirmation emailed to {$client_email}" : ' — email failed to send';
+    }
   }
 
   if ($action === 'update_stage') {
@@ -130,6 +149,14 @@ function e(string $value): string {
         <span>Project label (shown to the client)</span>
         <input type="text" name="project_label" placeholder="e.g. Documentary Edit" maxlength="80" required>
       </label>
+      <label class="tracker-field">
+        <span>Client name (optional)</span>
+        <input type="text" name="client_name" placeholder="e.g. Jane Doe" maxlength="80">
+      </label>
+      <label class="tracker-field">
+        <span>Client email (optional — sends order confirmation)</span>
+        <input type="email" name="client_email" placeholder="client@example.com" maxlength="160">
+      </label>
       <button type="submit" class="tracker-btn">Create &amp; Generate Code</button>
     </form>
   </div>
@@ -145,6 +172,7 @@ function e(string $value): string {
             <tr>
               <th>Code</th>
               <th>Project</th>
+              <th>Client</th>
               <th>Stage</th>
               <th>Payment note</th>
               <th>Delivery date</th>
@@ -157,6 +185,13 @@ function e(string $value): string {
               <tr>
                 <td class="tracker-code"><?= e($project['code']) ?></td>
                 <td><?= e($project['project_label'] !== '' ? $project['project_label'] : '(untitled)') ?></td>
+                <td class="tracker-muted">
+                  <?php if (($project['client_name'] ?? '') !== '' || ($project['client_email'] ?? '') !== ''): ?>
+                    <?= e((string) ($project['client_name'] ?? '')) ?><?php if (($project['client_email'] ?? '') !== ''): ?><br><?= e((string) $project['client_email']) ?><?php endif; ?>
+                  <?php else: ?>
+                    —
+                  <?php endif; ?>
+                </td>
                 <td>
                   <form method="post" class="tracker-stage-form">
                     <input type="hidden" name="action" value="update_stage">

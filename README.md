@@ -58,6 +58,7 @@ bash deploy.sh --dry-run               # preview without uploading
 | `track.html` | Public Project Tracker page (nav: "Track Order") |
 | `track-lookup.php` | Public code → project status lookup endpoint |
 | `lib/tracker-db.php` | SQLite helper shared by tracker + admin |
+| `lib/tracker-mail.php` | Sends the order-confirmation email to clients on project creation |
 | `admin/index.php`, `admin/login.php`, `admin/logout.php` | Password-gated dashboard to create projects and update stages |
 | `admin-config.local.php` | Admin password — NOT in git, lives on server only |
 | `data/tracker.sqlite` | Project tracker database — NOT in git, auto-created on server |
@@ -231,9 +232,16 @@ an update — nav button "Track Order" → `track.html`.
    `/admin/` (e.g. "50% advance ($150) received") — rendered as a small line
    under the *current* stage's label in the stepper whenever it's non-empty.
    Stage list lives in `TRACKER_STAGES` in `lib/tracker-db.php`.
-6. `/admin/` also lets Ariyan pick a delivery date per project. The client
-   sees "Started [creation date] · Expected delivery [date]" under the
-   project title (delivery date only shows once Ariyan has set one).
+6. Every time Ariyan changes a project's stage, today's date is auto-stamped
+   for that stage (first time only, stored as JSON in `stage_dates`) and
+   shown above that stage's dot on the stepper. The first dot falls back to
+   the creation date and the last dot falls back to the admin-picked
+   "delivery date" field whenever a stage has no stamped date of its own.
+7. Creating a project can optionally take a client name + email. If an
+   email is given, `lib/tracker-mail.php` sends an order-confirmation email
+   (via the same PHPMailer/`mail-config.local.php` setup as the contact
+   form) with the tracking link and code. Leaving the email blank just
+   skips sending — the project is still created either way.
 
 **Setup (one-time, done directly on the server — not via git):**
 ```bash

@@ -69,6 +69,12 @@ function tracker_db(): PDO {
   if (!in_array('stage_dates', $columns, true)) {
     $db->exec('ALTER TABLE projects ADD COLUMN stage_dates TEXT NOT NULL DEFAULT "{}"');
   }
+  if (!in_array('client_name', $columns, true)) {
+    $db->exec('ALTER TABLE projects ADD COLUMN client_name TEXT NOT NULL DEFAULT ""');
+  }
+  if (!in_array('client_email', $columns, true)) {
+    $db->exec('ALTER TABLE projects ADD COLUMN client_email TEXT NOT NULL DEFAULT ""');
+  }
 
   return $db;
 }
