@@ -5,10 +5,22 @@
    ══════════════════════════════════════════════════ */
 
 const TRACKER_STAGES = [
-  0 => 'Footage Received',
-  1 => 'Editing In Progress',
-  2 => 'In Review',
-  3 => 'Delivered',
+  0 => [
+    'label' => 'Footage Received',
+    'desc' => 'Your raw footage has been received and reviewed — getting familiar with the material before editing begins.',
+  ],
+  1 => [
+    'label' => 'Editing In Progress',
+    'desc' => 'Cutting, pacing, and shaping your video — building the structure, adding B-roll, captions, and sound design.',
+  ],
+  2 => [
+    'label' => 'In Review',
+    'desc' => 'Your first cut is ready and out for your feedback — waiting on notes or approval before the final pass.',
+  ],
+  3 => [
+    'label' => 'Delivered',
+    'desc' => 'Your finished video has been delivered, exported, and ready to publish.',
+  ],
 ];
 
 const TRACKER_CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; // no 0/O/1/I/L

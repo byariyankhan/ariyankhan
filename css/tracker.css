@@ -47,39 +47,23 @@
   color:#ef4444; font-size:13px; line-height:1.6; text-align:left;
 }
 
-.tracker-result{
-  max-width:420px; margin:40px auto 0; text-align:left;
-  background:var(--panel); border:1px solid #1f1f1f; border-radius:18px;
-  padding:28px 24px;
-}
+.tracker-result{ margin:40px auto 0; text-align:left; }
 .tracker-result-title{
   font-family:'Barlow Condensed',sans-serif; font-size:24px; font-weight:800;
-  text-transform:uppercase; margin:0 0 22px;
+  text-transform:uppercase; margin:0 0 22px; text-align:center;
 }
-.tracker-stages{ display:flex; flex-direction:column; gap:0; }
-.tracker-stage{
-  display:flex; align-items:center; gap:14px;
-  padding:12px 0; position:relative;
+
+/* Reuses the homepage's .stage-cards / .stcard component (css/style.css)
+   so the tracker's progress view matches "Editing Stages" exactly.
+   These modifiers add live done/current/upcoming state on top of it. */
+.tracker-stcard--done{ border-left-color:var(--yellow); }
+.tracker-stcard--current{
+  border-left-color:var(--yellow);
+  background:var(--panel2);
+  box-shadow:0 0 0 1px rgba(255,237,84,.15), 0 12px 34px rgba(255,237,84,.08);
 }
-.tracker-stage::before{
-  content:''; position:absolute; left:5px; top:-2px; bottom:-2px; width:2px;
-  background:#1f1f1f; z-index:0;
-}
-.tracker-stage:first-child::before{ top:50%; }
-.tracker-stage:last-child::before{ bottom:50%; }
-.tracker-stage-dot{
-  position:relative; z-index:1; flex-shrink:0;
-  width:12px; height:12px; border-radius:50%;
-  background:#1f1f1f; border:2px solid #1f1f1f;
-}
-.tracker-stage-label{ font-size:14px; font-weight:600; color:var(--muted); }
-.tracker-stage--done .tracker-stage-dot{ background:var(--yellow); border-color:var(--yellow); }
-.tracker-stage--done .tracker-stage-label{ color:var(--text); }
-.tracker-stage--current .tracker-stage-dot{
-  background:var(--yellow); border-color:var(--yellow);
-  box-shadow:0 0 0 4px rgba(255,237,84,.18);
-}
-.tracker-stage--current .tracker-stage-label{ color:var(--yellow); font-weight:800; }
+.tracker-stcard--current .stcard-name{ color:var(--yellow); }
+.tracker-stcard--upcoming{ opacity:.45; }
 
 /* ── Admin ── */
 .tracker-body{ background:var(--bg); color:var(--text); font-family:'Inter',sans-serif; min-height:100vh; }

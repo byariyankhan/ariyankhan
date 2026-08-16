@@ -72,6 +72,5 @@ respond(200, [
   'ok' => true,
   'projectLabel' => $project['project_label'] !== '' ? $project['project_label'] : 'Your Project',
   'stage' => $stage,
-  'stageLabel' => TRACKER_STAGES[$stage] ?? TRACKER_STAGES[0],
   'stages' => array_values(TRACKER_STAGES),
 ]);

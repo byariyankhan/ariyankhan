@@ -17,15 +17,26 @@
 
   function renderStages(stages, currentStage) {
     stagesEl.innerHTML = '';
-    stages.forEach((label, index) => {
-      const item = document.createElement('div');
+    stages.forEach((stage, index) => {
       const state = index < currentStage ? 'done' : index === currentStage ? 'current' : 'upcoming';
-      item.className = `tracker-stage tracker-stage--${state}`;
-      item.innerHTML = `
-        <span class="tracker-stage-dot" aria-hidden="true"></span>
-        <span class="tracker-stage-label">${label}</span>
-      `;
-      stagesEl.appendChild(item);
+
+      const card = document.createElement('div');
+      card.className = `stcard tracker-stcard tracker-stcard--${state}`;
+
+      const num = document.createElement('div');
+      num.className = 'stcard-num';
+      num.textContent = `Stage 0${index + 1}`;
+
+      const name = document.createElement('h3');
+      name.className = 'stcard-name';
+      name.textContent = stage.label;
+
+      const desc = document.createElement('p');
+      desc.className = 'stcard-desc';
+      desc.textContent = stage.desc;
+
+      card.append(num, name, desc);
+      stagesEl.appendChild(card);
     });
   }
 
