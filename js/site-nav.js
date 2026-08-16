@@ -23,14 +23,15 @@
     const logoHref = isHomePage ? '#home' : homePath;
     const contactHref = buildHref('contact', isHomePage, homePath);
     const basePath = homePath.replace(/index\.html$/, '');
+    const trackHref = `${basePath}track.html`;
 
     const desktopLinks = NAV_ITEMS.map(item =>
       `<a href="${escapeAttr(buildHref(item.id, isHomePage, homePath))}" class="nav-link">${item.label}</a>`
-    ).join('\n');
+    ).join('\n') + `\n<a href="${escapeAttr(trackHref)}" class="nav-link">Track Order</a>`;
 
     const mobileLinks = NAV_ITEMS.map(item =>
       `<a href="${escapeAttr(buildHref(item.id, isHomePage, homePath))}" class="menu-link"><span class="ml-num">${item.number}</span><span class="ml-label">${item.label}</span></a>`
-    ).join('\n');
+    ).join('\n') + `\n<a href="${escapeAttr(trackHref)}" class="menu-link"><span class="ml-num">07</span><span class="ml-label">Track Order</span></a>`;
 
     return `
 <nav class="site-nav">

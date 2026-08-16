@@ -37,7 +37,7 @@ bash deploy.sh index.html              # deploy one file
 bash deploy.sh --dry-run               # preview without uploading
 ```
 
-**Never commit:** `.env`, `mail-config.local.php` (credentials — both in `.gitignore`)
+**Never commit:** `.env`, `mail-config.local.php`, `admin-config.local.php` (credentials), `data/` (tracker database) — all in `.gitignore`
 
 ---
 
@@ -55,6 +55,13 @@ bash deploy.sh --dry-run               # preview without uploading
 | `sitemap.xml` | All pages. Update when adding new pages |
 | `send-mail.php` | Contact form handler (PHPMailer + SMTP) |
 | `mail-config.local.php` | SMTP credentials — NOT in git, lives on server only |
+| `track.html` | Public Project Tracker page (nav: "Track Order") |
+| `track-lookup.php` | Public code → project status lookup endpoint |
+| `lib/tracker-db.php` | SQLite helper shared by tracker + admin |
+| `admin/index.php`, `admin/login.php`, `admin/logout.php` | Password-gated dashboard to create projects and update stages |
+| `admin-config.local.php` | Admin password — NOT in git, lives on server only |
+| `data/tracker.sqlite` | Project tracker database — NOT in git, auto-created on server |
+| `css/tracker.css`, `js/tracker.js` | Tracker page + admin styling/behavior |
 
 ---
 
@@ -201,6 +208,43 @@ Bump `?v=` query string when editing CSS or JS files:
 ```
 
 Update ALL pages that load the changed file.
+
+---
+
+## Project Tracker
+
+Lets clients check their project status themselves instead of messaging for
+an update — nav button "Track Order" → `track.html`.
+
+**How it works:**
+1. Ariyan creates a project in `/admin/` (password-protected) with a short
+   client-facing label. This generates a random 8-character code like
+   `7K4M-9XPQ` (confusable characters like `0/O/1/I/L` excluded).
+2. Ariyan sends that code to the client (email/WhatsApp).
+3. The client goes to `ariyankhan.com/track.html`, types the code, and sees
+   a 4-stage progress bar: Footage Received → Editing In Progress → In
+   Review → Delivered.
+4. Ariyan updates the stage from the same `/admin/` dashboard as work
+   progresses — the client's page reflects it immediately on next lookup
+   (no notification is sent; the client checks on demand).
+
+**Setup (one-time, done directly on the server — not via git):**
+```bash
+# SSH in, then create the admin password file (never commit this):
+cat > admin-config.local.php <<'PHP'
+<?php
+return [
+  'password' => 'choose-a-strong-password-here',
+];
+PHP
+```
+Same protection model as `mail-config.local.php`: plain-text in a gitignored
+file, blocked from direct HTTP access by `.htaccess`. The SQLite database at
+`data/tracker.sqlite` is created automatically the first time any tracker
+script runs, and is also blocked from direct HTTP access by `.htaccess`.
+
+**Stack:** PHP 8 (confirmed live on this host) + SQLite via PDO (built into
+PHP, no separate database server or credentials needed). No new dependency.
 
 ---
 

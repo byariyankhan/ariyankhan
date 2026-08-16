@@ -80,5 +80,27 @@ RewriteRule ^ - [R=404,L]
   </IfModule>
 </Files>
 
+# ── Protect local admin config (Project Tracker) ──
+<Files "admin-config.local.php">
+  <IfModule mod_authz_core.c>
+    Require all denied
+  </IfModule>
+  <IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+  </IfModule>
+</Files>
+
+# ── Protect Project Tracker database ──────────────
+<FilesMatch "\.sqlite$">
+  <IfModule mod_authz_core.c>
+    Require all denied
+  </IfModule>
+  <IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+  </IfModule>
+</FilesMatch>
+
 # ── Hide server info ─────────────────────────────
 ServerSignature Off

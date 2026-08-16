@@ -4,6 +4,9 @@
 User-agent: *
 Allow: /
 Disallow: /send-mail.php
+Disallow: /track-lookup.php
+Disallow: /admin/
+Disallow: /data/
 
 # Google
 User-agent: Googlebot
