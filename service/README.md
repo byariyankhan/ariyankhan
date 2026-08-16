@@ -35,6 +35,7 @@ service/
 ├── corporate-video-editing.html           ← Corporate / Internal Teams (variant of talking-head)
 ├── video-editor-for-podcasters.html       ← Podcasters going to YouTube (variant of talking-head)
 ├── video-editor-for-healthcare-professionals.html ← Doctors & healthcare professionals (variant of talking-head)
+├── video-editor-for-fitness-creators.html ← Fitness & wellness creators (variant of short-form)
 └── (future pages, one per audience segment)
 ```
 
@@ -98,6 +99,7 @@ Every page here is one level deep (`service/<page>.html`), so:
 | `corporate-video-editing.html` | HR/L&D teams, marketing departments, company leadership, internal comms | `talking-head-video-editing.html` |
 | `video-editor-for-podcasters.html` | Interview/panel podcast hosts and networks turning episodes into YouTube uploads | `talking-head-video-editing.html` |
 | `video-editor-for-healthcare-professionals.html` | Physicians, dentists, nurse practitioners, therapists making patient-education content | `talking-head-video-editing.html` |
+| `video-editor-for-fitness-creators.html` | Personal trainers, fitness influencers, yoga/wellness coaches, gym & studio brands | `short-form-video-editing.html` |
 
 **Note on the healthcare page:** a full opportunity-research pass flagged this one as
 overlapping `video-editor-for-coaches.html`'s "Educational Channels" audience closely
