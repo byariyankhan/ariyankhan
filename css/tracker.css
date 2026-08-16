@@ -50,31 +50,38 @@
 .tracker-result{ margin:40px auto 0; text-align:left; }
 .tracker-result-title{
   font-family:'Barlow Condensed',sans-serif; font-size:24px; font-weight:800;
-  text-transform:uppercase; margin:0 0 8px; text-align:center;
-}
-.tracker-meta{
-  text-align:center; margin:0 0 22px;
-  font-size:12px; color:var(--muted);
+  text-transform:uppercase; margin:0 0 26px; text-align:center;
 }
 
 /* Horizontal progress stepper — dots connected left-to-right, stage name
    only (no per-stage description), so the whole path stays scannable
-   in one glance instead of a long dimmed-text list. */
-.tracker-hstepper{ display:flex; align-items:flex-start; gap:2px; margin:32px 0 0; }
+   in one glance instead of a long dimmed-text list. The start/delivery
+   dates sit directly above the first/last dot with a dotted connector,
+   each reserving the same slot height so every dot still lines up. */
+.tracker-hstepper{ display:flex; align-items:flex-start; gap:2px; }
 .hstep{ position:relative; flex:1; min-width:0; display:flex; flex-direction:column; align-items:center; text-align:center; }
-.hstep::before{
-  content:''; position:absolute; top:6px; left:-50%; width:100%; height:2px;
-  background:#2a2a2a; z-index:0;
+
+.hstep-date-slot{ height:38px; width:100%; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; }
+.hstep-date-text{
+  font-size:9px; font-weight:700; letter-spacing:.5px; text-transform:uppercase;
+  color:var(--muted); line-height:1.25;
 }
-.hstep:first-child::before{ content:none; }
+.hstep-date-dots{ width:0; height:8px; margin-top:4px; border-left:1px dotted #3a3a3a; }
+
+.hstep-dot-row{ position:relative; width:100%; display:flex; justify-content:center; margin:6px 0 10px; }
+.hstep-dot-row::before{
+  content:''; position:absolute; top:50%; left:-50%; width:100%; height:2px;
+  background:#2a2a2a; transform:translateY(-50%); z-index:0;
+}
+.hstep:first-child .hstep-dot-row::before{ content:none; }
 .hstep-dot{
   width:14px; height:14px; border-radius:50%;
   background:#2a2a2a; border:2px solid #2a2a2a;
-  margin-bottom:10px; position:relative; z-index:1;
+  position:relative; z-index:1;
 }
 .hstep-label{ font-size:10px; font-weight:600; line-height:1.3; color:var(--muted); padding:0 2px; }
 .hstep--done .hstep-dot, .hstep--current .hstep-dot{ background:var(--yellow); border-color:var(--yellow); }
-.hstep--done::before, .hstep--current::before{ background:var(--yellow); }
+.hstep--done .hstep-dot-row::before, .hstep--current .hstep-dot-row::before{ background:var(--yellow); }
 .hstep--done .hstep-label{ color:var(--text); }
 .hstep--current .hstep-label{ color:var(--yellow); font-weight:700; }
 /* Payment note (admin-written) shown under the current stage's own label,
@@ -86,8 +93,9 @@
 }
 
 @media (min-width:600px){
+  .hstep-date-slot{ height:42px; }
+  .hstep-date-text{ font-size:11px; }
   .hstep-dot{ width:16px; height:16px; }
-  .hstep::before{ top:7px; }
   .hstep-label{ font-size:12px; }
   .hstep-note{ font-size:11px; }
 }

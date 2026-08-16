@@ -5,7 +5,6 @@
   const errorEl = document.getElementById('trackerError');
   const resultEl = document.getElementById('trackerResult');
   const labelEl = document.getElementById('trackerProjectLabel');
-  const metaEl = document.getElementById('trackerMeta');
   const stagesEl = document.getElementById('trackerStages');
 
   if (!form) return;
@@ -24,32 +23,44 @@
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   }
 
-  function renderMeta(createdAt, deliveryDate) {
-    const parts = [];
-    const created = formatDate(createdAt);
-    if (created) parts.push(`Started ${created}`);
-    const delivery = formatDate(deliveryDate);
-    if (delivery) parts.push(`Expected delivery ${delivery}`);
-    metaEl.textContent = parts.join(' · ');
-    metaEl.hidden = parts.length === 0;
-  }
-
-  function renderStages(stages, currentStage, note) {
+  function renderStages(stages, currentStage, note, createdAt, deliveryDate) {
     stagesEl.innerHTML = '';
+    const lastIndex = stages.length - 1;
+    const createdLabel = formatDate(createdAt);
+    const deliveryLabel = formatDate(deliveryDate);
+
     stages.forEach((stage, index) => {
       const state = index < currentStage ? 'done' : index === currentStage ? 'current' : 'upcoming';
 
       const step = document.createElement('div');
       step.className = `hstep hstep--${state}`;
 
+      const dateSlot = document.createElement('div');
+      dateSlot.className = 'hstep-date-slot';
+      const dateLabel = index === 0 ? createdLabel : index === lastIndex ? deliveryLabel : '';
+      if (dateLabel) {
+        const dateText = document.createElement('span');
+        dateText.className = 'hstep-date-text';
+        dateText.textContent = dateLabel;
+
+        const dateDots = document.createElement('span');
+        dateDots.className = 'hstep-date-dots';
+
+        dateSlot.append(dateText, dateDots);
+      }
+      step.append(dateSlot);
+
+      const dotRow = document.createElement('div');
+      dotRow.className = 'hstep-dot-row';
       const dot = document.createElement('span');
       dot.className = 'hstep-dot';
+      dotRow.append(dot);
+      step.append(dotRow);
 
       const label = document.createElement('span');
       label.className = 'hstep-label';
       label.textContent = stage.label;
-
-      step.append(dot, label);
+      step.append(label);
 
       if (state === 'current' && note) {
         const noteEl = document.createElement('span');
@@ -96,8 +107,7 @@
 
       const note = typeof json.note === 'string' ? json.note.trim() : '';
       labelEl.textContent = json.projectLabel;
-      renderMeta(json.createdAt, json.deliveryDate);
-      renderStages(json.stages, json.stage, note);
+      renderStages(json.stages, json.stage, note, json.createdAt, json.deliveryDate);
       resultEl.hidden = false;
     } catch (err) {
       showError('Could not reach the server. Please check your connection and try again.');
