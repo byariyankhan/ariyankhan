@@ -837,6 +837,7 @@ section{ position:relative; z-index:1; padding:80px 22px; }
   transition:border-color .25s, box-shadow .25s, transform .25s;
 }
 .t-card:hover{ border-color:rgba(255,237,84,.3); box-shadow:0 12px 48px rgba(255,237,84,.08), 0 8px 40px rgba(0,0,0,.4); transform:translateY(-4px); }
+.t-card[hidden]{ display:none; }
 .t-stars{ color:var(--yellow); font-size:14px; letter-spacing:2px; margin-bottom:14px; }
 .t-quote{ font-size:14px; line-height:1.75; color:var(--text); flex:1; margin:0 0 20px; }
 .t-quote::before{ content:'\201C'; }
@@ -855,7 +856,8 @@ section{ position:relative; z-index:1; padding:80px 22px; }
 .testimonials-cta{
   display:inline-flex; align-items:center; gap:8px;
   padding:12px 24px; border:1px solid var(--border); border-radius:100px;
-  color:var(--text); text-decoration:none; font-size:13px; font-weight:700;
+  background:none; color:var(--text); font:inherit; text-decoration:none;
+  font-size:13px; font-weight:700; cursor:pointer;
   transition:border-color .2s, color .2s, background .2s;
 }
 .testimonials-cta:hover{ border-color:rgba(255,237,84,.4); color:var(--yellow); background:rgba(255,237,84,.05); }

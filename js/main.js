@@ -961,6 +961,20 @@ document.querySelectorAll('.faq-q').forEach(button => {
   button.addEventListener('click', () => toggleFaq(button.closest('.faq-item')));
 });
 
+/* Testimonials — show all */
+const testimonialsToggle = document.getElementById('testimonialsToggle');
+if (testimonialsToggle) {
+  testimonialsToggle.addEventListener('click', () => {
+    const isExpanded = testimonialsToggle.getAttribute('aria-expanded') === 'true';
+    document.querySelectorAll('.t-card--extra').forEach(card => {
+      card.hidden = isExpanded;
+    });
+    testimonialsToggle.setAttribute('aria-expanded', String(!isExpanded));
+    testimonialsToggle.querySelector('.testimonials-cta-label').textContent =
+      isExpanded ? 'See All Reviews' : 'Show Fewer Reviews';
+  });
+}
+
 /* Service card accordions */
 function setServiceCardState(card, isOpen) {
   if (!card) return;
