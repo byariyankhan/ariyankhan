@@ -239,7 +239,7 @@
 }
 @media (max-width: 1023px) {
   .service-page .service-introduction {
-    padding: 46px 24px 48px;
+    padding: 46px 28px 48px;
   }
   .service-status {
     min-height: 42px;
@@ -665,7 +665,7 @@
 @media (max-width: 1023px) {
   .service-page--landing {
     --what-i-do-gap-top: 58px;
-    --what-i-do-pad-x: 24px;
+    --what-i-do-pad-x: 28px;
     --what-i-do-pad-bottom: 34px;
   }
   .what-i-do-intro {
@@ -1026,7 +1026,7 @@
 }
 @media (max-width: 767px) {
   .service-page .how-it-works {
-    padding: 48px 24px 36px;
+    padding: 48px 28px 36px;
   }
   .how-it-works-intro {
     margin-bottom: 34px;
@@ -1127,7 +1127,7 @@
    FEATURED WORK
 ══════════════════════════════════════════════════ */
 .featured-work {
-  padding: 0 22px 60px;
+  padding: 0 28px 60px;
   max-width: 1200px;
   margin: 0 auto;
 }
@@ -1209,7 +1209,7 @@
    SERVICE FAQ
 ══════════════════════════════════════════════════ */
 .service-faq {
-  padding: 0 22px 80px;
+  padding: 0 28px 80px;
   max-width: 860px;
   margin: 0 auto;
 }
@@ -1283,7 +1283,7 @@
    PROBLEMS I SOLVE
 ══════════════════════════════════════════════════ */
 .service-pain {
-  padding: 64px 24px;
+  padding: 64px 28px;
   max-width: 1200px;
   margin: 0 auto;
 }
