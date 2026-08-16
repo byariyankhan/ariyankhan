@@ -58,7 +58,7 @@ if ($code_input === '') {
 $code = tracker_normalize_code($code_input);
 
 $db = tracker_db();
-$stmt = $db->prepare('SELECT project_label, stage, note, created_at, delivery_date FROM projects WHERE code = :code');
+$stmt = $db->prepare('SELECT project_label, stage, note, created_at, delivery_date, stage_dates FROM projects WHERE code = :code');
 $stmt->execute(['code' => $code]);
 $project = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -67,6 +67,10 @@ if (!$project) {
 }
 
 $stage = (int) $project['stage'];
+$stage_dates = json_decode((string) ($project['stage_dates'] ?? '{}'), true);
+if (!is_array($stage_dates)) {
+  $stage_dates = [];
+}
 
 respond(200, [
   'ok' => true,
@@ -76,4 +80,5 @@ respond(200, [
   'note' => (string) ($project['note'] ?? ''),
   'createdAt' => substr((string) $project['created_at'], 0, 10),
   'deliveryDate' => (string) ($project['delivery_date'] ?? ''),
+  'stageDates' => (object) $stage_dates,
 ]);

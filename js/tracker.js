@@ -23,11 +23,10 @@
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   }
 
-  function renderStages(stages, currentStage, note, createdAt, deliveryDate) {
+  function renderStages(stages, currentStage, note, createdAt, deliveryDate, stageDates) {
     stagesEl.innerHTML = '';
     const lastIndex = stages.length - 1;
-    const createdLabel = formatDate(createdAt);
-    const deliveryLabel = formatDate(deliveryDate);
+    const dates = stageDates && typeof stageDates === 'object' ? stageDates : {};
 
     stages.forEach((stage, index) => {
       const state = index < currentStage ? 'done' : index === currentStage ? 'current' : 'upcoming';
@@ -37,7 +36,12 @@
 
       const dateSlot = document.createElement('div');
       dateSlot.className = 'hstep-date-slot';
-      const dateLabel = index === 0 ? createdLabel : index === lastIndex ? deliveryLabel : '';
+      // Prefer the actual date this stage was marked; fall back to the
+      // project's creation date on the first stage and the admin-picked
+      // expected delivery date on the last, for stages never explicitly dated.
+      let dateLabel = formatDate(dates[index]);
+      if (!dateLabel && index === 0) dateLabel = formatDate(createdAt);
+      if (!dateLabel && index === lastIndex) dateLabel = formatDate(deliveryDate);
       if (dateLabel) {
         const dateText = document.createElement('span');
         dateText.className = 'hstep-date-text';
@@ -107,7 +111,7 @@
 
       const note = typeof json.note === 'string' ? json.note.trim() : '';
       labelEl.textContent = json.projectLabel;
-      renderStages(json.stages, json.stage, note, json.createdAt, json.deliveryDate);
+      renderStages(json.stages, json.stage, note, json.createdAt, json.deliveryDate, json.stageDates);
       resultEl.hidden = false;
     } catch (err) {
       showError('Could not reach the server. Please check your connection and try again.');

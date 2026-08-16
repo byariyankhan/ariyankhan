@@ -21,12 +21,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $label = trim((string) ($_POST['project_label'] ?? ''));
     $now = gmdate('c');
     $code = tracker_generate_code();
+    $stage_dates = json_encode(['0' => gmdate('Y-m-d')], JSON_FORCE_OBJECT);
 
     $stmt = $db->prepare(
-      'INSERT INTO projects (code, project_label, stage, created_at, updated_at)
-       VALUES (:code, :label, 0, :now, :now)'
+      'INSERT INTO projects (code, project_label, stage, stage_dates, created_at, updated_at)
+       VALUES (:code, :label, 0, :stage_dates, :now, :now)'
     );
-    $stmt->execute(['code' => $code, 'label' => $label, 'now' => $now]);
+    $stmt->execute(['code' => $code, 'label' => $label, 'stage_dates' => $stage_dates, 'now' => $now]);
     $notice = "Created project with code {$code}";
   }
 
@@ -35,8 +36,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $stage = (int) ($_POST['stage'] ?? 0);
     $stage = max(0, min(TRACKER_MAX_STAGE, $stage));
 
-    $stmt = $db->prepare('UPDATE projects SET stage = :stage, updated_at = :now WHERE id = :id');
-    $stmt->execute(['stage' => $stage, 'now' => gmdate('c'), 'id' => $id]);
+    $stmt = $db->prepare('SELECT stage_dates FROM projects WHERE id = :id');
+    $stmt->execute(['id' => $id]);
+    $stage_dates = json_decode((string) $stmt->fetchColumn(), true);
+    if (!is_array($stage_dates)) {
+      $stage_dates = [];
+    }
+    if (!isset($stage_dates[(string) $stage])) {
+      $stage_dates[(string) $stage] = gmdate('Y-m-d');
+    }
+
+    $stmt = $db->prepare('UPDATE projects SET stage = :stage, stage_dates = :stage_dates, updated_at = :now WHERE id = :id');
+    $stmt->execute([
+      'stage' => $stage,
+      'stage_dates' => json_encode($stage_dates, JSON_FORCE_OBJECT),
+      'now' => gmdate('c'),
+      'id' => $id,
+    ]);
     $notice = 'Stage updated';
   }
 
