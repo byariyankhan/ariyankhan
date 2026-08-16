@@ -1282,8 +1282,9 @@
 /* ══════════════════════════════════════════════════
    PROBLEMS I SOLVE
 ══════════════════════════════════════════════════ */
-.service-pain {
-  padding: 64px 28px;
+.service-page .service-pain {
+  box-sizing: border-box;
+  padding: 64px 28px !important;
   max-width: 1200px;
   margin: 0 auto;
 }
@@ -1421,8 +1422,8 @@
 }
 @media (min-width: 768px) {
   .pain-grid { grid-template-columns: 1fr 1fr; gap: 14px; }
-  .service-pain { padding: 72px 40px; }
+  .service-page .service-pain { padding: 72px 40px !important; }
 }
 @media (min-width: 1200px) {
-  .service-pain { padding: 80px 60px; }
+  .service-page .service-pain { padding: 80px 60px !important; }
 }
