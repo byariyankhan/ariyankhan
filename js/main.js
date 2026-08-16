@@ -961,14 +961,13 @@ document.querySelectorAll('.faq-q').forEach(button => {
   button.addEventListener('click', () => toggleFaq(button.closest('.faq-item')));
 });
 
-/* Testimonials — show all */
+/* Testimonials — show all (3 visible on mobile, 6 on tablet/desktop by default) */
 const testimonialsToggle = document.getElementById('testimonialsToggle');
-if (testimonialsToggle) {
+const testimonialsGrid = document.getElementById('testimonialsGrid');
+if (testimonialsToggle && testimonialsGrid) {
   testimonialsToggle.addEventListener('click', () => {
     const isExpanded = testimonialsToggle.getAttribute('aria-expanded') === 'true';
-    document.querySelectorAll('.t-card--extra').forEach(card => {
-      card.hidden = isExpanded;
-    });
+    testimonialsGrid.classList.toggle('show-all', !isExpanded);
     testimonialsToggle.setAttribute('aria-expanded', String(!isExpanded));
     testimonialsToggle.querySelector('.testimonials-cta-label').textContent =
       isExpanded ? 'See All Reviews' : 'Show Fewer Reviews';
