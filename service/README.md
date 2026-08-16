@@ -33,6 +33,7 @@ service/
 ├── video-editor-for-founders.html         ← Founders & Personal Brands (variant of talking-head)
 ├── video-editor-for-coaches.html          ← Online Coaches & Course Creators (variant of talking-head)
 ├── corporate-video-editing.html           ← Corporate / Internal Teams (variant of talking-head)
+├── video-editor-for-podcasters.html       ← Podcasters going to YouTube (variant of talking-head)
 └── (future pages, one per audience segment)
 ```
 
@@ -94,6 +95,7 @@ Every page here is one level deep (`service/<page>.html`), so:
 | `video-editor-for-founders.html` | Startup founders, LinkedIn creators, SaaS/B2B, coaches & consultants | `talking-head-video-editing.html` |
 | `video-editor-for-coaches.html` | Online coaches, course creators, educational YouTube channels | `talking-head-video-editing.html` |
 | `corporate-video-editing.html` | HR/L&D teams, marketing departments, company leadership, internal comms | `talking-head-video-editing.html` |
+| `video-editor-for-podcasters.html` | Interview/panel podcast hosts and networks turning episodes into YouTube uploads | `talking-head-video-editing.html` |
 
 Pages in this folder cross-link to each other (Explore Services), but **not** from
 the 4 main service pages — those only cross-link to each other. Keeps the main
