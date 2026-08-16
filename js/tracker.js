@@ -5,6 +5,7 @@
   const errorEl = document.getElementById('trackerError');
   const resultEl = document.getElementById('trackerResult');
   const labelEl = document.getElementById('trackerProjectLabel');
+  const metaEl = document.getElementById('trackerMeta');
   const stagesEl = document.getElementById('trackerStages');
 
   if (!form) return;
@@ -13,6 +14,24 @@
     errorEl.textContent = message;
     errorEl.hidden = false;
     resultEl.hidden = true;
+  }
+
+  function formatDate(isoDate) {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(isoDate || '');
+    if (!match) return '';
+    const [, y, m, d] = match;
+    const date = new Date(Number(y), Number(m) - 1, Number(d));
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+
+  function renderMeta(createdAt, deliveryDate) {
+    const parts = [];
+    const created = formatDate(createdAt);
+    if (created) parts.push(`Started ${created}`);
+    const delivery = formatDate(deliveryDate);
+    if (delivery) parts.push(`Expected delivery ${delivery}`);
+    metaEl.textContent = parts.join(' · ');
+    metaEl.hidden = parts.length === 0;
   }
 
   function renderStages(stages, currentStage, note) {
@@ -77,6 +96,7 @@
 
       const note = typeof json.note === 'string' ? json.note.trim() : '';
       labelEl.textContent = json.projectLabel;
+      renderMeta(json.createdAt, json.deliveryDate);
       renderStages(json.stages, json.stage, note);
       resultEl.hidden = false;
     } catch (err) {

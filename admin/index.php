@@ -49,6 +49,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $notice = 'Note updated';
   }
 
+  if ($action === 'update_delivery') {
+    $id = (int) ($_POST['id'] ?? 0);
+    $delivery_date = trim((string) ($_POST['delivery_date'] ?? ''));
+    if ($delivery_date !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $delivery_date)) {
+      $delivery_date = '';
+    }
+
+    $stmt = $db->prepare('UPDATE projects SET delivery_date = :delivery_date, updated_at = :now WHERE id = :id');
+    $stmt->execute(['delivery_date' => $delivery_date, 'now' => gmdate('c'), 'id' => $id]);
+    $notice = 'Delivery date updated';
+  }
+
   if ($action === 'delete') {
     $id = (int) ($_POST['id'] ?? 0);
     $stmt = $db->prepare('DELETE FROM projects WHERE id = :id');
@@ -77,7 +89,7 @@ function e(string $value): string {
 <link rel="icon" type="image/x-icon" href="../favicon/favicon.ico">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../css/style.css?v=9">
-<link rel="stylesheet" href="../css/tracker.css?v=8">
+<link rel="stylesheet" href="../css/tracker.css?v=9">
 </head>
 <body class="tracker-body">
 <div id="stars"></div>
@@ -119,6 +131,7 @@ function e(string $value): string {
               <th>Project</th>
               <th>Stage</th>
               <th>Payment note</th>
+              <th>Delivery date</th>
               <th>Created</th>
               <th></th>
             </tr>
@@ -147,6 +160,14 @@ function e(string $value): string {
                     <input type="hidden" name="id" value="<?= (int) $project['id'] ?>">
                     <textarea name="note" rows="2" maxlength="300" placeholder="e.g. 50% advance ($150) received"><?= e((string) ($project['note'] ?? '')) ?></textarea>
                     <button type="submit" class="tracker-btn tracker-btn--ghost tracker-btn--small">Save Note</button>
+                  </form>
+                </td>
+                <td>
+                  <form method="post" class="tracker-date-form">
+                    <input type="hidden" name="action" value="update_delivery">
+                    <input type="hidden" name="id" value="<?= (int) $project['id'] ?>">
+                    <input type="date" name="delivery_date" value="<?= e((string) ($project['delivery_date'] ?? '')) ?>">
+                    <button type="submit" class="tracker-btn tracker-btn--ghost tracker-btn--small">Save</button>
                   </form>
                 </td>
                 <td class="tracker-muted"><?= e(substr((string) $project['created_at'], 0, 10)) ?></td>

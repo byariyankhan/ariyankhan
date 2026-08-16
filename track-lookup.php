@@ -58,7 +58,7 @@ if ($code_input === '') {
 $code = tracker_normalize_code($code_input);
 
 $db = tracker_db();
-$stmt = $db->prepare('SELECT project_label, stage, note FROM projects WHERE code = :code');
+$stmt = $db->prepare('SELECT project_label, stage, note, created_at, delivery_date FROM projects WHERE code = :code');
 $stmt->execute(['code' => $code]);
 $project = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -74,4 +74,6 @@ respond(200, [
   'stage' => $stage,
   'stages' => array_values(TRACKER_STAGES),
   'note' => (string) ($project['note'] ?? ''),
+  'createdAt' => substr((string) $project['created_at'], 0, 10),
+  'deliveryDate' => (string) ($project['delivery_date'] ?? ''),
 ]);

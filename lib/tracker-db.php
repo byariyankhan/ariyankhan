@@ -63,6 +63,9 @@ function tracker_db(): PDO {
   if (!in_array('note', $columns, true)) {
     $db->exec('ALTER TABLE projects ADD COLUMN note TEXT NOT NULL DEFAULT ""');
   }
+  if (!in_array('delivery_date', $columns, true)) {
+    $db->exec('ALTER TABLE projects ADD COLUMN delivery_date TEXT NOT NULL DEFAULT ""');
+  }
 
   return $db;
 }

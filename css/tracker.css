@@ -50,7 +50,11 @@
 .tracker-result{ margin:40px auto 0; text-align:left; }
 .tracker-result-title{
   font-family:'Barlow Condensed',sans-serif; font-size:24px; font-weight:800;
-  text-transform:uppercase; margin:0 0 22px; text-align:center;
+  text-transform:uppercase; margin:0 0 8px; text-align:center;
+}
+.tracker-meta{
+  text-align:center; margin:0 0 22px;
+  font-size:12px; color:var(--muted);
 }
 
 /* Horizontal progress stepper — dots connected left-to-right, stage name
@@ -146,6 +150,12 @@
 }
 .tracker-note-form textarea::placeholder{ color:rgba(255,255,255,.3); }
 .tracker-note-form .tracker-btn{ align-self:flex-start; }
+.tracker-date-form{ display:flex; align-items:center; gap:8px; }
+.tracker-date-form input[type="date"]{
+  color-scheme:dark;
+  background:rgba(255,255,255,.03); color:var(--text); border:1px solid #1f1f1f; border-radius:8px;
+  padding:8px 10px; font-family:inherit; font-size:13px;
+}
 
 @media (max-width:480px){
   .tracker-page{ padding-top:120px; }
