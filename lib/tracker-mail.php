@@ -103,7 +103,7 @@ function tracker_send_order_email(string $to_email, string $to_name, string $pro
   try {
     $mail = tracker_mail_new($config, $to_email, $to_name);
     $mail->MessageID = tracker_mail_thread_id($code);
-    $mail->Subject = "Your order is confirmed — {$label}";
+    $mail->Subject = $label;
 
     $greeting = $to_name !== '' ? "Hi {$to_name}," : 'Hi,';
     $mail->Body =
@@ -136,7 +136,7 @@ function tracker_send_stage_update_email(string $to_email, string $to_name, stri
 
   try {
     $mail = tracker_mail_new($config, $to_email, $to_name);
-    $mail->Subject = "Re: Your order is confirmed — {$label}";
+    $mail->Subject = "Re: {$label}";
     $mail->addCustomHeader('In-Reply-To', $thread_id);
     $mail->addCustomHeader('References', $thread_id);
 
