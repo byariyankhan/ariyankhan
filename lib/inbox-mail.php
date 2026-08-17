@@ -57,6 +57,27 @@ function inbox_send(string $to_email, string $to_name, string $subject, string $
     return ['ok' => false, 'error' => 'Mail is not configured on the server yet.'];
   }
 
+  $db = inbox_db();
+
+  // A reply sent through here goes to someone who never received the
+  // original message themselves (it only ever landed in Ariyan's inbox),
+  // so there's nothing on their end for mail clients to thread against.
+  // Prepending the quoted original — same as a native "Reply" — is what
+  // makes it read as a continuation instead of a cold, unrelated email.
+  $quoted_text = '';
+  $quoted_html = '';
+  if ($in_reply_to !== '') {
+    $stmt = $db->prepare('SELECT contact_name, contact_email, body, created_at FROM mail_messages WHERE message_id = :mid ORDER BY id DESC LIMIT 1');
+    $stmt->execute(['mid' => $in_reply_to]);
+    $original = $stmt->fetch(PDO::FETCH_ASSOC);
+    if ($original) {
+      $who = $original['contact_name'] !== '' ? $original['contact_name'] : $original['contact_email'];
+      $when = inbox_format_quote_date((string) $original['created_at']);
+      $quoted_text = "\n\nOn {$when}, {$who} wrote:\n" . inbox_quote_prefix_lines((string) $original['body']);
+      $quoted_html = inbox_render_quoted_html($who, $when, (string) $original['body']);
+    }
+  }
+
   $mail = new PHPMailer(true);
 
   try {
@@ -88,9 +109,9 @@ function inbox_send(string $to_email, string $to_name, string $subject, string $
     $mail->Subject = $subject;
     $mail->Body = mail_template_wrap(
       mb_strimwidth(trim(preg_replace('/\s+/', ' ', $body) ?? $body), 0, 110, '…'),
-      inbox_render_html_body($body)
+      inbox_render_html_body($body) . $quoted_html
     );
-    $mail->AltBody = $body;
+    $mail->AltBody = $body . $quoted_text;
 
     if ($in_reply_to !== '') {
       $mail->addCustomHeader('In-Reply-To', $in_reply_to);
@@ -100,7 +121,6 @@ function inbox_send(string $to_email, string $to_name, string $subject, string $
     $mail->send();
     $message_id = trim((string) $mail->getLastMessageID());
 
-    $db = inbox_db();
     $stmt = $db->prepare(
       'INSERT INTO mail_messages (direction, contact_email, contact_name, subject, body, message_id, in_reply_to, created_at)
        VALUES ("out", :email, :name, :subject, :body, :message_id, :in_reply_to, :now)'
@@ -133,6 +153,33 @@ function inbox_render_html_body(string $body_text): string {
     $html .= '<p style="margin:0 0 16px;">' . nl2br(mail_template_esc($paragraph)) . '</p>';
   }
   return $html;
+}
+
+/* Formats a stored UTC created_at for the "On [date], [name] wrote:" quote
+   line, matching the style native mail clients use when replying. */
+function inbox_format_quote_date(string $iso): string {
+  try {
+    $dt = new DateTime($iso);
+  } catch (Throwable $e) {
+    return $iso;
+  }
+  $dt->setTimezone(new DateTimeZone('Asia/Dhaka'));
+  return $dt->format('D, M j, Y \a\t g:i A');
+}
+
+function inbox_quote_prefix_lines(string $text): string {
+  $lines = explode("\n", trim($text));
+  return implode("\n", array_map(fn($line) => '> ' . $line, $lines));
+}
+
+function inbox_render_quoted_html(string $who, string $when, string $body): string {
+  return
+    '<div style="margin-top:24px;padding-top:16px;border-top:1px solid rgba(255,255,255,0.15);">'
+    . '<p style="margin:0 0 12px;color:#888888;font-size:13px;">On ' . mail_template_esc($when) . ', ' . mail_template_esc($who) . ' wrote:</p>'
+    . '<blockquote style="margin:0;padding-left:16px;border-left:2px solid rgba(255,255,255,0.2);color:#aaaaaa;">'
+    . inbox_render_html_body($body)
+    . '</blockquote>'
+    . '</div>';
 }
 
 function inbox_decode_mime_str(string $value): string {
