@@ -76,6 +76,23 @@ function mcp_tool_definitions(): array {
       ],
     ],
     [
+      'name' => 'update_project',
+      'title' => 'Update Project',
+      'description' => 'Updates one or more fields on an existing project, identified by its tracking code. Only the fields you provide are changed — omit any you don\'t want to touch. Use this for renaming the project, correcting client info, recording a payment note (e.g. "50% advance ($150) received"), or setting/changing the delivery date. To change the stage instead, use update_project_stage.',
+      'inputSchema' => [
+        'type' => 'object',
+        'properties' => [
+          'code' => ['type' => 'string', 'description' => 'The project\'s tracking code, e.g. "7K4M-9XPQ".'],
+          'project_label' => ['type' => 'string', 'description' => 'New client-facing project name.'],
+          'client_name' => ['type' => 'string', 'description' => 'New client name.'],
+          'client_email' => ['type' => 'string', 'description' => 'New client email address.'],
+          'note' => ['type' => 'string', 'description' => 'Payment/internal note, e.g. "50% advance ($150) received". Replaces the existing note.'],
+          'delivery_date' => ['type' => 'string', 'description' => 'Delivery date in YYYY-MM-DD format. Pass an empty string to clear it.'],
+        ],
+        'required' => ['code'],
+      ],
+    ],
+    [
       'name' => 'update_project_stage',
       'title' => 'Update Project Stage',
       'description' => 'Changes a project\'s stage, identified by its tracking code. Stages in order: 0 Footage Received, 1 Payment (Advance), 2 Editing In Progress, 3 In Review, 4 Payment (Full), 5 Delivered. If the project has a client_email on file and notify_client is not false, the client is emailed about the change.',
@@ -249,6 +266,62 @@ function mcp_call_tool(string $name, array $args): array {
       $result .= $sent ? " Order confirmation emailed to {$client_email}." : ' Email to the client failed to send.';
     }
     return mcp_text_result($result);
+  }
+
+  if ($name === 'update_project') {
+    $code = tracker_normalize_code(trim((string) ($args['code'] ?? '')));
+    if ($code === '') {
+      return mcp_text_result('A valid code is required.', true);
+    }
+
+    $tdb = tracker_db();
+    $stmt = $tdb->prepare('SELECT id FROM projects WHERE code = :code');
+    $stmt->execute(['code' => $code]);
+    $existing = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$existing) {
+      return mcp_text_result("No project found with code {$code}.", true);
+    }
+
+    $fields = [];
+    $params = ['id' => $existing['id'], 'now' => gmdate('c')];
+
+    if (array_key_exists('project_label', $args)) {
+      $fields[] = 'project_label = :project_label';
+      $params['project_label'] = trim((string) $args['project_label']);
+    }
+    if (array_key_exists('client_name', $args)) {
+      $fields[] = 'client_name = :client_name';
+      $params['client_name'] = trim((string) $args['client_name']);
+    }
+    if (array_key_exists('client_email', $args)) {
+      $email = trim((string) $args['client_email']);
+      if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        return mcp_text_result('client_email is not a valid email address.', true);
+      }
+      $fields[] = 'client_email = :client_email';
+      $params['client_email'] = $email;
+    }
+    if (array_key_exists('note', $args)) {
+      $fields[] = 'note = :note';
+      $params['note'] = trim((string) $args['note']);
+    }
+    if (array_key_exists('delivery_date', $args)) {
+      $date = trim((string) $args['delivery_date']);
+      if ($date !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+        return mcp_text_result('delivery_date must be in YYYY-MM-DD format (or an empty string to clear it).', true);
+      }
+      $fields[] = 'delivery_date = :delivery_date';
+      $params['delivery_date'] = $date;
+    }
+
+    if (!$fields) {
+      return mcp_text_result('Nothing to update — provide at least one of project_label, client_name, client_email, note, or delivery_date.', true);
+    }
+
+    $fields[] = 'updated_at = :now';
+    $tdb->prepare('UPDATE projects SET ' . implode(', ', $fields) . ' WHERE id = :id')->execute($params);
+
+    return mcp_text_result("Project {$code} updated.");
   }
 
   if ($name === 'update_project_stage') {

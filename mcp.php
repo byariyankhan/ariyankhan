@@ -84,7 +84,7 @@ if ($rpc_method === 'initialize') {
       'title' => 'Ariyan Khan Mailbox',
       'version' => '1.0.0',
     ],
-    'instructions' => "Tools for Ariyan Khan's business inbox (hi@ariyankhan.com) and client project tracker. Mail: use check_new_mail to see what just arrived, list_threads for an overview, get_thread to read a full conversation, and send_reply to send a real reply. Tracker: use list_projects to see what's in progress, create_project to start tracking a new client job (generates a tracking code and, with a client_email, emails an order confirmation), and update_project_stage to move a project forward (can email the client). send_reply, create_project, and update_project_stage all take real, irreversible action (sending real email) — always show the user exactly what will be sent/changed and get explicit approval first.",
+    'instructions' => "Tools for Ariyan Khan's business inbox (hi@ariyankhan.com) and client project tracker. Mail: use check_new_mail to see what just arrived, list_threads for an overview, get_thread to read a full conversation, and send_reply to send a real reply. Tracker: use list_projects to see what's in progress, create_project to start tracking a new client job (generates a tracking code and, with a client_email, emails an order confirmation), update_project to edit its name/client info/payment note/delivery date, and update_project_stage to move it forward (can email the client). send_reply, create_project, and update_project_stage all take real, irreversible action (sending real email) — always show the user exactly what will be sent/changed and get explicit approval first.",
   ]);
 }
 
