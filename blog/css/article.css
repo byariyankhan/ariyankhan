@@ -187,16 +187,6 @@
     linear-gradient(160deg, #151300 0%, #0d0d0d 55%, #0a0a0a 100%);
 }
 
-.article-frame::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 50%;
-  height: 1px;
-  background: rgba(255, 237, 84, 0.18);
-}
-
 .article-frame img {
   position: relative;
   z-index: 1;
