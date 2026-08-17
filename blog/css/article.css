@@ -59,7 +59,6 @@
 /* ── Header ── */
 .article-header {
   padding: 28px 0 36px;
-  border-bottom: 1px solid var(--border);
 }
 
 .article-tag {
