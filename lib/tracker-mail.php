@@ -8,6 +8,8 @@
 
 use PHPMailer\PHPMailer\PHPMailer;
 
+require_once __DIR__ . '/mail-template.php';
+
 function tracker_mail_config(): array {
   $local = [];
   $local_path = __DIR__ . '/../mail-config.local.php';
@@ -51,89 +53,6 @@ function tracker_mail_ready(array $config): bool {
 function tracker_mail_thread_id(string $code): string {
   $slug = strtolower(preg_replace('/[^A-Za-z0-9]/', '', $code) ?? '');
   return "<tracker-{$slug}@ariyankhan.com>";
-}
-
-function tracker_mail_esc(string $value): string {
-  return htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
-}
-
-/* ══════════════════════════════════════════════════
-   Branded HTML email shell — table-based layout with
-   inline styles for cross-client compatibility
-   (Outlook/Gmail/Apple Mail all render this reliably).
-   ══════════════════════════════════════════════════ */
-function tracker_mail_wrap(string $preheader, string $content_html): string {
-  $avatar = 'https://ariyankhan.com/images/ariyan-khan-profile.webp';
-  $year = date('Y');
-  $preheader_esc = tracker_mail_esc($preheader);
-
-  $social = [
-    ['YouTube', 'https://www.youtube.com/@ariyankhan'],
-    ['Instagram', 'https://www.instagram.com/byariyankhan/'],
-    ['LinkedIn', 'https://www.linkedin.com/in/ariyankhan'],
-    ['TikTok', 'https://www.tiktok.com/@byariyankhan'],
-    ['Facebook', 'https://www.facebook.com/ariyankhan'],
-  ];
-  $social_html = implode(
-    '<span style="color:#3a3a3a;"> &nbsp;&middot;&nbsp; </span>',
-    array_map(
-      fn($s) => '<a href="' . $s[1] . '" style="color:#FFED54;text-decoration:none;font-size:12px;font-weight:600;letter-spacing:.3px;">' . $s[0] . '</a>',
-      $social
-    )
-  );
-
-  return <<<HTML
-<!doctype html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="color-scheme" content="dark light">
-<title>Ariyan Khan</title>
-</head>
-<body style="margin:0;padding:0;background-color:#000000;font-family:Helvetica,Arial,sans-serif;">
-  <div style="display:none;max-height:0;overflow:hidden;opacity:0;mso-hide:all;">{$preheader_esc}</div>
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#000000;">
-    <tr>
-      <td align="center" style="padding:32px 16px;">
-        <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background-color:#0D0D0D;border:1px solid rgba(255,237,84,0.15);border-radius:12px;overflow:hidden;">
-          <!-- Content -->
-          <tr>
-            <td style="padding:36px 32px 8px;color:#FFFFFF;font-size:15px;line-height:1.65;">
-              {$content_html}
-            </td>
-          </tr>
-          <!-- Signature -->
-          <tr>
-            <td style="padding:12px 32px 32px;">
-              <table role="presentation" cellpadding="0" cellspacing="0">
-                <tr>
-                  <td style="padding-right:12px;vertical-align:middle;">
-                    <img src="{$avatar}" width="44" height="44" alt="Ariyan Khan" style="display:block;border-radius:50%;border:1px solid rgba(255,237,84,0.3);">
-                  </td>
-                  <td style="vertical-align:middle;">
-                    <div style="font-size:14px;font-weight:700;color:#FFFFFF;">Ariyan Khan</div>
-                    <div style="font-size:12px;color:#888888;">hi@ariyankhan.com</div>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-          <!-- Footer -->
-          <tr>
-            <td align="center" style="padding:22px 32px;border-top:1px solid rgba(255,237,84,0.15);background-color:#000000;">
-              <div style="margin-bottom:12px;">{$social_html}</div>
-              <div style="font-size:11px;color:#555555;">&copy; {$year} Ariyan Khan &middot; Dhaka, Bangladesh</div>
-              <div style="font-size:11px;color:#555555;margin-top:4px;">You're receiving this because you have an active project with Ariyan Khan.</div>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>
-HTML;
 }
 
 function tracker_mail_new(array $config, string $to_email, string $to_name): PHPMailer {
@@ -189,10 +108,10 @@ function tracker_send_order_email(string $to_email, string $to_name, string $pro
     $mail->Subject = $label;
 
     $greeting_text = $to_name !== '' ? "Hi {$to_name}," : 'Hi,';
-    $greeting_html = $to_name !== '' ? 'Hi ' . tracker_mail_esc($to_name) . ',' : 'Hi,';
-    $label_esc = tracker_mail_esc($label);
-    $code_esc = tracker_mail_esc($code);
-    $track_url_esc = tracker_mail_esc($track_url);
+    $greeting_html = $to_name !== '' ? 'Hi ' . mail_template_esc($to_name) . ',' : 'Hi,';
+    $label_esc = mail_template_esc($label);
+    $code_esc = mail_template_esc($code);
+    $track_url_esc = mail_template_esc($track_url);
 
     $content = <<<HTML
       <p style="margin:0 0 16px;">{$greeting_html}</p>
@@ -209,7 +128,7 @@ function tracker_send_order_email(string $to_email, string $to_name, string $pro
       <p style="margin:0;color:#888888;font-size:13px;">The button above takes you straight to your status &mdash; no need to re-enter the code. Save it in case you check from a different device.</p>
       HTML;
 
-    $mail->Body = tracker_mail_wrap("Your project \"{$label}\" is now underway — track it anytime.", $content);
+    $mail->Body = mail_template_wrap("Your project \"{$label}\" is now underway — track it anytime.", $content, "You're receiving this because you have an active project with Ariyan Khan.");
     $mail->AltBody =
       "{$greeting_text}\n\n" .
       "Thank you for your order! Your project \"{$label}\" is now underway.\n\n" .
@@ -245,11 +164,11 @@ function tracker_send_stage_update_email(string $to_email, string $to_name, stri
     $mail->addCustomHeader('References', $thread_id);
 
     $greeting_text = $to_name !== '' ? "Hi {$to_name}," : 'Hi,';
-    $greeting_html = $to_name !== '' ? 'Hi ' . tracker_mail_esc($to_name) . ',' : 'Hi,';
-    $label_esc = tracker_mail_esc($label);
-    $stage_label_esc = tracker_mail_esc($stage_label);
-    $code_esc = tracker_mail_esc($code);
-    $track_url_esc = tracker_mail_esc($track_url);
+    $greeting_html = $to_name !== '' ? 'Hi ' . mail_template_esc($to_name) . ',' : 'Hi,';
+    $label_esc = mail_template_esc($label);
+    $stage_label_esc = mail_template_esc($stage_label);
+    $code_esc = mail_template_esc($code);
+    $track_url_esc = mail_template_esc($track_url);
 
     $content = <<<HTML
       <p style="margin:0 0 16px;">{$greeting_html}</p>
@@ -266,7 +185,7 @@ function tracker_send_stage_update_email(string $to_email, string $to_name, stri
       <p style="margin:0;color:#888888;font-size:13px;">Your tracking code: <span style="color:#FFFFFF;font-family:'Courier New',monospace;">{$code_esc}</span></p>
       HTML;
 
-    $mail->Body = tracker_mail_wrap("Your project \"{$label}\" just moved to: {$stage_label}", $content);
+    $mail->Body = mail_template_wrap("Your project \"{$label}\" just moved to: {$stage_label}", $content, "You're receiving this because you have an active project with Ariyan Khan.");
     $mail->AltBody =
       "{$greeting_text}\n\n" .
       "Your project \"{$label}\" just moved to a new stage: {$stage_label}.\n\n" .

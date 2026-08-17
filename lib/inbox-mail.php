@@ -1,17 +1,19 @@
 <?php
 /* ══════════════════════════════════════════════════
    Admin Inbox — send + fetch mail via hi@ariyankhan.com
-   Sending reuses PHPMailer (same vendor/ as tracker-mail.php).
-   Fetching uses the imap PHP extension to poll the same
-   mailbox on demand — no cron required. Only replies from
-   contacts we've already emailed are imported, so this stays
-   a focused "my sent conversations" inbox, not a full mail
-   client mirroring everything that lands at hi@.
+   Sending reuses PHPMailer (same vendor/ as tracker-mail.php)
+   and the shared branded template. Fetching uses the imap
+   PHP extension to poll the same mailbox on demand — no
+   cron required. Every message in the mailbox is imported
+   (grouped into threads by sender email), so this mirrors
+   the whole hi@ariyankhan.com inbox, not just self-started
+   conversations.
    ══════════════════════════════════════════════════ */
 
 use PHPMailer\PHPMailer\PHPMailer;
 
 require_once __DIR__ . '/inbox-db.php';
+require_once __DIR__ . '/mail-template.php';
 
 function inbox_mail_config(): array {
   $local = [];
@@ -82,9 +84,13 @@ function inbox_send(string $to_email, string $to_name, string $subject, string $
     $mail->CharSet = 'UTF-8';
     $mail->setFrom($config['imap_user'], 'Ariyan Khan');
     $mail->addAddress($to_email, $to_name !== '' ? $to_name : $to_email);
-    $mail->isHTML(false);
+    $mail->isHTML(true);
     $mail->Subject = $subject;
-    $mail->Body = $body;
+    $mail->Body = mail_template_wrap(
+      mb_strimwidth(trim(preg_replace('/\s+/', ' ', $body) ?? $body), 0, 110, '…'),
+      inbox_render_html_body($body)
+    );
+    $mail->AltBody = $body;
 
     if ($in_reply_to !== '') {
       $mail->addCustomHeader('In-Reply-To', $in_reply_to);
@@ -115,6 +121,18 @@ function inbox_send(string $to_email, string $to_name, string $subject, string $
     error_log('inbox-mail: send failed - ' . $detail);
     return ['ok' => false, 'error' => $detail];
   }
+}
+
+function inbox_render_html_body(string $body_text): string {
+  $paragraphs = preg_split('/\n{2,}/', trim($body_text)) ?: [];
+  $html = '';
+  foreach ($paragraphs as $paragraph) {
+    if ($paragraph === '') {
+      continue;
+    }
+    $html .= '<p style="margin:0 0 16px;">' . nl2br(mail_template_esc($paragraph)) . '</p>';
+  }
+  return $html;
 }
 
 function inbox_decode_mime_str(string $value): string {
@@ -201,10 +219,6 @@ function inbox_fetch_new(): array {
   }
 
   $db = inbox_db();
-
-  // Only pull in mail from contacts we've already emailed — keeps this a
-  // focused reply tracker, not a mirror of everything landing at hi@.
-  $known = array_flip($db->query('SELECT DISTINCT LOWER(contact_email) FROM mail_messages')->fetchAll(PDO::FETCH_COLUMN, 0));
   $known_uids = array_flip(array_map('intval', $db->query('SELECT imap_uid FROM mail_messages WHERE imap_uid IS NOT NULL')->fetchAll(PDO::FETCH_COLUMN, 0)));
 
   $total = imap_num_msg($conn);
@@ -223,10 +237,6 @@ function inbox_fetch_new(): array {
 
     $from = $header->from[0];
     $from_email = strtolower(($from->mailbox ?? '') . '@' . ($from->host ?? ''));
-
-    if (!isset($known[$from_email])) {
-      continue; // not a reply to a thread we started
-    }
 
     $from_name = isset($from->personal) ? inbox_decode_mime_str($from->personal) : '';
     $subject = isset($header->subject) ? inbox_decode_mime_str($header->subject) : '';
