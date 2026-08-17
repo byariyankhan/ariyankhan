@@ -10,6 +10,7 @@ const SITE = {
 class ServiceProfile extends HTMLElement {
   connectedCallback() {
     const service = this.getAttribute('service') || '';
+    const portfolioCategory = this.getAttribute('portfolio-category') || service;
     const serviceLabel = this.getAttribute('service-label') || service;
     const imageSrc = this.getAttribute('image-src') || '';
     const imageAlt = this.getAttribute('image-alt') || '';
@@ -23,7 +24,7 @@ class ServiceProfile extends HTMLElement {
 
     this.outerHTML = `
       <aside class="service-profile-card" aria-label="${serviceLabel} video editing order card">
-        <div class="service-profile-media" data-hero-portfolio-slider="${service}" data-hero-initial-src="${imageSrc}">
+        <div class="service-profile-media" data-hero-portfolio-slider="${portfolioCategory}" data-hero-initial-src="${imageSrc}">
           <button class="service-profile-media-link" type="button" aria-label="Play ${serviceLabel.toLowerCase()} portfolio video">
             <img src="${imageSrc}" alt="${imageAlt}" class="service-profile-image is-active" width="1200" height="630" loading="eager" data-hero-slide-current>
             <img src="${previewSrc}" alt="" class="service-profile-image" width="1200" height="675" loading="eager" data-hero-slide-next aria-hidden="true">
