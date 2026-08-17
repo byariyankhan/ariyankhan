@@ -68,7 +68,7 @@ function mail_template_wrap(string $preheader, string $content_html, string $foo
                   </td>
                   <td style="vertical-align:middle;">
                     <div style="font-size:14px;font-weight:700;color:#FFFFFF;">Ariyan Khan</div>
-                    <div style="font-size:12px;color:#888888;">hi@ariyankhan.com</div>
+                    <div style="font-size:12px;"><a href="https://ariyankhan.com" style="color:#888888;text-decoration:none;">ariyankhan.com</a></div>
                   </td>
                 </tr>
               </table>
