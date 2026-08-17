@@ -287,10 +287,16 @@ function inbox_fetch_new(): array {
       continue;
     }
 
+    // The contact-form notifier always sends From no-reply@ariyankhan.com
+    // with Reply-To set to the actual visitor (see send-mail.php). Prefer
+    // Reply-To so each visitor gets their own thread instead of every
+    // inquiry collapsing into one "no-reply" bucket.
     $from = $header->from[0];
-    $from_email = strtolower(($from->mailbox ?? '') . '@' . ($from->host ?? ''));
+    $reply_to = $header->reply_to[0] ?? null;
+    $sender = (!empty($reply_to->mailbox) && !empty($reply_to->host)) ? $reply_to : $from;
 
-    $from_name = isset($from->personal) ? inbox_decode_mime_str($from->personal) : '';
+    $from_email = strtolower(($sender->mailbox ?? '') . '@' . ($sender->host ?? ''));
+    $from_name = isset($sender->personal) ? inbox_decode_mime_str($sender->personal) : '';
     $subject = isset($header->subject) ? inbox_decode_mime_str($header->subject) : '';
     $message_id = isset($header->message_id) ? trim($header->message_id) : '';
     $in_reply_to = isset($header->in_reply_to) ? trim($header->in_reply_to) : '';
