@@ -5,6 +5,7 @@
   const errorEl = document.getElementById('trackerError');
   const resultEl = document.getElementById('trackerResult');
   const labelEl = document.getElementById('trackerProjectLabel');
+  const noteEl = document.getElementById('trackerProjectNote');
   const stagesEl = document.getElementById('trackerStages');
 
   if (!form) return;
@@ -23,7 +24,7 @@
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   }
 
-  function renderStages(stages, currentStage, note, createdAt, deliveryDate, stageDates) {
+  function renderStages(stages, currentStage, createdAt, deliveryDate, stageDates) {
     stagesEl.innerHTML = '';
     const lastIndex = stages.length - 1;
     const dates = stageDates && typeof stageDates === 'object' ? stageDates : {};
@@ -66,13 +67,6 @@
       label.textContent = stage.label;
       step.append(label);
 
-      if (state === 'current' && note) {
-        const noteEl = document.createElement('span');
-        noteEl.className = 'hstep-note';
-        noteEl.textContent = note;
-        step.append(noteEl);
-      }
-
       stagesEl.appendChild(step);
     });
   }
@@ -111,7 +105,9 @@
 
       const note = typeof json.note === 'string' ? json.note.trim() : '';
       labelEl.textContent = json.projectLabel;
-      renderStages(json.stages, json.stage, note, json.createdAt, json.deliveryDate, json.stageDates);
+      noteEl.textContent = note;
+      noteEl.hidden = !note;
+      renderStages(json.stages, json.stage, json.createdAt, json.deliveryDate, json.stageDates);
       resultEl.hidden = false;
     } catch (err) {
       showError('Could not reach the server. Please check your connection and try again.');
