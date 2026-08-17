@@ -1,10 +1,13 @@
 <?php
 /* ══════════════════════════════════════════════════
-   MCP server — tool definitions and dispatch logic
-   for Ariyan's mailbox, used by Claude/ChatGPT custom
-   connectors. Exposes: check_new_mail, list_threads,
-   get_thread, send_reply. See the entry-point script
-   at the site root for the JSON-RPC/HTTP transport.
+   MCP server ("Ariyan Workspace") — tool definitions
+   and dispatch logic for Ariyan's mailbox and client
+   project tracker, used by Claude/ChatGPT custom
+   connectors. Mail: check_new_mail, list_threads,
+   get_thread, send_reply. Tracker: list_projects,
+   create_project, update_project, update_project_stage.
+   See the entry-point script at the site root for the
+   JSON-RPC/HTTP transport.
    ══════════════════════════════════════════════════ */
 
 require_once __DIR__ . '/inbox-db.php';

@@ -80,8 +80,8 @@ if ($rpc_method === 'initialize') {
     'protocolVersion' => MCP_PROTOCOL_VERSION,
     'capabilities' => ['tools' => ['listChanged' => false]],
     'serverInfo' => [
-      'name' => 'ariyankhan-mailbox',
-      'title' => 'Ariyan Khan Mailbox',
+      'name' => 'ariyan-workspace',
+      'title' => 'Ariyan Workspace',
       'version' => '1.0.0',
     ],
     'instructions' => "Tools for Ariyan Khan's business inbox (hi@ariyankhan.com) and client project tracker.\n\n"
