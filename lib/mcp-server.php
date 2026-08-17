@@ -67,13 +67,13 @@ function mcp_tool_definitions(): array {
     [
       'name' => 'create_project',
       'title' => 'Create Project',
-      'description' => 'Creates a new tracked project and generates a client-facing tracking code (looked up on the public track.html page). New projects always start at stage 0 (Footage Received). If client_email is given, an order-confirmation email with the tracking code and a track-my-project link is sent immediately.',
+      'description' => 'Creates a new tracked project and generates a client-facing tracking code (looked up on the public track.html page). New projects always start at stage 0 (Footage Received). If client_email is given, an order-confirmation email with the tracking code and a track-my-project link is sent immediately, and future update_project_stage calls can notify the client automatically — without it, the client never gets the code and can\'t be notified later. If this project is coming from an email inquiry, always pass the contact_email/contact_name you already have from that thread; don\'t leave these blank just because the user didn\'t repeat them out loud.',
       'inputSchema' => [
         'type' => 'object',
         'properties' => [
           'project_label' => ['type' => 'string', 'description' => 'Short client-facing project name, e.g. "Documentary Edit".'],
-          'client_name' => ['type' => 'string', 'description' => 'Client\'s name, if known. Optional.'],
-          'client_email' => ['type' => 'string', 'description' => 'Client\'s email address. Optional — if given, an order-confirmation email is sent immediately with the tracking code.'],
+          'client_name' => ['type' => 'string', 'description' => 'Client\'s name, if known. Optional, but include it whenever you already have it (e.g. from an inbox thread).'],
+          'client_email' => ['type' => 'string', 'description' => 'Client\'s email address. Optional, but include it whenever you already have it (e.g. from an inbox thread) — without it, no confirmation email is sent and the client can\'t be notified of later stage updates.'],
         ],
         'required' => ['project_label'],
       ],
