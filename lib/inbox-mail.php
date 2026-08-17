@@ -120,6 +120,7 @@ function inbox_send(string $to_email, string $to_name, string $subject, string $
 
     $mail->send();
     $message_id = trim((string) $mail->getLastMessageID());
+    inbox_append_sent_copy($config, $mail->getSentMIMEMessage());
 
     $stmt = $db->prepare(
       'INSERT INTO mail_messages (direction, contact_email, contact_name, subject, body, message_id, in_reply_to, created_at)
@@ -141,6 +142,30 @@ function inbox_send(string $to_email, string $to_name, string $subject, string $
     error_log('inbox-mail: send failed - ' . $detail);
     return ['ok' => false, 'error' => $detail];
   }
+}
+
+/* Copies a just-sent message into the account's own IMAP Sent folder, so
+   it shows up in any other client logged into hi@ariyankhan.com (webmail,
+   phone, etc.) the same as a normally-sent email would — SMTP alone never
+   does this. Best-effort: the reply has already gone out by the time this
+   runs, so a failure here is logged, not surfaced as a send failure. */
+function inbox_append_sent_copy(array $config, string $raw_message): void {
+  if (empty($config['imap_host']) || empty($config['imap_user']) || empty($config['imap_pass'])) {
+    return;
+  }
+
+  $mailbox = '{' . $config['imap_host'] . ':' . $config['imap_port'] . '/imap/ssl}INBOX.Sent';
+  $conn = @imap_open($mailbox, $config['imap_user'], $config['imap_pass']);
+  if (!$conn) {
+    error_log('inbox-mail: could not open Sent folder to save a copy - ' . imap_last_error());
+    return;
+  }
+
+  if (!imap_append($conn, $mailbox, $raw_message, '\\Seen')) {
+    error_log('inbox-mail: failed to save sent copy - ' . imap_last_error());
+  }
+
+  imap_close($conn);
 }
 
 function inbox_render_html_body(string $body_text): string {
