@@ -179,7 +179,7 @@ function tracker_send_order_email(string $to_email, string $to_name, string $pro
     return false;
   }
 
-  $track_url = rtrim($config['site_url'], '/') . '/track.html';
+  $track_url = rtrim($config['site_url'], '/') . '/track.html?code=' . urlencode($code);
   $label = $project_label !== '' ? $project_label : 'your project';
   $mail = null;
 
@@ -206,7 +206,7 @@ function tracker_send_order_email(string $to_email, string $to_name, string $pro
           <a href="{$track_url_esc}" style="display:inline-block;padding:14px 28px;font-size:14px;font-weight:700;color:#000000;text-decoration:none;">Track My Project &rarr;</a>
         </td></tr>
       </table>
-      <p style="margin:0;color:#888888;font-size:13px;">Enter your tracking code on that page anytime to see the current status.</p>
+      <p style="margin:0;color:#888888;font-size:13px;">The button above takes you straight to your status &mdash; no need to re-enter the code. Save it in case you check from a different device.</p>
       HTML;
 
     $mail->Body = tracker_mail_wrap("Your project \"{$label}\" is now underway — track it anytime.", $content);
@@ -215,7 +215,7 @@ function tracker_send_order_email(string $to_email, string $to_name, string $pro
       "Thank you for your order! Your project \"{$label}\" is now underway.\n\n" .
       "You can track its progress anytime here:\n{$track_url}\n\n" .
       "Your tracking code: {$code}\n\n" .
-      "Just enter that code on the page above to see the current status.\n\n" .
+      "That link takes you straight to your status. Save the code in case you check from a different device.\n\n" .
       "Thanks again,\nAriyan Khan\n";
 
     $mail->send();
@@ -233,7 +233,7 @@ function tracker_send_stage_update_email(string $to_email, string $to_name, stri
     return false;
   }
 
-  $track_url = rtrim($config['site_url'], '/') . '/track.html';
+  $track_url = rtrim($config['site_url'], '/') . '/track.html?code=' . urlencode($code);
   $label = $project_label !== '' ? $project_label : 'your project';
   $thread_id = tracker_mail_thread_id($code);
   $mail = null;

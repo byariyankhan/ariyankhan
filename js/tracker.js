@@ -120,4 +120,13 @@
       submitBtn.textContent = 'Track Project';
     }
   });
+
+  // Auto-fill and auto-submit when arriving from an emailed "Track My
+  // Project" link (e.g. track.html?code=7K4M-9XPQ), so the client isn't
+  // asked to type a code they were just given.
+  const prefillCode = new URLSearchParams(window.location.search).get('code');
+  if (prefillCode) {
+    codeInput.value = prefillCode.trim();
+    form.requestSubmit();
+  }
 })();
