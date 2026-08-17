@@ -29,6 +29,7 @@ function tracker_mail_config(): array {
     'smtp_pass'  => $local['smtp_pass'] ?? null,
     'smtp_port'  => (int) ($local['smtp_port'] ?? 587),
     'allow_self_signed' => filter_var($local['allow_self_signed'] ?? false, FILTER_VALIDATE_BOOL),
+    'to_email'   => $local['to_email'] ?? null,
   ];
 }
 
@@ -86,6 +87,11 @@ function tracker_mail_new(array $config, string $to_email, string $to_name): PHP
   $mail->CharSet = 'UTF-8';
   $from_email = $config['driver'] === 'smtp' ? $config['smtp_user'] : $to_email;
   $mail->setFrom($from_email, 'Ariyan Khan');
+  if (!empty($config['to_email'])) {
+    // Sent from no-reply@ — route any client reply to the real inbox
+    // instead of a dead address, same trick send-mail.php uses.
+    $mail->addReplyTo($config['to_email'], 'Ariyan Khan');
+  }
   $mail->addAddress($to_email, $to_name !== '' ? $to_name : $to_email);
   $mail->isHTML(true);
 
