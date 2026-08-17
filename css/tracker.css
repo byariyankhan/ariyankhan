@@ -248,6 +248,15 @@
   color:var(--muted); margin-bottom:8px;
 }
 .mail-message--out .mail-message-meta span:first-child{ color:var(--yellow); }
+.mail-message-meta-right{ display:flex; align-items:center; gap:8px; }
+.mail-delete-form{ margin:0; line-height:0; }
+.mail-delete-btn{
+  width:18px; height:18px; display:inline-flex; align-items:center; justify-content:center;
+  border:none; border-radius:50%; cursor:pointer;
+  background:none; color:var(--muted); font-size:15px; line-height:1; padding:0;
+  transition:background .2s, color .2s;
+}
+.mail-delete-btn:hover{ background:rgba(239,68,68,.15); color:#ef4444; }
 .mail-message-subject{ font-weight:700; font-size:14px; margin-bottom:6px; }
 .mail-message-body{ font-size:14px; line-height:1.6; color:var(--text); white-space:pre-wrap; word-break:break-word; }
 

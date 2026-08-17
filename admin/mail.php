@@ -36,6 +36,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     exit;
   }
 
+  if ($action === 'delete_message') {
+    $id = (int) ($_POST['id'] ?? 0);
+    $thread = trim((string) ($_POST['thread'] ?? ''));
+
+    $stmt = $db->prepare('UPDATE mail_messages SET hidden = 1 WHERE id = :id');
+    $stmt->execute(['id' => $id]);
+
+    header('Location: mail.php?thread=' . urlencode($thread) . '&notice=' . urlencode('Message deleted'));
+    exit;
+  }
+
   if ($action === 'check_replies') {
     $result = inbox_fetch_new();
     $notice = $result['error'] !== null
@@ -77,7 +88,7 @@ function e(string $value): string {
 <link rel="icon" type="image/x-icon" href="../favicon/favicon.ico">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../css/style.css?v=9">
-<link rel="stylesheet" href="../css/tracker.css?v=13">
+<link rel="stylesheet" href="../css/tracker.css?v=14">
 </head>
 <body class="tracker-body">
 <div id="stars"></div>
@@ -138,7 +149,15 @@ function e(string $value): string {
             <div class="mail-message mail-message--<?= e($msg['direction']) ?>">
               <div class="mail-message-meta">
                 <span><?= $msg['direction'] === 'out' ? 'You' : e($active_thread['contact_name'] !== '' ? $active_thread['contact_name'] : $active_thread['contact_email']) ?></span>
-                <span><?= e(substr((string) $msg['created_at'], 0, 16)) ?></span>
+                <span class="mail-message-meta-right">
+                  <?= e(substr((string) $msg['created_at'], 0, 16)) ?>
+                  <form method="post" class="mail-delete-form" onsubmit="return confirm('Delete this message?');">
+                    <input type="hidden" name="action" value="delete_message">
+                    <input type="hidden" name="id" value="<?= (int) $msg['id'] ?>">
+                    <input type="hidden" name="thread" value="<?= e($active_thread['contact_email']) ?>">
+                    <button type="submit" class="mail-delete-btn" aria-label="Delete message" title="Delete message">&times;</button>
+                  </form>
+                </span>
               </div>
               <div class="mail-message-subject"><?= e((string) $msg['subject']) ?></div>
               <div class="mail-message-body"><?= nl2br(e((string) $msg['body'])) ?></div>

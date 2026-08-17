@@ -35,14 +35,21 @@ function inbox_db(): PDO {
   ');
   $db->exec('CREATE INDEX IF NOT EXISTS idx_mail_contact ON mail_messages (contact_email)');
 
+  $columns = $db->query('PRAGMA table_info(mail_messages)')->fetchAll(PDO::FETCH_COLUMN, 1);
+  if (!in_array('hidden', $columns, true)) {
+    $db->exec('ALTER TABLE mail_messages ADD COLUMN hidden INTEGER NOT NULL DEFAULT 0');
+  }
+
   return $db;
 }
 
-/* Groups all messages by contact_email into threads, each sorted
-   oldest-first internally, and the thread list itself sorted by
-   most recent activity first. */
+/* Groups all non-hidden messages by contact_email into threads, each
+   sorted oldest-first internally, and the thread list itself sorted by
+   most recent activity first. Deleted messages stay in the table (with
+   hidden=1) so their imap_uid still counts as "already seen" and the
+   underlying email isn't re-imported on the next check. */
 function inbox_threads(PDO $db): array {
-  $rows = $db->query('SELECT * FROM mail_messages ORDER BY created_at ASC')->fetchAll(PDO::FETCH_ASSOC);
+  $rows = $db->query('SELECT * FROM mail_messages WHERE hidden = 0 ORDER BY created_at ASC')->fetchAll(PDO::FETCH_ASSOC);
 
   $threads = [];
   foreach ($rows as $row) {
