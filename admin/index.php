@@ -143,7 +143,7 @@ function e(string $value): string {
 <link rel="icon" type="image/x-icon" href="../favicon/favicon.ico">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../css/style.css?v=9">
-<link rel="stylesheet" href="../css/tracker.css?v=12">
+<link rel="stylesheet" href="../css/tracker.css?v=13">
 </head>
 <body class="tracker-body">
 <div id="stars"></div>
@@ -153,7 +153,10 @@ function e(string $value): string {
       <div class="tag-pill">Admin</div>
       <h1 class="tracker-auth-title">Project Tracker</h1>
     </div>
-    <a href="logout.php" class="tracker-btn tracker-btn--ghost">Log Out</a>
+    <div class="tracker-admin-head-links">
+      <a href="mail.php" class="tracker-btn tracker-btn--ghost">Inbox</a>
+      <a href="logout.php" class="tracker-btn tracker-btn--ghost">Log Out</a>
+    </div>
   </div>
 
   <?php if ($notice !== ''): ?>
