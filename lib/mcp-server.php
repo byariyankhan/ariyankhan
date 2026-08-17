@@ -98,7 +98,7 @@ function mcp_tool_definitions(): array {
     [
       'name' => 'update_project_stage',
       'title' => 'Update Project Stage',
-      'description' => 'Changes a project\'s stage, identified by its tracking code. Stages in order: 0 Footage Received, 1 Payment (Advance), 2 Editing In Progress, 3 In Review, 4 Payment (Full), 5 Delivered. If the project has a client_email on file and notify_client is not false, the client is emailed about the change.',
+      'description' => 'Changes a project\'s stage, identified by its tracking code. Stages in order: 0 Footage Received, 1 Payment (Advance), 2 Editing In Progress, 3 In Review, 4 Payment (Full), 5 Delivered. If the project has a client_email on file and notify_client is not false, the client is emailed about the change — moving to stage 5 (Delivered) sends a different email than the others: it thanks them and asks, low-pressure, whether they\'d be open to a quick testimonial, instead of the generic stage-update notice.',
       'inputSchema' => [
         'type' => 'object',
         'properties' => [

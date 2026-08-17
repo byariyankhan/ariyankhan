@@ -175,29 +175,53 @@ function tracker_send_stage_update_email(string $to_email, string $to_name, stri
     $stage_label_esc = mail_template_esc($stage_label);
     $code_esc = mail_template_esc($code);
     $track_url_esc = mail_template_esc($track_url);
+    $is_delivered = $stage_label === 'Delivered';
 
-    $content = <<<HTML
-      <p style="margin:0 0 16px;">{$greeting_html}</p>
-      <p style="margin:0 0 16px;">Your project <strong style="color:#FFED54;">&ldquo;{$label_esc}&rdquo;</strong> just moved to a new stage:</p>
-      <div style="background-color:#111111;border:1px solid rgba(255,237,84,0.15);border-radius:8px;padding:18px 20px;margin:24px 0;text-align:center;">
-        <div style="font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#888888;margin-bottom:6px;">New Stage</div>
-        <div style="font-size:20px;font-weight:700;color:#FFED54;">{$stage_label_esc}</div>
-      </div>
-      <table role="presentation" cellpadding="0" cellspacing="0" style="margin:8px 0 20px;">
-        <tr><td style="background-color:#FFED54;border-radius:8px;">
-          <a href="{$track_url_esc}" style="display:inline-block;padding:14px 28px;font-size:14px;font-weight:700;color:#000000;text-decoration:none;">See Full Progress &rarr;</a>
-        </td></tr>
-      </table>
-      <p style="margin:0;color:#888888;font-size:13px;">Your tracking code: <span style="color:#FFFFFF;font-family:'Courier New',monospace;">{$code_esc}</span></p>
-      HTML;
+    if ($is_delivered) {
+      $content = <<<HTML
+        <p style="margin:0 0 16px;">{$greeting_html}</p>
+        <p style="margin:0 0 16px;">Your project <strong style="color:#FFED54;">&ldquo;{$label_esc}&rdquo;</strong> has been delivered — thanks for working with me on this one.</p>
+        <p style="margin:0 0 16px;">If you're happy with how it turned out, a quick word from you would genuinely help — just reply to this email with a line or two, and let me know if it's okay to feature it as a testimonial on my site. No pressure either way.</p>
+        <table role="presentation" cellpadding="0" cellspacing="0" style="margin:8px 0 20px;">
+          <tr><td style="background-color:#FFED54;border-radius:8px;">
+            <a href="{$track_url_esc}" style="display:inline-block;padding:14px 28px;font-size:14px;font-weight:700;color:#000000;text-decoration:none;">See Full Progress &rarr;</a>
+          </td></tr>
+        </table>
+        <p style="margin:0;color:#888888;font-size:13px;">Your tracking code: <span style="color:#FFFFFF;font-family:'Courier New',monospace;">{$code_esc}</span></p>
+        HTML;
 
-    $mail->Body = mail_template_wrap("Your project \"{$label}\" just moved to: {$stage_label}", $content, "You're receiving this because you have an active project with Ariyan Khan.");
-    $mail->AltBody =
-      "{$greeting_text}\n\n" .
-      "Your project \"{$label}\" just moved to a new stage: {$stage_label}.\n\n" .
-      "You can see full progress anytime here:\n{$track_url}\n\n" .
-      "Your tracking code: {$code}\n\n" .
-      "Thanks,\nAriyan Khan\n";
+      $mail->Body = mail_template_wrap("Your project \"{$label}\" has been delivered.", $content, "You're receiving this because you have an active project with Ariyan Khan.");
+      $mail->AltBody =
+        "{$greeting_text}\n\n" .
+        "Your project \"{$label}\" has been delivered — thanks for working with me on this one.\n\n" .
+        "If you're happy with how it turned out, a quick word from you would genuinely help — just reply to this email with a line or two, and let me know if it's okay to feature it as a testimonial on my site. No pressure either way.\n\n" .
+        "You can see full progress anytime here:\n{$track_url}\n\n" .
+        "Your tracking code: {$code}\n\n" .
+        "Thanks,\nAriyan Khan\n";
+    } else {
+      $content = <<<HTML
+        <p style="margin:0 0 16px;">{$greeting_html}</p>
+        <p style="margin:0 0 16px;">Your project <strong style="color:#FFED54;">&ldquo;{$label_esc}&rdquo;</strong> just moved to a new stage:</p>
+        <div style="background-color:#111111;border:1px solid rgba(255,237,84,0.15);border-radius:8px;padding:18px 20px;margin:24px 0;text-align:center;">
+          <div style="font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#888888;margin-bottom:6px;">New Stage</div>
+          <div style="font-size:20px;font-weight:700;color:#FFED54;">{$stage_label_esc}</div>
+        </div>
+        <table role="presentation" cellpadding="0" cellspacing="0" style="margin:8px 0 20px;">
+          <tr><td style="background-color:#FFED54;border-radius:8px;">
+            <a href="{$track_url_esc}" style="display:inline-block;padding:14px 28px;font-size:14px;font-weight:700;color:#000000;text-decoration:none;">See Full Progress &rarr;</a>
+          </td></tr>
+        </table>
+        <p style="margin:0;color:#888888;font-size:13px;">Your tracking code: <span style="color:#FFFFFF;font-family:'Courier New',monospace;">{$code_esc}</span></p>
+        HTML;
+
+      $mail->Body = mail_template_wrap("Your project \"{$label}\" just moved to: {$stage_label}", $content, "You're receiving this because you have an active project with Ariyan Khan.");
+      $mail->AltBody =
+        "{$greeting_text}\n\n" .
+        "Your project \"{$label}\" just moved to a new stage: {$stage_label}.\n\n" .
+        "You can see full progress anytime here:\n{$track_url}\n\n" .
+        "Your tracking code: {$code}\n\n" .
+        "Thanks,\nAriyan Khan\n";
+    }
 
     $mail->send();
     return true;
