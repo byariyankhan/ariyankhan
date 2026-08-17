@@ -241,7 +241,15 @@
   text-transform:uppercase; margin:0 0 4px;
 }
 
-.mail-messages{ display:flex; flex-direction:column; gap:12px; margin-bottom:24px; }
+.mail-messages{ display:flex; flex-direction:column; gap:22px; margin-bottom:24px; }
+
+.mail-subject-group{ display:flex; flex-direction:column; gap:10px; }
+.mail-subject-group-head{
+  display:flex; align-items:center; justify-content:space-between; gap:10px;
+  padding-bottom:8px; border-bottom:1px solid #1f1f1f;
+}
+.mail-subject-group-title{ font-weight:700; font-size:14px; }
+
 .mail-message{
   border:1px solid #1f1f1f; border-radius:12px; padding:14px 16px;
   background:rgba(255,255,255,.02);
@@ -253,16 +261,15 @@
   color:var(--muted); margin-bottom:8px;
 }
 .mail-message--out .mail-message-meta span:first-child{ color:var(--yellow); }
-.mail-message-meta-right{ display:flex; align-items:center; gap:8px; }
 .mail-delete-form{ margin:0; line-height:0; }
 .mail-delete-btn{
-  width:18px; height:18px; display:inline-flex; align-items:center; justify-content:center;
+  width:20px; height:20px; display:inline-flex; align-items:center; justify-content:center;
+  flex-shrink:0;
   border:none; border-radius:50%; cursor:pointer;
-  background:none; color:var(--muted); font-size:15px; line-height:1; padding:0;
+  background:none; color:var(--muted); font-size:16px; line-height:1; padding:0;
   transition:background .2s, color .2s;
 }
 .mail-delete-btn:hover{ background:rgba(239,68,68,.15); color:#ef4444; }
-.mail-message-subject{ font-weight:700; font-size:14px; margin-bottom:6px; }
 .mail-message-body{ font-size:14px; line-height:1.6; color:var(--text); white-space:pre-wrap; word-break:break-word; }
 
 .mail-compose{ display:flex; flex-direction:column; gap:16px; }

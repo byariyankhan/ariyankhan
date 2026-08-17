@@ -36,14 +36,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     exit;
   }
 
-  if ($action === 'delete_message') {
-    $id = (int) ($_POST['id'] ?? 0);
+  if ($action === 'delete_subject') {
+    $ids = array_filter(array_map('intval', explode(',', (string) ($_POST['ids'] ?? ''))));
     $thread = trim((string) ($_POST['thread'] ?? ''));
 
-    $stmt = $db->prepare('UPDATE mail_messages SET hidden = 1 WHERE id = :id');
-    $stmt->execute(['id' => $id]);
+    $result = inbox_delete_messages_permanently($ids);
+    $notice = $result['error'] !== null
+      ? ('Deleted locally, but removing it from the mail server failed — ' . $result['error'])
+      : 'Email permanently deleted';
 
-    header('Location: mail.php?thread=' . urlencode($thread) . '&notice=' . urlencode('Message deleted'));
+    header('Location: mail.php?thread=' . urlencode($thread) . '&notice=' . urlencode($notice));
     exit;
   }
 
@@ -104,7 +106,7 @@ function e(string $value): string {
 <link rel="icon" type="image/x-icon" href="../favicon/favicon.ico">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../css/style.css?v=9">
-<link rel="stylesheet" href="../css/tracker.css?v=15">
+<link rel="stylesheet" href="../css/tracker.css?v=16">
 </head>
 <body class="tracker-body">
 <div id="stars"></div>
@@ -163,23 +165,37 @@ function e(string $value): string {
           <p class="tracker-muted"><?= e($active_thread['contact_email']) ?></p>
         </div>
 
+        <?php
+          // Group by normalized subject (stripping Re:/Fwd: prefixes) so a
+          // whole email exchange — original plus every reply — deletes as
+          // one unit instead of message by message.
+          $subject_groups = [];
+          foreach ($active_thread['messages'] as $msg) {
+            $norm = inbox_normalize_subject((string) $msg['subject']);
+            $subject_groups[$norm][] = $msg;
+          }
+        ?>
         <div class="mail-messages">
-          <?php foreach ($active_thread['messages'] as $msg): ?>
-            <div class="mail-message mail-message--<?= e($msg['direction']) ?>">
-              <div class="mail-message-meta">
-                <span><?= $msg['direction'] === 'out' ? 'You' : e($active_thread['contact_name'] !== '' ? $active_thread['contact_name'] : $active_thread['contact_email']) ?></span>
-                <span class="mail-message-meta-right">
-                  <?= e(inbox_format_time((string) $msg['created_at'])) ?>
-                  <form method="post" class="mail-delete-form" onsubmit="return confirm('Delete this message?');">
-                    <input type="hidden" name="action" value="delete_message">
-                    <input type="hidden" name="id" value="<?= (int) $msg['id'] ?>">
-                    <input type="hidden" name="thread" value="<?= e($active_thread['contact_email']) ?>">
-                    <button type="submit" class="mail-delete-btn" aria-label="Delete message" title="Delete message">&times;</button>
-                  </form>
-                </span>
+          <?php foreach ($subject_groups as $group): ?>
+            <div class="mail-subject-group">
+              <div class="mail-subject-group-head">
+                <span class="mail-subject-group-title"><?= e((string) $group[0]['subject']) ?></span>
+                <form method="post" class="mail-delete-form" onsubmit="return confirm('Permanently delete this email? This removes it from the mail server too and cannot be undone.');">
+                  <input type="hidden" name="action" value="delete_subject">
+                  <input type="hidden" name="ids" value="<?= e(implode(',', array_map(fn($m) => (string) $m['id'], $group))) ?>">
+                  <input type="hidden" name="thread" value="<?= e($active_thread['contact_email']) ?>">
+                  <button type="submit" class="mail-delete-btn" aria-label="Delete email" title="Delete email">&times;</button>
+                </form>
               </div>
-              <div class="mail-message-subject"><?= e((string) $msg['subject']) ?></div>
-              <div class="mail-message-body"><?= nl2br(e((string) $msg['body'])) ?></div>
+              <?php foreach ($group as $msg): ?>
+                <div class="mail-message mail-message--<?= e($msg['direction']) ?>">
+                  <div class="mail-message-meta">
+                    <span><?= $msg['direction'] === 'out' ? 'You' : e($active_thread['contact_name'] !== '' ? $active_thread['contact_name'] : $active_thread['contact_email']) ?></span>
+                    <span><?= e(inbox_format_time((string) $msg['created_at'])) ?></span>
+                  </div>
+                  <div class="mail-message-body"><?= nl2br(e((string) $msg['body'])) ?></div>
+                </div>
+              <?php endforeach; ?>
             </div>
           <?php endforeach; ?>
         </div>

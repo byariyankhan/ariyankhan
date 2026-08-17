@@ -90,6 +90,16 @@ function inbox_threads(PDO $db): array {
   return $threads;
 }
 
+/* Strips repeated "Re:" / "Fwd:" prefixes so replies group under the
+   same email as the message they're replying to. */
+function inbox_normalize_subject(string $subject): string {
+  $s = trim($subject);
+  while (preg_match('/^(re|fwd?)\s*:\s*/i', $s)) {
+    $s = (string) preg_replace('/^(re|fwd?)\s*:\s*/i', '', $s);
+  }
+  return strtolower(trim($s));
+}
+
 function inbox_mark_thread_read(PDO $db, string $contact_email): void {
   $stmt = $db->prepare('UPDATE mail_messages SET is_read = 1 WHERE LOWER(contact_email) = LOWER(:email) AND direction = "in" AND is_read = 0');
   $stmt->execute(['email' => $contact_email]);

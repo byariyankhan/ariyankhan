@@ -206,6 +206,58 @@ function inbox_extract_body($conn, int $msgno, object $structure, string $part_n
   return '';
 }
 
+/* Permanently deletes the given messages — from the local database AND,
+   for any received message still on the server, from the actual mailbox
+   (via IMAP delete + expunge). This is irreversible; the caller is
+   responsible for confirming with the user first. */
+function inbox_delete_messages_permanently(array $ids): array {
+  $ids = array_values(array_unique(array_map('intval', $ids)));
+  if (!$ids) {
+    return ['deleted' => 0, 'error' => null];
+  }
+
+  $db = inbox_db();
+  $placeholders = implode(',', array_fill(0, count($ids), '?'));
+
+  $stmt = $db->prepare("SELECT direction, imap_uid FROM mail_messages WHERE id IN ($placeholders)");
+  $stmt->execute($ids);
+  $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+  $uids = [];
+  foreach ($rows as $row) {
+    if ($row['direction'] === 'in' && $row['imap_uid'] !== null) {
+      $uids[] = (int) $row['imap_uid'];
+    }
+  }
+
+  $imap_error = null;
+  if ($uids) {
+    $config = inbox_mail_config();
+    if (empty($config['imap_host']) || empty($config['imap_user']) || empty($config['imap_pass'])) {
+      $imap_error = 'IMAP is not configured on the server yet.';
+    } else {
+      $mailbox = '{' . $config['imap_host'] . ':' . $config['imap_port'] . '/imap/ssl}INBOX';
+      $conn = @imap_open($mailbox, $config['imap_user'], $config['imap_pass']);
+      if (!$conn) {
+        $imap_error = trim((string) imap_last_error()) ?: 'Could not connect to the mailbox.';
+      } else {
+        foreach ($uids as $uid) {
+          $msgno = imap_msgno($conn, $uid);
+          if ($msgno) {
+            imap_delete($conn, $msgno);
+          }
+        }
+        imap_expunge($conn);
+        imap_close($conn);
+      }
+    }
+  }
+
+  $db->prepare("DELETE FROM mail_messages WHERE id IN ($placeholders)")->execute($ids);
+
+  return ['deleted' => count($ids), 'error' => $imap_error];
+}
+
 function inbox_fetch_new(): array {
   $config = inbox_mail_config();
   if (empty($config['imap_host']) || empty($config['imap_user']) || empty($config['imap_pass'])) {
