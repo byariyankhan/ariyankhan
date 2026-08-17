@@ -57,6 +57,15 @@ const PORTFOLIO = [
   { service: 'map-animation', platform: 'youtube', id: 'LwdSfdEkXPA'  },
   /* ──────────────────────────────────────────────────────── */
 
+  /* ── TRUE CRIME ──────────────────────────────────────────── */
+  { service: 'true-crime', platform: 'youtube', id: 'UzH-ifjcwMo'  },
+  { service: 'true-crime', platform: 'youtube', id: 'qAxCty2RWe0'  },
+  { service: 'true-crime', platform: 'youtube', id: 'aZ4WbbzAF1A'  },
+  { service: 'true-crime', platform: 'youtube', id: 'FXwm-fTDr7M'  },
+  { service: 'true-crime', platform: 'youtube', id: '9XHP2cZQxPI'  },
+  { service: 'true-crime', platform: 'youtube', id: 'DEa5hfcZyWo'  },
+  /* ──────────────────────────────────────────────────────── */
+
 ];
 
 /* ══ Service meta — update when adding a new portfolio category ══ */
@@ -80,6 +89,11 @@ const SERVICE_META = {
     label: 'Map Animation',
     icon:  '🗺️',
     page:  'map-animation-video-editing.html',
+  },
+  'true-crime': {
+    label: 'True Crime',
+    icon:  '🔎',
+    page:  'service/video-editor-for-true-crime-youtube-channels.html',
   },
 };
 
