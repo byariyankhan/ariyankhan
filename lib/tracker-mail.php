@@ -63,7 +63,6 @@ function tracker_mail_esc(string $value): string {
    (Outlook/Gmail/Apple Mail all render this reliably).
    ══════════════════════════════════════════════════ */
 function tracker_mail_wrap(string $preheader, string $content_html): string {
-  $logo = 'https://ariyankhan.com/favicon/favicon-96x96.png';
   $avatar = 'https://ariyankhan.com/images/ariyan-khan-profile.webp';
   $year = date('Y');
   $preheader_esc = tracker_mail_esc($preheader);
@@ -98,14 +97,6 @@ function tracker_mail_wrap(string $preheader, string $content_html): string {
     <tr>
       <td align="center" style="padding:32px 16px;">
         <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background-color:#0D0D0D;border:1px solid rgba(255,237,84,0.15);border-radius:12px;overflow:hidden;">
-          <!-- Header -->
-          <tr>
-            <td align="center" style="padding:28px 32px;border-bottom:1px solid rgba(255,237,84,0.15);">
-              <img src="{$logo}" width="36" height="36" alt="Ariyan Khan" style="display:block;margin:0 auto 10px;border-radius:8px;">
-              <div style="font-size:19px;font-weight:700;letter-spacing:.5px;color:#FFFFFF;">ARIYAN KHAN</div>
-              <div style="font-size:11px;color:#888888;letter-spacing:1.5px;text-transform:uppercase;margin-top:5px;">Video Editor &amp; Documentary Creator</div>
-            </td>
-          </tr>
           <!-- Content -->
           <tr>
             <td style="padding:36px 32px 8px;color:#FFFFFF;font-size:15px;line-height:1.65;">
