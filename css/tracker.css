@@ -223,7 +223,12 @@
 }
 .mail-thread-item:hover{ border-color:rgba(255,237,84,.3); }
 .mail-thread-item.is-active{ border-color:var(--yellow); background:rgba(255,237,84,.05); }
-.mail-thread-name{ font-weight:700; font-size:14px; }
+.mail-thread-item.is-unread{ border-color:rgba(255,237,84,.35); background:rgba(255,237,84,.03); }
+.mail-thread-row{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.mail-thread-name{ display:flex; align-items:center; gap:7px; font-weight:700; font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.mail-unread-dot{ flex-shrink:0; width:7px; height:7px; border-radius:50%; background:var(--yellow); }
+.mail-thread-time{ flex-shrink:0; color:var(--muted); font-size:11px; }
+.mail-thread-item.is-unread .mail-thread-time{ color:var(--yellow); font-weight:700; }
 .mail-thread-preview{ color:var(--muted); font-size:12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
 .mail-main{

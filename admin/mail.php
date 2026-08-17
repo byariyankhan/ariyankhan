@@ -61,8 +61,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $notice = isset($_GET['notice']) ? (string) $_GET['notice'] : '';
-$threads = inbox_threads($db);
+
+// Auto-check for new mail on every plain page load. Skipped when a notice
+// is already present — that means we just got here from an action (send,
+// delete, or an explicit "Check for Replies") that already checked or
+// doesn't need to.
+if ($notice === '') {
+  $auto = inbox_fetch_new();
+  if ($auto['error'] === null && $auto['fetched'] > 0) {
+    $notice = $auto['fetched'] . ' new message' . ($auto['fetched'] === 1 ? '' : 's') . ' found';
+  }
+}
+
 $active_key = isset($_GET['thread']) ? strtolower(trim((string) $_GET['thread'])) : '';
+if ($active_key !== '') {
+  inbox_mark_thread_read($db, $active_key);
+}
+
+$threads = inbox_threads($db);
 $active_thread = $threads[$active_key] ?? null;
 
 $reply_subject = '';
@@ -88,7 +104,7 @@ function e(string $value): string {
 <link rel="icon" type="image/x-icon" href="../favicon/favicon.ico">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../css/style.css?v=9">
-<link rel="stylesheet" href="../css/tracker.css?v=14">
+<link rel="stylesheet" href="../css/tracker.css?v=15">
 </head>
 <body class="tracker-body">
 <div id="stars"></div>
@@ -128,8 +144,11 @@ function e(string $value): string {
               $last = $msgs[count($msgs) - 1];
               $is_active = $key === $active_key;
             ?>
-            <a href="mail.php?thread=<?= urlencode($thread['contact_email']) ?>" class="mail-thread-item <?= $is_active ? 'is-active' : '' ?>">
-              <span class="mail-thread-name"><?= e($thread['contact_name'] !== '' ? $thread['contact_name'] : $thread['contact_email']) ?></span>
+            <a href="mail.php?thread=<?= urlencode($thread['contact_email']) ?>" class="mail-thread-item <?= $is_active ? 'is-active' : '' ?> <?= $thread['unread'] ? 'is-unread' : '' ?>">
+              <span class="mail-thread-row">
+                <span class="mail-thread-name"><?php if ($thread['unread']): ?><span class="mail-unread-dot" aria-hidden="true"></span><?php endif; ?><?= e($thread['contact_name'] !== '' ? $thread['contact_name'] : $thread['contact_email']) ?></span>
+                <span class="mail-thread-time"><?= e(inbox_format_time((string) $last['created_at'])) ?></span>
+              </span>
               <span class="mail-thread-preview"><?= e($last['direction'] === 'out' ? 'You: ' : '') . e(mb_strimwidth((string) $last['subject'], 0, 48, '…')) ?></span>
             </a>
           <?php endforeach; ?>
@@ -150,7 +169,7 @@ function e(string $value): string {
               <div class="mail-message-meta">
                 <span><?= $msg['direction'] === 'out' ? 'You' : e($active_thread['contact_name'] !== '' ? $active_thread['contact_name'] : $active_thread['contact_email']) ?></span>
                 <span class="mail-message-meta-right">
-                  <?= e(substr((string) $msg['created_at'], 0, 16)) ?>
+                  <?= e(inbox_format_time((string) $msg['created_at'])) ?>
                   <form method="post" class="mail-delete-form" onsubmit="return confirm('Delete this message?');">
                     <input type="hidden" name="action" value="delete_message">
                     <input type="hidden" name="id" value="<?= (int) $msg['id'] ?>">

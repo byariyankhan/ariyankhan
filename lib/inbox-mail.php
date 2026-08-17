@@ -247,8 +247,8 @@ function inbox_fetch_new(): array {
     $body = $structure ? inbox_extract_body($conn, $msgno, $structure) : '';
 
     $stmt = $db->prepare(
-      'INSERT INTO mail_messages (direction, contact_email, contact_name, subject, body, message_id, in_reply_to, imap_uid, created_at)
-       VALUES ("in", :email, :name, :subject, :body, :message_id, :in_reply_to, :uid, :now)'
+      'INSERT INTO mail_messages (direction, contact_email, contact_name, subject, body, message_id, in_reply_to, imap_uid, is_read, created_at)
+       VALUES ("in", :email, :name, :subject, :body, :message_id, :in_reply_to, :uid, 0, :now)'
     );
     $stmt->execute([
       'email' => $from_email,
