@@ -48,6 +48,11 @@ function tracker_mail_ready(array $config): bool {
   return true;
 }
 
+function tracker_mail_thread_id(string $code): string {
+  $slug = strtolower(preg_replace('/[^A-Za-z0-9]/', '', $code) ?? '');
+  return "<tracker-{$slug}@ariyankhan.com>";
+}
+
 function tracker_mail_new(array $config, string $to_email, string $to_name): PHPMailer {
   $mail = new PHPMailer(true);
 
@@ -97,6 +102,7 @@ function tracker_send_order_email(string $to_email, string $to_name, string $pro
 
   try {
     $mail = tracker_mail_new($config, $to_email, $to_name);
+    $mail->MessageID = tracker_mail_thread_id($code);
     $mail->Subject = "Your order is confirmed — {$label}";
 
     $greeting = $to_name !== '' ? "Hi {$to_name}," : 'Hi,';
@@ -125,11 +131,14 @@ function tracker_send_stage_update_email(string $to_email, string $to_name, stri
 
   $track_url = rtrim($config['site_url'], '/') . '/track.html';
   $label = $project_label !== '' ? $project_label : 'your project';
+  $thread_id = tracker_mail_thread_id($code);
   $mail = null;
 
   try {
     $mail = tracker_mail_new($config, $to_email, $to_name);
-    $mail->Subject = "Project update: {$stage_label} — {$label}";
+    $mail->Subject = "Re: Your order is confirmed — {$label}";
+    $mail->addCustomHeader('In-Reply-To', $thread_id);
+    $mail->addCustomHeader('References', $thread_id);
 
     $greeting = $to_name !== '' ? "Hi {$to_name}," : 'Hi,';
     $mail->Body =
