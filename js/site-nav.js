@@ -5,8 +5,9 @@
     { id: 'stages', label: 'Editing Stages', number: '03', type: 'anchor' },
     { id: 'work', label: 'Recent Work', number: '04', type: 'anchor' },
     { id: 'faq', label: 'FAQ', number: '05', type: 'anchor' },
-    { id: 'contact', label: 'Contact', number: '06', type: 'anchor' },
-    { label: 'Track Order', number: '07', type: 'page', path: 'track.html' },
+    { id: 'reviews', label: 'Reviews', number: '06', type: 'anchor' },
+    { id: 'contact', label: 'Contact', number: '07', type: 'anchor' },
+    { label: 'Track Order', number: '08', type: 'page', path: 'track.html' },
   ];
 
   function escapeAttr(value) {
