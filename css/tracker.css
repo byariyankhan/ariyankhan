@@ -11,16 +11,6 @@
   max-width:360px; margin:32px auto 0; text-align:left;
 }
 
-.review-verify-note{
-  max-width:360px; margin:28px auto 0; padding:20px 22px;
-  background:var(--panel); border:1px solid #1f1f1f; border-radius:14px;
-  text-align:left;
-}
-.review-verify-note h2{
-  font-family:'Barlow Condensed',sans-serif; font-size:16px; font-weight:800;
-  letter-spacing:.5px; margin:0 0 8px; color:var(--text);
-}
-.review-verify-note p{ font-size:13px; line-height:1.7; color:var(--muted); margin:0; }
 .tracker-field{ display:flex; flex-direction:column; gap:8px; }
 .tracker-field span{
   font-size:11px; font-weight:700; letter-spacing:2px; text-transform:uppercase;
