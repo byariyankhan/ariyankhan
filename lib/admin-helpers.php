@@ -1,6 +1,6 @@
 <?php
 /* ══════════════════════════════════════════════════
-   Shared helper for every dashboard/*.php page.
+   Shared helper for every admin/*.php page.
    ══════════════════════════════════════════════════ */
 
 function e(string $value): string {

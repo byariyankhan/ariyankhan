@@ -1,7 +1,7 @@
 <?php
 /* ══════════════════════════════════════════════════
    Project Tracker — shared SQLite helper
-   Used by track-lookup.php and dashboard/index.php
+   Used by track-lookup.php and admin/index.php
    ══════════════════════════════════════════════════ */
 
 const TRACKER_STAGES = [
@@ -234,7 +234,7 @@ function tracker_normalize_code(string $raw): string {
 }
 
 // Admin date inputs are typed/displayed as DD/MM/YYYY (see the
-// .tracker-date-input mask in dashboard/index.php) — everything stored and
+// .tracker-date-input mask in admin/index.php) — everything stored and
 // passed around internally stays plain YYYY-MM-DD.
 function tracker_date_to_display(string $iso): string {
   if (!preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $iso, $m)) {

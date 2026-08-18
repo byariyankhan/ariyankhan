@@ -1,7 +1,7 @@
 <?php
 /* ══════════════════════════════════════════════════
    Shared admin project-card markup — used by both
-   dashboard/index.php (all projects) and dashboard/orders.php
+   admin/index.php (all projects) and admin/orders.php
    (Delivered only) so the two never drift apart.
    All forms post to index.php, whichever page they're
    rendered from, since that's where the action handling
