@@ -5,14 +5,15 @@
 Options -Indexes
 ErrorDocument 404 /404.html
 
-# ── Force HTTPS ──────────────────────────────────
+# ── Redirect www to non-www (checked first so http://www.
+#    resolves in a single hop instead of http→https-www→https-apex) ──
 RewriteEngine On
-RewriteCond %{HTTPS} off
-RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
-
-# ── Redirect www to non-www ───────────────────────
 RewriteCond %{HTTP_HOST} ^www\.(.+)$ [NC]
 RewriteRule ^ https://%1%{REQUEST_URI} [L,R=301]
+
+# ── Force HTTPS ──────────────────────────────────
+RewriteCond %{HTTPS} off
+RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 
 ## Missing paths: keep a real 404 status and hand off to /404.html
 RewriteCond %{REQUEST_URI} !^/404\.html$ [NC]
