@@ -156,7 +156,10 @@
       const submitted = allSubmitted.filter(
         (r) => !r.service || curatedKeys.includes(r.service)
       );
-      init([...curated, ...submitted]);
+      // Real, self-submitted reviews lead (newest first, per reviews.php's
+      // own ordering) so a fresh review is the first thing shown when the
+      // section comes into view, with curated quotes filling in after.
+      init([...submitted, ...curated]);
     })
     .catch(() => init(curated));
 })();
