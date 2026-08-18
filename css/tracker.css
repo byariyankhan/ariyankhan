@@ -16,7 +16,7 @@
   font-size:11px; font-weight:700; letter-spacing:2px; text-transform:uppercase;
   color:var(--muted); font-family:'Barlow Condensed',sans-serif;
 }
-.tracker-field input{
+.tracker-field input, .tracker-field select{
   width:100%; color:var(--text); font-family:'Inter',sans-serif; font-size:16px; font-weight:600;
   letter-spacing:1px; text-transform:uppercase;
   padding:14px 16px; outline:none;
@@ -24,8 +24,24 @@
   background:rgba(255,255,255,.02);
   transition:border-color .2s, background .2s;
 }
-.tracker-field input:focus{ border-color:rgba(255,237,84,.4); background:rgba(255,237,84,.03); }
+.tracker-field input:focus, .tracker-field select:focus{ border-color:rgba(255,237,84,.4); background:rgba(255,237,84,.03); }
 .tracker-field input::placeholder{ color:rgba(255,255,255,.3); text-transform:none; letter-spacing:0; font-weight:400; }
+.tracker-field select{
+  appearance:none; -webkit-appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8' fill='none'%3E%3Cpath d='M1 1L6 6L11 1' stroke='%23888888' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat:no-repeat; background-position:right 16px center;
+  padding-right:40px; cursor:pointer;
+}
+/* Native dropdown popups don't inherit the select's background — set it
+   explicitly on the options too, or unselected rows render white-on-white. */
+.tracker-field select option{ background:#161616; color:var(--text); }
+/* Hide native number-input spinners — they render as a plain white OS
+   widget that ignores the field's dark background. */
+.tracker-field input[type="number"]{ -moz-appearance:textfield; }
+.tracker-field input[type="number"]::-webkit-outer-spin-button,
+.tracker-field input[type="number"]::-webkit-inner-spin-button{
+  -webkit-appearance:none; margin:0;
+}
 
 .tracker-btn{
   display:inline-flex; align-items:center; justify-content:center; gap:8px;
@@ -224,6 +240,11 @@
 .tracker-payment-input input{
   width:90px; color:var(--text); border:none; background:none; outline:none;
   padding:10px 0; font-family:inherit; font-size:14px;
+  -moz-appearance:textfield;
+}
+.tracker-payment-input input::-webkit-outer-spin-button,
+.tracker-payment-input input::-webkit-inner-spin-button{
+  -webkit-appearance:none; margin:0;
 }
 .tracker-payment-status{
   margin:10px 0 0; font-size:13px; color:var(--yellow);
