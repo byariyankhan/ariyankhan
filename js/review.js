@@ -72,4 +72,11 @@
       submitBtn.textContent = 'Submit Review';
     }
   });
+
+  // Arriving from an emailed review link (review.html?code=7K4M-9XPQ) —
+  // fill in the code so the client only has to type name/rating/review.
+  const prefillCode = new URLSearchParams(window.location.search).get('code');
+  if (prefillCode) {
+    form.code.value = prefillCode.trim();
+  }
 })();

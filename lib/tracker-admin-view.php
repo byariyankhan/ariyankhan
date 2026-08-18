@@ -92,6 +92,20 @@ function tracker_render_project_card(array $project, string $redirect_to = 'inde
           <button type="submit" class="tracker-btn tracker-btn--ghost tracker-btn--small">Save Payment</button>
         </form>
       </div>
+
+      <div class="tracker-project-field tracker-project-field--wide">
+        <label>Delivery link</label>
+        <form method="post" action="index.php" class="tracker-date-form">
+          <input type="hidden" name="action" value="update_delivery_link">
+          <input type="hidden" name="id" value="<?= (int) $project['id'] ?>">
+          <input type="hidden" name="redirect_to" value="<?= $redirectAttr ?>">
+          <input type="url" name="delivery_link" class="tracker-date-input" placeholder="https://drive.google.com/..." autocomplete="off" value="<?= e((string) ($project['delivery_link'] ?? '')) ?>">
+          <button type="submit" class="tracker-btn tracker-btn--ghost tracker-btn--small">Save</button>
+        </form>
+        <p class="tracker-muted" style="margin-top:8px; font-size:12px;">
+          Sent to the client automatically when the stage is moved to Delivered (with notify checked).
+        </p>
+      </div>
     </div>
 
     <p class="tracker-project-foot">Created <?= e(substr((string) $project['created_at'], 0, 10)) ?></p>

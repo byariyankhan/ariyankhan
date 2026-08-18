@@ -95,6 +95,9 @@ function tracker_db(): PDO {
   if (!in_array('advance_amount', $columns, true)) {
     $db->exec('ALTER TABLE projects ADD COLUMN advance_amount REAL NOT NULL DEFAULT 0');
   }
+  if (!in_array('delivery_link', $columns, true)) {
+    $db->exec('ALTER TABLE projects ADD COLUMN delivery_link TEXT NOT NULL DEFAULT ""');
+  }
 
   $db->exec('
     CREATE TABLE IF NOT EXISTS reviews (

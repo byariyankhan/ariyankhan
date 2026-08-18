@@ -96,7 +96,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $stage = max(0, min(TRACKER_MAX_STAGE, $stage));
     $notify_client = isset($_POST['notify_client']);
 
-    $stmt = $db->prepare('SELECT stage, stage_dates, project_label, code, client_name, client_email FROM projects WHERE id = :id');
+    $stmt = $db->prepare('SELECT stage, stage_dates, project_label, code, client_name, client_email, delivery_link FROM projects WHERE id = :id');
     $stmt->execute(['id' => $id]);
     $existing = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -127,7 +127,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           (string) ($existing['client_name'] ?? ''),
           (string) ($existing['project_label'] ?? ''),
           (string) $existing['code'],
-          $stage_label
+          $stage_label,
+          (string) ($existing['delivery_link'] ?? '')
         );
         $notice .= $sent ? ' — client notified by email' : ' — notification email failed';
       }
@@ -160,6 +161,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $stmt = $db->prepare('UPDATE projects SET delivery_date = :delivery_date, updated_at = :now WHERE id = :id');
     $stmt->execute(['delivery_date' => $delivery_date, 'now' => gmdate('c'), 'id' => $id]);
     $notice = 'Delivery date updated';
+  }
+
+  if ($action === 'update_delivery_link') {
+    $id = (int) ($_POST['id'] ?? 0);
+    $delivery_link = trim((string) ($_POST['delivery_link'] ?? ''));
+    if ($delivery_link !== '' && !filter_var($delivery_link, FILTER_VALIDATE_URL)) {
+      header('Location: ' . $redirect_to . '?notice=' . urlencode('Delivery link must be a valid URL.'));
+      exit;
+    }
+
+    $stmt = $db->prepare('UPDATE projects SET delivery_link = :delivery_link, updated_at = :now WHERE id = :id');
+    $stmt->execute(['delivery_link' => $delivery_link, 'now' => gmdate('c'), 'id' => $id]);
+    $notice = 'Delivery link updated';
   }
 
   if ($action === 'delete') {

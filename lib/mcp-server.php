@@ -85,7 +85,7 @@ function mcp_tool_definitions(): array {
     [
       'name' => 'update_project',
       'title' => 'Update Project',
-      'description' => 'Updates one or more fields on an existing project, identified by its tracking code. Only the fields you provide are changed — omit any you don\'t want to touch. Use this for renaming the project, correcting client info, recording a payment (set advance_amount when a deposit or final payment comes in — the client-facing status line is calculated automatically from price_amount/advance_amount, there\'s no free-text note to write), setting/changing the delivery date, or fixing the service a project is tagged to. To change the stage instead, use update_project_stage.',
+      'description' => 'Updates one or more fields on an existing project, identified by its tracking code. Only the fields you provide are changed — omit any you don\'t want to touch. Use this for renaming the project, correcting client info, recording a payment (set advance_amount when a deposit or final payment comes in — the client-facing status line is calculated automatically from price_amount/advance_amount, there\'s no free-text note to write), setting/changing the delivery date, setting the delivery link, or fixing the service a project is tagged to. To change the stage instead, use update_project_stage.',
       'inputSchema' => [
         'type' => 'object',
         'properties' => [
@@ -96,6 +96,7 @@ function mcp_tool_definitions(): array {
           'delivery_date' => ['type' => 'string', 'description' => 'Delivery date in YYYY-MM-DD format. Pass an empty string to clear it.'],
           'price_amount' => ['type' => 'number', 'description' => 'Total project price in dollars. Replaces the existing price.'],
           'advance_amount' => ['type' => 'number', 'description' => 'Amount paid so far, in dollars — e.g. set this when a deposit or the final payment arrives. Replaces the existing amount (not added to it).'],
+          'delivery_link' => ['type' => 'string', 'description' => 'URL to the finished files (Google Drive, WeTransfer, etc.). When the stage is then moved to Delivered with notify_client on, this link is sent to the client in a prominent "Access Your Files" button, with a note to download within 7-14 days. Pass an empty string to clear it.'],
           'service_key' => ['type' => 'string', 'enum' => array_keys(TRACKER_SERVICE_KEYS), 'description' => 'Which service page a review from this client should publish to: talking-head, documentary, short-form, or map-animation.'],
         ],
         'required' => ['code'],
@@ -371,9 +372,17 @@ function mcp_call_tool(string $name, array $args): array {
       $fields[] = 'service_key = :service_key';
       $params['service_key'] = $service_key;
     }
+    if (array_key_exists('delivery_link', $args)) {
+      $delivery_link = trim((string) $args['delivery_link']);
+      if ($delivery_link !== '' && !filter_var($delivery_link, FILTER_VALIDATE_URL)) {
+        return mcp_text_result('delivery_link must be a valid URL (or an empty string to clear it).', true);
+      }
+      $fields[] = 'delivery_link = :delivery_link';
+      $params['delivery_link'] = $delivery_link;
+    }
 
     if (!$fields) {
-      return mcp_text_result('Nothing to update — provide at least one of project_label, client_name, client_email, delivery_date, price_amount, advance_amount, or service_key.', true);
+      return mcp_text_result('Nothing to update — provide at least one of project_label, client_name, client_email, delivery_date, price_amount, advance_amount, delivery_link, or service_key.', true);
     }
 
     $fields[] = 'updated_at = :now';
@@ -426,7 +435,8 @@ function mcp_call_tool(string $name, array $args): array {
         (string) ($existing['client_name'] ?? ''),
         (string) ($existing['project_label'] ?? ''),
         $code,
-        $stage_label
+        $stage_label,
+        (string) ($existing['delivery_link'] ?? '')
       );
       $result .= $sent ? ' Client notified by email.' : ' Client notification email failed to send.';
     }

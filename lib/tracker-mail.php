@@ -172,13 +172,14 @@ function tracker_send_order_email(string $to_email, string $to_name, string $pro
   }
 }
 
-function tracker_send_stage_update_email(string $to_email, string $to_name, string $project_label, string $code, string $stage_label): bool {
+function tracker_send_stage_update_email(string $to_email, string $to_name, string $project_label, string $code, string $stage_label, string $delivery_link = ''): bool {
   $config = tracker_mail_config();
   if (!tracker_mail_ready($config)) {
     return false;
   }
 
   $track_url = rtrim($config['site_url'], '/') . '/track.html?code=' . urlencode($code);
+  $review_url = rtrim($config['site_url'], '/') . '/review.html?code=' . urlencode($code);
   $label = $project_label !== '' ? $project_label : 'your project';
   $thread_id = tracker_mail_thread_id($code);
   $mail = null;
@@ -195,18 +196,37 @@ function tracker_send_stage_update_email(string $to_email, string $to_name, stri
     $stage_label_esc = mail_template_esc($stage_label);
     $code_esc = mail_template_esc($code);
     $track_url_esc = mail_template_esc($track_url);
+    $review_url_esc = mail_template_esc($review_url);
     $is_delivered = $stage_label === 'Delivered';
 
     if ($is_delivered) {
+      // The download button + expiry note only appear when a delivery
+      // link is actually on file (set from the project card) — an admin
+      // can still mark a project Delivered without one and this just
+      // quietly skips that block.
+      $delivery_link_html = '';
+      $delivery_link_text = '';
+      if ($delivery_link !== '') {
+        $delivery_link_esc = mail_template_esc($delivery_link);
+        $delivery_link_html = <<<HTML
+          <table role="presentation" cellpadding="0" cellspacing="0" style="margin:8px 0 12px;">
+            <tr><td style="background-color:#FFED54;border-radius:8px;">
+              <a href="{$delivery_link_esc}" style="display:inline-block;padding:14px 28px;font-size:14px;font-weight:700;color:#000000;text-decoration:none;">Access Your Files &rarr;</a>
+            </td></tr>
+          </table>
+          <p style="margin:0 0 24px;color:#888888;font-size:13px;">Please download within the next 7&ndash;14 days &mdash; the file is removed after that, so don't wait too long to grab it.</p>
+          HTML;
+        $delivery_link_text =
+          "Access your files here:\n{$delivery_link}\n\n" .
+          "Please download within the next 7-14 days — the file is removed after that, so don't wait too long to grab it.\n\n";
+      }
+
       $content = <<<HTML
         <p style="margin:0 0 16px;">{$greeting_html}</p>
         <p style="margin:0 0 16px;">Your project <strong style="color:#FFED54;">&ldquo;{$label_esc}&rdquo;</strong> has been delivered — thanks for working with me on this one.</p>
-        <p style="margin:0 0 16px;">If you're happy with how it turned out, a quick word from you would genuinely help — just reply to this email with a line or two, and let me know if it's okay to feature it as a testimonial on my site. No pressure either way.</p>
-        <table role="presentation" cellpadding="0" cellspacing="0" style="margin:8px 0 20px;">
-          <tr><td style="background-color:#FFED54;border-radius:8px;">
-            <a href="{$track_url_esc}" style="display:inline-block;padding:14px 28px;font-size:14px;font-weight:700;color:#000000;text-decoration:none;">See Full Progress &rarr;</a>
-          </td></tr>
-        </table>
+        {$delivery_link_html}
+        <p style="margin:0 0 12px;">If you're happy with how it turned out, I'd really appreciate a quick review — it takes less than a minute: <a href="{$review_url_esc}" style="color:#FFED54;font-weight:700;text-decoration:none;">Leave a Review &rarr;</a></p>
+        <p style="margin:0 0 16px;color:#888888;font-size:13px;">You can also see full progress anytime here: <a href="{$track_url_esc}" style="color:#888888;">{$track_url_esc}</a></p>
         <p style="margin:0;color:#888888;font-size:13px;">Your tracking code: <span style="color:#FFFFFF;font-family:'Courier New',monospace;">{$code_esc}</span></p>
         HTML;
 
@@ -214,8 +234,9 @@ function tracker_send_stage_update_email(string $to_email, string $to_name, stri
       $mail->AltBody =
         "{$greeting_text}\n\n" .
         "Your project \"{$label}\" has been delivered — thanks for working with me on this one.\n\n" .
-        "If you're happy with how it turned out, a quick word from you would genuinely help — just reply to this email with a line or two, and let me know if it's okay to feature it as a testimonial on my site. No pressure either way.\n\n" .
-        "You can see full progress anytime here:\n{$track_url}\n\n" .
+        $delivery_link_text .
+        "If you're happy with how it turned out, I'd really appreciate a quick review — it takes less than a minute:\n{$review_url}\n\n" .
+        "You can also see full progress anytime here:\n{$track_url}\n\n" .
         "Your tracking code: {$code}\n\n" .
         "Thanks,\nAriyan Khan\n";
     } else {
