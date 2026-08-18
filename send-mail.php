@@ -327,14 +327,14 @@ try {
   $mail->CharSet = 'UTF-8';
 
   $from_email = $config['driver'] === 'smtp' ? $config['smtp_user'] : $config['to_email'];
-  $from_name = $config['driver'] === 'smtp' ? 'No-Reply' : 'Ariyan Khan';
+  $from_name = $config['driver'] === 'smtp' ? "{$name} (via ariyankhan.com)" : 'Ariyan Khan';
 
   $mail->setFrom($from_email, $from_name);
   $mail->addAddress($config['to_email'], 'Ariyan Khan');
   $mail->addReplyTo($email, $name);
 
   $mail->isHTML(false);
-  $mail->Subject = "New inquiry: {$service} — {$name}";
+  $mail->Subject = "{$name} — {$service}";
   $mail->Body =
     "New project inquiry via ariyankhan.com\n" .
     str_repeat('─', 48) . "\n\n" .
