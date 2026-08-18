@@ -150,26 +150,34 @@ function review_submit(string $code, string $email, string $name, int $rating, s
     return ['ok' => false, 'error' => 'Reviews can be left once your project has been marked as delivered.'];
   }
 
+  $already_reviewed_error = "A review has already been submitted for this order — it can't be edited or resubmitted.";
+
+  $stmt = $db->prepare('SELECT id FROM reviews WHERE project_id = :project_id');
+  $stmt->execute(['project_id' => $project['id']]);
+  if ($stmt->fetch()) {
+    return ['ok' => false, 'error' => $already_reviewed_error];
+  }
+
   $now = gmdate('c');
-  $stmt = $db->prepare('
-    INSERT INTO reviews (project_id, code, client_name, rating, review_body, service_key, created_at, updated_at)
-    VALUES (:project_id, :code, :name, :rating, :body, :service_key, :now, :now)
-    ON CONFLICT(project_id) DO UPDATE SET
-      client_name = excluded.client_name,
-      rating = excluded.rating,
-      review_body = excluded.review_body,
-      service_key = excluded.service_key,
-      updated_at = excluded.updated_at
-  ');
-  $stmt->execute([
-    'project_id' => $project['id'],
-    'code' => $code,
-    'name' => $name,
-    'rating' => $rating,
-    'body' => $body,
-    'service_key' => (string) $project['service_key'],
-    'now' => $now,
-  ]);
+  try {
+    $stmt = $db->prepare('
+      INSERT INTO reviews (project_id, code, client_name, rating, review_body, service_key, created_at, updated_at)
+      VALUES (:project_id, :code, :name, :rating, :body, :service_key, :now, :now)
+    ');
+    $stmt->execute([
+      'project_id' => $project['id'],
+      'code' => $code,
+      'name' => $name,
+      'rating' => $rating,
+      'body' => $body,
+      'service_key' => (string) $project['service_key'],
+      'now' => $now,
+    ]);
+  } catch (PDOException $e) {
+    // Two submissions racing past the check above — the UNIQUE(project_id)
+    // constraint still guarantees only one review ever lands.
+    return ['ok' => false, 'error' => $already_reviewed_error];
+  }
 
   return ['ok' => true, 'name' => $name, 'service' => (string) $project['service_key']];
 }
