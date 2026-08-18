@@ -1110,6 +1110,15 @@ section{ position:relative; z-index:1; padding:80px 22px; }
 .contact-intro{ font-size:15px; color:var(--muted); line-height:1.8; margin-top:8px; }
 .contact-left .section-title{ font-size:clamp(28px,5vw,44px); margin-bottom:12px; }
 
+.contact-trust-list{ display:flex; flex-direction:column; gap:12px; margin-top:18px; }
+.contact-trust-item{ display:flex; align-items:center; gap:10px; font-size:13px; font-weight:600; color:var(--text); line-height:1.4; }
+.contact-trust-icon{
+  flex-shrink:0; width:20px; height:20px; border-radius:50%;
+  background:rgba(255,237,84,.12); border:1px solid rgba(255,237,84,.3);
+  display:flex; align-items:center; justify-content:center;
+  color:var(--yellow); font-size:12px; font-weight:900; line-height:1;
+}
+
 /* Shared subpage back link */
 .back-link{
   display:inline-flex; align-items:center; gap:8px;
