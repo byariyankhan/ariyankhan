@@ -176,6 +176,31 @@ function reviews_list(): array {
   return $db->query('SELECT client_name, rating, review_body, service_key, created_at FROM reviews ORDER BY created_at DESC')->fetchAll(PDO::FETCH_ASSOC);
 }
 
+// Same published reviews as reviews_list(), plus the fields only the admin
+// moderation view needs (review row id for deleting, and the project it
+// came from) — kept separate from reviews_list() so the public API never
+// exposes an id an outside caller could probe.
+function reviews_list_admin(): array {
+  $db = tracker_db();
+  return $db->query('
+    SELECT r.id, r.client_name, r.rating, r.review_body, r.service_key, r.code, r.created_at,
+           p.project_label
+    FROM reviews r
+    LEFT JOIN projects p ON p.id = r.project_id
+    ORDER BY r.created_at DESC
+  ')->fetchAll(PDO::FETCH_ASSOC);
+}
+
+// Deletes a published review outright — the moderation safety net for
+// self-published reviews (no approval step before they go live, so this
+// is the only way to take down something abusive/inappropriate after
+// the fact).
+function review_delete(int $id): void {
+  $db = tracker_db();
+  $stmt = $db->prepare('DELETE FROM reviews WHERE id = :id');
+  $stmt->execute(['id' => $id]);
+}
+
 function tracker_generate_code(): string {
   $db = tracker_db();
   $alphabet = TRACKER_CODE_ALPHABET;

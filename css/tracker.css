@@ -259,6 +259,11 @@
   margin:18px 0 0; padding-top:14px; border-top:1px solid #1a1a1a;
   color:var(--muted); font-size:12px;
 }
+.tracker-review-body{
+  margin:16px 0 0; padding:14px 16px;
+  background:rgba(255,255,255,.02); border:1px solid #1a1a1a; border-radius:10px;
+  color:var(--text); font-size:14px; line-height:1.7;
+}
 
 @media (min-width:640px){
   .tracker-project-fields{ grid-template-columns:1fr 1fr; }

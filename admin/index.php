@@ -11,12 +11,22 @@ if (empty($_SESSION['tracker_admin'])) {
 
 require __DIR__ . '/../lib/tracker-db.php';
 require __DIR__ . '/../lib/tracker-mail.php';
+require __DIR__ . '/../lib/admin-helpers.php';
+require __DIR__ . '/../lib/tracker-admin-view.php';
 
 $db = tracker_db();
 $notice = '';
 
+// Only ever redirect back to one of our own admin pages — never trust
+// this value for an open redirect.
+function tracker_admin_redirect_target(): string {
+  $target = (string) ($_POST['redirect_to'] ?? 'index.php');
+  return in_array($target, ['index.php', 'orders.php'], true) ? $target : 'index.php';
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $action = (string) ($_POST['action'] ?? '');
+  $redirect_to = tracker_admin_redirect_target();
 
   if ($action === 'create') {
     $label = trim((string) ($_POST['project_label'] ?? ''));
@@ -154,16 +164,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $notice = 'Project deleted';
   }
 
-  header('Location: index.php?notice=' . urlencode($notice));
+  header('Location: ' . $redirect_to . '?notice=' . urlencode($notice));
   exit;
 }
 
 $notice = isset($_GET['notice']) ? (string) $_GET['notice'] : '';
 $projects = $db->query('SELECT * FROM projects ORDER BY created_at DESC')->fetchAll(PDO::FETCH_ASSOC);
-
-function e(string $value): string {
-  return htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
-}
 ?>
 <!doctype html>
 <html lang="en-US">
@@ -175,7 +181,7 @@ function e(string $value): string {
 <link rel="icon" type="image/x-icon" href="../favicon/favicon.ico">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../css/style.css?v=10">
-<link rel="stylesheet" href="../css/tracker.css?v=24">
+<link rel="stylesheet" href="../css/tracker.css?v=25">
 </head>
 <body class="tracker-body">
 <div id="stars"></div>
@@ -187,6 +193,8 @@ function e(string $value): string {
     </div>
     <div class="tracker-admin-head-links">
       <a href="mail.php" class="tracker-btn tracker-btn--ghost">Inbox</a>
+      <a href="orders.php" class="tracker-btn tracker-btn--ghost">Delivered</a>
+      <a href="reviews.php" class="tracker-btn tracker-btn--ghost">Reviews</a>
       <a href="logout.php" class="tracker-btn tracker-btn--ghost">Log Out</a>
     </div>
   </div>
@@ -243,91 +251,7 @@ function e(string $value): string {
     <?php else: ?>
       <div class="tracker-project-list">
         <?php foreach ($projects as $project): ?>
-          <div class="tracker-project-card">
-            <div class="tracker-project-head">
-              <div>
-                <span class="tracker-code"><?= e($project['code']) ?></span>
-                <?php $svcKey = (string) ($project['service_key'] ?? ''); ?>
-                <?php if ($svcKey !== '' && isset(TRACKER_SERVICE_KEYS[$svcKey])): ?>
-                  <span class="tracker-service-badge"><?= e(TRACKER_SERVICE_KEYS[$svcKey]) ?></span>
-                <?php elseif ($svcKey === ''): ?>
-                  <span class="tracker-service-badge tracker-service-badge--none">No service set</span>
-                <?php endif; ?>
-                <h3 class="tracker-project-title"><?= e($project['project_label'] !== '' ? $project['project_label'] : '(untitled)') ?></h3>
-                <?php if (($project['client_name'] ?? '') !== '' || ($project['client_email'] ?? '') !== ''): ?>
-                  <p class="tracker-project-client">
-                    <?= e((string) ($project['client_name'] ?? '')) ?>
-                    <?php if (($project['client_email'] ?? '') !== ''): ?>
-                      <?= (($project['client_name'] ?? '') !== '') ? ' · ' : '' ?><?= e((string) $project['client_email']) ?>
-                    <?php endif; ?>
-                  </p>
-                <?php endif; ?>
-              </div>
-              <form method="post" onsubmit="return confirm('Delete this project?');">
-                <input type="hidden" name="action" value="delete">
-                <input type="hidden" name="id" value="<?= (int) $project['id'] ?>">
-                <button type="submit" class="tracker-btn tracker-btn--ghost tracker-btn--small">Delete</button>
-              </form>
-            </div>
-
-            <div class="tracker-project-fields">
-              <div class="tracker-project-field">
-                <label>Stage</label>
-                <form method="post" class="tracker-stage-form">
-                  <input type="hidden" name="action" value="update_stage">
-                  <input type="hidden" name="id" value="<?= (int) $project['id'] ?>">
-                  <select name="stage" onchange="this.form.submit()">
-                    <?php foreach (TRACKER_STAGES as $index => $info): ?>
-                      <option value="<?= $index ?>" <?= ((int) $project['stage'] === $index) ? 'selected' : '' ?>>
-                        <?= e($info['label']) ?>
-                      </option>
-                    <?php endforeach; ?>
-                  </select>
-                  <?php if (($project['client_email'] ?? '') !== ''): ?>
-                    <label class="tracker-notify-check">
-                      <input type="checkbox" name="notify_client" value="1" checked>
-                      Notify client by email
-                    </label>
-                  <?php endif; ?>
-                </form>
-              </div>
-
-              <div class="tracker-project-field">
-                <label>Delivery date</label>
-                <form method="post" class="tracker-date-form">
-                  <input type="hidden" name="action" value="update_delivery">
-                  <input type="hidden" name="id" value="<?= (int) $project['id'] ?>">
-                  <input type="text" name="delivery_date" class="tracker-date-input" placeholder="DD/MM/YYYY" inputmode="numeric" autocomplete="off" maxlength="10" pattern="\d{2}/\d{2}/\d{4}" title="DD/MM/YYYY" value="<?= e(tracker_date_to_display((string) ($project['delivery_date'] ?? ''))) ?>">
-                  <button type="submit" class="tracker-btn tracker-btn--ghost tracker-btn--small">Save</button>
-                </form>
-              </div>
-
-              <div class="tracker-project-field tracker-project-field--wide">
-                <label>Payment</label>
-                <form method="post" class="tracker-payment-form">
-                  <input type="hidden" name="action" value="update_payment">
-                  <input type="hidden" name="id" value="<?= (int) $project['id'] ?>">
-                  <span class="tracker-payment-input">
-                    <span class="tracker-payment-prefix">Price $</span>
-                    <input type="number" name="price_amount" min="0" step="0.01" value="<?= e((string) ($project['price_amount'] ?? '0')) ?>">
-                  </span>
-                  <span class="tracker-payment-input">
-                    <span class="tracker-payment-prefix">Advance $</span>
-                    <input type="number" name="advance_amount" min="0" step="0.01" value="<?= e((string) ($project['advance_amount'] ?? '0')) ?>">
-                  </span>
-                  <button type="submit" class="tracker-btn tracker-btn--ghost tracker-btn--small">Save Payment</button>
-                </form>
-                <?php
-                  $paymentNote = tracker_payment_note((float) ($project['price_amount'] ?? 0), (float) ($project['advance_amount'] ?? 0));
-                ?>
-                <?php if ($paymentNote !== ''): ?>
-                  <p class="tracker-payment-status"><?= e($paymentNote) ?></p>
-                <?php endif; ?>
-              </div>
-            </div>
-
-            <p class="tracker-project-foot">Created <?= e(substr((string) $project['created_at'], 0, 10)) ?></p>
-          </div>
+          <?php tracker_render_project_card($project, 'index.php'); ?>
         <?php endforeach; ?>
       </div>
     <?php endif; ?>
