@@ -130,6 +130,16 @@
   align-items: center;
   gap: 14px;
   margin-top: 24px;
+  text-decoration: none;
+  width: fit-content;
+}
+
+.article-byline:hover .article-byline-name strong {
+  color: var(--yellow);
+}
+
+.article-byline:hover .article-byline-avatar {
+  box-shadow: 0 0 0 3px rgba(255, 237, 84, 0.2);
 }
 
 .article-byline-avatar {
