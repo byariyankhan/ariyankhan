@@ -32,6 +32,7 @@
 .service-testimonial {
   position: relative;
   z-index: 1;
+  scroll-margin-top: 100px;
   padding: 0 28px 60px;
   max-width: 520px;
   margin: 0 auto;
