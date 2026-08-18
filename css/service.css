@@ -1206,6 +1206,26 @@
 }
 
 /* ══════════════════════════════════════════════════
+   SERVICE TESTIMONIAL — one relevant client review,
+   reuses the .t-card component from style.css so the
+   design stays controlled from a single place; each
+   page only supplies its own quote/name/location.
+══════════════════════════════════════════════════ */
+.service-testimonial {
+  padding: 0 28px 60px;
+  max-width: 560px;
+  margin: 0 auto;
+}
+.service-testimonial .service-section-header {
+  text-align: center;
+}
+@media (min-width: 768px) {
+  .service-testimonial {
+    padding: 0 40px 72px;
+  }
+}
+
+/* ══════════════════════════════════════════════════
    SERVICE FAQ
 ══════════════════════════════════════════════════ */
 .service-faq {
