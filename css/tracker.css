@@ -245,7 +245,8 @@
   -webkit-appearance:none; margin:0;
 }
 .tracker-date-form{ display:flex; align-items:center; gap:8px; }
-.tracker-date-form .tracker-date-input{
+.tracker-date-form .tracker-date-input,
+.tracker-date-form .tracker-url-input{
   flex:1;
   background:rgba(255,255,255,.03); color:var(--text); border:1px solid #1f1f1f; border-radius:8px;
   padding:10px 12px; font-family:inherit; font-size:14px;
