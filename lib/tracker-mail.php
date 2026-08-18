@@ -118,11 +118,11 @@ function tracker_send_order_email(string $to_email, string $to_name, string $pro
     $advance_fmt = tracker_format_money($advance_amount);
     if ($price_amount > 0 && $advance_amount < $price_amount) {
       $due_fmt = tracker_format_money($price_amount - $advance_amount);
-      $payment_line_html = "<p style=\"margin:0 0 16px;\">We've received your advance payment of <strong style=\"color:#FFED54;\">{$advance_fmt}</strong> — {$due_fmt} remaining before final delivery.</p>";
-      $payment_line_text = "We've received your advance payment of {$advance_fmt} — {$due_fmt} remaining before final delivery.\n\n";
+      $payment_line_html = "<p style=\"margin:0 0 16px;\">I've received your advance payment of <strong style=\"color:#FFED54;\">{$advance_fmt}</strong> — {$due_fmt} remaining before final delivery.</p>";
+      $payment_line_text = "I've received your advance payment of {$advance_fmt} — {$due_fmt} remaining before final delivery.\n\n";
     } else {
-      $payment_line_html = "<p style=\"margin:0 0 16px;\">We've received your payment of <strong style=\"color:#FFED54;\">{$advance_fmt}</strong> — thank you!</p>";
-      $payment_line_text = "We've received your payment of {$advance_fmt} — thank you!\n\n";
+      $payment_line_html = "<p style=\"margin:0 0 16px;\">I've received your payment of <strong style=\"color:#FFED54;\">{$advance_fmt}</strong> — thank you!</p>";
+      $payment_line_text = "I've received your payment of {$advance_fmt} — thank you!\n\n";
     }
   }
 
