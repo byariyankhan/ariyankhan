@@ -89,6 +89,12 @@ function tracker_db(): PDO {
   if (!in_array('service_key', $columns, true)) {
     $db->exec('ALTER TABLE projects ADD COLUMN service_key TEXT NOT NULL DEFAULT ""');
   }
+  if (!in_array('price_amount', $columns, true)) {
+    $db->exec('ALTER TABLE projects ADD COLUMN price_amount REAL NOT NULL DEFAULT 0');
+  }
+  if (!in_array('advance_amount', $columns, true)) {
+    $db->exec('ALTER TABLE projects ADD COLUMN advance_amount REAL NOT NULL DEFAULT 0');
+  }
 
   $db->exec('
     CREATE TABLE IF NOT EXISTS reviews (
@@ -197,4 +203,30 @@ function tracker_normalize_code(string $raw): string {
     return $upper;
   }
   return substr($stripped, 0, 4) . '-' . substr($stripped, 4, 4);
+}
+
+function tracker_format_money(float $amount): string {
+  $rounded = round($amount, 2);
+  if (abs($rounded - round($rounded)) < 0.001) {
+    return '$' . number_format($rounded, 0);
+  }
+  return '$' . number_format($rounded, 2);
+}
+
+// Replaces the old free-text "payment note" — derived from price/advance
+// instead of typed by hand, so it can never drift out of sync with the
+// numbers. Empty until an advance is actually on file, matching the old
+// note's default-blank behavior.
+function tracker_payment_note(float $price, float $advance): string {
+  if ($advance <= 0) {
+    return '';
+  }
+  if ($price <= 0) {
+    return tracker_format_money($advance) . ' received';
+  }
+  if ($advance >= $price) {
+    return 'Payment received in full (' . tracker_format_money($price) . ')';
+  }
+  $pct = (int) round($advance / $price * 100);
+  return "{$pct}% advance (" . tracker_format_money($advance) . ' of ' . tracker_format_money($price) . ') received';
 }

@@ -23,11 +23,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $client_name = trim((string) ($_POST['client_name'] ?? ''));
     $client_email = trim((string) ($_POST['client_email'] ?? ''));
     $service_key = trim((string) ($_POST['service_key'] ?? ''));
+    $delivery_date = trim((string) ($_POST['delivery_date'] ?? ''));
+    $price_amount = (float) ($_POST['price_amount'] ?? 0);
+    $advance_amount = (float) ($_POST['advance_amount'] ?? 0);
     if ($client_email !== '' && !filter_var($client_email, FILTER_VALIDATE_EMAIL)) {
       $client_email = '';
     }
     if (!array_key_exists($service_key, TRACKER_SERVICE_KEYS)) {
       $service_key = '';
+    }
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $delivery_date)) {
+      $delivery_date = '';
+    }
+    if ($price_amount < 0) {
+      $price_amount = 0;
+    }
+    if ($advance_amount < 0) {
+      $advance_amount = 0;
+    }
+
+    if ($label === '' || $service_key === '' || $delivery_date === '' || $price_amount <= 0) {
+      header('Location: index.php?notice=' . urlencode('Project label, service, delivery date, and price are all required.'));
+      exit;
     }
 
     $now = gmdate('c');
@@ -35,8 +52,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $stage_dates = json_encode(['0' => gmdate('Y-m-d')], JSON_FORCE_OBJECT);
 
     $stmt = $db->prepare(
-      'INSERT INTO projects (code, project_label, stage, stage_dates, client_name, client_email, service_key, created_at, updated_at)
-       VALUES (:code, :label, 0, :stage_dates, :client_name, :client_email, :service_key, :now, :now)'
+      'INSERT INTO projects (code, project_label, stage, stage_dates, client_name, client_email, service_key, delivery_date, price_amount, advance_amount, created_at, updated_at)
+       VALUES (:code, :label, 0, :stage_dates, :client_name, :client_email, :service_key, :delivery_date, :price_amount, :advance_amount, :now, :now)'
     );
     $stmt->execute([
       'code' => $code,
@@ -45,6 +62,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       'client_name' => $client_name,
       'client_email' => $client_email,
       'service_key' => $service_key,
+      'delivery_date' => $delivery_date,
+      'price_amount' => $price_amount,
+      'advance_amount' => $advance_amount,
       'now' => $now,
     ]);
 
@@ -99,13 +119,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
   }
 
-  if ($action === 'update_note') {
+  if ($action === 'update_payment') {
     $id = (int) ($_POST['id'] ?? 0);
-    $note = trim((string) ($_POST['note'] ?? ''));
+    $price_amount = (float) ($_POST['price_amount'] ?? 0);
+    $advance_amount = (float) ($_POST['advance_amount'] ?? 0);
+    if ($price_amount < 0) {
+      $price_amount = 0;
+    }
+    if ($advance_amount < 0) {
+      $advance_amount = 0;
+    }
 
-    $stmt = $db->prepare('UPDATE projects SET note = :note, updated_at = :now WHERE id = :id');
-    $stmt->execute(['note' => $note, 'now' => gmdate('c'), 'id' => $id]);
-    $notice = 'Note updated';
+    $stmt = $db->prepare('UPDATE projects SET price_amount = :price_amount, advance_amount = :advance_amount, updated_at = :now WHERE id = :id');
+    $stmt->execute(['price_amount' => $price_amount, 'advance_amount' => $advance_amount, 'now' => gmdate('c'), 'id' => $id]);
+    $notice = 'Payment updated';
   }
 
   if ($action === 'update_delivery') {
@@ -148,7 +175,7 @@ function e(string $value): string {
 <link rel="icon" type="image/x-icon" href="../favicon/favicon.ico">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../css/style.css?v=10">
-<link rel="stylesheet" href="../css/tracker.css?v=21">
+<link rel="stylesheet" href="../css/tracker.css?v=22">
 </head>
 <body class="tracker-body">
 <div id="stars"></div>
@@ -192,6 +219,18 @@ function e(string $value): string {
             <option value="<?= e($key) ?>"><?= e($svcLabel) ?></option>
           <?php endforeach; ?>
         </select>
+      </label>
+      <label class="tracker-field">
+        <span>Delivery date</span>
+        <input type="date" name="delivery_date" required>
+      </label>
+      <label class="tracker-field">
+        <span>Project price ($)</span>
+        <input type="number" name="price_amount" min="0" step="0.01" placeholder="e.g. 300" required>
+      </label>
+      <label class="tracker-field">
+        <span>Advance paid ($, optional)</span>
+        <input type="number" name="advance_amount" min="0" step="0.01" placeholder="e.g. 150">
       </label>
       <button type="submit" class="tracker-btn">Create &amp; Generate Code</button>
     </form>
@@ -264,13 +303,26 @@ function e(string $value): string {
               </div>
 
               <div class="tracker-project-field tracker-project-field--wide">
-                <label>Payment note</label>
-                <form method="post" class="tracker-note-form">
-                  <input type="hidden" name="action" value="update_note">
+                <label>Payment</label>
+                <form method="post" class="tracker-payment-form">
+                  <input type="hidden" name="action" value="update_payment">
                   <input type="hidden" name="id" value="<?= (int) $project['id'] ?>">
-                  <textarea name="note" rows="2" maxlength="300" placeholder="e.g. 50% advance ($150) received"><?= e((string) ($project['note'] ?? '')) ?></textarea>
-                  <button type="submit" class="tracker-btn tracker-btn--ghost tracker-btn--small">Save Note</button>
+                  <span class="tracker-payment-input">
+                    <span class="tracker-payment-prefix">Price $</span>
+                    <input type="number" name="price_amount" min="0" step="0.01" value="<?= e((string) ($project['price_amount'] ?? '0')) ?>">
+                  </span>
+                  <span class="tracker-payment-input">
+                    <span class="tracker-payment-prefix">Advance $</span>
+                    <input type="number" name="advance_amount" min="0" step="0.01" value="<?= e((string) ($project['advance_amount'] ?? '0')) ?>">
+                  </span>
+                  <button type="submit" class="tracker-btn tracker-btn--ghost tracker-btn--small">Save Payment</button>
                 </form>
+                <?php
+                  $paymentNote = tracker_payment_note((float) ($project['price_amount'] ?? 0), (float) ($project['advance_amount'] ?? 0));
+                ?>
+                <?php if ($paymentNote !== ''): ?>
+                  <p class="tracker-payment-status"><?= e($paymentNote) ?></p>
+                <?php endif; ?>
               </div>
             </div>
 

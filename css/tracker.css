@@ -214,14 +214,20 @@
 .tracker-stage-form select option{
   background:#161616; color:var(--text);
 }
-.tracker-note-form{ display:flex; flex-direction:column; gap:8px; }
-.tracker-note-form textarea{
-  width:100%; resize:vertical; min-height:44px;
-  background:rgba(255,255,255,.03); color:var(--text); border:1px solid #1f1f1f; border-radius:8px;
-  padding:10px 12px; font-family:inherit; font-size:14px; line-height:1.5;
+.tracker-payment-form{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.tracker-payment-input{
+  display:flex; align-items:center; gap:8px;
+  background:rgba(255,255,255,.03); border:1px solid #1f1f1f; border-radius:8px;
+  padding:0 12px;
 }
-.tracker-note-form textarea::placeholder{ color:rgba(255,255,255,.3); }
-.tracker-note-form .tracker-btn{ align-self:flex-start; }
+.tracker-payment-prefix{ font-size:13px; color:var(--muted); white-space:nowrap; }
+.tracker-payment-input input{
+  width:90px; color:var(--text); border:none; background:none; outline:none;
+  padding:10px 0; font-family:inherit; font-size:14px;
+}
+.tracker-payment-status{
+  margin:10px 0 0; font-size:13px; color:var(--yellow);
+}
 .tracker-date-form{ display:flex; align-items:center; gap:8px; }
 .tracker-date-form input[type="date"]{
   flex:1; color-scheme:dark;

@@ -225,12 +225,14 @@ an update — nav button "Track Order" → `track.html`.
 
 **How it works:**
 1. Ariyan creates a project in `/admin/` (password-protected) with a short
-   client-facing label and a required **service** (Talking Head / Documentary
-   / Short Form / Map Animation — `TRACKER_SERVICE_KEYS` in
-   `lib/tracker-db.php`). This generates a random 8-character code like
-   `7K4M-9XPQ` (confusable characters like `0/O/1/I/L` excluded). The service
-   choice determines which page a review from this client publishes to later
-   — see "Review Card" below.
+   client-facing label and three other **required** fields: **service**
+   (Talking Head / Documentary / Short Form / Map Animation —
+   `TRACKER_SERVICE_KEYS` in `lib/tracker-db.php`), **delivery date**, and
+   **project price**. The form (and `create_project` server-side) refuses to
+   create a project missing any of these — creation generates a random
+   8-character code like `7K4M-9XPQ` (confusable characters like `0/O/1/I/L`
+   excluded). The service choice determines which page a review from this
+   client publishes to later — see "Review Card" below.
 2. Ariyan sends that code to the client (email/WhatsApp).
 3. The client goes to `ariyankhan.com/track.html`, types the code, and sees
    a 6-stage horizontal progress stepper: Footage Received → Payment
@@ -238,10 +240,16 @@ an update — nav button "Track Order" → `track.html`.
 4. Ariyan updates the stage from the same `/admin/` dashboard as work
    progresses — the client's page reflects it immediately on next lookup
    (no notification is sent; the client checks on demand).
-5. Each project also has a free-text "payment note" Ariyan can set from
-   `/admin/` (e.g. "50% advance ($150) received") — rendered as a small line
-   under the *current* stage's label in the stepper whenever it's non-empty.
-   Stage list lives in `TRACKER_STAGES` in `lib/tracker-db.php`.
+5. Payment status is **not** a free-text field — `/admin/` has a "Price" and
+   an "Advance" number input per project (`price_amount`/`advance_amount`
+   columns), and `tracker_payment_note()` (`lib/tracker-db.php`) derives the
+   client-facing line from them, e.g. "50% advance ($150 of $300) received"
+   or "Payment received in full ($300)". It's rendered as a small line under
+   the *current* stage's label in the stepper whenever an advance is on
+   file (blank before any payment). Editing the numbers is the only way to
+   change that text — there's no separate note to type and it can never
+   drift out of sync with the actual figures. Stage list lives in
+   `TRACKER_STAGES` in `lib/tracker-db.php`.
 6. Every time Ariyan changes a project's stage, today's date is auto-stamped
    for that stage (first time only, stored as JSON in `stage_dates`) and
    shown above that stage's dot on the stepper. The first dot falls back to

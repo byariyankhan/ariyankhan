@@ -61,13 +61,13 @@ function mcp_tool_definitions(): array {
     [
       'name' => 'list_projects',
       'title' => 'List Projects',
-      'description' => 'Lists every project in the tracker, most recently created first. Shows the tracking code, project label, client name/email, current stage, delivery date, and payment note. Use this to see what\'s in progress or to find a project\'s tracking code.',
+      'description' => 'Lists every project in the tracker, most recently created first. Shows the tracking code, project label, client name/email, current stage, delivery date, and payment status (price, advance paid, percentage). Use this to see what\'s in progress or to find a project\'s tracking code.',
       'inputSchema' => ['type' => 'object', 'properties' => new stdClass(), 'required' => []],
     ],
     [
       'name' => 'create_project',
       'title' => 'Create Project',
-      'description' => 'Creates a new tracked project and generates a client-facing tracking code (looked up on the public track.html page). New projects always start at stage 0 (Footage Received). If client_email is given, an order-confirmation email with the tracking code and a track-my-project link is sent immediately, and future update_project_stage calls can notify the client automatically — without it, the client never gets the code and can\'t be notified later. If this project is coming from an email inquiry, always pass the contact_email/contact_name you already have from that thread; don\'t leave these blank just because the user didn\'t repeat them out loud. Always pass service_key too — it\'s what determines which service page a review from this client publishes to once the project is delivered; without it, a submitted review has nowhere specific to show.',
+      'description' => 'Creates a new tracked project and generates a client-facing tracking code (looked up on the public track.html page). New projects always start at stage 0 (Footage Received). If client_email is given, an order-confirmation email with the tracking code and a track-my-project link is sent immediately, and future update_project_stage calls can notify the client automatically — without it, the client never gets the code and can\'t be notified later. If this project is coming from an email inquiry, always pass the contact_email/contact_name you already have from that thread; don\'t leave these blank just because the user didn\'t repeat them out loud. Always pass service_key too — it\'s what determines which service page a review from this client publishes to once the project is delivered; without it, a submitted review has nowhere specific to show. delivery_date and price_amount are also required — there is no free-text payment note anymore; the client-facing payment status line is calculated automatically from price_amount and advance_amount.',
       'inputSchema' => [
         'type' => 'object',
         'properties' => [
@@ -75,14 +75,17 @@ function mcp_tool_definitions(): array {
           'client_name' => ['type' => 'string', 'description' => 'Client\'s name, if known. Optional, but include it whenever you already have it (e.g. from an inbox thread).'],
           'client_email' => ['type' => 'string', 'description' => 'Client\'s email address. Optional, but include it whenever you already have it (e.g. from an inbox thread) — without it, no confirmation email is sent and the client can\'t be notified of later stage updates.'],
           'service_key' => ['type' => 'string', 'enum' => array_keys(TRACKER_SERVICE_KEYS), 'description' => 'Which service this project is for — controls which page a review from this client shows up on once submitted: talking-head, documentary, short-form, or map-animation.'],
+          'delivery_date' => ['type' => 'string', 'description' => 'Expected delivery date in YYYY-MM-DD format. Required.'],
+          'price_amount' => ['type' => 'number', 'description' => 'Total project price in dollars, e.g. 300. Required.'],
+          'advance_amount' => ['type' => 'number', 'description' => 'Advance/deposit already paid, in dollars. Optional, defaults to 0 — set it later with update_project once an advance actually comes in.'],
         ],
-        'required' => ['project_label', 'service_key'],
+        'required' => ['project_label', 'service_key', 'delivery_date', 'price_amount'],
       ],
     ],
     [
       'name' => 'update_project',
       'title' => 'Update Project',
-      'description' => 'Updates one or more fields on an existing project, identified by its tracking code. Only the fields you provide are changed — omit any you don\'t want to touch. Use this for renaming the project, correcting client info, recording a payment note (e.g. "50% advance ($150) received"), setting/changing the delivery date, or fixing the service a project is tagged to. To change the stage instead, use update_project_stage.',
+      'description' => 'Updates one or more fields on an existing project, identified by its tracking code. Only the fields you provide are changed — omit any you don\'t want to touch. Use this for renaming the project, correcting client info, recording a payment (set advance_amount when a deposit or final payment comes in — the client-facing status line is calculated automatically from price_amount/advance_amount, there\'s no free-text note to write), setting/changing the delivery date, or fixing the service a project is tagged to. To change the stage instead, use update_project_stage.',
       'inputSchema' => [
         'type' => 'object',
         'properties' => [
@@ -90,8 +93,9 @@ function mcp_tool_definitions(): array {
           'project_label' => ['type' => 'string', 'description' => 'New client-facing project name.'],
           'client_name' => ['type' => 'string', 'description' => 'New client name.'],
           'client_email' => ['type' => 'string', 'description' => 'New client email address.'],
-          'note' => ['type' => 'string', 'description' => 'Payment/internal note, e.g. "50% advance ($150) received". Replaces the existing note.'],
           'delivery_date' => ['type' => 'string', 'description' => 'Delivery date in YYYY-MM-DD format. Pass an empty string to clear it.'],
+          'price_amount' => ['type' => 'number', 'description' => 'Total project price in dollars. Replaces the existing price.'],
+          'advance_amount' => ['type' => 'number', 'description' => 'Amount paid so far, in dollars — e.g. set this when a deposit or the final payment arrives. Replaces the existing amount (not added to it).'],
           'service_key' => ['type' => 'string', 'enum' => array_keys(TRACKER_SERVICE_KEYS), 'description' => 'Which service page a review from this client should publish to: talking-head, documentary, short-form, or map-animation.'],
         ],
         'required' => ['code'],
@@ -229,9 +233,10 @@ function mcp_call_tool(string $name, array $args): array {
       $who = $p['client_name'] !== '' ? $p['client_name'] : ($p['client_email'] !== '' ? $p['client_email'] : 'no client on file');
       $label = $p['project_label'] !== '' ? $p['project_label'] : '(untitled)';
       $delivery = $p['delivery_date'] !== '' ? ", delivery {$p['delivery_date']}" : '';
-      $note = $p['note'] !== '' ? " — note: {$p['note']}" : '';
+      $payment_note = tracker_payment_note((float) ($p['price_amount'] ?? 0), (float) ($p['advance_amount'] ?? 0));
+      $price = (float) ($p['price_amount'] ?? 0) > 0 ? ' — ' . tracker_format_money((float) $p['price_amount']) . ($payment_note !== '' ? " ({$payment_note})" : ' (no advance yet)') : '';
       $service = ($p['service_key'] ?? '') !== '' ? " — service: {$p['service_key']}" : ' — service: none set';
-      $lines[] = "- {$p['code']} — \"{$label}\" — {$who} — stage: {$stage_label}{$service}{$delivery}{$note}";
+      $lines[] = "- {$p['code']} — \"{$label}\" — {$who} — stage: {$stage_label}{$service}{$delivery}{$price}";
     }
     return mcp_text_result(implode("\n", $lines));
   }
@@ -241,6 +246,9 @@ function mcp_call_tool(string $name, array $args): array {
     $client_name = trim((string) ($args['client_name'] ?? ''));
     $client_email = trim((string) ($args['client_email'] ?? ''));
     $service_key = trim((string) ($args['service_key'] ?? ''));
+    $delivery_date = trim((string) ($args['delivery_date'] ?? ''));
+    $price_amount = (float) ($args['price_amount'] ?? 0);
+    $advance_amount = (float) ($args['advance_amount'] ?? 0);
 
     if ($label === '') {
       return mcp_text_result('project_label is required.', true);
@@ -252,6 +260,15 @@ function mcp_call_tool(string $name, array $args): array {
       $valid = implode(', ', array_keys(TRACKER_SERVICE_KEYS));
       return mcp_text_result("service_key must be one of: {$valid}.", true);
     }
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $delivery_date)) {
+      return mcp_text_result('delivery_date is required, in YYYY-MM-DD format.', true);
+    }
+    if ($price_amount <= 0) {
+      return mcp_text_result('price_amount is required and must be greater than 0.', true);
+    }
+    if ($advance_amount < 0) {
+      $advance_amount = 0;
+    }
 
     $tdb = tracker_db();
     $now = gmdate('c');
@@ -259,8 +276,8 @@ function mcp_call_tool(string $name, array $args): array {
     $stage_dates = json_encode(['0' => gmdate('Y-m-d')], JSON_FORCE_OBJECT);
 
     $stmt = $tdb->prepare(
-      'INSERT INTO projects (code, project_label, stage, stage_dates, client_name, client_email, service_key, created_at, updated_at)
-       VALUES (:code, :label, 0, :stage_dates, :client_name, :client_email, :service_key, :now, :now)'
+      'INSERT INTO projects (code, project_label, stage, stage_dates, client_name, client_email, service_key, delivery_date, price_amount, advance_amount, created_at, updated_at)
+       VALUES (:code, :label, 0, :stage_dates, :client_name, :client_email, :service_key, :delivery_date, :price_amount, :advance_amount, :now, :now)'
     );
     $stmt->execute([
       'code' => $code,
@@ -269,10 +286,13 @@ function mcp_call_tool(string $name, array $args): array {
       'client_name' => $client_name,
       'client_email' => $client_email,
       'service_key' => $service_key,
+      'delivery_date' => $delivery_date,
+      'price_amount' => $price_amount,
+      'advance_amount' => $advance_amount,
       'now' => $now,
     ]);
 
-    $result = "Created project \"{$label}\" with tracking code {$code} (stage: Footage Received, service: {$service_key}).";
+    $result = "Created project \"{$label}\" with tracking code {$code} (stage: Footage Received, service: {$service_key}, price: " . tracker_format_money($price_amount) . ", delivery: {$delivery_date}).";
     if ($client_email !== '') {
       $sent = tracker_send_order_email($client_email, $client_name, $label, $code);
       $result .= $sent ? " Order confirmation emailed to {$client_email}." : ' Email to the client failed to send.';
@@ -313,9 +333,21 @@ function mcp_call_tool(string $name, array $args): array {
       $fields[] = 'client_email = :client_email';
       $params['client_email'] = $email;
     }
-    if (array_key_exists('note', $args)) {
-      $fields[] = 'note = :note';
-      $params['note'] = trim((string) $args['note']);
+    if (array_key_exists('price_amount', $args)) {
+      $price_amount = (float) $args['price_amount'];
+      if ($price_amount < 0) {
+        return mcp_text_result('price_amount cannot be negative.', true);
+      }
+      $fields[] = 'price_amount = :price_amount';
+      $params['price_amount'] = $price_amount;
+    }
+    if (array_key_exists('advance_amount', $args)) {
+      $advance_amount = (float) $args['advance_amount'];
+      if ($advance_amount < 0) {
+        return mcp_text_result('advance_amount cannot be negative.', true);
+      }
+      $fields[] = 'advance_amount = :advance_amount';
+      $params['advance_amount'] = $advance_amount;
     }
     if (array_key_exists('delivery_date', $args)) {
       $date = trim((string) $args['delivery_date']);
@@ -336,7 +368,7 @@ function mcp_call_tool(string $name, array $args): array {
     }
 
     if (!$fields) {
-      return mcp_text_result('Nothing to update — provide at least one of project_label, client_name, client_email, note, delivery_date, or service_key.', true);
+      return mcp_text_result('Nothing to update — provide at least one of project_label, client_name, client_email, delivery_date, price_amount, advance_amount, or service_key.', true);
     }
 
     $fields[] = 'updated_at = :now';
