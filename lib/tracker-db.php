@@ -205,6 +205,16 @@ function tracker_normalize_code(string $raw): string {
   return substr($stripped, 0, 4) . '-' . substr($stripped, 4, 4);
 }
 
+// Admin date inputs are typed/displayed as DD/MM/YYYY (see the
+// .tracker-date-input mask in admin/index.php) — everything stored and
+// passed around internally stays plain YYYY-MM-DD.
+function tracker_date_to_display(string $iso): string {
+  if (!preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $iso, $m)) {
+    return '';
+  }
+  return "{$m[3]}/{$m[2]}/{$m[1]}";
+}
+
 function tracker_format_money(float $amount): string {
   $rounded = round($amount, 2);
   if (abs($rounded - round($rounded)) < 0.001) {

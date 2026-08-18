@@ -229,8 +229,8 @@
   margin:10px 0 0; font-size:13px; color:var(--yellow);
 }
 .tracker-date-form{ display:flex; align-items:center; gap:8px; }
-.tracker-date-form input[type="date"]{
-  flex:1; color-scheme:dark;
+.tracker-date-form .tracker-date-input{
+  flex:1;
   background:rgba(255,255,255,.03); color:var(--text); border:1px solid #1f1f1f; border-radius:8px;
   padding:10px 12px; font-family:inherit; font-size:14px;
 }

@@ -175,7 +175,7 @@ function e(string $value): string {
 <link rel="icon" type="image/x-icon" href="../favicon/favicon.ico">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../css/style.css?v=10">
-<link rel="stylesheet" href="../css/tracker.css?v=22">
+<link rel="stylesheet" href="../css/tracker.css?v=23">
 </head>
 <body class="tracker-body">
 <div id="stars"></div>
@@ -222,7 +222,7 @@ function e(string $value): string {
       </label>
       <label class="tracker-field">
         <span>Delivery date</span>
-        <input type="date" name="delivery_date" required>
+        <input type="text" name="delivery_date" class="tracker-date-input" placeholder="DD/MM/YYYY" inputmode="numeric" autocomplete="off" maxlength="10" pattern="\d{2}/\d{2}/\d{4}" title="DD/MM/YYYY" required>
       </label>
       <label class="tracker-field">
         <span>Project price ($)</span>
@@ -297,7 +297,7 @@ function e(string $value): string {
                 <form method="post" class="tracker-date-form">
                   <input type="hidden" name="action" value="update_delivery">
                   <input type="hidden" name="id" value="<?= (int) $project['id'] ?>">
-                  <input type="date" name="delivery_date" value="<?= e((string) ($project['delivery_date'] ?? '')) ?>">
+                  <input type="text" name="delivery_date" class="tracker-date-input" placeholder="DD/MM/YYYY" inputmode="numeric" autocomplete="off" maxlength="10" pattern="\d{2}/\d{2}/\d{4}" title="DD/MM/YYYY" value="<?= e(tracker_date_to_display((string) ($project['delivery_date'] ?? ''))) ?>">
                   <button type="submit" class="tracker-btn tracker-btn--ghost tracker-btn--small">Save</button>
                 </form>
               </div>
@@ -333,5 +333,31 @@ function e(string $value): string {
     <?php endif; ?>
   </div>
 </main>
+<script>
+  // Plain text input styled/typed as DD/MM/YYYY (native <input type="date">
+  // renders in whatever order the browser's locale picks, which was
+  // showing month-first and getting mistyped). Auto-inserts the slashes
+  // as digits are typed, then rewrites to YYYY-MM-DD right before the
+  // form submits — the PHP side only ever sees ISO format.
+  document.querySelectorAll('.tracker-date-input').forEach((input) => {
+    input.addEventListener('input', () => {
+      const digits = input.value.replace(/\D/g, '').slice(0, 8);
+      if (digits.length > 4) {
+        input.value = `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+      } else if (digits.length > 2) {
+        input.value = `${digits.slice(0, 2)}/${digits.slice(2)}`;
+      } else {
+        input.value = digits;
+      }
+    });
+
+    input.closest('form')?.addEventListener('submit', () => {
+      const match = input.value.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+      if (match) {
+        input.value = `${match[3]}-${match[2]}-${match[1]}`;
+      }
+    });
+  });
+</script>
 </body>
 </html>
