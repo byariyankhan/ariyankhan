@@ -59,7 +59,7 @@ bash deploy.sh --dry-run               # preview without uploading
 | `track-lookup.php` | Public code → project status lookup endpoint |
 | `lib/tracker-db.php` | SQLite helper shared by tracker + admin |
 | `lib/tracker-mail.php` | Sends the order-confirmation email to clients on project creation |
-| `admin/index.php`, `admin/login.php`, `admin/logout.php` | Password-gated dashboard to create projects and update stages |
+| `dashboard/index.php`, `dashboard/login.php`, `dashboard/logout.php` | Password-gated dashboard to create projects and update stages |
 | `admin-config.local.php` | Admin password — NOT in git, lives on server only |
 | `data/tracker.sqlite` | Project tracker database — NOT in git, auto-created on server |
 | `css/tracker.css`, `js/tracker.js` | Tracker page + admin styling/behavior |
@@ -224,7 +224,7 @@ Lets clients check their project status themselves instead of messaging for
 an update — nav button "Track Order" → `track.html`.
 
 **How it works:**
-1. Ariyan creates a project in `/admin/` (password-protected) with a short
+1. Ariyan creates a project in `dashboard.ariyankhan.com` (password-protected) with a short
    client-facing label and three other **required** fields: **service**
    (Talking Head / Documentary / Short Form / Map Animation —
    `TRACKER_SERVICE_KEYS` in `lib/tracker-db.php`), **delivery date**, and
@@ -237,10 +237,10 @@ an update — nav button "Track Order" → `track.html`.
 3. The client goes to `ariyankhan.com/track.html`, types the code, and sees
    a 6-stage horizontal progress stepper: Footage Received → Payment
    (Advance) → Editing In Progress → In Review → Payment (Full) → Delivered.
-4. Ariyan updates the stage from the same `/admin/` dashboard as work
+4. Ariyan updates the stage from the same `dashboard.ariyankhan.com` dashboard as work
    progresses — the client's page reflects it immediately on next lookup
    (no notification is sent; the client checks on demand).
-5. Payment status is **not** a free-text field — `/admin/` has a "Price" and
+5. Payment status is **not** a free-text field — `dashboard.ariyankhan.com` has a "Price" and
    an "Advance" number input per project (`price_amount`/`advance_amount`
    columns), and `tracker_payment_note()` (`lib/tracker-db.php`) derives the
    client-facing line from them, e.g. "50% advance ($150 of $300) received"
@@ -260,7 +260,7 @@ an update — nav button "Track Order" → `track.html`.
    (via the same PHPMailer/`mail-config.local.php` setup as the contact
    form) with the tracking link and code. Leaving the email blank just
    skips sending — the project is still created either way.
-8. If a project has a client email, changing its stage from `/admin/` shows
+8. If a project has a client email, changing its stage from `dashboard.ariyankhan.com` shows
    a "Notify client by email" checkbox (checked by default) next to the
    stage dropdown. When checked and the stage actually changes, the client
    gets a short update email naming the new stage, with the tracking link
@@ -329,7 +329,7 @@ time — so new client reviews appear automatically without a code change.
 
 **Which page a self-submitted review publishes to:** every project has a
 `service_key` (`talking-head` / `documentary` / `short-form` / `map-animation`)
-set when it's created in `/admin/` or via the `create_project` MCP tool — it's
+set when it's created in `dashboard.ariyankhan.com` or via the `create_project` MCP tool — it's
 a required field precisely so a review can be routed correctly. When a client
 submits a review, `review_submit()` (`lib/tracker-db.php`) copies that
 project's `service_key` onto the review row. `reviews.php`'s GET response

@@ -14,17 +14,17 @@ RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 RewriteCond %{HTTP_HOST} ^www\.(.+)$ [NC]
 RewriteRule ^ https://%1%{REQUEST_URI} [L,R=301]
 
-# ── dashboard.ariyankhan.com: route everything into /admin ──
+# ── dashboard.ariyankhan.com: route everything into /dashboard ──
 # Same document root as the main site (shared on purpose — the tracker
-# admin relies on ../lib and ../data which live outside /admin), so this
-# just aliases the subdomain's root to the admin app instead of showing
-# the marketing homepage. Static assets it already references via
-# relative ../css, ../favicon paths are left alone so they keep resolving
-# normally instead of getting an extra /admin/ prefix.
+# admin relies on ../lib and ../data which live outside /dashboard), so
+# this just aliases the subdomain's root to the admin app instead of
+# showing the marketing homepage. Static assets it already references
+# via relative ../css, ../favicon paths are left alone so they keep
+# resolving normally instead of getting an extra /dashboard/ prefix.
 RewriteCond %{HTTP_HOST} ^dashboard\.ariyankhan\.com$ [NC]
-RewriteCond %{REQUEST_URI} !^/admin/
+RewriteCond %{REQUEST_URI} !^/dashboard/
 RewriteCond %{REQUEST_URI} !^/(css|js|favicon|images)/
-RewriteRule ^(.*)$ /admin/$1 [L]
+RewriteRule ^(.*)$ /dashboard/$1 [L]
 
 ## Missing paths: keep a real 404 status and hand off to /404.html
 RewriteCond %{REQUEST_URI} !^/404\.html$ [NC]

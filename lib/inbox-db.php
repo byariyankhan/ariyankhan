@@ -1,7 +1,7 @@
 <?php
 /* ══════════════════════════════════════════════════
    Admin Inbox — shared SQLite helper
-   Used by admin/mail.php and lib/inbox-mail.php.
+   Used by dashboard/mail.php and lib/inbox-mail.php.
    Threads are derived by grouping messages on
    contact_email — there's no separate threads table.
    ══════════════════════════════════════════════════ */
