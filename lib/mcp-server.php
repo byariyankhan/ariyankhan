@@ -77,7 +77,7 @@ function mcp_tool_definitions(): array {
           'service_key' => ['type' => 'string', 'enum' => array_keys(TRACKER_SERVICE_KEYS), 'description' => 'Which service this project is for — controls which page a review from this client shows up on once submitted: talking-head, documentary, short-form, or map-animation.'],
           'delivery_date' => ['type' => 'string', 'description' => 'Expected delivery date in YYYY-MM-DD format. Required.'],
           'price_amount' => ['type' => 'number', 'description' => 'Total project price in dollars, e.g. 300. Required.'],
-          'advance_amount' => ['type' => 'number', 'description' => 'Advance/deposit already paid, in dollars. Optional, defaults to 0 — set it later with update_project once an advance actually comes in.'],
+          'advance_amount' => ['type' => 'number', 'description' => 'Advance/deposit already paid, in dollars. Optional, defaults to 0 — set it later with update_project once an advance actually comes in. Passing a value greater than 0 here starts the project at the "Payment (Advance)" stage instead of "Footage Received", since an advance on file at creation means it has already been paid.'],
         ],
         'required' => ['project_label', 'service_key', 'delivery_date', 'price_amount'],
       ],
@@ -273,15 +273,19 @@ function mcp_call_tool(string $name, array $args): array {
     $tdb = tracker_db();
     $now = gmdate('c');
     $code = tracker_generate_code();
-    $stage_dates = json_encode(['0' => gmdate('Y-m-d')], JSON_FORCE_OBJECT);
+    // An advance given right at creation means it's already been paid —
+    // start at "Payment (Advance)" instead of "Footage Received".
+    $initial_stage = $advance_amount > 0 ? TRACKER_ADVANCE_STAGE : 0;
+    $stage_dates = json_encode([(string) $initial_stage => gmdate('Y-m-d')], JSON_FORCE_OBJECT);
 
     $stmt = $tdb->prepare(
       'INSERT INTO projects (code, project_label, stage, stage_dates, client_name, client_email, service_key, delivery_date, price_amount, advance_amount, created_at, updated_at)
-       VALUES (:code, :label, 0, :stage_dates, :client_name, :client_email, :service_key, :delivery_date, :price_amount, :advance_amount, :now, :now)'
+       VALUES (:code, :label, :stage, :stage_dates, :client_name, :client_email, :service_key, :delivery_date, :price_amount, :advance_amount, :now, :now)'
     );
     $stmt->execute([
       'code' => $code,
       'label' => $label,
+      'stage' => $initial_stage,
       'stage_dates' => $stage_dates,
       'client_name' => $client_name,
       'client_email' => $client_email,
@@ -292,7 +296,8 @@ function mcp_call_tool(string $name, array $args): array {
       'now' => $now,
     ]);
 
-    $result = "Created project \"{$label}\" with tracking code {$code} (stage: Footage Received, service: {$service_key}, price: " . tracker_format_money($price_amount) . ", delivery: {$delivery_date}).";
+    $stage_label_for_result = TRACKER_STAGES[$initial_stage]['label'] ?? 'Footage Received';
+    $result = "Created project \"{$label}\" with tracking code {$code} (stage: {$stage_label_for_result}, service: {$service_key}, price: " . tracker_format_money($price_amount) . ", delivery: {$delivery_date}).";
     if ($client_email !== '') {
       $sent = tracker_send_order_email($client_email, $client_name, $label, $code);
       $result .= $sent ? " Order confirmation emailed to {$client_email}." : ' Email to the client failed to send.';

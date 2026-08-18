@@ -49,8 +49,9 @@ function tracker_render_project_card(array $project, string $redirect_to = 'inde
           <input type="hidden" name="redirect_to" value="<?= $redirectAttr ?>">
           <select name="stage" onchange="this.form.submit()">
             <?php foreach (TRACKER_STAGES as $index => $info): ?>
+              <?php $stageNote = tracker_stage_payment_note($index, (float) ($project['price_amount'] ?? 0), (float) ($project['advance_amount'] ?? 0)); ?>
               <option value="<?= $index ?>" <?= ((int) $project['stage'] === $index) ? 'selected' : '' ?>>
-                <?= e($info['label']) ?>
+                <?= e($info['label']) ?><?= $stageNote !== '' ? ' — ' . e($stageNote) : '' ?>
               </option>
             <?php endforeach; ?>
           </select>
@@ -90,12 +91,6 @@ function tracker_render_project_card(array $project, string $redirect_to = 'inde
           </span>
           <button type="submit" class="tracker-btn tracker-btn--ghost tracker-btn--small">Save Payment</button>
         </form>
-        <?php
-          $paymentNote = tracker_payment_note((float) ($project['price_amount'] ?? 0), (float) ($project['advance_amount'] ?? 0));
-        ?>
-        <?php if ($paymentNote !== ''): ?>
-          <p class="tracker-payment-status"><?= e($paymentNote) ?></p>
-        <?php endif; ?>
       </div>
     </div>
 

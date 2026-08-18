@@ -5,8 +5,32 @@
   const errorEl = document.getElementById('trackerError');
   const resultEl = document.getElementById('trackerResult');
   const labelEl = document.getElementById('trackerProjectLabel');
-  const noteEl = document.getElementById('trackerProjectNote');
   const stagesEl = document.getElementById('trackerStages');
+
+  // Index into the fixed TRACKER_STAGES list (lib/tracker-db.php) that
+  // "Payment (Advance)" and "Payment (Full)" live at — used to attach a
+  // $ amount straight onto that stage's label instead of a separate note.
+  const ADVANCE_STAGE_INDEX = 1;
+  const FULL_PAYMENT_STAGE_INDEX = 4;
+
+  function formatMoney(amount) {
+    const rounded = Math.round(amount * 100) / 100;
+    return `$${Number.isInteger(rounded) ? rounded : rounded.toFixed(2)}`;
+  }
+
+  // "$240 received" under Payment (Advance), "$160 due" (or "Paid in
+  // full") under Payment (Full) — only when there's a price on file.
+  function stagePaymentNote(stageIndex, priceAmount, advanceAmount) {
+    if (priceAmount <= 0) return '';
+    if (stageIndex === ADVANCE_STAGE_INDEX) {
+      return advanceAmount > 0 ? `${formatMoney(advanceAmount)} received` : '';
+    }
+    if (stageIndex === FULL_PAYMENT_STAGE_INDEX) {
+      const due = priceAmount - advanceAmount;
+      return due > 0 ? `${formatMoney(due)} due` : 'Paid in full';
+    }
+    return '';
+  }
 
   if (!form) return;
 
@@ -24,7 +48,7 @@
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   }
 
-  function renderStages(stages, currentStage, createdAt, deliveryDate, stageDates) {
+  function renderStages(stages, currentStage, createdAt, deliveryDate, stageDates, priceAmount, advanceAmount) {
     stagesEl.innerHTML = '';
     const lastIndex = stages.length - 1;
     const dates = stageDates && typeof stageDates === 'object' ? stageDates : {};
@@ -67,6 +91,14 @@
       label.textContent = stage.label;
       step.append(label);
 
+      const paymentNote = stagePaymentNote(index, priceAmount, advanceAmount);
+      if (paymentNote) {
+        const noteText = document.createElement('span');
+        noteText.className = 'hstep-payment-note';
+        noteText.textContent = paymentNote;
+        step.append(noteText);
+      }
+
       stagesEl.appendChild(step);
     });
   }
@@ -103,11 +135,16 @@
         return;
       }
 
-      const note = typeof json.note === 'string' ? json.note.trim() : '';
       labelEl.textContent = json.projectLabel;
-      noteEl.textContent = note;
-      noteEl.hidden = !note;
-      renderStages(json.stages, json.stage, json.createdAt, json.deliveryDate, json.stageDates);
+      renderStages(
+        json.stages,
+        json.stage,
+        json.createdAt,
+        json.deliveryDate,
+        json.stageDates,
+        Number(json.priceAmount) || 0,
+        Number(json.advanceAmount) || 0
+      );
       resultEl.hidden = false;
     } catch (err) {
       showError('Could not reach the server. Please check your connection and try again.');

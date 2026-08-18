@@ -96,15 +96,7 @@
 .tracker-result{ margin:40px auto 0; text-align:left; }
 .tracker-result-title{
   font-family:'Barlow Condensed',sans-serif; font-size:24px; font-weight:800;
-  text-transform:uppercase; margin:0 0 8px; text-align:center;
-}
-/* General project note (e.g. a payment note) — shown once under the
-   title, not nested under whichever stage happens to be current, since
-   the note isn't tied to a specific stage and stays put as the stage
-   advances past whatever it was originally about. */
-.tracker-result-note{
-  margin:0 0 26px; text-align:center; font-size:13px; line-height:1.5;
-  color:var(--muted);
+  text-transform:uppercase; margin:0 0 26px; text-align:center;
 }
 
 /* Horizontal progress stepper — dots connected left-to-right, stage name
@@ -138,13 +130,19 @@
 .hstep--done .hstep-dot-row::before, .hstep--current .hstep-dot-row::before{ background:var(--yellow); }
 .hstep--done .hstep-label{ color:var(--text); }
 .hstep--current .hstep-label{ color:var(--yellow); font-weight:700; }
+/* $ received / $ due, attached to the Payment (Advance) and Payment
+   (Full) stages specifically instead of a separate note line — see
+   stagePaymentNote() in js/tracker.js. */
+.hstep-payment-note{
+  display:block; margin-top:3px; font-size:9px; font-weight:700; color:var(--yellow); padding:0 2px;
+}
 
 @media (min-width:600px){
   .hstep-date-slot{ height:42px; }
   .hstep-date-text{ font-size:11px; }
   .hstep-dot{ width:16px; height:16px; }
   .hstep-label{ font-size:12px; }
-  .tracker-result-note{ font-size:14px; }
+  .hstep-payment-note{ font-size:11px; }
 }
 
 /* ── Admin ── */
@@ -245,9 +243,6 @@
 .tracker-payment-input input::-webkit-outer-spin-button,
 .tracker-payment-input input::-webkit-inner-spin-button{
   -webkit-appearance:none; margin:0;
-}
-.tracker-payment-status{
-  margin:10px 0 0; font-size:13px; color:var(--yellow);
 }
 .tracker-date-form{ display:flex; align-items:center; gap:8px; }
 .tracker-date-form .tracker-date-input{

@@ -265,3 +265,27 @@ function tracker_payment_note(float $price, float $advance): string {
   $pct = (int) round($advance / $price * 100);
   return "{$pct}% advance (" . tracker_format_money($advance) . ' of ' . tracker_format_money($price) . ') received';
 }
+
+// Which TRACKER_STAGES index is "Payment (Advance)" / "Payment (Full)" —
+// mirrors ADVANCE_STAGE_INDEX/FULL_PAYMENT_STAGE_INDEX in js/tracker.js.
+const TRACKER_ADVANCE_STAGE = 1;
+const TRACKER_FULL_PAYMENT_STAGE = 4;
+
+// "$240 received" / "$160 due" attached directly to a specific stage
+// (the admin stage dropdown's option label) instead of a standalone
+// note — same idea as tracker_payment_note() but scoped per-stage so
+// the client-facing stepper (js/tracker.js) and this admin dropdown
+// show the amount right where it's relevant instead of once, generically.
+function tracker_stage_payment_note(int $stage_index, float $price, float $advance): string {
+  if ($price <= 0) {
+    return '';
+  }
+  if ($stage_index === TRACKER_ADVANCE_STAGE) {
+    return $advance > 0 ? tracker_format_money($advance) . ' received' : '';
+  }
+  if ($stage_index === TRACKER_FULL_PAYMENT_STAGE) {
+    $due = $price - $advance;
+    return $due > 0 ? tracker_format_money($due) . ' due' : 'Paid in full';
+  }
+  return '';
+}

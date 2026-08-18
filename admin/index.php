@@ -59,15 +59,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $now = gmdate('c');
     $code = tracker_generate_code();
-    $stage_dates = json_encode(['0' => gmdate('Y-m-d')], JSON_FORCE_OBJECT);
+    // An advance given right at creation means it's already been paid —
+    // start at "Payment (Advance)" instead of "Footage Received" so the
+    // stage reflects that immediately, no manual bump required.
+    $initial_stage = $advance_amount > 0 ? TRACKER_ADVANCE_STAGE : 0;
+    $stage_dates = json_encode([(string) $initial_stage => gmdate('Y-m-d')], JSON_FORCE_OBJECT);
 
     $stmt = $db->prepare(
       'INSERT INTO projects (code, project_label, stage, stage_dates, client_name, client_email, service_key, delivery_date, price_amount, advance_amount, created_at, updated_at)
-       VALUES (:code, :label, 0, :stage_dates, :client_name, :client_email, :service_key, :delivery_date, :price_amount, :advance_amount, :now, :now)'
+       VALUES (:code, :label, :stage, :stage_dates, :client_name, :client_email, :service_key, :delivery_date, :price_amount, :advance_amount, :now, :now)'
     );
     $stmt->execute([
       'code' => $code,
       'label' => $label,
+      'stage' => $initial_stage,
       'stage_dates' => $stage_dates,
       'client_name' => $client_name,
       'client_email' => $client_email,
@@ -181,7 +186,7 @@ $projects = $db->query('SELECT * FROM projects ORDER BY created_at DESC')->fetch
 <link rel="icon" type="image/x-icon" href="../favicon/favicon.ico">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../css/style.css?v=10">
-<link rel="stylesheet" href="../css/tracker.css?v=25">
+<link rel="stylesheet" href="../css/tracker.css?v=26">
 </head>
 <body class="tracker-body">
 <div id="stars"></div>

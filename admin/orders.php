@@ -32,7 +32,7 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
 <link rel="icon" type="image/x-icon" href="../favicon/favicon.ico">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../css/style.css?v=10">
-<link rel="stylesheet" href="../css/tracker.css?v=25">
+<link rel="stylesheet" href="../css/tracker.css?v=26">
 </head>
 <body class="tracker-body">
 <div id="stars"></div>
