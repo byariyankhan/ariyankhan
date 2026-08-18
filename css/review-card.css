@@ -172,6 +172,12 @@
 .service-testimonial-verify a:hover {
   text-decoration: underline;
 }
+.service-testimonial-verify small {
+  display: block;
+  margin-top: 6px;
+  font-size: 11px;
+  color: #666;
+}
 @media (min-width: 768px) {
   .service-testimonial {
     padding: 0 40px 72px;
