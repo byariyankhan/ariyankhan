@@ -177,6 +177,11 @@
   font-weight: 800;
   line-height: 1.2;
   margin-bottom: 4px;
+  text-decoration: none;
+  transition: color 0.2s;
+}
+.service-profile-name:hover {
+  color: var(--yellow);
 }
 .service-profile-role {
   color: rgba(255,255,255,.46);

@@ -39,7 +39,7 @@ class ServiceProfile extends HTMLElement {
               <img src="${basePath}${SITE.avatar}" alt="${SITE.name}" class="service-profile-avatar" width="64" height="64" loading="lazy">
             </div>
             <div class="service-profile-meta">
-              <div class="service-profile-name">${SITE.name}</div>
+              <a class="service-profile-name" href="${basePath}about.html">${SITE.name}</a>
               <div class="service-profile-role">${role}</div>
             </div>
             <div class="service-profile-rating">

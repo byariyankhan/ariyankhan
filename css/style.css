@@ -539,6 +539,18 @@ section{ position:relative; z-index:1; padding:80px 22px; }
 }
 .ht-text strong{ color:var(--yellow); }
 
+/* ── ABOUT LINK (byline to bio page) ── */
+.hero-about-link{
+  display:inline-flex; align-items:center; gap:6px;
+  color:rgba(255,255,255,.5);
+  font-size:13px; font-weight:600;
+  text-decoration:none;
+  transition:color .2s;
+}
+.hero-about-link span{ transition:transform .2s; }
+.hero-about-link:hover{ color:var(--yellow); }
+.hero-about-link:hover span{ transform:translateX(3px); }
+
 .hs-link:hover{
   border-color:var(--yellow);
   background:rgba(255,237,84,.08);
