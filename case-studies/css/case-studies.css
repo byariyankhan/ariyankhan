@@ -1,0 +1,258 @@
+/* ══════════════════════════════════════════════════
+   Case studies listing page — self-contained styles.
+   Same design language as /blog/css/blog.css (dark,
+   restrained yellow accent) but trimmed down — no
+   filters/typewriter/load-more, since this section is
+   small by nature. Reuses --yellow/--border/--muted
+   tokens from ../css/style.css. Every selector here is
+   prefixed .cs- so nothing collides with the rest of
+   the site (blog.css included).
+   ══════════════════════════════════════════════════ */
+
+.cs-page { padding-top: 74px; }
+
+.cs-width {
+  width: min(1080px, calc(100% - 44px));
+  margin-inline: auto;
+}
+
+@media (max-width: 780px) {
+  .cs-width { width: calc(100% - 40px); }
+}
+
+.cs-label {
+  display: block;
+  color: var(--yellow);
+  font-family: "Barlow Condensed", sans-serif;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+/* ── HERO ── */
+.cs-hero {
+  padding: clamp(56px, 7vw, 88px) 0 clamp(44px, 5vw, 64px);
+  border-bottom: 1px solid var(--border);
+}
+
+.cs-hero h1 {
+  max-width: 780px;
+  margin: 20px 0 18px;
+  color: #fff;
+  font-family: "Barlow Condensed", sans-serif;
+  font-size: clamp(40px, 6vw, 68px);
+  font-weight: 900;
+  line-height: 1.02;
+  letter-spacing: -1px;
+}
+
+.cs-hero p {
+  max-width: 640px;
+  margin: 0;
+  color: var(--muted);
+  font-size: clamp(15px, 1.3vw, 16.5px);
+  line-height: 1.75;
+}
+
+/* ── GRID ── */
+.cs-list {
+  padding: clamp(48px, 6vw, 72px) 0 clamp(64px, 7vw, 96px);
+}
+
+.cs-grid {
+  display: grid;
+  gap: 28px;
+}
+
+@media (min-width: 760px) {
+  .cs-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+.cs-card {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  text-decoration: none;
+  transition: border-color 220ms ease, transform 220ms ease;
+}
+
+.cs-card:hover {
+  border-color: rgba(255, 237, 84, 0.34);
+  transform: translateY(-4px);
+}
+
+.cs-card-frame {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  background:
+    repeating-linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.05) 0,
+      rgba(255, 255, 255, 0.05) 1px,
+      transparent 1px,
+      transparent 64px
+    ),
+    linear-gradient(160deg, #151300 0%, #0d0d0d 55%, #0a0a0a 100%);
+}
+
+.cs-card-frame img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.cs-card-mark {
+  position: absolute;
+  right: 14px;
+  top: 12px;
+  color: var(--yellow);
+  font-family: "SFMono-Regular", Menlo, Consolas, monospace;
+  font-size: 10.5px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  opacity: 0.75;
+}
+
+.cs-card-time {
+  position: absolute;
+  right: 10px;
+  bottom: 9px;
+  padding: 6px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  color: rgba(255, 255, 255, 0.74);
+  background: rgba(13, 13, 13, 0.84);
+  font-family: "SFMono-Regular", Menlo, Consolas, monospace;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 1px;
+}
+
+.cs-card-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  padding: 22px 22px 26px;
+}
+
+.cs-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 12px;
+  color: rgba(255, 255, 255, 0.44);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.cs-card-meta b { color: var(--yellow); }
+
+.cs-card-meta i {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.cs-card h2 {
+  margin: 0 0 10px;
+  color: #fff;
+  font-family: "Barlow Condensed", sans-serif;
+  font-size: clamp(21px, 2vw, 25px);
+  font-weight: 800;
+  line-height: 1.18;
+}
+
+.cs-card p {
+  margin: 0 0 18px;
+  color: var(--muted);
+  font-size: 13.5px;
+  line-height: 1.65;
+  flex: 1;
+}
+
+.cs-card-link {
+  display: inline-flex;
+  align-items: center;
+  color: var(--yellow);
+  font-family: "Barlow Condensed", sans-serif;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.cs-card-link span {
+  display: inline-block;
+  margin-left: 7px;
+  transition: transform 220ms ease;
+}
+
+.cs-card:hover .cs-card-link span { transform: translate(3px, -3px); }
+
+/* ── SERVICE CTA (reused from blog's treatment) ── */
+.cs-service-cta {
+  border-block: 1px solid rgba(255, 237, 84, 0.22);
+  background: linear-gradient(100deg, rgba(255, 237, 84, 0.07), rgba(255, 237, 84, 0.015));
+}
+
+.cs-service-cta-inner {
+  display: grid;
+  gap: 24px;
+  align-items: center;
+  padding: 48px 0;
+}
+
+.cs-service-cta-inner h2 {
+  margin: 10px 0 0;
+  color: #fff;
+  font-family: "Barlow Condensed", sans-serif;
+  font-size: clamp(26px, 3.4vw, 38px);
+  font-weight: 850;
+  line-height: 1.1;
+}
+
+.cs-service-cta-inner p {
+  margin: 14px 0 0;
+  color: var(--muted);
+  font-size: 14.5px;
+  line-height: 1.72;
+}
+
+.cs-service-cta-inner > a {
+  display: inline-flex;
+  align-items: center;
+  width: max-content;
+  padding: 15px 22px;
+  border-radius: 6px;
+  color: #000;
+  background: var(--yellow);
+  font-family: "Barlow Condensed", sans-serif;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-decoration: none;
+  text-transform: uppercase;
+  white-space: nowrap;
+  transition: transform 220ms ease, box-shadow 220ms ease;
+}
+
+.cs-service-cta-inner > a:hover {
+  box-shadow: 0 12px 30px rgba(255, 237, 84, 0.16);
+  transform: translateY(-3px);
+}
+
+@media (min-width: 760px) {
+  .cs-service-cta-inner { grid-template-columns: 1fr auto; }
+}
+
+@media (max-width: 780px) {
+  .cs-page { padding-top: 66px; }
+}

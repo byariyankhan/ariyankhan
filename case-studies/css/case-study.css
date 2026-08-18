@@ -1,0 +1,660 @@
+/* ══════════════════════════════════════════════════
+   Case study article page — self-contained styles.
+   Same "serious minimalism / editing-bay" language as
+   /blog/css/article.css (restrained yellow, monospace
+   timecodes, thin rules) so a case study reads as a
+   natural extension of the blog, not a different site.
+   Reuses --yellow/--muted/--border tokens from
+   ../css/style.css; every selector is prefixed .article-
+   so nothing collides with the rest of the site.
+   ══════════════════════════════════════════════════ */
+
+.article-page {
+  padding-top: 74px;
+  background: #0a0a0a;
+}
+
+.article-shell {
+  width: min(720px, calc(100% - 44px));
+  margin: 0 auto;
+}
+
+/* ── Reading progress (playhead) ── */
+.article-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 200;
+  width: 0%;
+  height: 2px;
+  background: var(--yellow);
+  box-shadow: 0 0 8px rgba(255, 237, 84, 0.5);
+  transition: width 80ms linear;
+}
+
+/* ── Breadcrumb ── */
+.article-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 40px 0 0;
+  color: rgba(255, 255, 255, 0.36);
+  font-size: 12px;
+}
+
+.article-breadcrumb a {
+  color: rgba(255, 255, 255, 0.5);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.article-breadcrumb a:hover { color: var(--yellow); }
+
+.article-breadcrumb span[aria-current] {
+  color: rgba(255, 255, 255, 0.36);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  max-width: 220px;
+}
+
+/* ── Header ── */
+.article-header {
+  padding: 28px 0 36px;
+}
+
+.article-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 20px;
+  color: var(--yellow);
+  font-family: "SFMono-Regular", Menlo, Consolas, monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+}
+
+.article-tag::before {
+  content: "";
+  display: block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--yellow);
+  box-shadow: 0 0 6px rgba(255, 237, 84, 0.6);
+}
+
+.article-header h1 {
+  margin: 0 0 18px;
+  color: #fff;
+  font-family: "Barlow Condensed", sans-serif;
+  font-size: clamp(32px, 5vw, 52px);
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.5px;
+}
+
+.article-dek {
+  max-width: 60ch;
+  margin: 0 0 24px;
+  color: rgba(255, 255, 255, 0.56);
+  font-size: 17px;
+  line-height: 1.6;
+}
+
+.article-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  color: rgba(255, 255, 255, 0.4);
+  font-family: "SFMono-Regular", Menlo, Consolas, monospace;
+  font-size: 12px;
+  letter-spacing: 0.3px;
+}
+
+.article-meta-row strong {
+  color: rgba(255, 255, 255, 0.72);
+  font-weight: 600;
+}
+
+.article-meta-dot {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.article-byline {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 24px;
+  text-decoration: none;
+  width: fit-content;
+}
+
+.article-byline:hover .article-byline-name strong {
+  color: var(--yellow);
+}
+
+.article-byline:hover .article-byline-avatar {
+  box-shadow: 0 0 0 3px rgba(255, 237, 84, 0.2);
+}
+
+.article-byline-avatar {
+  flex-shrink: 0;
+  width: 52px;
+  height: 52px;
+  overflow: hidden;
+  border: 2px solid var(--yellow);
+  border-radius: 50%;
+}
+
+.article-byline-avatar img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.article-byline-name {
+  display: block;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 14px;
+}
+
+.article-byline-name strong {
+  color: #fff;
+  font-weight: 800;
+}
+
+.article-byline-role {
+  display: block;
+  margin-top: 4px;
+  color: rgba(255, 255, 255, 0.46);
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+/* ── Cover frame (CSS-only editing-timeline motif) ── */
+.article-frame {
+  position: relative;
+  margin: 40px 0 8px;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background:
+    repeating-linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.05) 0,
+      rgba(255, 255, 255, 0.05) 1px,
+      transparent 1px,
+      transparent 64px
+    ),
+    linear-gradient(160deg, #151300 0%, #0d0d0d 55%, #0a0a0a 100%);
+}
+
+.article-frame img {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.article-frame iframe {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.article-frame-code {
+  position: absolute;
+  left: 14px;
+  bottom: 12px;
+  z-index: 2;
+  padding: 5px 9px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 3px;
+  background: rgba(10, 10, 10, 0.75);
+  color: rgba(255, 255, 255, 0.6);
+  font-family: "SFMono-Regular", Menlo, Consolas, monospace;
+  font-size: 10.5px;
+  letter-spacing: 1px;
+}
+
+.article-frame-mark {
+  position: absolute;
+  right: 14px;
+  top: 12px;
+  z-index: 2;
+  color: var(--yellow);
+  font-family: "SFMono-Regular", Menlo, Consolas, monospace;
+  font-size: 10.5px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  opacity: 0.75;
+}
+
+/* ── Body typography ── */
+.article-body {
+  padding: 44px 0 8px;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 17px;
+  line-height: 1.85;
+}
+
+.article-body > p {
+  margin: 0 0 26px;
+}
+
+.article-lead {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 19px;
+  line-height: 1.75;
+}
+
+.article-body h2 {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  margin: 56px 0 22px;
+  padding-top: 28px;
+  border-top: 1px solid var(--border);
+  color: #fff;
+  font-family: "Barlow Condensed", sans-serif;
+  font-size: clamp(24px, 3vw, 32px);
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+.article-body h2:first-child {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.article-h-num {
+  flex-shrink: 0;
+  color: var(--yellow);
+  font-family: "SFMono-Regular", Menlo, Consolas, monospace;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+.article-body h3 {
+  margin: 34px 0 14px;
+  color: #fff;
+  font-family: "Barlow Condensed", sans-serif;
+  font-size: 21px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+}
+
+.article-body ul,
+.article-body ol {
+  margin: 0 0 26px;
+  padding-left: 22px;
+}
+
+.article-body li {
+  margin-bottom: 10px;
+}
+
+.article-body li::marker {
+  color: var(--yellow);
+}
+
+.article-body strong { color: #fff; font-weight: 700; }
+
+.article-body a {
+  color: var(--yellow);
+  text-decoration: underline;
+  text-decoration-color: rgba(255, 237, 84, 0.35);
+  text-underline-offset: 3px;
+  transition: text-decoration-color 0.2s;
+}
+
+.article-body a:hover { text-decoration-color: var(--yellow); }
+
+/* ── Transparency / methodology note ── */
+.article-note {
+  display: flex;
+  gap: 12px;
+  margin: 0 0 34px;
+  padding: 16px 18px;
+  border: 1px solid var(--border);
+  border-left: 2px solid var(--yellow);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.article-note p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 13.5px;
+  line-height: 1.7;
+}
+
+.article-note strong { color: rgba(255, 255, 255, 0.85); }
+
+/* ── Pull quote (like a select take / caption card) ── */
+.article-pull {
+  margin: 40px 0;
+  padding: 4px 0 4px 24px;
+  border-left: 2px solid var(--yellow);
+}
+
+.article-pull p {
+  margin: 0;
+  color: #fff;
+  font-family: "Barlow Condensed", sans-serif;
+  font-size: clamp(21px, 2.4vw, 27px);
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+/* ── Verdict / principle badge ── */
+.article-verdict {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0 0 26px;
+  padding: 10px 16px;
+  border: 1px solid rgba(255, 237, 84, 0.22);
+  border-radius: 6px;
+  background: rgba(255, 237, 84, 0.05);
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 13px;
+}
+
+.article-verdict strong {
+  color: var(--yellow);
+  font-weight: 700;
+}
+
+/* ── Comparison table ── */
+.article-table-wrap {
+  margin: 0 0 30px;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.article-body table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+
+.article-body th,
+.article-body td {
+  padding: 12px 16px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+
+.article-body th {
+  color: var(--yellow);
+  font-family: "SFMono-Regular", Menlo, Consolas, monospace;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  background: rgba(255, 255, 255, 0.03);
+  white-space: nowrap;
+}
+
+.article-body td {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.article-body tr:last-child td {
+  border-bottom: 0;
+}
+
+/* ── Divider between sections (scene break) ── */
+.article-break {
+  display: flex;
+  justify-content: center;
+  margin: 48px 0;
+  color: rgba(255, 255, 255, 0.28);
+  font-family: "SFMono-Regular", Menlo, Consolas, monospace;
+  font-size: 12px;
+  letter-spacing: 6px;
+}
+
+/* ── Share row ── */
+.article-share {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 48px;
+  padding: 18px 0;
+  border-block: 1px solid var(--border);
+}
+
+.article-share > span {
+  color: rgba(255, 255, 255, 0.34);
+  font-family: "SFMono-Regular", Menlo, Consolas, monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+
+.article-share-links {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.article-share-links a,
+.article-share-links button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: rgba(255, 255, 255, 0.6);
+  background: transparent;
+  cursor: pointer;
+  font-family: "SFMono-Regular", Menlo, Consolas, monospace;
+  font-size: 11px;
+  font-weight: 700;
+  transition: border-color 0.2s, color 0.2s, background 0.2s;
+}
+
+.article-share-links a:hover,
+.article-share-links button:hover,
+.article-share-links button.is-copied {
+  border-color: var(--yellow);
+  color: var(--yellow);
+  background: rgba(255, 237, 84, 0.06);
+}
+
+/* ── Related case studies ── */
+.article-related {
+  margin-bottom: 32px;
+}
+
+.article-related-label {
+  display: block;
+  margin-bottom: 14px;
+  color: rgba(255, 255, 255, 0.34);
+  font-family: "SFMono-Regular", Menlo, Consolas, monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+
+.article-related-list {
+  display: grid;
+  gap: 10px;
+}
+
+.article-related-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 18px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: rgba(255, 255, 255, 0.82);
+  text-decoration: none;
+  font-family: "Barlow Condensed", sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  transition: border-color 0.2s, color 0.2s, background 0.2s;
+}
+
+.article-related-item span:last-child {
+  flex-shrink: 0;
+  color: rgba(255, 255, 255, 0.3);
+  font-family: "SFMono-Regular", Menlo, Consolas, monospace;
+  transition: color 0.2s, transform 0.2s;
+}
+
+.article-related-item:hover {
+  border-color: rgba(255, 237, 84, 0.4);
+  color: var(--yellow);
+  background: rgba(255, 237, 84, 0.05);
+}
+
+.article-related-item:hover span:last-child {
+  color: var(--yellow);
+  transform: translateX(3px);
+}
+
+@media (min-width: 700px) {
+  .article-related-list {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* ── Footer: CTA ── */
+.article-footer {
+  margin-top: 28px;
+  padding: 0 0 72px;
+}
+
+.article-cta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 28px;
+  border: 1px solid rgba(255, 237, 84, 0.22);
+  border-radius: 8px;
+  background: linear-gradient(100deg, rgba(255, 237, 84, 0.06), rgba(255, 237, 84, 0.015));
+}
+
+.article-cta p {
+  margin: 0;
+  max-width: 42ch;
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 14.5px;
+  line-height: 1.6;
+}
+
+.article-cta-title {
+  display: block;
+  margin-bottom: 6px;
+  color: #fff;
+  font-family: "Barlow Condensed", sans-serif;
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.article-cta-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.article-cta-actions > a {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  padding: 14px 24px;
+  border-radius: 6px;
+  color: #000;
+  background: var(--yellow);
+  font-family: "Barlow Condensed", sans-serif;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-decoration: none;
+  text-transform: uppercase;
+  white-space: nowrap;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.article-cta-actions > a:hover {
+  box-shadow: 0 12px 30px rgba(255, 237, 84, 0.16);
+  transform: translateY(-3px);
+}
+
+.article-cta-actions > a.article-cta-secondary {
+  color: rgba(255, 255, 255, 0.75);
+  background: transparent;
+  border: 1px solid var(--border);
+}
+
+.article-cta-actions > a.article-cta-secondary:hover {
+  border-color: rgba(255, 237, 84, 0.4);
+  color: var(--yellow);
+  box-shadow: none;
+}
+
+.article-nav-links {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 32px;
+  font-family: "SFMono-Regular", Menlo, Consolas, monospace;
+  font-size: 12px;
+  letter-spacing: 0.5px;
+}
+
+.article-nav-links a {
+  color: rgba(255, 255, 255, 0.5);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.article-nav-links a:hover { color: var(--yellow); }
+
+/* ── Mobile ── */
+@media (max-width: 560px) {
+  .article-page { padding-top: 66px; }
+
+  .article-cta { flex-direction: column; align-items: flex-start; }
+  .article-cta-actions { width: 100%; }
+  .article-cta-actions > a { width: 100%; justify-content: center; }
+
+  .article-share { flex-direction: column; align-items: flex-start; }
+
+  .article-nav-links { flex-direction: column; gap: 12px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .article-progress { transition: none; }
+}

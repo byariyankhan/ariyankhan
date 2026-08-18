@@ -53,6 +53,8 @@
   <p class="footer-legal">
     <a href="${basePath}blog/">Blog</a>
     <span class="footer-divider" aria-hidden="true">|</span>
+    <a href="${basePath}case-studies/">Case Studies</a>
+    <span class="footer-divider" aria-hidden="true">|</span>
     <a href="${basePath}about.html">About</a>
     <span class="footer-divider" aria-hidden="true">|</span>
     <a href="${basePath}privacy-policy.html">Privacy Policy</a>
