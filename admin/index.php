@@ -188,7 +188,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $notice = isset($_GET['notice']) ? (string) $_GET['notice'] : '';
-$projects = $db->query('SELECT * FROM projects ORDER BY created_at DESC')->fetchAll(PDO::FETCH_ASSOC);
+// Delivered projects move to the Delivered page (orders.php) instead of
+// staying here, so this list is just what's still actively running.
+$stmt = $db->prepare('SELECT * FROM projects WHERE stage < :max_stage ORDER BY created_at DESC');
+$stmt->execute(['max_stage' => TRACKER_MAX_STAGE]);
+$projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
 <!doctype html>
 <html lang="en-US">
@@ -264,9 +268,9 @@ $projects = $db->query('SELECT * FROM projects ORDER BY created_at DESC')->fetch
   </div>
 
   <div class="tracker-admin-section">
-    <h2>Projects</h2>
+    <h2>Running Projects</h2>
     <?php if (!$projects): ?>
-      <p class="tracker-muted">No projects yet.</p>
+      <p class="tracker-muted">No running projects — check <a href="orders.php">Delivered</a>.</p>
     <?php else: ?>
       <div class="tracker-project-list">
         <?php foreach ($projects as $project): ?>
