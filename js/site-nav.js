@@ -14,6 +14,61 @@
     return String(value).replace(/"/g, '&quot;');
   }
 
+  // Owns the mobile menu button/overlay this component just rendered — kept
+  // here (not in main.js) so pages that skip main.js (review.html, track.html)
+  // still get a working menu button.
+  function initMenu(root) {
+    const menuBtn = root.querySelector('#menuBtn');
+    const menuOverlay = root.querySelector('#menuOverlay');
+    const menuNav = root.querySelector('.site-nav');
+    if (!menuBtn || !menuOverlay || !menuNav) return;
+
+    function syncMenuOverlayOffset() {
+      menuOverlay.style.setProperty('--menu-offset', `${Math.ceil(menuNav.getBoundingClientRect().height)}px`);
+    }
+
+    function setMenuState(isOpen) {
+      menuBtn.classList.toggle('open', isOpen);
+      menuOverlay.classList.toggle('open', isOpen);
+      menuBtn.setAttribute('aria-expanded', String(isOpen));
+      menuBtn.setAttribute('aria-label', isOpen ? 'Close navigation menu' : 'Open navigation menu');
+      menuOverlay.setAttribute('aria-hidden', String(!isOpen));
+      document.body.classList.toggle('menu-open', isOpen);
+
+      if (isOpen) {
+        syncMenuOverlayOffset();
+        // Move focus into the menu so keyboard/screen-reader users can navigate it.
+        requestAnimationFrame(() => {
+          menuOverlay.scrollTop = 0;
+          menuOverlay.querySelector('.menu-link')?.focus();
+        });
+      } else {
+        // Restore focus to the button that opened the menu.
+        menuBtn.focus();
+      }
+    }
+
+    function closeMenu() {
+      setMenuState(false);
+    }
+
+    syncMenuOverlayOffset();
+    menuBtn.addEventListener('click', () => setMenuState(!menuOverlay.classList.contains('open')));
+
+    menuOverlay.querySelectorAll('.menu-link, .menu-cta').forEach(link => {
+      link.addEventListener('click', closeMenu);
+    });
+
+    // Only recalculate offset on mobile where the overlay is visible.
+    window.addEventListener('resize', () => {
+      if (window.innerWidth < 1024) syncMenuOverlayOffset();
+    });
+
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') closeMenu();
+    });
+  }
+
   // Anchor items scroll on the homepage (#services) or jump back to the
   // homepage first on subpages (index.html#services). Page items always
   // point at their own page, resolved relative to the site root.
@@ -80,6 +135,7 @@
       this.style.display = 'contents';
       this.innerHTML = buildNavComponent(isHomePage, homePath);
       this.dataset.rendered = 'true';
+      initMenu(this);
     }
   }
 

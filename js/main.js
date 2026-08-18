@@ -3,68 +3,12 @@
    Main JavaScript
 ══════════════════════════════ */
 
-/* ── Menu ── */
-
-// Cache elements once — the <site-nav> web component has already rendered
-// by the time this script runs (scripts are at end of <body>).
-const menuBtn     = document.getElementById('menuBtn');
-const menuOverlay = document.getElementById('menuOverlay');
-// Scope nav lookup to the fixed header so the overlay's inner <nav> is ignored.
-const menuNav     = menuBtn?.closest('.site-nav') || document.querySelector('.site-nav');
-
-function syncMenuOverlayOffset() {
-  if (!menuNav || !menuOverlay) return;
-  // Align overlay top edge to the current header height (accounts for resize).
-  menuOverlay.style.setProperty('--menu-offset', `${Math.ceil(menuNav.getBoundingClientRect().height)}px`);
-}
-
-function setMenuState(isOpen) {
-  if (!menuBtn || !menuOverlay) return;
-
-  menuBtn.classList.toggle('open', isOpen);
-  menuOverlay.classList.toggle('open', isOpen);
-  menuBtn.setAttribute('aria-expanded', String(isOpen));
-  menuBtn.setAttribute('aria-label', isOpen ? 'Close navigation menu' : 'Open navigation menu');
-  menuOverlay.setAttribute('aria-hidden', String(!isOpen));
-  document.body.classList.toggle('menu-open', isOpen);
-
-  if (isOpen) {
-    syncMenuOverlayOffset();
-    // Move focus into the menu so keyboard/screen-reader users can navigate it.
-    requestAnimationFrame(() => {
-      menuOverlay.scrollTop = 0;
-      menuOverlay.querySelector('.menu-link')?.focus();
-    });
-  } else {
-    // Restore focus to the button that opened the menu.
-    menuBtn.focus();
-  }
-}
-
-function closeMenu() {
-  setMenuState(false);
-}
-
-if (menuBtn && menuOverlay) {
-  syncMenuOverlayOffset();
-  menuBtn.addEventListener('click', () => setMenuState(!menuOverlay.classList.contains('open')));
-
-  // Scope listeners to the overlay — avoids touching unrelated .menu-link elements.
-  menuOverlay.querySelectorAll('.menu-link, .menu-cta').forEach(link => {
-    link.addEventListener('click', closeMenu);
-  });
-
-  // Only recalculate offset on mobile where the overlay is visible.
-  window.addEventListener('resize', () => {
-    if (window.innerWidth < 1024) syncMenuOverlayOffset();
-  });
-}
+// Mobile menu button/overlay behavior now lives in site-nav.js, next to the
+// markup it controls — that way pages that skip main.js (review.html,
+// track.html) still get a working menu button.
 
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') {
-    closeMenu();
-    closeAllDropdowns();
-  }
+  if (e.key === 'Escape') closeAllDropdowns();
 });
 
 /* ── Stars ── */
