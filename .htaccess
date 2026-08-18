@@ -26,6 +26,12 @@ RewriteCond %{REQUEST_URI} !^/dashboard/
 RewriteCond %{REQUEST_URI} !^/(css|js|favicon|images)/
 RewriteRule ^(.*)$ /dashboard/$1 [L]
 
+# ── Block /dashboard on any other host — the panel only exists at
+#    dashboard.ariyankhan.com now, not as a second path on the main site.
+RewriteCond %{HTTP_HOST} !^dashboard\.ariyankhan\.com$ [NC]
+RewriteCond %{REQUEST_URI} ^/dashboard/
+RewriteRule ^ - [R=404,L]
+
 ## Missing paths: keep a real 404 status and hand off to /404.html
 RewriteCond %{REQUEST_URI} !^/404\.html$ [NC]
 RewriteCond %{REQUEST_FILENAME} !-f
