@@ -85,7 +85,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $notice = "Created project with code {$code}";
     if ($client_email !== '') {
-      $sent = tracker_send_order_email($client_email, $client_name, $label, $code);
+      $sent = tracker_send_order_email($client_email, $client_name, $label, $code, $price_amount, $advance_amount);
       $notice .= $sent ? " — confirmation emailed to {$client_email}" : ' — email failed to send';
     }
   }

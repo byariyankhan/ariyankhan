@@ -299,7 +299,7 @@ function mcp_call_tool(string $name, array $args): array {
     $stage_label_for_result = TRACKER_STAGES[$initial_stage]['label'] ?? 'Footage Received';
     $result = "Created project \"{$label}\" with tracking code {$code} (stage: {$stage_label_for_result}, service: {$service_key}, price: " . tracker_format_money($price_amount) . ", delivery: {$delivery_date}).";
     if ($client_email !== '') {
-      $sent = tracker_send_order_email($client_email, $client_name, $label, $code);
+      $sent = tracker_send_order_email($client_email, $client_name, $label, $code, $price_amount, $advance_amount);
       $result .= $sent ? " Order confirmation emailed to {$client_email}." : ' Email to the client failed to send.';
     }
     return mcp_text_result($result);

@@ -9,6 +9,7 @@
 use PHPMailer\PHPMailer\PHPMailer;
 
 require_once __DIR__ . '/mail-template.php';
+require_once __DIR__ . '/tracker-db.php'; // tracker_format_money()
 
 function tracker_mail_config(): array {
   $local = [];
@@ -98,7 +99,7 @@ function tracker_mail_new(array $config, string $to_email, string $to_name): PHP
   return $mail;
 }
 
-function tracker_send_order_email(string $to_email, string $to_name, string $project_label, string $code): bool {
+function tracker_send_order_email(string $to_email, string $to_name, string $project_label, string $code, float $price_amount = 0, float $advance_amount = 0): bool {
   $config = tracker_mail_config();
   if (!tracker_mail_ready($config)) {
     return false;
@@ -107,6 +108,23 @@ function tracker_send_order_email(string $to_email, string $to_name, string $pro
   $track_url = rtrim($config['site_url'], '/') . '/track.html?code=' . urlencode($code);
   $label = $project_label !== '' ? $project_label : 'your project';
   $mail = null;
+
+  // Only mentioned when an advance is actually on file — matches the
+  // tracker page/admin dropdown, which stay silent until there's a real
+  // number to show.
+  $payment_line_html = '';
+  $payment_line_text = '';
+  if ($advance_amount > 0) {
+    $advance_fmt = tracker_format_money($advance_amount);
+    if ($price_amount > 0 && $advance_amount < $price_amount) {
+      $due_fmt = tracker_format_money($price_amount - $advance_amount);
+      $payment_line_html = "<p style=\"margin:0 0 16px;\">We've received your advance payment of <strong style=\"color:#FFED54;\">{$advance_fmt}</strong> — {$due_fmt} remaining before final delivery.</p>";
+      $payment_line_text = "We've received your advance payment of {$advance_fmt} — {$due_fmt} remaining before final delivery.\n\n";
+    } else {
+      $payment_line_html = "<p style=\"margin:0 0 16px;\">We've received your payment of <strong style=\"color:#FFED54;\">{$advance_fmt}</strong> — thank you!</p>";
+      $payment_line_text = "We've received your payment of {$advance_fmt} — thank you!\n\n";
+    }
+  }
 
   try {
     $mail = tracker_mail_new($config, $to_email, $to_name);
@@ -122,6 +140,7 @@ function tracker_send_order_email(string $to_email, string $to_name, string $pro
     $content = <<<HTML
       <p style="margin:0 0 16px;">{$greeting_html}</p>
       <p style="margin:0 0 16px;">Thank you for your order! Your project <strong style="color:#FFED54;">&ldquo;{$label_esc}&rdquo;</strong> is now underway.</p>
+      {$payment_line_html}
       <div style="background-color:#111111;border:1px solid rgba(255,237,84,0.15);border-radius:8px;padding:18px 20px;margin:24px 0;text-align:center;">
         <div style="font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#888888;margin-bottom:6px;">Your Tracking Code</div>
         <div style="font-size:22px;font-weight:700;letter-spacing:2px;color:#FFED54;font-family:'Courier New',monospace;">{$code_esc}</div>
@@ -138,6 +157,7 @@ function tracker_send_order_email(string $to_email, string $to_name, string $pro
     $mail->AltBody =
       "{$greeting_text}\n\n" .
       "Thank you for your order! Your project \"{$label}\" is now underway.\n\n" .
+      $payment_line_text .
       "You can track its progress anytime here:\n{$track_url}\n\n" .
       "Your tracking code: {$code}\n\n" .
       "That link takes you straight to your status. Save the code in case you check from a different device.\n\n" .
