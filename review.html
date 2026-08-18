@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en-US">
+  <head>
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-8ZPSNG5X37"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag() {
+        dataLayer.push(arguments);
+      }
+      gtag("js", new Date());
+      gtag("config", "G-8ZPSNG5X37");
+    </script>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- SEO -->
+    <title>Leave a Review | Ariyan Khan</title>
+    <meta
+      name="description"
+      content="Worked with Ariyan Khan on a video editing project? Leave a review using your tracking code and the email on file."
+    />
+    <meta name="author" content="Ariyan Khan" />
+    <meta name="robots" content="noindex, follow" />
+    <meta name="theme-color" content="#0d0d0d" />
+    <link rel="canonical" href="https://ariyankhan.com/review.html" />
+    <link rel="alternate" hreflang="en-US" href="https://ariyankhan.com/review.html" />
+
+    <!-- FAVICON -->
+    <link rel="icon" type="image/x-icon" href="favicon/favicon.ico" />
+    <link rel="icon" type="image/png" sizes="96x96" href="favicon/favicon-96x96.png" />
+    <link rel="apple-touch-icon" href="favicon/apple-touch-icon.png" />
+    <link rel="manifest" href="favicon/site.webmanifest" />
+
+    <!-- FONTS -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700;800;900&family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="css/style.css?v=10" />
+    <link rel="stylesheet" href="css/tracker.css?v=18" />
+  </head>
+  <body>
+    <div id="stars"></div>
+
+    <site-nav data-page="subpage"></site-nav>
+
+    <main class="tracker-page">
+      <div class="tracker-hero">
+        <div class="tag-pill">Client Review</div>
+        <h1 class="section-title">Leave a <span class="yl">Review</span></h1>
+        <p class="section-desc">
+          Recently finished a project with me? I'd genuinely appreciate a few words.
+          Enter the tracking code and email from your project to verify it's really
+          you — reviews publish immediately once verified.
+        </p>
+
+        <form class="tracker-form review-form" id="reviewForm" novalidate>
+          <label class="tracker-field" for="reviewName">
+            <span>Your Name</span>
+            <input type="text" id="reviewName" name="name" placeholder="Jane Doe" autocomplete="name" maxlength="80" required />
+          </label>
+          <label class="tracker-field" for="reviewEmail">
+            <span>Email (used on your project)</span>
+            <input type="email" id="reviewEmail" name="email" placeholder="you@example.com" autocomplete="email" maxlength="160" required />
+          </label>
+          <label class="tracker-field" for="reviewCode">
+            <span>Tracking Code</span>
+            <input type="text" id="reviewCode" name="code" placeholder="e.g. 7K4M-9XPQ" autocomplete="off" autocapitalize="characters" maxlength="20" required />
+          </label>
+          <div class="tracker-field">
+            <span>Your Rating</span>
+            <div class="star-rating" id="starRating">
+              <input type="radio" id="star5" name="rating" value="5" />
+              <label for="star5" title="5 stars">★</label>
+              <input type="radio" id="star4" name="rating" value="4" />
+              <label for="star4" title="4 stars">★</label>
+              <input type="radio" id="star3" name="rating" value="3" />
+              <label for="star3" title="3 stars">★</label>
+              <input type="radio" id="star2" name="rating" value="2" />
+              <label for="star2" title="2 stars">★</label>
+              <input type="radio" id="star1" name="rating" value="1" />
+              <label for="star1" title="1 star">★</label>
+            </div>
+          </div>
+          <label class="tracker-field" for="reviewBody">
+            <span>Your Review</span>
+            <textarea id="reviewBody" name="review" rows="5" maxlength="600" placeholder="How was the experience working together?" required></textarea>
+          </label>
+          <button type="submit" class="tracker-btn" id="reviewSubmit">Submit Review</button>
+        </form>
+
+        <p class="tracker-error" id="reviewError" hidden></p>
+        <p class="tracker-notice" id="reviewSuccess" hidden>
+          Thank you — your review is published. Really appreciate you taking the time.
+        </p>
+      </div>
+    </main>
+
+    <site-footer></site-footer>
+
+    <script src="js/site-nav.js?v=7"></script>
+    <script src="js/site-footer.js?v=5"></script>
+    <script src="js/review.js?v=1"></script>
+  </body>
+</html>

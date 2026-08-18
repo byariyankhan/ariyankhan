@@ -47,6 +47,35 @@
   color:#ef4444; font-size:13px; line-height:1.6; text-align:left;
 }
 
+/* ── Review form (leave-a-review page) ── */
+.review-form{ max-width:420px; }
+.review-form .tracker-field input,
+.review-form .tracker-field textarea{
+  text-transform:none; letter-spacing:0; font-weight:500;
+}
+.review-form .tracker-field textarea{
+  width:100%; color:var(--text); font-family:'Inter',sans-serif; font-size:15px;
+  padding:14px 16px; outline:none; resize:vertical;
+  border:1px solid #1f1f1f; border-radius:10px;
+  background:rgba(255,255,255,.02);
+  transition:border-color .2s, background .2s;
+}
+.review-form .tracker-field textarea:focus{ border-color:rgba(255,237,84,.4); background:rgba(255,237,84,.03); }
+.review-form .tracker-field textarea::placeholder{ color:rgba(255,255,255,.3); }
+.review-form .tracker-notice{ max-width:none; margin:0; text-align:left; }
+
+/* Right-to-left radio group so hovering/selecting a star fills every
+   star to its left — standard pure-CSS star-rating trick. */
+.star-rating{ display:flex; flex-direction:row-reverse; justify-content:flex-end; gap:4px; }
+.star-rating input{ position:absolute; opacity:0; width:0; height:0; }
+.star-rating label{
+  font-size:32px; line-height:1; color:#2a2a2a; cursor:pointer;
+  transition:color .15s;
+}
+.star-rating input:checked ~ label,
+.star-rating label:hover,
+.star-rating label:hover ~ label{ color:var(--yellow); }
+
 .tracker-result{ margin:40px auto 0; text-align:left; }
 .tracker-result-title{
   font-family:'Barlow Condensed',sans-serif; font-size:24px; font-weight:800;

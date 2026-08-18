@@ -5,6 +5,7 @@ User-agent: *
 Allow: /
 Disallow: /send-mail.php
 Disallow: /track-lookup.php
+Disallow: /reviews.php
 Disallow: /admin/
 Disallow: /data/
 Disallow: /mcp.php

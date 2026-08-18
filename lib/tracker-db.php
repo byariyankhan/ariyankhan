@@ -76,7 +76,77 @@ function tracker_db(): PDO {
     $db->exec('ALTER TABLE projects ADD COLUMN client_email TEXT NOT NULL DEFAULT ""');
   }
 
+  $db->exec('
+    CREATE TABLE IF NOT EXISTS reviews (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      project_id INTEGER NOT NULL UNIQUE,
+      code TEXT NOT NULL,
+      client_name TEXT NOT NULL,
+      rating INTEGER NOT NULL,
+      review_body TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY(project_id) REFERENCES projects(id)
+    )
+  ');
+
   return $db;
+}
+
+/* Self-service review submission — a client proves they're a real,
+   completed client by supplying the tracking code + the email on
+   file for that project. No manual approval step: a valid code+email
+   match against a Delivered project publishes immediately. One
+   review per project; resubmitting under the same code updates it
+   rather than creating a duplicate. */
+function review_submit(string $code, string $email, string $name, int $rating, string $body): array {
+  $code = tracker_normalize_code($code);
+  $email = strtolower(trim($email));
+  $name = trim($name);
+  $body = trim($body);
+
+  if ($code === '' || $email === '' || $name === '' || $body === '' || $rating < 1 || $rating > 5) {
+    return ['ok' => false, 'error' => 'Please fill in every field with a rating between 1 and 5.'];
+  }
+
+  $db = tracker_db();
+  $stmt = $db->prepare('SELECT id, stage, client_email FROM projects WHERE code = :code');
+  $stmt->execute(['code' => $code]);
+  $project = $stmt->fetch(PDO::FETCH_ASSOC);
+
+  if (!$project || $project['client_email'] === '' || strtolower((string) $project['client_email']) !== $email) {
+    return ['ok' => false, 'error' => "We couldn't verify that order. Double-check your tracking code and the email address used on this project."];
+  }
+
+  if ((int) $project['stage'] < TRACKER_MAX_STAGE) {
+    return ['ok' => false, 'error' => 'Reviews can be left once your project has been marked as delivered.'];
+  }
+
+  $now = gmdate('c');
+  $stmt = $db->prepare('
+    INSERT INTO reviews (project_id, code, client_name, rating, review_body, created_at, updated_at)
+    VALUES (:project_id, :code, :name, :rating, :body, :now, :now)
+    ON CONFLICT(project_id) DO UPDATE SET
+      client_name = excluded.client_name,
+      rating = excluded.rating,
+      review_body = excluded.review_body,
+      updated_at = excluded.updated_at
+  ');
+  $stmt->execute([
+    'project_id' => $project['id'],
+    'code' => $code,
+    'name' => $name,
+    'rating' => $rating,
+    'body' => $body,
+    'now' => $now,
+  ]);
+
+  return ['ok' => true];
+}
+
+function reviews_list(): array {
+  $db = tracker_db();
+  return $db->query('SELECT client_name, rating, review_body, created_at FROM reviews ORDER BY created_at DESC')->fetchAll(PDO::FETCH_ASSOC);
 }
 
 function tracker_generate_code(): string {
