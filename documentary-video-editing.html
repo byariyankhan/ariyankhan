@@ -87,7 +87,51 @@
         },
         "serviceType": "Video Editing",
         "areaServed": ["United States", "Canada", "United Kingdom", "Ireland", "Australia", "New Zealand", "Switzerland", "Europe"],
-        "url": "https://ariyankhan.com/documentary-video-editing.html"
+        "url": "https://ariyankhan.com/documentary-video-editing.html",
+        "review": [
+          {
+            "@type": "Review",
+            "author": { "@type": "Person", "name": "Daniel Brooks" },
+            "reviewRating": { "@type": "Rating", "ratingValue": "5", "bestRating": "5" },
+            "reviewBody": "Ariyan did an excellent job with our documentary. The pacing, visuals, and overall storytelling felt natural and polished. He understood the tone we wanted and delivered exactly what we had in mind."
+          },
+          {
+            "@type": "Review",
+            "author": { "@type": "Person", "name": "Michael Carter" },
+            "reviewRating": { "@type": "Rating", "ratingValue": "5", "bestRating": "5" },
+            "reviewBody": "Really impressed with Ariyan's editing. He knew exactly where to use B-roll, maps, and motion graphics without making the video feel overloaded. The final documentary was professional and engaging from start to finish."
+          },
+          {
+            "@type": "Review",
+            "author": { "@type": "Person", "name": "Sophie Bennett" },
+            "reviewRating": { "@type": "Rating", "ratingValue": "5", "bestRating": "5" },
+            "reviewBody": "Working with Ariyan was a very smooth experience. He turned our script and raw footage into a clear, well-paced documentary with great attention to detail. Communication was easy, and I was very happy with the final result."
+          },
+          {
+            "@type": "Review",
+            "author": { "@type": "Person", "name": "Dr. Emily Carter", "jobTitle": "Physician" },
+            "reviewRating": { "@type": "Rating", "ratingValue": "5", "bestRating": "5" },
+            "reviewBody": "Ariyan edited a documentary project for me and I was really happy with how it came together. There was a lot of information to work with but the final video never felt confusing or too slow. The visuals and pacing were handled really well."
+          },
+          {
+            "@type": "Review",
+            "author": { "@type": "Person", "name": "James Miller", "jobTitle": "Engineer" },
+            "reviewRating": { "@type": "Rating", "ratingValue": "5", "bestRating": "5" },
+            "reviewBody": "I sent Ariyan the script, voiceover + a bunch of footage and he understood the direction pretty quickly. The edit felt clean and the b-roll actually helped explain the story instead of just being there. Had a few small revisions and he got them done fast."
+          },
+          {
+            "@type": "Review",
+            "author": { "@type": "Person", "name": "Sarah Thompson", "jobTitle": "Content Producer" },
+            "reviewRating": { "@type": "Rating", "ratingValue": "5", "bestRating": "5" },
+            "reviewBody": "Really enjoyed working with Ariyan on this one. The documentary needed maps, archive footage and a lot of visual storytelling and everything flowed nicely in the final edit. Didn't feel over edited either which I really liked."
+          }
+        ],
+        "aggregateRating": {
+          "@type": "AggregateRating",
+          "ratingValue": "5",
+          "bestRating": "5",
+          "reviewCount": "6"
+        }
       }
     </script>
     <script type="application/ld+json">
@@ -216,8 +260,9 @@
       href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700;800;900&family=Inter:wght@400;500;600;700;800&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="css/style.css?v=10" />
-    <link rel="stylesheet" href="css/service.css?v=51" />
+    <link rel="stylesheet" href="css/style.css?v=11" />
+    <link rel="stylesheet" href="css/service.css?v=67" />
+    <link rel="stylesheet" href="css/review-card.css?v=3" />
     <link rel="stylesheet" href="css/service-profile.css?v=4" />
   </head>
   <body>
@@ -744,6 +789,33 @@
         <div class="pf-grid" id="pf-grid"></div>
       </div>
 
+      <!-- CLIENT QUOTES -->
+      <div class="service-testimonial">
+        <div class="service-section-header">
+          <div class="tag-pill">Client Reviews</div>
+          <h2 class="section-title">What Clients <span class="yl">Are Saying</span></h2>
+          <p class="section-desc">
+            A 5.0 average from the documentary creators and brands I've edited long-form
+            stories for — real client feedback, not cherry-picked screenshots.
+          </p>
+        </div>
+        <div
+          class="review-card"
+          id="reviewCard"
+          data-curated="documentary"
+          data-api="reviews.php"
+          aria-live="polite"
+          aria-busy="true"
+        >
+          <div class="review-card-face" id="reviewCardFace"></div>
+          <div class="review-card-dots" id="reviewCardDots"></div>
+        </div>
+        <span class="service-testimonial-verify">
+          Recently worked with me?
+          <a href="review.html">Leave a review →</a>
+        </span>
+      </div>
+
       <!-- BOTTOM: FAQ -->
       <div class="service-faq">
         <section aria-labelledby="documentary-faq-title">
@@ -1077,6 +1149,8 @@
     <script src="js/service-profile.js?v=6"></script>
     <script src="js/site-nav.js?v=7"></script>
     <script src="js/site-footer.js?v=5"></script>
+    <script src="js/reviews-data.js?v=1"></script>
+    <script src="js/review-card.js?v=5"></script>
     <script src="js/main.js?v=17"></script>
     <script>
       initHeroPortfolioSlider();

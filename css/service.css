@@ -1205,52 +1205,8 @@
   display: none;
 }
 
-/* ══════════════════════════════════════════════════
-   SERVICE TESTIMONIAL — 2-3 relevant client reviews,
-   reuses the .t-card component from style.css so the
-   design stays controlled from a single place; each
-   page only supplies its own quotes/names/locations.
-   A link to the real Fiverr profile lets a skeptical
-   visitor verify the reviews themselves — the single
-   strongest trust signal available, since it isn't a
-   claim, it's something they can go check.
-══════════════════════════════════════════════════ */
-.service-testimonial {
-  padding: 0 28px 60px;
-  max-width: 1080px;
-  margin: 0 auto;
-}
-.service-testimonial .service-section-header {
-  text-align: center;
-}
-.service-testimonial-grid {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 16px;
-}
-.service-testimonial-verify {
-  display: block;
-  text-align: center;
-  margin-top: 24px;
-  font-size: 13px;
-  color: var(--muted);
-}
-.service-testimonial-verify a {
-  color: var(--yellow);
-  text-decoration: none;
-  font-weight: 600;
-}
-.service-testimonial-verify a:hover {
-  text-decoration: underline;
-}
-@media (min-width: 768px) {
-  .service-testimonial {
-    padding: 0 40px 72px;
-  }
-  .service-testimonial-grid {
-    grid-template-columns: repeat(3, 1fr);
-  }
-}
+/* Review-card testimonial component moved to css/review-card.css —
+   it's now shared by the 4 main service pages and index.html. */
 
 /* ══════════════════════════════════════════════════
    SERVICE FAQ

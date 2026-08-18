@@ -94,7 +94,51 @@
         },
         "serviceType": "Short form video editing for TikTok, Reels, and YouTube Shorts",
         "areaServed": ["United States", "Canada", "United Kingdom", "Ireland", "Australia", "New Zealand", "Switzerland", "Europe"],
-        "url": "https://ariyankhan.com/short-form-video-editing.html"
+        "url": "https://ariyankhan.com/short-form-video-editing.html",
+        "review": [
+          {
+            "@type": "Review",
+            "author": { "@type": "Person", "name": "Jake Miller" },
+            "reviewRating": { "@type": "Rating", "ratingValue": "5", "bestRating": "5" },
+            "reviewBody": "Ariyan edited a bunch of shorts for us and honestly they came out really good. Fast cuts, captions were clean, and he knew where to add b-roll without making it feel like too much. Would definitely work with him again."
+          },
+          {
+            "@type": "Review",
+            "author": { "@type": "Person", "name": "Emma Collins" },
+            "reviewRating": { "@type": "Rating", "ratingValue": "5", "bestRating": "5" },
+            "reviewBody": "Super easy to work with. I sent over the raw clips and a rough idea, and he turned them into short videos that actually felt engaging. Had a few changes here and there, but he handled them quickly."
+          },
+          {
+            "@type": "Review",
+            "author": { "@type": "Person", "name": "Ryan Cooper" },
+            "reviewRating": { "@type": "Rating", "ratingValue": "5", "bestRating": "5" },
+            "reviewBody": "Really liked the edits. The pacing was on point, and the first few seconds had a much stronger hook than what we had before. Communication was good too — no overcomplicated stuff, just solid work."
+          },
+          {
+            "@type": "Review",
+            "author": { "@type": "Person", "name": "Jessica Davis", "jobTitle": "Marketing Manager" },
+            "reviewRating": { "@type": "Rating", "ratingValue": "5", "bestRating": "5" },
+            "reviewBody": "Sent Ariyan a few raw clips for shorts and didn't give him a ton of direction lol. He still got the pacing, captions and overall style right. The finished videos felt much more engaging than the original footage."
+          },
+          {
+            "@type": "Review",
+            "author": { "@type": "Person", "name": "Michael Anderson", "jobTitle": "Software Engineer" },
+            "reviewRating": { "@type": "Rating", "ratingValue": "5", "bestRating": "5" },
+            "reviewBody": "Really easy process from start to finish. I shared the footage + a couple examples and Ariyan pretty much took it from there. Clean captions, good cuts and no unnecessary effects everywhere."
+          },
+          {
+            "@type": "Review",
+            "author": { "@type": "Person", "name": "Rachel Wilson", "jobTitle": "Entrepreneur" },
+            "reviewRating": { "@type": "Rating", "ratingValue": "5", "bestRating": "5" },
+            "reviewBody": "I've worked with Ariyan on several short videos now and the quality has been really consistent. He knows how to make the first few seconds stronger and keep things moving without making the edit feel chaotic. Def happy with the work."
+          }
+        ],
+        "aggregateRating": {
+          "@type": "AggregateRating",
+          "ratingValue": "5",
+          "bestRating": "5",
+          "reviewCount": "6"
+        }
       }
     </script>
     <script type="application/ld+json">
@@ -223,8 +267,9 @@
       href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700;800;900&family=Inter:wght@400;500;600;700;800&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="css/style.css?v=10" />
-    <link rel="stylesheet" href="css/service.css?v=51" />
+    <link rel="stylesheet" href="css/style.css?v=11" />
+    <link rel="stylesheet" href="css/service.css?v=67" />
+    <link rel="stylesheet" href="css/review-card.css?v=3" />
     <link rel="stylesheet" href="css/service-profile.css?v=4" />
   </head>
   <body>
@@ -760,6 +805,33 @@
         <div class="pf-grid pf-grid-v" id="pf-grid"></div>
       </div>
 
+      <!-- CLIENT QUOTES -->
+      <div class="service-testimonial">
+        <div class="service-section-header">
+          <div class="tag-pill">Client Reviews</div>
+          <h2 class="section-title">What Clients <span class="yl">Are Saying</span></h2>
+          <p class="section-desc">
+            A 5.0 average from the creators and brands I've cut short-form and Shorts content
+            for — real client feedback, not cherry-picked screenshots.
+          </p>
+        </div>
+        <div
+          class="review-card"
+          id="reviewCard"
+          data-curated="short-form"
+          data-api="reviews.php"
+          aria-live="polite"
+          aria-busy="true"
+        >
+          <div class="review-card-face" id="reviewCardFace"></div>
+          <div class="review-card-dots" id="reviewCardDots"></div>
+        </div>
+        <span class="service-testimonial-verify">
+          Recently worked with me?
+          <a href="review.html">Leave a review →</a>
+        </span>
+      </div>
+
       <!-- BOTTOM: FAQ -->
       <div class="service-faq">
         <section aria-labelledby="short-form-faq-title">
@@ -1094,6 +1166,8 @@
     <script src="js/service-profile.js?v=6"></script>
     <script src="js/site-nav.js?v=7"></script>
     <script src="js/site-footer.js?v=5"></script>
+    <script src="js/reviews-data.js?v=1"></script>
+    <script src="js/review-card.js?v=5"></script>
     <script src="js/main.js?v=17"></script>
     <script>
       initHeroPortfolioSlider();

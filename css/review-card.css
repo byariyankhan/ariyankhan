@@ -1,0 +1,200 @@
+/* ══════════════════════════════════════════════════
+   REVIEW CARD — one review card that fades to the next
+   every few seconds, with dot indicators so it's obvious
+   more exist without needing a click. Shared component:
+   loaded by the 4 main service pages (each showing its
+   own niche's reviews) and by index.html (showing a
+   shuffled mix pulled from all 4 — see js/reviews-data.js
+   and js/review-card.js). Design lives here in one place;
+   pages only ever supply which review set(s) to show (see
+   README.md → "Review Card" for the full writeup).
+
+   Fixed geometry, not content-driven:
+   - .review-card has a fixed `height` (not min-height) so
+     the box never resizes as the rotation swaps in a
+     shorter/longer quote. .review-card-quote line-clamps
+     to stay inside that budget; .review-card-body centers
+     the quote+stars as a group in the leftover space below
+     the name row.
+   - The avatar ring is positioned with `position: absolute`
+     directly on .review-card (which holds position:relative
+     for this reason). NONE of the elements between the ring
+     and .review-card may get their own `position` — that
+     would become the ring's new positioning anchor and
+     silently break its corner offset. Same reasoning for the
+     ::before cutout circle below.
+   - The avatar lives outside #reviewCardFace (js/review-card.js
+     inserts it once, as a sibling, and only ever updates its
+     textContent). #reviewCardFace is what gets .is-fading
+     (opacity:0) on rotation — if the avatar were inside it,
+     it would fade to nothing every 5s along with the quote.
+══════════════════════════════════════════════════ */
+.service-testimonial {
+  position: relative;
+  z-index: 1;
+  padding: 0 28px 60px;
+  max-width: 520px;
+  margin: 0 auto;
+}
+.service-testimonial .service-section-header {
+  text-align: center;
+}
+.review-card {
+  position: relative;
+  isolation: isolate;
+  width: min(100%, 496px);
+  height: 300px;
+  margin: 0 auto;
+  padding: 20px 28px 32px;
+  background: var(--panel);
+  border-radius: 12px 22px 22px 22px;
+  box-shadow:
+    0 0 0 1px rgba(255, 237, 84, 0.24),
+    0 18px 36px rgba(0, 0, 0, 0.32);
+}
+/* The card surface curves away around the avatar instead of sitting behind it. */
+.review-card::before {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  top: -17px;
+  left: -19px;
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: var(--bg);
+  pointer-events: none;
+}
+.review-card-face {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  transition: opacity .35s ease;
+}
+.review-card-face.is-fading {
+  opacity: 0;
+}
+.review-card-avatar {
+  position: absolute;
+  z-index: 3;
+  top: -11px;
+  left: -13px;
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  background: var(--panel);
+  border: 3px solid var(--yellow);
+  box-shadow: 0 0 0 2px var(--bg), 0 3px 8px rgba(255, 237, 84, 0.1);
+  color: var(--yellow);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 800;
+  font-size: 18px;
+}
+.review-card-name {
+  flex-shrink: 0;
+  margin: 0 0 12px 50px;
+  font-size: 22px;
+  font-weight: 500;
+  line-height: 1.35;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.review-card-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.review-card-quote {
+  font-size: 15px;
+  line-height: 1.56;
+  letter-spacing: -0.3px;
+  color: var(--text);
+  margin: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.review-card-stars {
+  display: flex;
+  gap: 12px;
+  margin-top: 18px;
+  color: var(--yellow);
+  font-size: 22px;
+  line-height: 1;
+}
+.review-card-dots {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 14px;
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+}
+.review-card-dot {
+  width: 6px;
+  height: 6px;
+  padding: 0;
+  border: none;
+  border-radius: 3px;
+  background: #2a2a2a;
+  cursor: pointer;
+  transition: background .2s, width .2s;
+}
+.review-card-dot:hover {
+  background: rgba(255, 237, 84, 0.4);
+}
+.review-card-dot.is-active {
+  background: var(--yellow);
+  width: 18px;
+}
+.service-testimonial-verify {
+  display: block;
+  text-align: center;
+  margin-top: 24px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.service-testimonial-verify a {
+  color: var(--yellow);
+  text-decoration: none;
+  font-weight: 600;
+}
+.service-testimonial-verify a:hover {
+  text-decoration: underline;
+}
+@media (min-width: 768px) {
+  .service-testimonial {
+    padding: 0 40px 72px;
+  }
+  .service-testimonial .service-section-header {
+    margin-bottom: 18px;
+  }
+}
+@media (min-width: 1024px) {
+  .service-testimonial {
+    max-width: 1180px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    align-items: start;
+    gap: 24px 64px;
+  }
+  .service-testimonial .service-section-header {
+    text-align: left;
+    margin-bottom: 0;
+  }
+  .review-card {
+    width: 100%;
+  }
+  .service-testimonial-verify {
+    grid-column: 1 / -1;
+  }
+}

@@ -63,6 +63,12 @@ bash deploy.sh --dry-run               # preview without uploading
 | `admin-config.local.php` | Admin password — NOT in git, lives on server only |
 | `data/tracker.sqlite` | Project tracker database — NOT in git, auto-created on server |
 | `css/tracker.css`, `js/tracker.js` | Tracker page + admin styling/behavior |
+| `review.html` | Public self-service review submission form (nav-hidden, `noindex`) |
+| `js/review.js` | Submission form handler for `review.html` (separate from `js/review-card.js`) |
+| `reviews.php` | GET published reviews / POST a new one — validates against `lib/tracker-db.php` |
+| `js/review-card.js` | Auto-rotating testimonial card behavior — see "Review Card" section below |
+| `js/reviews-data.js` | Curated review text (`window.CURATED_REVIEWS`), single source of truth |
+| `css/review-card.css` | Review card + testimonial section design, shared across pages |
 
 ---
 
@@ -266,6 +272,99 @@ script runs, and is also blocked from direct HTTP access by `.htaccess`.
 
 **Stack:** PHP 8 (confirmed live on this host) + SQLite via PDO (built into
 PHP, no separate database server or credentials needed). No new dependency.
+
+---
+
+## Review Card (Client Testimonials)
+
+Single auto-rotating testimonial card. Live on the 4 main service pages
+(`talking-head-video-editing.html`, `documentary-video-editing.html`,
+`short-form-video-editing.html`, `map-animation-video-editing.html`) — each
+showing that page's own niche reviews — and on `index.html`, which shows a
+shuffled mix pulled from all 4. Not yet on the 10 SEO landing pages under
+`/service/`.
+
+**Files:**
+- `css/review-card.css` → all visual design (both the `.service-testimonial`
+  section layout and the `.review-card` component itself), shared by every
+  page that uses it — service pages load this alongside `css/service.css`;
+  `index.html` loads it alongside `css/style.css`
+- `js/reviews-data.js` → `window.CURATED_REVIEWS`, the **single source of
+  truth** for hand-picked review text, keyed by service (`talking-head`,
+  `documentary`, `short-form`, `map-animation`). This is also what each
+  service page's own JSON-LD `Review`/`AggregateRating` block was written
+  from — if you edit a review's text here, update that page's `<head>`
+  schema too, or they'll drift out of sync.
+- `js/review-card.js` → all rotation/fade/dots behavior, shared. Reads
+  `data-curated` off the `.review-card` element as a comma-separated list of
+  `CURATED_REVIEWS` keys (one key on a service page, all 4 on the homepage)
+  and optionally shuffles the combined list when `data-shuffle="true"` is set
+
+**Load order** (`reviews-data.js` must come before `review-card.js`):
+```html
+<link rel="stylesheet" href="css/review-card.css?v=1" />
+...
+<script src="js/reviews-data.js?v=1"></script>
+<script src="js/review-card.js?v=5"></script>
+```
+
+**How it works:** shows one review at a time, cross-fades to the next every
+5s, with clickable dot indicators so it's clear more exist. Pauses on
+hover/focus, skipped entirely for `prefers-reduced-motion`. Whatever
+`CURATED_REVIEWS` keys are named in `data-curated` gets concatenated with
+whatever's been self-submitted via `review.html` → `reviews.php` at load
+time — so new client reviews appear automatically without a code change.
+
+**Markup shape** (copy this block into a new page — see
+`talking-head-video-editing.html` for a full working single-service example,
+or `index.html` for the multi-key + shuffled example):
+
+```html
+<div class="service-testimonial">
+  <div class="service-section-header">
+    <div class="tag-pill">Client Reviews</div>
+    <h2 class="section-title">What Clients <span class="yl">Are Saying</span></h2>
+    <p class="section-desc"><!-- one page-specific sentence, real stats only --></p>
+  </div>
+  <div class="review-card" id="reviewCard"
+       data-curated="talking-head"
+       data-api="reviews.php" aria-live="polite" aria-busy="true">
+    <div class="review-card-face" id="reviewCardFace"></div>
+    <div class="review-card-dots" id="reviewCardDots"></div>
+  </div>
+  <span class="service-testimonial-verify">
+    Recently worked with me? <a href="review.html">Leave a review →</a>
+  </span>
+</div>
+```
+
+To add a new service key: add an entry to `CURATED_REVIEWS` in
+`js/reviews-data.js`, use that key in the new page's `data-curated`, and add
+a matching `Review`/`AggregateRating` block to the page's own JSON-LD
+`Service` schema (same review text, kept in sync by hand). Never link out to
+Fiverr itself from a service page — a past version did this and it was
+deliberately removed (risk of sending the visitor to a cheaper competing
+listing).
+
+**Fixed-size design — do not reintroduce content-driven sizing:**
+`.review-card` uses a fixed `height` (not `min-height`) so the box never
+resizes as the rotation swaps in a shorter/longer quote — `.review-card-quote`
+line-clamps to stay inside that budget instead.
+
+**Two fragile spots, both already broken once during development — read
+before touching avatar/ring CSS:**
+1. The avatar ring is `position: absolute` directly against `.review-card`
+   (which holds `position: relative` for exactly this). If ANY element
+   between the ring and `.review-card` — `.review-card-face`,
+   `.review-card-head`, etc. — ever gets its own `position` set, it silently
+   becomes the ring's new offset anchor and the corner-overlap breaks with no
+   error, just a wrong-looking result. Same logic applies to the `::before`
+   cutout circle that makes the card surface "recede" around the ring.
+2. The avatar element lives outside `#reviewCardFace` — `js/review-card.js`
+   creates it once and only ever updates its `textContent` on rotation.
+   `#reviewCardFace` is what gets `.is-fading` (`opacity: 0`) every 5s; if
+   the avatar were a child of it (it was, originally), the ring would fade
+   to nothing on every rotation instead of staying put.
 
 ---
 

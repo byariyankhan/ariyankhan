@@ -250,8 +250,9 @@
       href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700;800;900&family=Inter:wght@400;500;600;700;800&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="css/style.css?v=10" />
-    <link rel="stylesheet" href="css/service.css?v=51" />
+    <link rel="stylesheet" href="css/style.css?v=11" />
+    <link rel="stylesheet" href="css/service.css?v=67" />
+    <link rel="stylesheet" href="css/review-card.css?v=3" />
     <link rel="stylesheet" href="css/service-profile.css?v=4" />
   </head>
   <body>
@@ -831,41 +832,21 @@
         <div class="service-section-header">
           <div class="tag-pill">Client Reviews</div>
           <h2 class="section-title">What Clients <span class="yl">Are Saying</span></h2>
+          <p class="section-desc">
+            A 5.0 average from the YouTube creators and coaches I've edited talking head videos
+            for — real client feedback, not cherry-picked screenshots.
+          </p>
         </div>
-        <div class="service-testimonial-grid">
-          <article class="t-card">
-            <div class="t-stars" aria-label="5 out of 5 stars">★★★★★</div>
-            <p class="t-quote">Ariyan Khan is a top-notch video editor! The storytelling and visual appeal were outstanding — absolutely the best video work I've ever had on this platform. Working with Ariyan was a breeze; polite, deeply understanding, and proactive in communication.</p>
-            <div class="t-footer">
-              <span class="t-avatar" aria-hidden="true">K</span>
-              <div class="t-meta">
-                <span class="t-name">kammosh</span>
-                <span class="t-loc">🇺🇸 United States</span>
-              </div>
-            </div>
-          </article>
-          <article class="t-card">
-            <div class="t-stars" aria-label="5 out of 5 stars">★★★★★</div>
-            <p class="t-quote">Ariyan Khan is an exceptional video editor! His work is professional and visually appealing, and he was super responsive and proactive in his communication. Highly recommend — he's keen to help and a pleasure to work with!</p>
-            <div class="t-footer">
-              <span class="t-avatar" aria-hidden="true">S</span>
-              <div class="t-meta">
-                <span class="t-name">shaqo43</span>
-                <span class="t-loc">🇮🇱 Israel</span>
-              </div>
-            </div>
-          </article>
-          <article class="t-card">
-            <div class="t-stars" aria-label="5 out of 5 stars">★★★★★</div>
-            <p class="t-quote">Another fantastic project from Ariyan. Love how dedicated and talented he is, always making sure the quality is the priority. My only choice for video editing — thank you very much and will be back soon!</p>
-            <div class="t-footer">
-              <span class="t-avatar" aria-hidden="true">J</span>
-              <div class="t-meta">
-                <span class="t-name">joaomrb</span>
-                <span class="t-loc">🇺🇸 United States</span>
-              </div>
-            </div>
-          </article>
+        <div
+          class="review-card"
+          id="reviewCard"
+          data-curated="talking-head"
+          data-api="reviews.php"
+          aria-live="polite"
+          aria-busy="true"
+        >
+          <div class="review-card-face" id="reviewCardFace"></div>
+          <div class="review-card-dots" id="reviewCardDots"></div>
         </div>
         <span class="service-testimonial-verify">
           Recently worked with me?
@@ -1231,6 +1212,8 @@
     <script src="js/service-profile.js?v=6"></script>
     <script src="js/site-nav.js?v=7"></script>
     <script src="js/site-footer.js?v=5"></script>
+    <script src="js/reviews-data.js?v=1"></script>
+    <script src="js/review-card.js?v=5"></script>
     <script src="js/main.js?v=17"></script>
     <script>
       initHeroPortfolioSlider();
