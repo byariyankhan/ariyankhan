@@ -48,6 +48,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         'name' => $r['client_name'],
         'rating' => (int) $r['rating'],
         'body' => $r['review_body'],
+        'service' => $r['service_key'],
         'date' => substr((string) $r['created_at'], 0, 10),
       ];
     },

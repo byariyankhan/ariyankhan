@@ -35,6 +35,17 @@ const TRACKER_MAX_STAGE = 5;
 
 const TRACKER_CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; // no 0/O/1/I/L
 
+// Which service page a project belongs to — also the exact keys used in
+// js/reviews-data.js's CURATED_REVIEWS and each page's data-curated
+// attribute, so a review submitted against this project shows up on the
+// right page (see review_submit() and reviews.php).
+const TRACKER_SERVICE_KEYS = [
+  'talking-head' => 'Talking Head',
+  'documentary' => 'Documentary',
+  'short-form' => 'Short Form',
+  'map-animation' => 'Map Animation',
+];
+
 function tracker_db(): PDO {
   static $db = null;
   if ($db !== null) {
@@ -75,6 +86,9 @@ function tracker_db(): PDO {
   if (!in_array('client_email', $columns, true)) {
     $db->exec('ALTER TABLE projects ADD COLUMN client_email TEXT NOT NULL DEFAULT ""');
   }
+  if (!in_array('service_key', $columns, true)) {
+    $db->exec('ALTER TABLE projects ADD COLUMN service_key TEXT NOT NULL DEFAULT ""');
+  }
 
   $db->exec('
     CREATE TABLE IF NOT EXISTS reviews (
@@ -89,6 +103,11 @@ function tracker_db(): PDO {
       FOREIGN KEY(project_id) REFERENCES projects(id)
     )
   ');
+
+  $review_columns = $db->query('PRAGMA table_info(reviews)')->fetchAll(PDO::FETCH_COLUMN, 1);
+  if (!in_array('service_key', $review_columns, true)) {
+    $db->exec('ALTER TABLE reviews ADD COLUMN service_key TEXT NOT NULL DEFAULT ""');
+  }
 
   return $db;
 }
@@ -110,7 +129,7 @@ function review_submit(string $code, string $email, string $name, int $rating, s
   }
 
   $db = tracker_db();
-  $stmt = $db->prepare('SELECT id, stage, client_email FROM projects WHERE code = :code');
+  $stmt = $db->prepare('SELECT id, stage, client_email, service_key FROM projects WHERE code = :code');
   $stmt->execute(['code' => $code]);
   $project = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -124,12 +143,13 @@ function review_submit(string $code, string $email, string $name, int $rating, s
 
   $now = gmdate('c');
   $stmt = $db->prepare('
-    INSERT INTO reviews (project_id, code, client_name, rating, review_body, created_at, updated_at)
-    VALUES (:project_id, :code, :name, :rating, :body, :now, :now)
+    INSERT INTO reviews (project_id, code, client_name, rating, review_body, service_key, created_at, updated_at)
+    VALUES (:project_id, :code, :name, :rating, :body, :service_key, :now, :now)
     ON CONFLICT(project_id) DO UPDATE SET
       client_name = excluded.client_name,
       rating = excluded.rating,
       review_body = excluded.review_body,
+      service_key = excluded.service_key,
       updated_at = excluded.updated_at
   ');
   $stmt->execute([
@@ -138,6 +158,7 @@ function review_submit(string $code, string $email, string $name, int $rating, s
     'name' => $name,
     'rating' => $rating,
     'body' => $body,
+    'service_key' => (string) $project['service_key'],
     'now' => $now,
   ]);
 
@@ -146,7 +167,7 @@ function review_submit(string $code, string $email, string $name, int $rating, s
 
 function reviews_list(): array {
   $db = tracker_db();
-  return $db->query('SELECT client_name, rating, review_body, created_at FROM reviews ORDER BY created_at DESC')->fetchAll(PDO::FETCH_ASSOC);
+  return $db->query('SELECT client_name, rating, review_body, service_key, created_at FROM reviews ORDER BY created_at DESC')->fetchAll(PDO::FETCH_ASSOC);
 }
 
 function tracker_generate_code(): string {

@@ -67,21 +67,22 @@ function mcp_tool_definitions(): array {
     [
       'name' => 'create_project',
       'title' => 'Create Project',
-      'description' => 'Creates a new tracked project and generates a client-facing tracking code (looked up on the public track.html page). New projects always start at stage 0 (Footage Received). If client_email is given, an order-confirmation email with the tracking code and a track-my-project link is sent immediately, and future update_project_stage calls can notify the client automatically — without it, the client never gets the code and can\'t be notified later. If this project is coming from an email inquiry, always pass the contact_email/contact_name you already have from that thread; don\'t leave these blank just because the user didn\'t repeat them out loud.',
+      'description' => 'Creates a new tracked project and generates a client-facing tracking code (looked up on the public track.html page). New projects always start at stage 0 (Footage Received). If client_email is given, an order-confirmation email with the tracking code and a track-my-project link is sent immediately, and future update_project_stage calls can notify the client automatically — without it, the client never gets the code and can\'t be notified later. If this project is coming from an email inquiry, always pass the contact_email/contact_name you already have from that thread; don\'t leave these blank just because the user didn\'t repeat them out loud. Always pass service_key too — it\'s what determines which service page a review from this client publishes to once the project is delivered; without it, a submitted review has nowhere specific to show.',
       'inputSchema' => [
         'type' => 'object',
         'properties' => [
           'project_label' => ['type' => 'string', 'description' => 'Short client-facing project name, e.g. "Documentary Edit".'],
           'client_name' => ['type' => 'string', 'description' => 'Client\'s name, if known. Optional, but include it whenever you already have it (e.g. from an inbox thread).'],
           'client_email' => ['type' => 'string', 'description' => 'Client\'s email address. Optional, but include it whenever you already have it (e.g. from an inbox thread) — without it, no confirmation email is sent and the client can\'t be notified of later stage updates.'],
+          'service_key' => ['type' => 'string', 'enum' => array_keys(TRACKER_SERVICE_KEYS), 'description' => 'Which service this project is for — controls which page a review from this client shows up on once submitted: talking-head, documentary, short-form, or map-animation.'],
         ],
-        'required' => ['project_label'],
+        'required' => ['project_label', 'service_key'],
       ],
     ],
     [
       'name' => 'update_project',
       'title' => 'Update Project',
-      'description' => 'Updates one or more fields on an existing project, identified by its tracking code. Only the fields you provide are changed — omit any you don\'t want to touch. Use this for renaming the project, correcting client info, recording a payment note (e.g. "50% advance ($150) received"), or setting/changing the delivery date. To change the stage instead, use update_project_stage.',
+      'description' => 'Updates one or more fields on an existing project, identified by its tracking code. Only the fields you provide are changed — omit any you don\'t want to touch. Use this for renaming the project, correcting client info, recording a payment note (e.g. "50% advance ($150) received"), setting/changing the delivery date, or fixing the service a project is tagged to. To change the stage instead, use update_project_stage.',
       'inputSchema' => [
         'type' => 'object',
         'properties' => [
@@ -91,6 +92,7 @@ function mcp_tool_definitions(): array {
           'client_email' => ['type' => 'string', 'description' => 'New client email address.'],
           'note' => ['type' => 'string', 'description' => 'Payment/internal note, e.g. "50% advance ($150) received". Replaces the existing note.'],
           'delivery_date' => ['type' => 'string', 'description' => 'Delivery date in YYYY-MM-DD format. Pass an empty string to clear it.'],
+          'service_key' => ['type' => 'string', 'enum' => array_keys(TRACKER_SERVICE_KEYS), 'description' => 'Which service page a review from this client should publish to: talking-head, documentary, short-form, or map-animation.'],
         ],
         'required' => ['code'],
       ],
@@ -228,7 +230,8 @@ function mcp_call_tool(string $name, array $args): array {
       $label = $p['project_label'] !== '' ? $p['project_label'] : '(untitled)';
       $delivery = $p['delivery_date'] !== '' ? ", delivery {$p['delivery_date']}" : '';
       $note = $p['note'] !== '' ? " — note: {$p['note']}" : '';
-      $lines[] = "- {$p['code']} — \"{$label}\" — {$who} — stage: {$stage_label}{$delivery}{$note}";
+      $service = ($p['service_key'] ?? '') !== '' ? " — service: {$p['service_key']}" : ' — service: none set';
+      $lines[] = "- {$p['code']} — \"{$label}\" — {$who} — stage: {$stage_label}{$service}{$delivery}{$note}";
     }
     return mcp_text_result(implode("\n", $lines));
   }
@@ -237,12 +240,17 @@ function mcp_call_tool(string $name, array $args): array {
     $label = trim((string) ($args['project_label'] ?? ''));
     $client_name = trim((string) ($args['client_name'] ?? ''));
     $client_email = trim((string) ($args['client_email'] ?? ''));
+    $service_key = trim((string) ($args['service_key'] ?? ''));
 
     if ($label === '') {
       return mcp_text_result('project_label is required.', true);
     }
     if ($client_email !== '' && !filter_var($client_email, FILTER_VALIDATE_EMAIL)) {
       return mcp_text_result('client_email is not a valid email address.', true);
+    }
+    if (!array_key_exists($service_key, TRACKER_SERVICE_KEYS)) {
+      $valid = implode(', ', array_keys(TRACKER_SERVICE_KEYS));
+      return mcp_text_result("service_key must be one of: {$valid}.", true);
     }
 
     $tdb = tracker_db();
@@ -251,8 +259,8 @@ function mcp_call_tool(string $name, array $args): array {
     $stage_dates = json_encode(['0' => gmdate('Y-m-d')], JSON_FORCE_OBJECT);
 
     $stmt = $tdb->prepare(
-      'INSERT INTO projects (code, project_label, stage, stage_dates, client_name, client_email, created_at, updated_at)
-       VALUES (:code, :label, 0, :stage_dates, :client_name, :client_email, :now, :now)'
+      'INSERT INTO projects (code, project_label, stage, stage_dates, client_name, client_email, service_key, created_at, updated_at)
+       VALUES (:code, :label, 0, :stage_dates, :client_name, :client_email, :service_key, :now, :now)'
     );
     $stmt->execute([
       'code' => $code,
@@ -260,10 +268,11 @@ function mcp_call_tool(string $name, array $args): array {
       'stage_dates' => $stage_dates,
       'client_name' => $client_name,
       'client_email' => $client_email,
+      'service_key' => $service_key,
       'now' => $now,
     ]);
 
-    $result = "Created project \"{$label}\" with tracking code {$code} (stage: Footage Received).";
+    $result = "Created project \"{$label}\" with tracking code {$code} (stage: Footage Received, service: {$service_key}).";
     if ($client_email !== '') {
       $sent = tracker_send_order_email($client_email, $client_name, $label, $code);
       $result .= $sent ? " Order confirmation emailed to {$client_email}." : ' Email to the client failed to send.';
@@ -316,9 +325,18 @@ function mcp_call_tool(string $name, array $args): array {
       $fields[] = 'delivery_date = :delivery_date';
       $params['delivery_date'] = $date;
     }
+    if (array_key_exists('service_key', $args)) {
+      $service_key = trim((string) $args['service_key']);
+      if (!array_key_exists($service_key, TRACKER_SERVICE_KEYS)) {
+        $valid = implode(', ', array_keys(TRACKER_SERVICE_KEYS));
+        return mcp_text_result("service_key must be one of: {$valid}.", true);
+      }
+      $fields[] = 'service_key = :service_key';
+      $params['service_key'] = $service_key;
+    }
 
     if (!$fields) {
-      return mcp_text_result('Nothing to update — provide at least one of project_label, client_name, client_email, note, or delivery_date.', true);
+      return mcp_text_result('Nothing to update — provide at least one of project_label, client_name, client_email, note, delivery_date, or service_key.', true);
     }
 
     $fields[] = 'updated_at = :now';

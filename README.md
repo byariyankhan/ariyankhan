@@ -225,8 +225,12 @@ an update — nav button "Track Order" → `track.html`.
 
 **How it works:**
 1. Ariyan creates a project in `/admin/` (password-protected) with a short
-   client-facing label. This generates a random 8-character code like
-   `7K4M-9XPQ` (confusable characters like `0/O/1/I/L` excluded).
+   client-facing label and a required **service** (Talking Head / Documentary
+   / Short Form / Map Animation — `TRACKER_SERVICE_KEYS` in
+   `lib/tracker-db.php`). This generates a random 8-character code like
+   `7K4M-9XPQ` (confusable characters like `0/O/1/I/L` excluded). The service
+   choice determines which page a review from this client publishes to later
+   — see "Review Card" below.
 2. Ariyan sends that code to the client (email/WhatsApp).
 3. The client goes to `ariyankhan.com/track.html`, types the code, and sees
    a 6-stage horizontal progress stepper: Footage Received → Payment
@@ -314,6 +318,21 @@ hover/focus, skipped entirely for `prefers-reduced-motion`. Whatever
 `CURATED_REVIEWS` keys are named in `data-curated` gets concatenated with
 whatever's been self-submitted via `review.html` → `reviews.php` at load
 time — so new client reviews appear automatically without a code change.
+
+**Which page a self-submitted review publishes to:** every project has a
+`service_key` (`talking-head` / `documentary` / `short-form` / `map-animation`)
+set when it's created in `/admin/` or via the `create_project` MCP tool — it's
+a required field precisely so a review can be routed correctly. When a client
+submits a review, `review_submit()` (`lib/tracker-db.php`) copies that
+project's `service_key` onto the review row. `reviews.php`'s GET response
+includes it as `service`, and `js/review-card.js` filters the fetched list
+against its own `data-curated` keys before merging — so a review from a
+documentary project only shows on `documentary-video-editing.html` and the
+homepage (which lists all 4 keys), never on `short-form-video-editing.html`.
+A review with no `service` on file (shouldn't happen going forward, but
+covers any pre-existing data) falls back to showing everywhere rather than
+silently vanishing. To fix a project tagged with the wrong service after the
+fact, use `update_project` with a new `service_key`.
 
 **Markup shape** (copy this block into a new page — see
 `talking-head-video-editing.html` for a full working single-service example,

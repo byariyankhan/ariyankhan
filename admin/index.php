@@ -22,8 +22,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $label = trim((string) ($_POST['project_label'] ?? ''));
     $client_name = trim((string) ($_POST['client_name'] ?? ''));
     $client_email = trim((string) ($_POST['client_email'] ?? ''));
+    $service_key = trim((string) ($_POST['service_key'] ?? ''));
     if ($client_email !== '' && !filter_var($client_email, FILTER_VALIDATE_EMAIL)) {
       $client_email = '';
+    }
+    if (!array_key_exists($service_key, TRACKER_SERVICE_KEYS)) {
+      $service_key = '';
     }
 
     $now = gmdate('c');
@@ -31,8 +35,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $stage_dates = json_encode(['0' => gmdate('Y-m-d')], JSON_FORCE_OBJECT);
 
     $stmt = $db->prepare(
-      'INSERT INTO projects (code, project_label, stage, stage_dates, client_name, client_email, created_at, updated_at)
-       VALUES (:code, :label, 0, :stage_dates, :client_name, :client_email, :now, :now)'
+      'INSERT INTO projects (code, project_label, stage, stage_dates, client_name, client_email, service_key, created_at, updated_at)
+       VALUES (:code, :label, 0, :stage_dates, :client_name, :client_email, :service_key, :now, :now)'
     );
     $stmt->execute([
       'code' => $code,
@@ -40,6 +44,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       'stage_dates' => $stage_dates,
       'client_name' => $client_name,
       'client_email' => $client_email,
+      'service_key' => $service_key,
       'now' => $now,
     ]);
 
@@ -143,7 +148,7 @@ function e(string $value): string {
 <link rel="icon" type="image/x-icon" href="../favicon/favicon.ico">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../css/style.css?v=10">
-<link rel="stylesheet" href="../css/tracker.css?v=20">
+<link rel="stylesheet" href="../css/tracker.css?v=21">
 </head>
 <body class="tracker-body">
 <div id="stars"></div>
@@ -179,6 +184,15 @@ function e(string $value): string {
         <span>Client email (optional — sends order confirmation)</span>
         <input type="email" name="client_email" placeholder="client@example.com" maxlength="160">
       </label>
+      <label class="tracker-field">
+        <span>Service (which page a review publishes to)</span>
+        <select name="service_key" required>
+          <option value="" disabled selected>Choose a service&hellip;</option>
+          <?php foreach (TRACKER_SERVICE_KEYS as $key => $svcLabel): ?>
+            <option value="<?= e($key) ?>"><?= e($svcLabel) ?></option>
+          <?php endforeach; ?>
+        </select>
+      </label>
       <button type="submit" class="tracker-btn">Create &amp; Generate Code</button>
     </form>
   </div>
@@ -194,6 +208,12 @@ function e(string $value): string {
             <div class="tracker-project-head">
               <div>
                 <span class="tracker-code"><?= e($project['code']) ?></span>
+                <?php $svcKey = (string) ($project['service_key'] ?? ''); ?>
+                <?php if ($svcKey !== '' && isset(TRACKER_SERVICE_KEYS[$svcKey])): ?>
+                  <span class="tracker-service-badge"><?= e(TRACKER_SERVICE_KEYS[$svcKey]) ?></span>
+                <?php elseif ($svcKey === ''): ?>
+                  <span class="tracker-service-badge tracker-service-badge--none">No service set</span>
+                <?php endif; ?>
                 <h3 class="tracker-project-title"><?= e($project['project_label'] !== '' ? $project['project_label'] : '(untitled)') ?></h3>
                 <?php if (($project['client_name'] ?? '') !== '' || ($project['client_email'] ?? '') !== ''): ?>
                   <p class="tracker-project-client">

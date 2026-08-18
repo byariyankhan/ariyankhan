@@ -138,7 +138,14 @@
   fetch(api)
     .then((res) => (res.ok ? res.json() : null))
     .then((json) => {
-      const submitted = json && json.ok && Array.isArray(json.reviews) ? json.reviews : [];
+      const allSubmitted = json && json.ok && Array.isArray(json.reviews) ? json.reviews : [];
+      // Only show a submitted review on the page(s) its project was tagged
+      // for. A review with no service on file (shouldn't happen for new
+      // projects, but covers old data) falls back to showing everywhere
+      // rather than silently vanishing.
+      const submitted = allSubmitted.filter(
+        (r) => !r.service || curatedKeys.includes(r.service)
+      );
       init([...curated, ...submitted]);
     })
     .catch(() => init(curated));
