@@ -90,4 +90,4 @@ if (!$result['ok']) {
   respond(422, $result);
 }
 
-respond(200, ['ok' => true]);
+respond(200, $result);

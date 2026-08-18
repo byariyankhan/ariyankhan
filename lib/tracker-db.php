@@ -171,7 +171,7 @@ function review_submit(string $code, string $email, string $name, int $rating, s
     'now' => $now,
   ]);
 
-  return ['ok' => true];
+  return ['ok' => true, 'name' => $name, 'service' => (string) $project['service_key']];
 }
 
 function reviews_list(): array {

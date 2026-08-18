@@ -6,6 +6,13 @@
 
   if (!form) return;
 
+  const SERVICE_PAGES = {
+    'talking-head': 'talking-head-video-editing.html',
+    documentary: 'documentary-video-editing.html',
+    'short-form': 'short-form-video-editing.html',
+    'map-animation': 'map-animation-video-editing.html',
+  };
+
   function showError(message) {
     errorEl.textContent = message;
     errorEl.hidden = false;
@@ -65,6 +72,12 @@
 
       form.hidden = true;
       successEl.hidden = false;
+
+      const destination = SERVICE_PAGES[json.service] || 'index.html';
+      const nameParam = json.name ? `?justReviewed=${encodeURIComponent(json.name)}` : '';
+      setTimeout(() => {
+        window.location.href = `${destination}${nameParam}`;
+      }, 2200);
     } catch (err) {
       showError('Could not reach the server. Please check your connection and try again.');
     } finally {

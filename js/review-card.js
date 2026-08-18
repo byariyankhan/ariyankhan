@@ -128,7 +128,17 @@
   function init(list) {
     reviews = shouldShuffle ? shuffle(list) : list;
     if (!reviews.length) return;
-    renderFace(reviews[0]);
+
+    // Arriving fresh from review.html?justReviewed=Name — jump straight to
+    // that review so the client sees their own feedback live on the page.
+    const justReviewed = new URLSearchParams(window.location.search).get('justReviewed');
+    if (justReviewed) {
+      const matchIndex = reviews.findIndex((r) => r.name === justReviewed);
+      if (matchIndex !== -1) index = matchIndex;
+      root.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    renderFace(reviews[index]);
     renderDots();
     root.setAttribute('aria-busy', 'false');
     startTimer();

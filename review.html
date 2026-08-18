@@ -83,7 +83,7 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="css/style.css?v=11" />
-    <link rel="stylesheet" href="css/tracker.css?v=27" />
+    <link rel="stylesheet" href="css/tracker.css?v=28" />
   </head>
   <body>
     <div id="stars"></div>
@@ -95,9 +95,9 @@
         <div class="tag-pill">Client Review</div>
         <h1 class="section-title">Leave a <span class="yl">Review</span></h1>
         <p class="section-desc">
-          Recently finished a project with me? I'd genuinely appreciate a few words.
-          Enter the tracking code and email from your project to verify it's really
-          you — reviews publish immediately once verified.
+          Enter the tracking code and email from your project to verify it's you.
+          Please double-check your feedback before submitting — once posted, a
+          review publishes immediately and can't be edited or removed afterward.
         </p>
 
         <form class="tracker-form review-form" id="reviewForm" novalidate>
@@ -136,8 +136,9 @@
         </form>
 
         <p class="tracker-error" id="reviewError" hidden></p>
-        <p class="tracker-notice" id="reviewSuccess" hidden>
-          Thank you — your review is published. Really appreciate you taking the time.
+        <p class="tracker-notice tracker-notice--success" id="reviewSuccess" hidden>
+          Thank you for taking the time to share your feedback — it genuinely helps
+          me improve my work. Taking you to your review now…
         </p>
       </div>
     </main>
@@ -146,6 +147,6 @@
 
     <script src="js/site-nav.js?v=9"></script>
     <script src="js/site-footer.js?v=5"></script>
-    <script src="js/review.js?v=2"></script>
+    <script src="js/review.js?v=3"></script>
   </body>
 </html>

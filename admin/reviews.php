@@ -44,7 +44,7 @@ $reviews = reviews_list_admin();
 <link rel="icon" type="image/x-icon" href="../favicon/favicon.ico">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../css/style.css?v=10">
-<link rel="stylesheet" href="../css/tracker.css?v=27">
+<link rel="stylesheet" href="../css/tracker.css?v=28">
 </head>
 <body class="tracker-body">
 <div id="stars"></div>
