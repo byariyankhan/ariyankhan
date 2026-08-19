@@ -115,7 +115,7 @@ $page_description = $page_count > 0
       href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700;800;900&family=Inter:wght@400;500;600;700;800&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="../css/style.css?v=12" />
+    <link rel="stylesheet" href="../css/style.css?v=13" />
     <link rel="stylesheet" href="css/service-index.css?v=2" />
   </head>
   <body>
@@ -166,6 +166,6 @@ $page_description = $page_count > 0
 
     <script src="../js/site-nav.js?v=9"></script>
     <script src="../js/site-footer.js?v=8"></script>
-    <script src="../js/main.js?v=19"></script>
+    <script src="../js/main.js?v=20"></script>
   </body>
 </html>

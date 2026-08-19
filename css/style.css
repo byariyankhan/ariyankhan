@@ -1351,6 +1351,39 @@ section{ position:relative; z-index:1; padding:80px 22px; }
   border:none;
 }
 
+/* ── Custom YouTube player chrome — controls=0 on the underlying iframe,
+   our own play/pause/mute/fullscreen buttons on top, so a click never
+   routes the viewer off-site to youtube.com. Used inside both .pf-thumb
+   (portfolio grid) and .service-profile-frame (hero slider). ── */
+.ytp-wrap{ position:absolute; inset:0; width:100%; height:100%; }
+.ytp-target{ position:absolute; inset:0; width:100%; height:100%; }
+.ytp-target iframe{ display:block; width:100%; height:100%; border:0; pointer-events:none; }
+.ytp-capture{
+  position:absolute; inset:0; z-index:4;
+  cursor:pointer; background:transparent;
+}
+.ytp-controls{
+  position:absolute; left:0; right:0; bottom:0; z-index:5;
+  display:flex; align-items:center; gap:8px;
+  padding:8px 10px;
+  background:linear-gradient(transparent, rgba(0,0,0,.78));
+}
+.ytp-spacer{ flex:1; }
+.ytp-btn{
+  display:flex; align-items:center; justify-content:center;
+  width:30px; height:30px; border-radius:6px;
+  background:rgba(255,255,255,.12);
+  border:1px solid rgba(255,255,255,.18);
+  color:#fff; cursor:pointer;
+  transition:background .2s, border-color .2s, color .2s;
+}
+.ytp-btn svg{ width:15px; height:15px; }
+.ytp-btn:hover{
+  background:var(--yellow);
+  border-color:var(--yellow);
+  color:#000;
+}
+
 /* Playing state */
 .pf-card.pf-playing{
   border-color:rgba(255,237,84,.5);
