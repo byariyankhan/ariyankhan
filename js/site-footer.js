@@ -51,8 +51,6 @@
 <footer class="site-footer">
   <nav class="footer-social" data-social-links="footer" aria-label="Social media links"></nav>
   <p class="footer-legal">
-    <a href="${basePath}service/">Services</a>
-    <span class="footer-divider" aria-hidden="true">|</span>
     <a href="${basePath}blog/">Blog</a>
     <span class="footer-divider" aria-hidden="true">|</span>
     <a href="${basePath}case-studies/">Case Studies</a>
