@@ -1057,11 +1057,6 @@ async function fetchYTTitle(id) {
 /* ── Stop all playing videos (restore thumbnails) ── */
 function stopAllVideos() {
   document.querySelectorAll('.pf-card.pf-playing').forEach(card => {
-    if (card._ytPlayer) {
-      card._ytPlayer.destroy();
-      card._ytPlayer = null;
-    }
-
     const thumb = card.querySelector('.pf-thumb');
     if (thumb && card._origHTML !== undefined) {
       thumb.innerHTML = card._origHTML;
@@ -1082,163 +1077,6 @@ function embedVideo(card, src, allow) {
     allowfullscreen
     ></iframe>`;
   card.classList.add('pf-playing');
-}
-
-/* ── Embed a YouTube video with our own play/pause/mute/fullscreen controls
-   instead of YouTube's native chrome, so a click never routes the viewer
-   off-site to youtube.com — the source video is unchanged either way. ── */
-function embedYouTubeVideo(card, videoId) {
-  const thumb = card.querySelector('.pf-thumb');
-  if (!thumb) return;
-
-  card._origHTML = thumb.innerHTML;
-  card._ytPlayer = mountHiddenYouTubePlayer(thumb, videoId);
-  card.classList.add('pf-playing');
-}
-
-/* ── Shared YouTube IFrame API loader (single script tag, single global
-   callback, any number of players queued behind one promise) ── */
-let ytApiReadyPromise = null;
-
-function loadYouTubeAPI() {
-  if (ytApiReadyPromise) return ytApiReadyPromise;
-
-  ytApiReadyPromise = new Promise(resolve => {
-    if (window.YT && window.YT.Player) {
-      resolve(window.YT);
-      return;
-    }
-
-    const previous = window.onYouTubeIframeAPIReady;
-    window.onYouTubeIframeAPIReady = () => {
-      if (typeof previous === 'function') previous();
-      resolve(window.YT);
-    };
-
-    const tag = document.createElement('script');
-    tag.src = 'https://www.youtube.com/iframe_api';
-    document.head.appendChild(tag);
-  });
-
-  return ytApiReadyPromise;
-}
-
-let ytpUidCounter = 0;
-
-/* ── Mount a YouTube player with controls=0 plus a same-origin capture
-   layer over the iframe (so right-click/title/logo clicks never reach
-   youtube.com) and our own play/pause/mute/fullscreen buttons wired
-   through the IFrame Player API. `wrapperEl` must already be a
-   positioned (relative/absolute) element the player can fill. ── */
-function mountHiddenYouTubePlayer(wrapperEl, videoId, { onFirstPlay } = {}) {
-  const uid = `ytp-target-${Date.now()}-${ytpUidCounter++}`;
-
-  wrapperEl.innerHTML = `
-    <div class="ytp-wrap">
-      <div class="ytp-target"><div id="${uid}"></div></div>
-      <div class="ytp-capture" data-ytp-capture></div>
-      <div class="ytp-controls" data-ytp-controls>
-        <button type="button" class="ytp-btn" data-ytp-playpause aria-label="Pause">
-          <svg data-ytp-icon-play viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
-          <svg data-ytp-icon-pause viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style="display:none"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>
-        </button>
-        <button type="button" class="ytp-btn" data-ytp-mute aria-label="Mute">
-          <svg data-ytp-icon-unmuted viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 10v4h4l5 5V5L7 10H3z"/></svg>
-          <svg data-ytp-icon-muted viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style="display:none"><path d="M3 10v4h4l5 5V5L7 10H3z" opacity=".5"/><path d="m18.5 8.5-5 7M13.5 8.5l5 7" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"/></svg>
-        </button>
-        <span class="ytp-spacer"></span>
-        <button type="button" class="ytp-btn" data-ytp-fullscreen aria-label="Fullscreen">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
-        </button>
-      </div>
-    </div>`;
-
-  const wrap = wrapperEl.querySelector('.ytp-wrap');
-  const capture = wrapperEl.querySelector('[data-ytp-capture]');
-  const playPauseBtn = wrapperEl.querySelector('[data-ytp-playpause]');
-  const iconPlay = wrapperEl.querySelector('[data-ytp-icon-play]');
-  const iconPause = wrapperEl.querySelector('[data-ytp-icon-pause]');
-  const muteBtn = wrapperEl.querySelector('[data-ytp-mute]');
-  const iconUnmuted = wrapperEl.querySelector('[data-ytp-icon-unmuted]');
-  const iconMuted = wrapperEl.querySelector('[data-ytp-icon-muted]');
-  const fsBtn = wrapperEl.querySelector('[data-ytp-fullscreen]');
-
-  let player = null;
-  let destroyed = false;
-
-  function togglePlay() {
-    if (!player || typeof player.getPlayerState !== 'function') return;
-    if (player.getPlayerState() === 1) {
-      player.pauseVideo();
-    } else {
-      player.playVideo();
-    }
-  }
-
-  function syncMuteIcon() {
-    if (!player || typeof player.isMuted !== 'function') return;
-    const muted = player.isMuted();
-    iconUnmuted.style.display = muted ? 'none' : '';
-    iconMuted.style.display = muted ? '' : 'none';
-  }
-
-  capture.addEventListener('click', togglePlay);
-  capture.addEventListener('contextmenu', event => event.preventDefault());
-  playPauseBtn.addEventListener('click', togglePlay);
-
-  muteBtn.addEventListener('click', () => {
-    if (!player) return;
-    if (player.isMuted()) {
-      player.unMute();
-    } else {
-      player.mute();
-    }
-    syncMuteIcon();
-  });
-
-  fsBtn.addEventListener('click', () => {
-    if (wrap.requestFullscreen) wrap.requestFullscreen();
-    else if (wrap.webkitRequestFullscreen) wrap.webkitRequestFullscreen();
-  });
-
-  loadYouTubeAPI().then(YT => {
-    if (destroyed) return;
-
-    player = new YT.Player(uid, {
-      videoId,
-      playerVars: {
-        autoplay: 1,
-        controls: 0,
-        disablekb: 1,
-        rel: 0,
-        modestbranding: 1,
-        iv_load_policy: 3,
-        fs: 0,
-        playsinline: 1,
-      },
-      events: {
-        onReady: () => syncMuteIcon(),
-        onStateChange: event => {
-          const playing = event.data === 1;
-          iconPlay.style.display = playing ? 'none' : '';
-          iconPause.style.display = playing ? '' : 'none';
-          playPauseBtn.setAttribute('aria-label', playing ? 'Pause' : 'Play');
-          if (playing && typeof onFirstPlay === 'function') onFirstPlay();
-        },
-      },
-    });
-  });
-
-  return {
-    destroy() {
-      destroyed = true;
-      try {
-        player && typeof player.destroy === 'function' && player.destroy();
-      } catch {
-        /* player already torn down with its iframe — nothing left to clean up */
-      }
-    },
-  };
 }
 
 /* ── Build service page grid ── */
@@ -1430,26 +1268,24 @@ function initHeroPortfolioSlider() {
     });
 
     function stopVideo() {
-      const frame = slider.querySelector('.service-profile-frame');
-      frame?._ytPlayer?.destroy();
-      frame?.remove();
+      slider.querySelector('.service-profile-frame')?.remove();
       slider.classList.remove('is-playing');
     }
 
     function playVideo(videoId) {
       const existingFrame = slider.querySelector('.service-profile-frame');
+      const src = `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1`;
       if (existingFrame) {
-        existingFrame._ytPlayer?.destroy();
-        existingFrame._ytPlayer = mountHiddenYouTubePlayer(existingFrame, videoId);
+        existingFrame.src = src;
         return;
       }
 
       if (timer) window.clearInterval(timer);
       slider.classList.add('is-playing');
-      const frame = document.createElement('div');
-      frame.className = 'service-profile-frame';
-      slider.appendChild(frame);
-      frame._ytPlayer = mountHiddenYouTubePlayer(frame, videoId);
+      slider.insertAdjacentHTML('beforeend', `<iframe class="service-profile-frame" src="https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1"
+        title="Portfolio video"
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+        allowfullscreen></iframe>`);
     }
 
     trigger.addEventListener('click', () => {
@@ -1523,7 +1359,11 @@ function makePfCard(item) {
       }
 
       stopAllVideos();
-      embedYouTubeVideo(card, item.id);
+      embedVideo(
+        card,
+        `https://www.youtube.com/embed/${item.id}?autoplay=1&rel=0&modestbranding=1`,
+        'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture'
+      );
     });
 
     const nameEl = card.querySelector('.pf-name');
