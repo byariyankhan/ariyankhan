@@ -216,14 +216,17 @@
   }
   .trusted-by-layout {
     padding: 0 clamp(32px, 5vw, 72px);
-    overflow: hidden;
   }
   .trusted-by-label {
     flex-shrink: 0;
   }
+  .trusted-by-viewport {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+  }
   .trusted-by-track {
     width: max-content;
-    flex-shrink: 0;
     animation: trusted-by-desktop-marquee 32s linear infinite;
     will-change: transform;
   }
