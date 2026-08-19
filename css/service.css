@@ -199,6 +199,11 @@
 .trusted-by-item strong {
   color: #fff;
 }
+.trusted-by-viewport {
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 32px, #000 calc(100% - 32px), transparent);
+  mask-image: linear-gradient(to right, transparent, #000 32px, #000 calc(100% - 32px), transparent);
+}
 @media (min-width: 1024px) {
   .service-page--landing .service-introduction {
     display: flex;
@@ -223,7 +228,6 @@
   .trusted-by-viewport {
     flex: 1 1 auto;
     min-width: 0;
-    overflow: hidden;
   }
   .trusted-by-track {
     width: max-content;
@@ -303,7 +307,6 @@
     justify-content: flex-end;
     gap: 0;
     padding: clamp(20px, 3.6vw, 26px) 0 clamp(18px, 3vw, 24px);
-    overflow: hidden;
   }
   .trusted-by-label {
     display: block;
