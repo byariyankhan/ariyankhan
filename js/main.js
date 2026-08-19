@@ -1135,7 +1135,7 @@ function mountHiddenYouTubePlayer(wrapperEl, videoId, { onFirstPlay } = {}) {
 
   wrapperEl.innerHTML = `
     <div class="ytp-wrap">
-      <div id="${uid}" class="ytp-target"></div>
+      <div class="ytp-target"><div id="${uid}"></div></div>
       <div class="ytp-capture" data-ytp-capture></div>
       <div class="ytp-controls" data-ytp-controls>
         <button type="button" class="ytp-btn" data-ytp-playpause aria-label="Pause">

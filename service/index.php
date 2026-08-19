@@ -166,6 +166,6 @@ $page_description = $page_count > 0
 
     <script src="../js/site-nav.js?v=9"></script>
     <script src="../js/site-footer.js?v=8"></script>
-    <script src="../js/main.js?v=20"></script>
+    <script src="../js/main.js?v=21"></script>
   </body>
 </html>
