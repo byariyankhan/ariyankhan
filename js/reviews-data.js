@@ -118,5 +118,22 @@ window.CURATED_REVIEWS = {
       rating: 5,
       body: 'Had a pretty basic idea for the maps and Ariyan turned it into something much better than I expected tbh. The routes and country highlights matched the narration really well and revisions were quick too. Would definitely work with him again.'
     }
+  ],
+  finance: [
+    {
+      name: 'Dr. Lauren Mitchell — Financial Educator',
+      rating: 5,
+      body: "Ariyan edited a few investing videos for my channel and I was really impressed with how clear everything felt. The charts, numbers and on-screen callouts were timed really well with the narration. Made some pretty dry topics way easier to follow."
+    },
+    {
+      name: 'Ryan Parker — Software Engineer & Investor',
+      rating: 5,
+      body: "I had a lot of charts + screen recordings in the video and honestly thought it might end up looking messy. Ariyan cleaned everything up really well and highlighted the exact numbers I was talking about. Super easy process and revisions were quick too."
+    },
+    {
+      name: 'Jessica Morgan — Finance Content Creator',
+      rating: 5,
+      body: "Really happy with the edits. Ariyan understands that finance videos need to move fast but the viewer still has to actually understand the data lol. The pacing, chart animations and text callouts all felt clean and not overdone. Def working with him again."
+    }
   ]
 };

@@ -218,6 +218,7 @@
     />
     <link rel="stylesheet" href="../css/style.css?v=12" />
     <link rel="stylesheet" href="../css/service.css?v=67" />
+    <link rel="stylesheet" href="../css/review-card.css?v=5" />
     <link rel="stylesheet" href="../css/service-profile.css?v=5" />
   </head>
   <body>
@@ -800,6 +801,34 @@
         <div class="pf-grid" id="pf-grid"></div>
       </div>
 
+      <!-- CLIENT QUOTES -->
+      <div class="service-testimonial">
+        <div class="service-section-header">
+          <div class="tag-pill">Client Reviews</div>
+          <h2 class="section-title">What Clients <span class="yl">Are Saying</span></h2>
+          <p class="section-desc">
+            A 5.0 average from the finance and investing creators I've edited for — real client
+            feedback, not cherry-picked screenshots.
+          </p>
+        </div>
+        <div
+          class="review-card"
+          id="reviewCard"
+          data-curated="finance"
+          data-api="../reviews.php"
+          aria-live="polite"
+          aria-busy="true"
+        >
+          <div class="review-card-face" id="reviewCardFace"></div>
+          <div class="review-card-dots" id="reviewCardDots"></div>
+        </div>
+        <span class="service-testimonial-verify">
+          Recently worked with me?
+          <a href="../review.html">Leave a review &rarr;</a>
+          <small>Every review is checked against project records before it publishes.</small>
+        </span>
+      </div>
+
       <!-- BOTTOM: FAQ -->
       <div class="service-faq">
         <section aria-labelledby="finance-faq-title">
@@ -1123,6 +1152,8 @@
     <script src="../js/service-profile.js?v=7"></script>
     <script src="../js/site-nav.js?v=9"></script>
     <script src="../js/site-footer.js?v=6"></script>
+    <script src="../js/reviews-data.js?v=2"></script>
+    <script src="../js/review-card.js?v=8"></script>
     <script src="../js/main.js?v=19"></script>
     <script>
       initHeroPortfolioSlider();
