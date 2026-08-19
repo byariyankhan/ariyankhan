@@ -1066,14 +1066,18 @@ function stopAllVideos() {
   });
 }
 
-/* ── Embed video inside card thumbnail area ── */
-function embedVideo(card, src, allow) {
+/* ── Embed video inside card thumbnail area ──
+   `sandbox`, when passed, omits allow-popups/allow-top-navigation so the
+   embedded player can't open a new tab or navigate our page away — the
+   native controls, logo and everything else render completely unchanged. ── */
+function embedVideo(card, src, allow, sandbox) {
   const thumb = card.querySelector('.pf-thumb');
   if (!thumb) return;
 
   card._origHTML = thumb.innerHTML;
   thumb.innerHTML = `<iframe class="pf-frame" src="${src}"
     allow="${allow || 'autoplay'}"
+    ${sandbox ? `sandbox="${sandbox}"` : ''}
     allowfullscreen
     ></iframe>`;
   card.classList.add('pf-playing');
@@ -1285,6 +1289,7 @@ function initHeroPortfolioSlider() {
       slider.insertAdjacentHTML('beforeend', `<iframe class="service-profile-frame" src="https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1"
         title="Portfolio video"
         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+        sandbox="allow-scripts allow-same-origin allow-presentation"
         allowfullscreen></iframe>`);
     }
 
@@ -1362,7 +1367,8 @@ function makePfCard(item) {
       embedVideo(
         card,
         `https://www.youtube.com/embed/${item.id}?autoplay=1&rel=0&modestbranding=1`,
-        'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture'
+        'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture',
+        'allow-scripts allow-same-origin allow-presentation'
       );
     });
 
