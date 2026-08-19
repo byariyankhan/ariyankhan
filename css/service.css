@@ -218,6 +218,9 @@
     padding: 0 clamp(32px, 5vw, 72px);
     overflow: hidden;
   }
+  .trusted-by-label {
+    flex-shrink: 0;
+  }
   .trusted-by-track {
     width: max-content;
     flex-shrink: 0;
