@@ -66,6 +66,15 @@ const PORTFOLIO = [
   { service: 'true-crime', platform: 'youtube', id: 'DEa5hfcZyWo'  },
   /* ──────────────────────────────────────────────────────── */
 
+  /* ── FINANCE & INVESTING ─────────────────────────────────── */
+  { service: 'finance', platform: 'youtube', id: 'OFWJVkgz5AY'  },
+  { service: 'finance', platform: 'youtube', id: 'Q0uXGQu55GM'  },
+  { service: 'finance', platform: 'youtube', id: '-C_5hzJCHaY'  },
+  { service: 'finance', platform: 'youtube', id: 'ouvbeb2wSGA'  },
+  { service: 'finance', platform: 'youtube', id: 'QThz1B8SHmc'  },
+  { service: 'finance', platform: 'youtube', id: 'QaJqKWXUs1U'  },
+  /* ──────────────────────────────────────────────────────── */
+
 ];
 
 /* ══ Service meta — update when adding a new portfolio category ══ */
@@ -94,6 +103,11 @@ const SERVICE_META = {
     label: 'True Crime',
     icon:  '🔎',
     page:  'service/video-editor-for-true-crime-youtube-channels.html',
+  },
+  'finance': {
+    label: 'Finance & Investing',
+    icon:  '📈',
+    page:  'service/video-editor-for-finance-and-investing-channels.html',
   },
 };
 
