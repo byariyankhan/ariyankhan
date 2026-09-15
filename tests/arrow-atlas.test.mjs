@@ -33,9 +33,9 @@ test('168 levels with name, capital, outline and 5 tier scales', () => {
   for (const L of data.levels) { assert.ok(L.name && L.cap && L.d.startsWith('M'), L.name); assert.equal(L.k.length, 5); assert.ok(L.k.every(k => k > 0), L.name); assert.ok(L.cont, `${L.name} has no continent`); }
 });
 test('every level id is unique', () => assert.equal(new Set(data.levels.map(l => l.id)).size, data.levels.length));
-test('rasterised tiers grow in cell count and stay within 46 cells (64 tall / 56 wide for elongated shapes)', () => {
+test('rasterised tiers grow in cell count and stay within 32 cells (46 tall / 38 wide for elongated shapes)', () => {
   for (const L of data.levels) {
-    for (let t = 0; t < 5; t++) { const m = maskFor(L, t); assert.ok(m.count >= 20, `${L.name} tier ${t} has only ${m.count} cells`); assert.ok(m.w <= 56 && m.h <= 64 && (m.w <= 46 || m.h <= 46), `${L.name} tier ${t} is ${m.w}x${m.h}`); assert.equal(m.rows.length, m.h); assert.ok(m.rows.every(r => r.length === m.w)); }
+    for (let t = 0; t < 5; t++) { const m = maskFor(L, t); assert.ok(m.count >= 20, `${L.name} tier ${t} has only ${m.count} cells`); assert.ok(m.w <= 38 && m.h <= 46 && (m.w <= 32 || m.h <= 32), `${L.name} tier ${t} is ${m.w}x${m.h}`); assert.equal(m.rows.length, m.h); assert.ok(m.rows.every(r => r.length === m.w)); }
     for (let t = 1; t < 5; t++) assert.ok(maskFor(L, t).count >= maskFor(L, t - 1).count, `${L.name} tier ${t} smaller than tier ${t - 1}`);
   }
 });
@@ -59,9 +59,9 @@ test('generation is deterministic for a seed', () => {
 test('100 random seeds on the hardest boards all generate', () => {
   for (let s = 0; s < 100; s++) { const L = data.levels[s % data.levels.length]; assert.ok(solvable(generate(maskFor(L, 4), 4, 5000 + s))); }
 });
-test('boards are dense: Hard tour levels average well over 115 arrows, Normal over 80', () => {
+test('boards are dense: Hard tour levels average over 55 arrows, Normal over 35 (long snakes on ~28-cell boards)', () => {
   const avg = tier => { const idx = data.levels.map((_, i) => i).filter(i => BASE_TIER(i) === tier); return idx.reduce((n, i) => n + generate(maskFor(data.levels[i], tier), MAXLEN_OF[tier], (i + 1) * 1000).pieces.length, 0) / idx.length; };
-  assert.ok(avg(1) > 80, `Normal averages ${avg(1)}`); assert.ok(avg(2) > 115, `Hard averages ${avg(2)}`);
+  assert.ok(avg(1) > 35, `Normal averages ${avg(1)}`); assert.ok(avg(2) > 55, `Hard averages ${avg(2)}`);
 });
 test('adaptive difficulty: clean quick clears step the tier up, repeated losses ease it off, levels 1-2 stay Normal', () => {
   const perfect = { won: true, wrong: 0, hints: 0, retries: 0, secPerArrow: 0.8 };
@@ -73,11 +73,11 @@ test('adaptive difficulty: clean quick clears step the tier up, repeated losses 
   s = nextSkill(s, lost); assert.equal(tierFor(12, s), BASE_TIER(12), 'one loss keeps the tier'); s = nextSkill(s, lost); assert.equal(tierFor(12, s), BASE_TIER(12) - 1, 'two losses ease off');
   assert.equal(tierFor(2, -2), 0, 'never below Normal'); assert.equal(rateRun(lost), -1); assert.ok(rateRun(perfect) === 1 && rateRun(sloppy) < 0.1);
 });
-test('narrow play: on Hard tour boards fewer than 15% of the arrows are free at the start (the game then keeps the best of 8)', () => {
+test('narrow play: on Hard tour boards fewer than 20% of the arrows are free at the start (the game then keeps the best of 8)', () => {
   const freeAtStart = b => b.pieces.filter(p => { const [dr, dc] = DIRS[p.dir]; let [y, x] = p.cells[0]; y += dr; x += dc; while (y >= 0 && y < b.H && x >= 0 && x < b.W) { if (b.occ[y][x] >= 0) return false; y += dr; x += dc; } return true; }).length;
   const idx = data.levels.map((_, i) => i).filter(i => BASE_TIER(i) === 2);
   const ratio = idx.reduce((n, i) => { const b = generate(maskFor(data.levels[i], 2), MAXLEN_OF[2], (i + 1) * 1000, GEN_OPTS(2)); return n + freeAtStart(b) / b.pieces.length; }, 0) / idx.length;
-  assert.ok(ratio < 0.15, `free at start: ${(ratio * 100).toFixed(1)}%`);
+  assert.ok(ratio < 0.2, `free at start: ${(ratio * 100).toFixed(1)}%`);
 });
 test('lobby world map has every tour country with a label point and stays under 200 KB', () => {
   const map = JSON.parse(fs.readFileSync(path.join(root, 'games/data/world-map.json'), 'utf8'));

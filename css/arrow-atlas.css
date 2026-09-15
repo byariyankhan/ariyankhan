@@ -120,26 +120,34 @@ button{ font-family:inherit; }
 .aa-guides circle{ fill:var(--line); fill-opacity:.32; }
 .aa-piece{ cursor:pointer; outline:none; }
 .aa-piece .aa-hit{ fill:transparent; }
-.aa-piece .aa-track{ fill:none; stroke:var(--line); stroke-width:.12; stroke-linecap:round; stroke-linejoin:round; pointer-events:none; }
-.aa-piece .aa-head{ fill:var(--line); stroke:var(--line); stroke-width:.06; stroke-linejoin:round; pointer-events:none; transform-box:view-box; }
-.aa-piece:hover .aa-track, .aa-piece:focus-visible .aa-track{ stroke:var(--accent); stroke-width:.17; }
+.aa-piece .aa-track{ fill:none; stroke:var(--line); stroke-width:.2; stroke-linecap:round; stroke-linejoin:round; pointer-events:none; }
+.aa-piece .aa-head{ fill:var(--line); stroke:var(--line); stroke-width:.08; stroke-linejoin:round; pointer-events:none; transform-box:view-box; }
+.aa-piece.is-pressed .aa-track{ stroke-width:.26; }
+.aa-piece.is-pressed .aa-head{ stroke-width:.14; }
+/* a shot arrow lights up with the board gradient and leaves sparks behind */
+.aa-piece.is-going .aa-track{ stroke:url(#aaGrad); stroke-width:.24; }
+.aa-piece.is-going .aa-head{ fill:url(#aaGrad); stroke:none; }
+.aa-grad-1{ stop-color:var(--accent); } .aa-grad-2{ stop-color:var(--accent2); } .aa-grad-3{ stop-color:var(--good); }
+.aa-sparks circle{ pointer-events:none; }
+.aa-spark--0{ fill:var(--accent); } .aa-spark--1{ fill:var(--accent2); } .aa-spark--2{ fill:var(--good); }
+.aa-piece:hover .aa-track, .aa-piece:focus-visible .aa-track{ stroke:var(--accent); stroke-width:.24; }
 .aa-piece:hover .aa-head, .aa-piece:focus-visible .aa-head{ fill:var(--accent); stroke:var(--accent); }
 .aa-piece.is-going{ pointer-events:none; }
 /* armed: a blocked arrow stays red until its lane clears, then goes by itself */
 .aa-piece.is-armed .aa-track{ stroke:var(--bad); }
 .aa-piece.is-armed .aa-head{ fill:var(--bad); stroke:var(--bad); }
 /* press and hold: the lane it would travel, green if clear, red if not */
-.aa-piece.is-peek-free .aa-track{ stroke:var(--good); stroke-width:.17; }
+.aa-piece.is-peek-free .aa-track{ stroke:var(--good); stroke-width:.24; }
 .aa-piece.is-peek-free .aa-head{ fill:var(--good); stroke:var(--good); }
-.aa-piece.is-peek-blocked .aa-track{ stroke:var(--bad); stroke-width:.17; }
+.aa-piece.is-peek-blocked .aa-track{ stroke:var(--bad); stroke-width:.24; }
 .aa-piece.is-peek-blocked .aa-head{ fill:var(--bad); stroke:var(--bad); }
-.aa-lanes line{ stroke-width:.14; stroke-linecap:round; pointer-events:none; opacity:.4; }
+.aa-lanes line{ stroke-width:.18; stroke-linecap:round; pointer-events:none; opacity:.4; }
 .aa-lane--free{ stroke:var(--good); }
 .aa-lane--blocked, .aa-lane--armed{ stroke:var(--bad); }
 .aa-lane--peek{ animation:aa-glow .6s ease-in-out infinite alternate; }
-.aa-piece.is-blocker .aa-track{ stroke:var(--bad) !important; stroke-width:.2; }
+.aa-piece.is-blocker .aa-track{ stroke:var(--bad) !important; stroke-width:.26; }
 .aa-piece.is-blocker .aa-head{ fill:var(--bad) !important; stroke:var(--bad) !important; }
-.aa-piece.is-hint .aa-track{ stroke:var(--accent) !important; stroke-width:.22; animation:aa-glow .5s ease-in-out infinite alternate; }
+.aa-piece.is-hint .aa-track{ stroke:var(--accent) !important; stroke-width:.28; animation:aa-glow .5s ease-in-out infinite alternate; }
 .aa-piece.is-hint .aa-head{ fill:var(--accent) !important; stroke:var(--accent) !important; }
 .aa-piece.is-shake .aa-track, .aa-piece.is-shake .aa-head{ animation:aa-shake .3s; }
 @keyframes aa-shake{ 0%,100%{ opacity:1; } 30%,70%{ opacity:.25; } }

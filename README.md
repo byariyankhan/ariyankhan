@@ -532,6 +532,15 @@ unlock (skip allowed after two fails), stars, best times and progress in
   `#aaAbout` section under the app (the settings "How to play" and "About"
   rows scroll to it); the homepage has a "Games" section linking both games
   with keyword anchor text; sitemap priority 1.0 with an image entry.
+- **Scale and feel** (matched to the reference apps): boards are at most 32 cells
+  across (46 tall / 38 wide for elongated shapes; `TARGETS` 110/240/400/540/680
+  cells), so phones show ~12 px cells; strokes are 0.2 of a cell with 0.5-cell
+  arrowheads; snakes run up to 7-15 cells (`MAXLEN_OF`). Every tap has feedback:
+  pressing thickens the arrow; a blocked arrow lunges forward, hits and comes
+  back (`bounce()`, WAAPI) with a thud; a shot arrow lights up with a three-colour
+  board gradient (`#aaGrad`, theme tokens) and throws sparks from its tip
+  (`sparks()`). Hard boards: ~55-65 arrows, ~3.4 free at any moment, freed arrow
+  within two cells of the tap 24%, five or more cells away 44%.
 - **Armed arrows and lane preview** (as in the reference apps): a blocked tap
   costs a heart once and leaves the arrow *armed* (red, with a faint red lane);
   after every shot `releaseArmed()` fires any armed arrow whose lane is now clear

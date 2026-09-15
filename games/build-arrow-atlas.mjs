@@ -19,9 +19,9 @@ const js = fs.readFileSync(new URL('../js/arrow-atlas.js', import.meta.url), 'ut
 const grab = re => { const m = js.match(re); if (!m) throw new Error('could not find ' + re); return m[0]; };
 const { rasterise, REF } = new Function([grab(/const REF = \d+;/), grab(/function parsePath\(d\) \{[\s\S]*?\n  \}\n/), grab(/function insidePath\([\s\S]*?\n  \}\n/), grab(/function rasterise\([\s\S]*?\n  \}\n/)].join('\n') + '\nreturn { rasterise, REF };')();
 
-const TARGETS = [160, 450, 780, 1050, 1300]; // land cells per difficulty tier (long snakes need more cells for the same arrow count)
-const MAX_DIM = 46;                        // widest/tallest board in cells for roundish countries
-const MAX_TALL = 64, MAX_WIDE = 56;        // long side for tall (Chile, Norway) and wide (Cuba, Malaysia) shapes; phones are tall, so tall boards get more room
+const TARGETS = [110, 240, 400, 540, 680]; // land cells per difficulty tier: boards ~28 cells across, like the reference apps (thick lines, long snakes)
+const MAX_DIM = 32;                        // widest/tallest board in cells for roundish countries (phones show ~12 px cells)
+const MAX_TALL = 46, MAX_WIDE = 38;        // long side for tall (Chile, Norway) and wide (Cuba, Malaysia) shapes
 
 // World Tour order: the original 70 (recognisable shapes first, then by area), then every other country by population.
 const TOUR = [
