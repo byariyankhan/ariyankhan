@@ -504,6 +504,14 @@ unlock (skip allowed after two fails), stars, best times and progress in
   (plain most-constrained generation) to ~5-7%, free at any moment from ~12% to
   ~4%; 1,050 boards: 0 failures, 0 unsolvable, ~7 ms (Normal) to ~250 ms (Master).
   `scratchpad/aa-free.mjs`-style profiling: count free pieces along a random solve.
+- **Lobby world map**: `games/data/world-map.json` (built by
+  `games/build-world-map.mjs` from world-atlas 110m, Natural Earth projection,
+  1000×520, Antarctica dropped, label point = centroid of the main landmass) is
+  drawn on the home screen by `renderWorld()`: every country faint, the 70 tour
+  countries outlined and tappable (opens that level), cleared ones filled green
+  and numbered with their level, the next level pulsing purple. Versioned with
+  `MAP_VERSION`. There is no Restart button in the game any more (back out or
+  fail and retry).
 - **First open / launch**: `#aaGate` (welcome, Terms + Privacy links, Accept,
   stored in `aa:v1:welcomed`), then `#aaSplash` (logo + one line from `QUOTES`,
   rotating per launch in `aa:v1:launches`, tap or 2.4 s to dismiss, skipped for

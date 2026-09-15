@@ -75,6 +75,14 @@ test('narrow play: on Hard tour boards fewer than 10% of the arrows are free at 
   const ratio = idx.reduce((n, i) => { const b = generate(data.levels[i].tiers[2], MAXLEN_OF[2], (i + 1) * 1000, GEN_OPTS(2)); return n + freeAtStart(b) / b.pieces.length; }, 0) / idx.length;
   assert.ok(ratio < 0.10, `free at start: ${(ratio * 100).toFixed(1)}%`);
 });
+test('lobby world map has every tour country with a label point and stays under 200 KB', () => {
+  const map = JSON.parse(fs.readFileSync(path.join(root, 'games/data/world-map.json'), 'utf8'));
+  assert.ok(map.countries.length > 150); const ids = new Set(map.countries.map(c => c.id));
+  for (const L of data.levels) assert.ok(ids.has(L.id), `${L.name} missing from the world map`);
+  for (const c of map.countries) assert.ok(c.d.startsWith('M') && c.cx >= 0 && c.cx <= map.w && c.cy >= 0 && c.cy <= map.h, c.n);
+  assert.ok(fs.statSync(path.join(root, 'games/data/world-map.json')).size < 200 * 1024);
+  assert.ok(html.includes('id="aaWorldMap"'));
+});
 test('data file stays under 600 KB', () => assert.ok(fs.statSync(path.join(root, 'games/data/arrow-atlas.json')).size < 600 * 1024));
 test('page copy quotes 70 levels and keeps the no-inline-style rule', () => { assert.ok(html.includes('70 countries')); assert.ok(!/<[a-z][^>]*\sstyle="/i.test(html)); });
 console.log(process.exitCode ? `\nsome of ${tests} tests failed` : `\nall ${tests} tests passed`);

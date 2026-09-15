@@ -15,6 +15,7 @@
   const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
   const SVG_NS = 'http://www.w3.org/2000/svg';
   const DATA_VERSION = '4';
+  const MAP_VERSION = '1';
   const STORE = 'aa:v1:';
   const store = {
     get(k, fb) { try { const v = localStorage.getItem(STORE + k); return v == null ? fb : JSON.parse(v); } catch { return fb; } },
@@ -63,10 +64,11 @@
     sheet: $('#aaSheet'), levelsSheet: $('#aaLevelsSheet'), levelsBtn: $('#aaLevelsBtn'), settingsBtns: $$('#aaSettings, #aaSettingsG'), themeBtn: $('#aaTheme'), themes: $('#aaThemes'),
     game: $('#aaGame'), boardWrap: $('#aaBoardWrap'), board: $('#aaBoard'), toast: $('#aaToast'), confetti: $('#aaConfetti'),
     hudLevel: $('#aaHudLevel'), hudMode: $('#aaHudMode'), hudTime: $('#aaHudTime'), hudLeft: $('#aaHudLeft'), hudLives: $('#aaHudLives'), hudLivesWrap: $('#aaHudLivesWrap'), hudPct: $('#aaHudPct'), boardBar: $('#aaBoardBar'),
-    btnHint: $('#aaHint'), btnRestart: $('#aaRestart'), btnLevels: $('#aaBackToLevels'), btnSound: $('#aaSound'),
+    btnHint: $('#aaHint'), btnLevels: $('#aaBackToLevels'), btnSound: $('#aaSound'),
     overlay: $('#aaOverlay'), card: $('#aaCard'),
     loading: $('#aaLoading'), error: $('#aaError'),
     gate: $('#aaGate'), accept: $('#aaAccept'), splash: $('#aaSplash'), splashQuote: $('#aaSplashQuote'),
+    worldMap: $('#aaWorldMap'), worldCap: $('#aaWorldCap'),
   };
   if (!el.board) return;
 
@@ -172,9 +174,51 @@
     return DATA;
   }
 
+  // ── Lobby world map ──
+  // Every country faint; the 70 tour countries outlined; cleared ones filled and numbered with their level;
+  // the next level pulsing. Tap a country to play its level. Built by games/build-world-map.mjs.
+  let MAP = null, mapPromise = null, mapDrawn = false;
+  function loadMap() {
+    if (!mapPromise) mapPromise = fetch(`games/data/world-map.json?v=${MAP_VERSION}`, { cache: 'force-cache' }).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }).then(m => { MAP = m; return m; });
+    return mapPromise;
+  }
+  function renderWorld() {
+    if (!el.worldMap || !DATA) return;
+    if (!MAP) { loadMap().then(renderWorld).catch(() => { el.worldMap.hidden = true; }); return; }
+    const land = el.worldMap.querySelector('.aa-world-land'), labels = el.worldMap.querySelector('.aa-world-labels');
+    const byId = new Map(DATA.levels.map((L, i) => [L.id, i]));
+    if (!mapDrawn) {
+      mapDrawn = true;
+      for (const c of MAP.countries) {
+        const p = svgEl('path', { d: c.d, 'data-id': c.id });
+        const i = byId.get(c.id);
+        if (i != null) { p.classList.add('is-tour'); p.setAttribute('tabindex', '0'); p.setAttribute('role', 'button'); p.addEventListener('click', () => { if (unlocked(i)) startLevel(i); else toast(`Level ${i + 1} is locked. Clear the levels before it first.`, 'bad'); }); p.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); p.click(); } }); }
+        land.appendChild(p);
+      }
+    }
+    labels.innerHTML = '';
+    const n = DATA.levels.length, done = DATA.levels.filter((_, i) => cleared(i)).length;
+    const nextIdx = DATA.levels.findIndex((_, j) => !cleared(j) && unlocked(j));
+    for (const c of MAP.countries) {
+      const i = byId.get(c.id); if (i == null) continue;
+      const p = land.querySelector(`path[data-id="${c.id}"]`);
+      const rec = cleared(i), isNext = i === nextIdx, open = unlocked(i);
+      p.classList.toggle('is-done', !!rec); p.classList.toggle('is-next', isNext); p.classList.toggle('is-locked', !open);
+      p.setAttribute('aria-label', rec ? `Level ${i + 1}, ${DATA.levels[i].name}, cleared, replay` : isNext ? `Level ${i + 1}, next, play` : open ? `Level ${i + 1}, play` : `Level ${i + 1}, locked`);
+      if (rec || isNext) {
+        const g = svgEl('g', { class: isNext ? 'is-next' : '' });
+        g.appendChild(svgEl('circle', { cx: c.cx, cy: c.cy, r: 16 }));
+        const t = svgEl('text', { x: c.cx, y: c.cy }); t.textContent = String(i + 1); g.appendChild(t);
+        labels.appendChild(g);
+      }
+    }
+    el.worldCap.textContent = done ? `${done} of ${n} countries collected · tap a country to play it` : 'Your world tour starts here · tap the highlighted country';
+  }
+
   // ── Level select ──
   function renderSelect() {
     if (!DATA) return;
+    renderWorld();
     const n = DATA.levels.length;
     const done = DATA.levels.filter((_, i) => cleared(i)).length;
     const learned = DATA.levels.filter((_, i) => cleared(i)?.quiz).length;
@@ -742,7 +786,6 @@
 
   // ── Wiring ──
   el.btnHint.addEventListener('click', hint);
-  el.btnRestart.addEventListener('click', () => startLevel(state.idx, false, state.daily));
   el.play.addEventListener('click', () => startLevel(+el.play.dataset.level || 0));
   // Sheets
   const openSheet = sh => { sh.hidden = false; document.body.style.overflow = 'hidden'; };
