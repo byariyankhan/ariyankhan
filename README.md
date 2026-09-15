@@ -471,8 +471,12 @@ offline; it starts on the first tap and stops when the tab is hidden. This is th
 same shell we will wrap for Android/iOS (TWA / Capacitor). Each level is a
 country's outline filled with arrows; tap an arrow to shoot it off the board if its
 run to the edge is clear, a blocked tap costs one of 4 hearts, no clock (time is still recorded for the result card), 4 hearts and 3 hints per
-level, difficulty that ramps automatically (Normal/Hard/Super Hard/Expert by tier,
-plus a Hard spike every 5th level via `SPIKE`/`TIER_OF`/`LEVEL_DIFF`), combo
+level, adaptive difficulty (Normal/Hard/Expert/Master by tier; the tour's
+`BASE_TIER` is shifted one tier up or down by a skill score in `aa:v1:skill`
+that `nextSkill`/`rateRun` update after every board from hearts lost, wrong taps,
+hints, retries and seconds per arrow — two clean quick clears step up, repeated
+losses ease off; `tierFor`/`TIER_OF`/`LEVEL_DIFF`; Try again keeps the same
+board, New layout takes the adapted tier; the result card says why), combo
 counter (taps within 1.5 s), win streak, milestones every 10 levels, a Today's Country
 bonus board (date-seeded, same for everyone, `#daily`), and clearing the board reveals the country for a
 3-option quiz plus capital/population/region. 70-level World Tour with sequential
@@ -496,12 +500,14 @@ unlock (skip allowed after two fails), stars, best times and progress in
   shot with a stroke-dashoffset transition so it flows out along its own track. Dead
   cells are absorbed into a neighbouring piece (head moves forward, or tail extends,
   with the removal-order invariant re-checked, re-ordering the piece to newest when
-  its line is clear); if that fails the seed is bumped and it retries. 1,400 boards
-  in tests: 0 failures, 0 unsolvable, ~12 ms each.
+  its line is clear); if that fails the seed is bumped and it retries. 1,050 boards
+  in tests: 0 failures, 0 unsolvable, ~4 ms (Normal) to ~230 ms (Master) each.
 - **Data**: `games/data/arrow-atlas.json` built by `games/build-arrow-atlas.mjs`
   from world-atlas 110m + Natural Earth 50m properties: per country the outline
   (`d`, in a 100×100 box) and five `tiers` of grid masks sized by land-cell count
-  (100/200/350/550/800 cells, ≤40 cells across). `TOUR` and `CAPITALS` in the build
+  (140/380/620/880/1150 cells — about 40/100/145/180/250 arrows — at most 46
+  cells across, 64 tall for tall shapes and 56 wide for wide ones; elongated
+  countries such as Chile or Cuba cap out smaller). `TOUR` and `CAPITALS` in the build
   script define the level order and quiz facts. Versioned with `?v=` +
   `DATA_VERSION`; served immutable by `games/data/.htaccess`.
 - **Adding countries**: append to `TOUR` and `CAPITALS`, rebuild, bump
