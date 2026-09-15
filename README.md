@@ -457,8 +457,10 @@ text, `#level-mode` deep links (`#africa-hard`). English only, continuous play
 `arrow-atlas.html` is the second game: the casual, addictive one. Each level is a
 country's outline filled with arrows; tap an arrow to shoot it off the board if its
 run to the edge is clear, a blocked tap costs one of 4 hearts, Classic (count-up) or
-Rush (90 s countdown) timer, Deep Focus (no clock, no hearts, unlimited hints; 3 hints
-per level otherwise), and clearing the board reveals the country for a
+Rush (90 s countdown) timer, One Life (1 heart), Deep Focus (no clock, no hearts, unlimited hints; 3 hints
+per level otherwise), difficulty labels Normal/Hard/Super Hard/Expert by tier, combo
+counter (taps within 1.5 s), win streak, milestones every 10 levels, a Today's Country
+bonus board (date-seeded, same for everyone, `#daily`), and clearing the board reveals the country for a
 3-option quiz plus capital/population/region. 70-level World Tour with sequential
 unlock (skip allowed after two fails), stars, best times and progress in
 `localStorage` (`aa:v1:*`), share text, `#level-N` deep links.
