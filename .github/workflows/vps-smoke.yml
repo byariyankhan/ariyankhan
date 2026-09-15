@@ -1,0 +1,51 @@
+# Manual smoke test: hits the VPS directly (by IP + Host header) so a deploy
+# can be verified before DNS is pointed at it. Fails if the site does not
+# answer 200 through the host nginx -> ariyankhan-web container path.
+name: VPS smoke test
+
+on:
+  workflow_dispatch:
+    inputs:
+      host_ip:
+        description: "VPS IPv4 to test"
+        required: true
+        default: "187.52.122.99"
+      domain:
+        description: "Host header to send"
+        required: true
+        default: "ariyankhan.com"
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Probe VPS
+        env:
+          IP: ${{ inputs.host_ip }}
+          DOMAIN: ${{ inputs.domain }}
+        run: |
+          set -u
+          fail=0
+          check() { # label, expected_code, url, extra curl args...
+            local label="$1" want="$2" url="$3"; shift 3
+            local code
+            code=$(curl -sS -m 20 -o /tmp/body -w "%{http_code}" -H "Host: $DOMAIN" "$@" "$url" || echo "000")
+            local redir; redir=$(curl -sS -m 20 -o /dev/null -w "%{redirect_url}" -H "Host: $DOMAIN" "$@" "$url" || true)
+            if [ "$code" = "$want" ]; then echo "PASS  $label -> $code ${redir:+(-> $redir)}"; else echo "FAIL  $label -> $code (want $want) ${redir:+(-> $redir)}"; head -c 300 /tmp/body; echo; fail=1; fi
+          }
+          echo "== response headers"
+          curl -sS -m 20 -I -H "Host: $DOMAIN" -H "X-Forwarded-Proto: https" "http://$IP/" | grep -iE "^(HTTP|server|content-security|strict-transport|x-frame)" || true
+          echo "== checks"
+          check "plain http -> https redirect"      301 "http://$IP/"
+          check "home (forwarded https)"            200 "http://$IP/"                          -H "X-Forwarded-Proto: https"
+          check "ai-metadata-remover page"          200 "http://$IP/ai-metadata-remover.html"  -H "X-Forwarded-Proto: https"
+          check "static js"                         200 "http://$IP/js/ai-metadata-remover.js" -H "X-Forwarded-Proto: https"
+          check "php + sqlite (reviews.php)"        200 "http://$IP/reviews.php"               -H "X-Forwarded-Proto: https"
+          check "php tracker lookup (bad code=404)" 404 "http://$IP/track-lookup.php?code=TEST-0000" -H "X-Forwarded-Proto: https"
+          check "missing page -> 404"               404 "http://$IP/nope-123.html"             -H "X-Forwarded-Proto: https"
+          check "/deploy hidden -> 404"             404 "http://$IP/deploy/docker-compose.yml" -H "X-Forwarded-Proto: https"
+          echo "== www redirect"
+          curl -sS -m 20 -o /dev/null -w "www -> %{http_code} %{redirect_url}\n" -H "Host: www.$DOMAIN" -H "X-Forwarded-Proto: https" "http://$IP/" || true
+          echo "== title"
+          curl -sS -m 20 -H "Host: $DOMAIN" -H "X-Forwarded-Proto: https" "http://$IP/" | grep -o "<title>[^<]*</title>" | head -1 || true
+          exit $fail
