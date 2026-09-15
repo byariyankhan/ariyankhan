@@ -14,7 +14,7 @@
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
   const SVG_NS = 'http://www.w3.org/2000/svg';
-  const DATA_VERSION = '6';
+  const DATA_VERSION = '7';
   const MAP_VERSION = '1';
   const STORE = 'aa:v1:';
   const store = {
@@ -48,7 +48,7 @@
   const nextSkill = (skill, run) => Math.max(-2, Math.min(2, skill * SKILL_KEEP + rateRun(run) * SKILL_GAIN));
   const TIER_OF = i => tierFor(i, store.get('skill', 0));
   const LEVEL_DIFF = (i, tier = TIER_OF(i)) => tier <= 1 && tier > BASE_TIER(i) ? 'Hard' : DIFF_OF(tier);
-  const MAXLEN_OF = [5, 7, 9, 11, 13];   // longest body per tier: long snakes free arrows far from where the player tapped
+  const MAXLEN_OF = [7, 9, 11, 13, 15];  // longest body per tier: long snakes, as on the reference boards, free arrows far from where the player tapped
   // How narrow the play is per tier (see generate()): narrow = prefer the end whose run holds more pieces (blocked
   // longer), far = prefer the end with a gap right ahead (the arrow it frees when it goes is that far away), rail =
   // straighter, longer snakes, holes/lane = share and length of the lanes carved out first.
@@ -154,7 +154,7 @@
     music.on = false; clearTimeout(music.timer);
     try { const t = music.ctx.currentTime; music.master.gain.setValueAtTime(music.master.gain.value, t); music.master.gain.exponentialRampToValueAtTime(0.0001, t + 1.5); setTimeout(() => { try { music.master.disconnect(); music.lfo.stop(); } catch { /* ignore */ } }, 1700); } catch { /* ignore */ }
   }
-  const SFX = { shoot: () => beep([[880, 0, 0.07], [1320, 0.04, 0.08]]), block: () => beep([[150, 0, 0.18, 'square', 0.04]]), win: () => beep([[523, 0, 0.12], [659, 0.1, 0.12], [784, 0.2, 0.12], [1047, 0.3, 0.35]]), lose: () => beep([[300, 0, 0.2, 'triangle'], [220, 0.2, 0.35, 'triangle']]) };
+  const SFX = { shoot: () => beep([[880, 0, 0.07], [1320, 0.04, 0.08]]), block: () => beep([[220, 0, 0.06, 'square', 0.05], [110, 0.05, 0.22, 'triangle', 0.06]]), win: () => beep([[523, 0, 0.12], [659, 0.1, 0.12], [784, 0.2, 0.12], [1047, 0.3, 0.35]]), lose: () => beep([[300, 0, 0.2, 'triangle'], [220, 0.2, 0.35, 'triangle']]) };
   function vibe(ms) { if (state.vibe && navigator.vibrate) { try { navigator.vibrate(ms); } catch { /* ignore */ } } }
   function renderToggles() {
     el.btnMusic?.setAttribute('aria-checked', String(state.music));
@@ -520,6 +520,11 @@
     const svg = el.board;
     svg.innerHTML = '';
     svg.setAttribute('viewBox', `-0.6 -0.6 ${W + 1.2} ${H + 1.2}`);
+    // a three-colour gradient across the board that a shooting arrow lights up with
+    const defs = svgEl('defs');
+    const grad = svgEl('linearGradient', { id: 'aaGrad', gradientUnits: 'userSpaceOnUse', x1: 0, y1: 0, x2: W, y2: H });
+    grad.appendChild(svgEl('stop', { offset: '0', class: 'aa-grad-1' })); grad.appendChild(svgEl('stop', { offset: '0.5', class: 'aa-grad-2' })); grad.appendChild(svgEl('stop', { offset: '1', class: 'aa-grad-3' }));
+    defs.appendChild(grad); svg.appendChild(defs);
     svg.classList.toggle('aa-board--tall', H > W * 1.25);
     const t = state.maskInfo;
     const outline = svgEl('path', { d: state.level.d, class: 'aa-outline', transform: `translate(${-t.x} ${-t.y}) scale(${t.k})` });
@@ -546,15 +551,16 @@
       track.style.strokeDashoffset = '0';
       g.appendChild(track);
       const headG = svgEl('g', { class: 'aa-head-g', transform: `translate(${tipX} ${tipY}) rotate(${ARROW[p.dir]})` });
-      headG.appendChild(svgEl('path', { d: 'M-0.26 -0.22 L0.08 0 L-0.26 0.22 Z', class: 'aa-head' }));
+      headG.appendChild(svgEl('path', { d: 'M-0.36 -0.3 L0.14 0 L-0.36 0.3 Z', class: 'aa-head' }));
       g.appendChild(headG);
       p.bodyLen = bodyLen; p.exitLen = exitLen;
       // a tap shoots (or fails); pressing and holding shows the arrow's lane instead: green if it can go, red if not
       let holdTimer = 0, held = false, down = null;
-      g.addEventListener('pointerdown', e => { if (e.pointerType === 'mouse' && e.button !== 0) return; held = false; down = [e.clientX, e.clientY]; clearTimeout(holdTimer); holdTimer = setTimeout(() => { held = true; peek(p); }, HOLD_MS); });
+      g.addEventListener('pointerdown', e => { if (e.pointerType === 'mouse' && e.button !== 0) return; held = false; down = [e.clientX, e.clientY]; g.classList.add('is-pressed'); clearTimeout(holdTimer); holdTimer = setTimeout(() => { held = true; peek(p); }, HOLD_MS); });
       g.addEventListener('pointermove', e => { if (down && Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 12) { clearTimeout(holdTimer); down = null; } });
-      g.addEventListener('pointerup', () => { clearTimeout(holdTimer); if (!down) return; down = null; if (held) { held = false; return; } tapPiece(p); });
-      g.addEventListener('pointercancel', () => { clearTimeout(holdTimer); down = null; });
+      g.addEventListener('pointerup', () => { clearTimeout(holdTimer); g.classList.remove('is-pressed'); if (!down) return; down = null; if (held) { held = false; return; } tapPiece(p); });
+      g.addEventListener('pointercancel', () => { clearTimeout(holdTimer); g.classList.remove('is-pressed'); down = null; });
+      g.addEventListener('pointerleave', () => g.classList.remove('is-pressed'));
       g.addEventListener('contextmenu', e => e.preventDefault());
       g.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); tapPiece(p); } else if (e.key === 'l' || e.key === 'L') { e.preventDefault(); peek(p); } });
       p.el = g;
@@ -562,6 +568,7 @@
     }
     svg.appendChild(piecesG);
     state.lanesEl = svgEl('g', { class: 'aa-lanes' }); svg.appendChild(state.lanesEl);
+    state.sparksEl = svgEl('g', { class: 'aa-sparks' }); svg.appendChild(state.sparksEl);
     updateReveal();
   }
   function updateReveal() {
@@ -637,6 +644,24 @@
     return null;
   }
   const HOLD_MS = 260;
+  // A blocked arrow lunges forward, hits, and comes back.
+  function bounce(p) {
+    const [dr, dc] = DIRS[p.dir]; const gap = Math.max(0.2, Math.min(0.55, (laneCells(p) + 0.35)));
+    p.el.animate([{ transform: 'translate(0,0)' }, { transform: `translate(${dc * gap}px, ${dr * gap}px)`, offset: 0.4 }, { transform: `translate(${-dc * 0.08}px, ${-dr * 0.08}px)`, offset: 0.75 }, { transform: 'translate(0,0)' }], { duration: 320, easing: 'cubic-bezier(.3,.9,.4,1)' });
+  }
+  function laneCells(p) { const [dr, dc] = DIRS[p.dir]; let [y, x] = p.cells[0]; y += dr; x += dc; let n = 0; while (y >= 0 && y < state.H && x >= 0 && x < state.W && state.occ[y][x] < 0) { y += dr; x += dc; n++; } return n; }
+  // A little burst of sparks from the tip as an arrow leaves.
+  function sparks(p, dur) {
+    if (!state.sparksEl || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const [dr, dc] = DIRS[p.dir]; const [hy, hx] = p.cells[0]; const x0 = hx + 0.5 + dc * 0.5, y0 = hy + 0.5 + dr * 0.5;
+    for (let k = 0; k < 7; k++) {
+      const c = svgEl('circle', { cx: x0, cy: y0, r: 0.07 + Math.random() * 0.08, class: 'aa-spark aa-spark--' + (k % 3) });
+      state.sparksEl.appendChild(c);
+      const spread = (Math.random() - 0.5) * 1.6, along = 0.6 + Math.random() * 1.4;
+      const dx = dc * along + (dr ? spread : 0), dy = dr * along + (dc ? spread : 0);
+      c.animate([{ transform: 'translate(0,0)', opacity: 1 }, { transform: `translate(${dx}px, ${dy}px)`, opacity: 0 }], { duration: 380 + Math.random() * 220, easing: 'cubic-bezier(.2,.8,.4,1)' }).onfinish = () => c.remove();
+    }
+  }
   // The lane an arrow would travel: from its tip to the board edge, or to the arrow in its way.
   function laneLine(p, cls) {
     const [dr, dc] = DIRS[p.dir]; const [hy, hx] = p.cells[0];
@@ -690,6 +715,7 @@
     const dur = Math.min(0.7, 0.15 + travel * 0.03);
     const track = p.el.querySelector('.aa-track'), head = p.el.querySelector('.aa-head');
     p.el.classList.add('is-going');
+    sparks(p, dur);
     track.style.transition = `stroke-dashoffset ${dur}s cubic-bezier(.45,0,1,1)`;
     track.style.strokeDashoffset = String(-travel);
     head.style.transition = `transform ${dur * (p.exitLen / travel)}s cubic-bezier(.45,0,1,1), opacity .15s ${dur * (p.exitLen / travel)}s`;
@@ -708,14 +734,13 @@
     else if (state.combo >= 3) toast(`Combo x${state.combo}!`, 'combo');
   }
   function blocked(p, blocker) {
-    if (state.armed.has(p)) { p.el.classList.remove('is-shake'); void p.el.getBBox(); p.el.classList.add('is-shake'); setTimeout(() => p.el.classList.remove('is-shake'), 400); toast('Still blocked. It will go by itself once its lane clears.', 'hint'); return; }
+    if (state.armed.has(p)) { bounce(p); SFX.block(); toast('Still blocked. It will go by itself once its lane clears.', 'hint'); return; }
     state.lives--; state.wrong++;
     arm(p);
     SFX.block(); vibe(60);
-    p.el.classList.remove('is-shake'); void p.el.getBBox(); p.el.classList.add('is-shake');
+    bounce(p);
     blocker.el.classList.add('is-blocker');
     setTimeout(() => blocker.el.classList.remove('is-blocker'), 600);
-    setTimeout(() => p.el.classList.remove('is-shake'), 400);
     renderHud();
     if (state.lives <= 0) failLevel('Out of hearts.');
     else toast(state.lives === 1 ? 'Blocked! Last heart. It stays red and goes by itself once its lane clears.' : 'Blocked! It stays red and goes by itself once its lane clears.', 'bad');
