@@ -216,19 +216,7 @@
       }
     }
     el.worldCap.textContent = done ? `${done} of ${n} countries collected · tap a country to play it` : 'Your world tour starts here · tap the highlighted country';
-    // The map takes the height left over in the lobby; on tall phones that makes it wider than the screen, so it
-    // scrolls sideways, opened on the next level. (Percent heights do not resolve inside an indefinite flex column,
-    // so the height is set here from the scroll box and kept in step on resize.)
-    const next = nextIdx >= 0 ? MAP.countries.find(c => c.id === DATA.levels[nextIdx].id) : null;
-    const fit = () => {
-      if (!el.worldScroll) return;
-      const h = el.worldScroll.clientHeight; if (h > 0) el.worldMap.style.height = `${h}px`;
-      const sw = el.worldMap.getBoundingClientRect().width, cw = el.worldScroll.clientWidth;
-      el.worldCap.classList.toggle('is-wide', sw > cw + 2);
-      if (next && sw > cw + 2) el.worldScroll.scrollLeft = Math.max(0, (next.cx / MAP.w) * sw - cw / 2);
-    };
-    requestAnimationFrame(fit);
-    if (!state.worldFit && 'ResizeObserver' in window) { state.worldFit = new ResizeObserver(() => requestAnimationFrame(fit)); state.worldFit.observe(el.worldScroll); }
+
   }
 
   // ── Level select ──
