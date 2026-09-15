@@ -111,7 +111,7 @@ directories unreachable over the web.
 | `games/data/*.json`, `games/build-data.mjs` | Level data (piece paths per continent) and the script that builds it from Natural Earth |
 | `games/piece-the-world.webmanifest`, `piece-the-world-sw.js` | PWA manifest + service worker for both games (offline levels, installable) |
 | `arrow-atlas.html`, `js/arrow-atlas.js`, `css/arrow-atlas.css` | Tap-away arrow puzzle game on country maps — see "Arrow Atlas" section below |
-| `games/data/arrow-atlas.json`, `games/build-arrow-atlas.mjs`, `games/arrow-atlas.webmanifest` | Its level data (grid masks + outlines for 70 countries), build script and PWA manifest |
+| `games/data/arrow-atlas.json`, `games/build-arrow-atlas.mjs`, `games/arrow-atlas.webmanifest` | Its level data (outlines + tier scales for 168 countries; masks are rasterised in the browser), build script and PWA manifest |
 | `js/vendor/` | Local copies of d3-array, d3-geo, d3-geo-projection, topojson-client and Natural Earth country data (`countries-110m.json`, `countries-50m.json`); the site CSP forbids CDNs |
 
 ---
@@ -479,7 +479,7 @@ losses ease off; `tierFor`/`TIER_OF`/`LEVEL_DIFF`; Try again keeps the same
 board, New layout takes the adapted tier; the result card says why), combo
 counter (taps within 1.5 s), win streak, milestones every 10 levels, a Today's Country
 bonus board (date-seeded, same for everyone, `#daily`), and clearing the board reveals the country for a
-3-option quiz plus capital/population/region. 70-level World Tour with sequential
+3-option quiz plus capital/population/region. 168-country World Tour (every country in world-atlas 110m minus dependencies and disputed areas) with sequential
 unlock (skip allowed after two fails), stars, best times and progress in
 `localStorage` (`aa:v1:*`), share text, `#level-N` deep links.
 
@@ -504,24 +504,38 @@ unlock (skip allowed after two fails), stars, best times and progress in
   (plain most-constrained generation) to ~5-7%, free at any moment from ~12% to
   ~4%; 1,050 boards: 0 failures, 0 unsolvable, ~7 ms (Normal) to ~250 ms (Master).
   `scratchpad/aa-free.mjs`-style profiling: count free pieces along a random solve.
+- **Board choice**: `bestBoard()` generates `CANDIDATES_OF[tier]` boards (1/2/3/3/2)
+  from the level seed and keeps the one with the fewest arrows free at the start,
+  so a tier's difficulty does not hinge on one seed. `startLevel` shows the game
+  screen with "Drawing the board…" and yields a frame first, because a Master board
+  takes up to ~1 s on a phone. Measured on the 168-country tour: free at the start
+  ~8% (Normal), ~7% (Hard), ~6.6% (Master); free at any moment ~4-5%.
 - **Lobby world map**: `games/data/world-map.json` (built by
   `games/build-world-map.mjs` from world-atlas 110m, Natural Earth projection,
   1000×520, Antarctica dropped, label point = centroid of the main landmass) is
-  drawn on the home screen by `renderWorld()`: every country faint, the 70 tour
+  drawn on the home screen by `renderWorld()`: every country faint, the tour
   countries outlined and tappable (opens that level), cleared ones filled green
-  and numbered with their level, the next level pulsing purple. Versioned with
-  `MAP_VERSION`. There is no Restart button in the game any more (back out or
+  and numbered with their level, the next level pulsing purple. The map takes the
+  height left over in the lobby: `renderWorld()` sets the SVG height from its
+  scroll box (percent heights do not resolve in an indefinite flex column), so on
+  phones it is wider than the screen, scrolls sideways and opens on the next level.
+  Features world-atlas leaves without an id (Kosovo) get `n:<slug>` ids in both
+  data files. Versioned with `MAP_VERSION`. There is no Restart button in the game any more (back out or
   fail and retry).
 - **Lobby layout**: title, the world map (fills the space), Continue, then two
-  compact buttons (Today's Country, World Tour n/70 · All levels). The old cards
+  compact buttons (Today's Country, World Tour n/168 · All levels). The old cards
   carousel and the level-path dots are gone.
 - **First open / launch**: `#aaGate` (welcome, Terms + Privacy links, Accept,
   stored in `aa:v1:welcomed`), then `#aaSplash` (logo + one line from `QUOTES`,
   rotating per launch in `aa:v1:launches`, tap or 2.4 s to dismiss, skipped for
   `#level-N`/`#daily` deep links and once per browser session).
-- **Data**: `games/data/arrow-atlas.json` built by `games/build-arrow-atlas.mjs`
-  from world-atlas 110m + Natural Earth 50m properties: per country the outline
-  (`d`, in a 100×100 box) and five `tiers` of grid masks sized by land-cell count
+- **Data**: `games/data/arrow-atlas.json` (112 KB for 168 countries) built by
+  `games/build-arrow-atlas.mjs` from world-atlas 110m + Natural Earth 50m
+  properties: per country the outline (`d`, in a 100×100 box) and five tier
+  scales `k` (cells per unit). The grid mask is rasterised in the browser by
+  `rasterise()` (even-odd point-in-polygon at cell centres, specks under 4 cells
+  dropped); the build script extracts that very function from the game JS to pick
+  each `k`, so boards are identical everywhere. Tiers are sized by land-cell count
   (140/380/620/880/1150 cells — about 40/100/145/180/250 arrows — at most 46
   cells across, 64 tall for tall shapes and 56 wide for wide ones; elongated
   countries such as Chile or Cuba cap out smaller). `TOUR` and `CAPITALS` in the build

@@ -14,6 +14,7 @@ const feats = topojson.feature(atlas, atlas.objects.countries).features.filter(f
 const proj = d3.geoNaturalEarth1().fitSize([W, H], { type: 'FeatureCollection', features: feats });
 const path = d3.geoPath(proj);
 const r1 = v => Math.round(v * 10) / 10;
+const idOf = f => f.id != null ? String(f.id).padStart(3, '0') : 'n:' + f.properties.name.toLowerCase().replace(/[^a-z]+/g, '-');
 function mainPoly(f) {
   const polys = f.geometry.type === 'Polygon' ? [f.geometry.coordinates] : f.geometry.coordinates;
   const areas = polys.map(c => d3.geoArea({ type: 'Polygon', coordinates: c }));
@@ -22,7 +23,7 @@ function mainPoly(f) {
 const countries = feats.map(f => {
   const d = path(f).replace(/-?\d+\.\d+/g, m => String(r1(+m)));
   const [cx, cy] = path.centroid(mainPoly(f));
-  return { id: String(f.id).padStart(3, '0'), n: f.properties.name, d, cx: r1(cx), cy: r1(cy) };
+  return { id: idOf(f), n: f.properties.name, d, cx: r1(cx), cy: r1(cy) };
 }).filter(c => c.d);
 fs.writeFileSync(OUT, JSON.stringify({ version: 1, w: W, h: H, countries }));
 console.log(countries.length, 'countries, bytes', fs.statSync(OUT).size);
