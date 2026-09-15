@@ -7,7 +7,6 @@
     { id: 'faq', label: 'FAQ', number: '05', type: 'anchor' },
     { id: 'reviews', label: 'Reviews', number: '06', type: 'anchor' },
     { id: 'contact', label: 'Contact', number: '07', type: 'anchor' },
-    { label: 'Track Order', number: '08', type: 'page', path: 'track.html' },
   ];
 
   function escapeAttr(value) {
@@ -15,8 +14,8 @@
   }
 
   // Owns the mobile menu button/overlay this component just rendered — kept
-  // here (not in main.js) so pages that skip main.js (review.html, track.html)
-  // still get a working menu button.
+  // here (not in main.js) so pages that skip main.js still get a working
+  // menu button.
   function initMenu(root) {
     const menuBtn = root.querySelector('#menuBtn');
     const menuOverlay = root.querySelector('#menuOverlay');

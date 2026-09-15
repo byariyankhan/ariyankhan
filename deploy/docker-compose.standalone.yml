@@ -30,7 +30,6 @@ services:
         condition: service_completed_successfully
     volumes:
       - site:/var/www/html
-      - site_data:/var/www/html/data
     environment:
       SITE_URL: ${SITE_URL:-https://ariyankhan.com}
       TO_EMAIL: ${TO_EMAIL:-}
@@ -38,13 +37,7 @@ services:
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASS: ${SMTP_PASS:-}
       SMTP_PORT: ${SMTP_PORT:-587}
-      IMAP_HOST: ${IMAP_HOST:-}
-      IMAP_PORT: ${IMAP_PORT:-993}
-      IMAP_USER: ${IMAP_USER:-}
-      IMAP_PASS: ${IMAP_PASS:-}
-      MCP_TOKEN: ${MCP_TOKEN:-}
       ALLOW_SELF_SIGNED: ${ALLOW_SELF_SIGNED:-}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
     command: ["bash", "/var/www/html/deploy/web-entrypoint.sh"]
 
   caddy:
@@ -81,7 +74,5 @@ services:
         exec caddy run --config /etc/caddy/Caddyfile --adapter caddyfile
 
 volumes:
-  site:
-  site_data:
   caddy_data:
   caddy_config:

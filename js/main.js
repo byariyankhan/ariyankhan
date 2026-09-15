@@ -4,8 +4,8 @@
 ══════════════════════════════ */
 
 // Mobile menu button/overlay behavior now lives in site-nav.js, next to the
-// markup it controls — that way pages that skip main.js (review.html,
-// track.html) still get a working menu button.
+// markup it controls — that way pages that skip main.js still get a working
+// menu button.
 
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') closeAllDropdowns();

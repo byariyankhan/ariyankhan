@@ -3,17 +3,15 @@
 # One container, no public port. `web` (php:8.4-apache) downloads the site
 # from GitHub as a tarball on every start (SITE_BRANCH, default main), runs
 # deploy/web-entrypoint.sh, and listens on 127.0.0.1:${WEB_PORT} (default
-# 8747). The VPS's host nginx routes ariyankhan.com to that port. All state
-# (SQLite: tracker, inbox, reviews) lives on this project's own `site_data`
-# volume, so moving the site to another VPS is: run this compose there, copy
-# the volume, flip DNS. Nothing is shared with other sites on the machine.
+# 8747). The VPS's host nginx routes ariyankhan.com to that port. The site is
+# stateless (static pages + a PHP contact form), so moving it to another VPS
+# is: run this compose there, flip DNS. Nothing is shared with other sites.
 #
 # Redeploy = re-run the project (container restarts → fetches latest code).
 #
 # Environment (Docker Manager → project env / .env):
 #   WEB_PORT, SITE_BRANCH,
 #   SITE_URL, TO_EMAIL, SMTP_HOST, SMTP_USER, SMTP_PASS, SMTP_PORT,
-#   IMAP_HOST, IMAP_PORT, IMAP_USER, IMAP_PASS, MCP_TOKEN, ADMIN_PASSWORD
 #
 # Dedicated VPS with nothing else on :80/:443 → deploy/docker-compose.standalone.yml
 
@@ -24,8 +22,6 @@ services:
     restart: unless-stopped
     ports:
       - "127.0.0.1:${WEB_PORT:-8747}:80"
-    volumes:
-      - site_data:/var/www/html/data
     environment:
       SITE_BRANCH: ${SITE_BRANCH:-main}
       SITE_URL: ${SITE_URL:-https://ariyankhan.com}
@@ -34,20 +30,14 @@ services:
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASS: ${SMTP_PASS:-}
       SMTP_PORT: ${SMTP_PORT:-587}
-      IMAP_HOST: ${IMAP_HOST:-}
-      IMAP_PORT: ${IMAP_PORT:-993}
-      IMAP_USER: ${IMAP_USER:-}
-      IMAP_PASS: ${IMAP_PASS:-}
-      MCP_TOKEN: ${MCP_TOKEN:-}
       ALLOW_SELF_SIGNED: ${ALLOW_SELF_SIGNED:-}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
     command:
       - bash
       - -c
       - |
         set -e
         echo "[deploy] fetching branch $$SITE_BRANCH"
-        find /var/www/html -mindepth 1 -maxdepth 1 ! -name data -exec rm -rf {} +
+        find /var/www/html -mindepth 1 -maxdepth 1 -exec rm -rf {} +
         curl -fsSL "https://codeload.github.com/byariyankhan/ariyankhan/tar.gz/refs/heads/$$SITE_BRANCH" \
           | tar -xz --strip-components=1 -C /var/www/html
         echo "[deploy] fetched $$(date -u)"
@@ -59,5 +49,3 @@ services:
       retries: 3
       start_period: 40s
 
-volumes:
-  site_data:

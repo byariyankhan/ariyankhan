@@ -40,7 +40,7 @@ bash deploy.sh index.html              # deploy one file
 bash deploy.sh --dry-run               # preview without uploading
 ```
 
-**Never commit:** `.env`, `mail-config.local.php`, `admin-config.local.php` (credentials), `data/` (tracker database) — all in `.gitignore`
+**Never commit:** `.env`, `mail-config.local.php` (credentials) — both in `.gitignore`
 
 ---
 
@@ -50,41 +50,32 @@ The site runs as one self-contained Docker Compose project on the shared
 Hostinger KVM VPS, next to the other sites already there. It binds **no public
 port**: `ariyankhan-web` listens on `127.0.0.1:${WEB_PORT:-8081}` and the VPS's
 existing reverse proxy routes `ariyankhan.com` to it (Traefik labels are on the
-container for proxies that read them). All state is in this project's own named
-volume (`site_data`), so moving the site to its own VPS later is: run
-the same compose there, copy the `site_data` volume, flip DNS.
+container for proxies that read them). The site is stateless (static pages plus
+the PHP contact form), so moving it to its own VPS later is: run the same
+compose there, flip DNS.
 
 | File | Purpose |
 |------|---------|
 | `deploy/docker-compose.yml` | Shared-VPS project: one `web` container (php:8.4-apache) that downloads the branch tarball from GitHub on start |
 | `deploy/docker-compose.standalone.yml` | Same, plus Caddy on :80/:443 with automatic TLS — only for a VPS where nothing else uses those ports |
 | `deploy/nginx-ariyankhan.conf` | Host nginx server block that proxies the domain to the container (the VPS's other sites are plain nginx vhosts too) |
-| `deploy/web-entrypoint.sh` | Enables Apache modules, `AllowOverride All`, and writes `mail-config.local.php` / `admin-config.local.php` from env vars |
+| `deploy/web-entrypoint.sh` | Enables Apache modules, `AllowOverride All`, and writes `mail-config.local.php` from env vars |
 
 **Live project:** VPS `srv1918310` (ID 1918310, IP 187.52.122.99), Docker
 project `ariyankhan`, container `ariyankhan-web` on `127.0.0.1:8747`.
 
 **Deploy / redeploy:** push to `main`, then re-run the project in hPanel → VPS →
 Docker Manager (or the Hostinger API `VPS_createNewProject` with
-`deploy/docker-compose.yml`). the container restarts and re-downloads `main`; `data/` (SQLite: tracker,
-inbox, reviews) is untouched because it lives on the `site_data` volume.
+`deploy/docker-compose.yml`). The container restarts and re-downloads `main`.
 
 **Secrets** are never in git: set them as the project's environment in Docker
-Manager. `deploy/web-entrypoint.sh` turns them into the two gitignored PHP files
-on every start:
+Manager. `deploy/web-entrypoint.sh` turns them into the gitignored PHP config
+file on every start:
 
 | Env var | Ends up in |
 |---------|-----------|
-| `SMTP_HOST`, `SMTP_USER`, `SMTP_PASS`, `SMTP_PORT`, `TO_EMAIL`, `SITE_URL` | `mail-config.local.php` (contact form, tracker + inbox mail) |
-| `IMAP_HOST`, `IMAP_PORT`, `IMAP_USER`, `IMAP_PASS` | `mail-config.local.php` (inbox) |
-| `MCP_TOKEN` | `mail-config.local.php` → `mcp.php` auth |
-| `ADMIN_PASSWORD` | `admin-config.local.php` → `/admin/` login |
+| `SMTP_HOST`, `SMTP_USER`, `SMTP_PASS`, `SMTP_PORT`, `TO_EMAIL`, `SITE_URL` | `mail-config.local.php` (contact form) |
 | `WEB_PORT` (default 8081), `SITE_BRANCH` (default `main`) | compose itself |
-
-**Migrating the old database from Namecheap:** download `data/tracker.sqlite`
-(and `data/inbox.sqlite` if present) from cPanel File Manager, upload to the
-VPS, then `docker cp tracker.sqlite ariyankhan-web:/var/www/html/data/` and
-`docker exec ariyankhan-web chown www-data:www-data /var/www/html/data/tracker.sqlite`.
 
 **Proxy note:** `.htaccess` forces HTTPS via `%{HTTPS}` *or*
 `X-Forwarded-Proto`, so any proxy that sets that header (all of them do) works
@@ -107,17 +98,6 @@ directories unreachable over the web.
 | `sitemap.xml` | All pages. Update when adding new pages |
 | `send-mail.php` | Contact form handler (PHPMailer + SMTP) |
 | `mail-config.local.php` | SMTP credentials — NOT in git, lives on server only |
-| `track.html` | Public Project Tracker page (nav: "Track Order") |
-| `track-lookup.php` | Public code → project status lookup endpoint |
-| `lib/tracker-db.php` | SQLite helper shared by tracker + admin |
-| `lib/tracker-mail.php` | Sends the order-confirmation email to clients on project creation |
-| `admin/index.php`, `admin/login.php`, `admin/logout.php` | Password-gated dashboard to create projects and update stages |
-| `admin-config.local.php` | Admin password — NOT in git, lives on server only |
-| `data/tracker.sqlite` | Project tracker database — NOT in git, auto-created on server |
-| `css/tracker.css`, `js/tracker.js` | Tracker page + admin styling/behavior |
-| `review.html` | Public self-service review submission form (nav-hidden, `noindex`) |
-| `js/review.js` | Submission form handler for `review.html` (separate from `js/review-card.js`) |
-| `reviews.php` | GET published reviews / POST a new one — validates against `lib/tracker-db.php` |
 | `js/review-card.js` | Auto-rotating testimonial card behavior — see "Review Card" section below |
 | `js/reviews-data.js` | Curated review text (`window.CURATED_REVIEWS`), single source of truth |
 | `css/review-card.css` | Review card + testimonial section design, shared across pages |
@@ -273,72 +253,13 @@ Update ALL pages that load the changed file.
 
 ---
 
-## Project Tracker
+## Removed features
 
-Lets clients check their project status themselves instead of messaging for
-an update — nav button "Track Order" → `track.html`.
-
-**How it works:**
-1. Ariyan creates a project in `/admin/` (password-protected) with a short
-   client-facing label and three other **required** fields: **service**
-   (Talking Head / Documentary / Short Form / Map Animation —
-   `TRACKER_SERVICE_KEYS` in `lib/tracker-db.php`), **delivery date**, and
-   **project price**. The form (and `create_project` server-side) refuses to
-   create a project missing any of these — creation generates a random
-   8-character code like `7K4M-9XPQ` (confusable characters like `0/O/1/I/L`
-   excluded). The service choice determines which page a review from this
-   client publishes to later — see "Review Card" below.
-2. Ariyan sends that code to the client (email/WhatsApp).
-3. The client goes to `ariyankhan.com/track.html`, types the code, and sees
-   a 6-stage horizontal progress stepper: Footage Received → Payment
-   (Advance) → Editing In Progress → In Review → Payment (Full) → Delivered.
-4. Ariyan updates the stage from the same `/admin/` dashboard as work
-   progresses — the client's page reflects it immediately on next lookup
-   (no notification is sent; the client checks on demand).
-5. Payment status is **not** a free-text field — `/admin/` has a "Price" and
-   an "Advance" number input per project (`price_amount`/`advance_amount`
-   columns), and `tracker_payment_note()` (`lib/tracker-db.php`) derives the
-   client-facing line from them, e.g. "50% advance ($150 of $300) received"
-   or "Payment received in full ($300)". It's rendered as a small line under
-   the *current* stage's label in the stepper whenever an advance is on
-   file (blank before any payment). Editing the numbers is the only way to
-   change that text — there's no separate note to type and it can never
-   drift out of sync with the actual figures. Stage list lives in
-   `TRACKER_STAGES` in `lib/tracker-db.php`.
-6. Every time Ariyan changes a project's stage, today's date is auto-stamped
-   for that stage (first time only, stored as JSON in `stage_dates`) and
-   shown above that stage's dot on the stepper. The first dot falls back to
-   the creation date and the last dot falls back to the admin-picked
-   "delivery date" field whenever a stage has no stamped date of its own.
-7. Creating a project can optionally take a client name + email. If an
-   email is given, `lib/tracker-mail.php` sends an order-confirmation email
-   (via the same PHPMailer/`mail-config.local.php` setup as the contact
-   form) with the tracking link and code. Leaving the email blank just
-   skips sending — the project is still created either way.
-8. If a project has a client email, changing its stage from `/admin/` shows
-   a "Notify client by email" checkbox (checked by default) next to the
-   stage dropdown. When checked and the stage actually changes, the client
-   gets a short update email naming the new stage, with the tracking link
-   and code again. No email is sent if the stage is unchanged, if there's
-   no client email on file, or if the checkbox is unchecked.
-
-**Setup (one-time, done directly on the server — not via git):**
-```bash
-# SSH in, then create the admin password file (never commit this):
-cat > admin-config.local.php <<'PHP'
-<?php
-return [
-  'password' => 'choose-a-strong-password-here',
-];
-PHP
-```
-Same protection model as `mail-config.local.php`: plain-text in a gitignored
-file, blocked from direct HTTP access by `.htaccess`. The SQLite database at
-`data/tracker.sqlite` is created automatically the first time any tracker
-script runs, and is also blocked from direct HTTP access by `.htaccess`.
-
-**Stack:** PHP 8 (confirmed live on this host) + SQLite via PDO (built into
-PHP, no separate database server or credentials needed). No new dependency.
+The client Project Tracker (`track.html`, `/admin/`, SQLite), the inbox, the
+self-service review submission (`review.html`, `reviews.php`) and the `mcp.php`
+endpoint were removed in September 2026. The review card now shows curated
+quotes only. If any of it is ever needed again, it lives in git history before
+that removal.
 
 ---
 
@@ -365,7 +286,7 @@ shuffled mix pulled from all 4. Not yet on the 10 SEO landing pages under
 - `js/review-card.js` → all rotation/fade/dots behavior, shared. Reads
   `data-curated` off the `.review-card` element as a comma-separated list of
   `CURATED_REVIEWS` keys (one key on a service page, all 4 on the homepage)
-  and optionally shuffles the combined list when `data-shuffle="true"` is set
+  and optionally shuffles the list when `data-shuffle="true"` is set
 
 **Load order** (`reviews-data.js` must come before `review-card.js`):
 ```html
@@ -377,25 +298,8 @@ shuffled mix pulled from all 4. Not yet on the 10 SEO landing pages under
 
 **How it works:** shows one review at a time, cross-fades to the next every
 5s, with clickable dot indicators so it's clear more exist. Pauses on
-hover/focus, skipped entirely for `prefers-reduced-motion`. Whatever
-`CURATED_REVIEWS` keys are named in `data-curated` gets concatenated with
-whatever's been self-submitted via `review.html` → `reviews.php` at load
-time — so new client reviews appear automatically without a code change.
-
-**Which page a self-submitted review publishes to:** every project has a
-`service_key` (`talking-head` / `documentary` / `short-form` / `map-animation`)
-set when it's created in `/admin/` or via the `create_project` MCP tool — it's
-a required field precisely so a review can be routed correctly. When a client
-submits a review, `review_submit()` (`lib/tracker-db.php`) copies that
-project's `service_key` onto the review row. `reviews.php`'s GET response
-includes it as `service`, and `js/review-card.js` filters the fetched list
-against its own `data-curated` keys before merging — so a review from a
-documentary project only shows on `documentary-video-editing.html` and the
-homepage (which lists all 4 keys), never on `short-form-video-editing.html`.
-A review with no `service` on file (shouldn't happen going forward, but
-covers any pre-existing data) falls back to showing everywhere rather than
-silently vanishing. To fix a project tagged with the wrong service after the
-fact, use `update_project` with a new `service_key`.
+hover/focus, skipped entirely for `prefers-reduced-motion`. Only the curated
+quotes named in `data-curated` are shown; there is no live review feed.
 
 **Markup shape** (copy this block into a new page — see
 `talking-head-video-editing.html` for a full working single-service example,
@@ -409,21 +313,16 @@ or `index.html` for the multi-key + shuffled example):
     <p class="section-desc"><!-- one page-specific sentence, real stats only --></p>
   </div>
   <div class="review-card" id="reviewCard"
-       data-curated="talking-head"
-       data-api="reviews.php" aria-live="polite" aria-busy="true">
+       data-curated="talking-head" aria-live="polite" aria-busy="true">
     <div class="review-card-face" id="reviewCardFace"></div>
     <div class="review-card-dots" id="reviewCardDots"></div>
   </div>
-  <span class="service-testimonial-verify">
-    Recently worked with me? <a href="review.html">Leave a review →</a>
-  </span>
 </div>
 ```
 
 To add a new service key: add an entry to `CURATED_REVIEWS` in
-`js/reviews-data.js`, use that key in the new page's `data-curated`, and add
-a matching `Review`/`AggregateRating` block to the page's own JSON-LD
-`Service` schema (same review text, kept in sync by hand). Never link out to
+`js/reviews-data.js` and use that key in the new page's `data-curated`. Do not
+put reviews in JSON-LD (see the note above). Never link out to
 Fiverr itself from a service page — a past version did this and it was
 deliberately removed (risk of sending the visitor to a cheaper competing
 listing).
