@@ -520,10 +520,14 @@
     const svg = el.board;
     svg.innerHTML = '';
     svg.setAttribute('viewBox', `-0.6 -0.6 ${W + 1.2} ${H + 1.2}`);
-    // a three-colour gradient across the board that a shooting arrow lights up with
+    // a three-colour gradient that flows along a shooting arrow: a short diagonal period, repeated,
+    // slid continuously by SMIL so the colours stream through the arrow while it travels
     const defs = svgEl('defs');
-    const grad = svgEl('linearGradient', { id: 'aaGrad', gradientUnits: 'userSpaceOnUse', x1: 0, y1: 0, x2: W, y2: H });
-    grad.appendChild(svgEl('stop', { offset: '0', class: 'aa-grad-1' })); grad.appendChild(svgEl('stop', { offset: '0.5', class: 'aa-grad-2' })); grad.appendChild(svgEl('stop', { offset: '1', class: 'aa-grad-3' }));
+    const grad = svgEl('linearGradient', { id: 'aaGrad', gradientUnits: 'userSpaceOnUse', spreadMethod: 'repeat', x1: 0, y1: 0, x2: GRAD_PERIOD, y2: GRAD_PERIOD });
+    [['0', 'aa-grad-1'], ['0.33', 'aa-grad-2'], ['0.66', 'aa-grad-3'], ['1', 'aa-grad-1']].forEach(([o, c]) => grad.appendChild(svgEl('stop', { offset: o, class: c })));
+    if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      grad.appendChild(svgEl('animateTransform', { attributeName: 'gradientTransform', type: 'translate', from: '0 0', to: `${GRAD_PERIOD} ${GRAD_PERIOD}`, dur: '0.5s', repeatCount: 'indefinite' }));
+    }
     defs.appendChild(grad); svg.appendChild(defs);
     svg.classList.toggle('aa-board--tall', H > W * 1.25);
     const t = state.maskInfo;
@@ -568,7 +572,6 @@
     }
     svg.appendChild(piecesG);
     state.lanesEl = svgEl('g', { class: 'aa-lanes' }); svg.appendChild(state.lanesEl);
-    state.sparksEl = svgEl('g', { class: 'aa-sparks' }); svg.appendChild(state.sparksEl);
     updateReveal();
   }
   function updateReveal() {
@@ -644,24 +647,13 @@
     return null;
   }
   const HOLD_MS = 260;
+  const GRAD_PERIOD = 5;      // cells per colour cycle of the shot gradient
   // A blocked arrow lunges forward, hits, and comes back.
   function bounce(p) {
     const [dr, dc] = DIRS[p.dir]; const gap = Math.max(0.2, Math.min(0.55, (laneCells(p) + 0.35)));
     p.el.animate([{ transform: 'translate(0,0)' }, { transform: `translate(${dc * gap}px, ${dr * gap}px)`, offset: 0.4 }, { transform: `translate(${-dc * 0.08}px, ${-dr * 0.08}px)`, offset: 0.75 }, { transform: 'translate(0,0)' }], { duration: 320, easing: 'cubic-bezier(.3,.9,.4,1)' });
   }
   function laneCells(p) { const [dr, dc] = DIRS[p.dir]; let [y, x] = p.cells[0]; y += dr; x += dc; let n = 0; while (y >= 0 && y < state.H && x >= 0 && x < state.W && state.occ[y][x] < 0) { y += dr; x += dc; n++; } return n; }
-  // A little burst of sparks from the tip as an arrow leaves.
-  function sparks(p, dur) {
-    if (!state.sparksEl || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    const [dr, dc] = DIRS[p.dir]; const [hy, hx] = p.cells[0]; const x0 = hx + 0.5 + dc * 0.5, y0 = hy + 0.5 + dr * 0.5;
-    for (let k = 0; k < 7; k++) {
-      const c = svgEl('circle', { cx: x0, cy: y0, r: 0.07 + Math.random() * 0.08, class: 'aa-spark aa-spark--' + (k % 3) });
-      state.sparksEl.appendChild(c);
-      const spread = (Math.random() - 0.5) * 1.6, along = 0.6 + Math.random() * 1.4;
-      const dx = dc * along + (dr ? spread : 0), dy = dr * along + (dc ? spread : 0);
-      c.animate([{ transform: 'translate(0,0)', opacity: 1 }, { transform: `translate(${dx}px, ${dy}px)`, opacity: 0 }], { duration: 380 + Math.random() * 220, easing: 'cubic-bezier(.2,.8,.4,1)' }).onfinish = () => c.remove();
-    }
-  }
   // The lane an arrow would travel: from its tip to the board edge, or to the arrow in its way.
   function laneLine(p, cls) {
     const [dr, dc] = DIRS[p.dir]; const [hy, hx] = p.cells[0];
@@ -686,14 +678,8 @@
     $$('.aa-lane--peek', el.board).forEach(l => l.remove());
   }
   // A blocked arrow stays armed (red) and goes by itself the moment its lane clears.
-  function arm(p) {
-    state.armed.add(p); p.el.classList.add('is-armed');
-    state.lanesEl.appendChild(laneLine(p, 'aa-lane--armed'));
-  }
-  function disarm(p) {
-    state.armed.delete(p); p.el?.classList.remove('is-armed');
-    $$(`.aa-lane--armed[data-i="${p.idx}"]`, el.board).forEach(l => l.remove());
-  }
+  function arm(p) { state.armed.add(p); p.el.classList.add('is-armed'); }
+  function disarm(p) { state.armed.delete(p); p.el?.classList.remove('is-armed'); }
   function releaseArmed() {
     if (state.finished) return;
     for (const p of Array.from(state.armed)) if (!p.gone && !blockerOf(p)) { disarm(p); shoot(p, true); return; }   // one at a time, each shot re-checks
@@ -715,7 +701,6 @@
     const dur = Math.min(0.7, 0.15 + travel * 0.03);
     const track = p.el.querySelector('.aa-track'), head = p.el.querySelector('.aa-head');
     p.el.classList.add('is-going');
-    sparks(p, dur);
     track.style.transition = `stroke-dashoffset ${dur}s cubic-bezier(.45,0,1,1)`;
     track.style.strokeDashoffset = String(-travel);
     head.style.transition = `transform ${dur * (p.exitLen / travel)}s cubic-bezier(.45,0,1,1), opacity .15s ${dur * (p.exitLen / travel)}s`;
