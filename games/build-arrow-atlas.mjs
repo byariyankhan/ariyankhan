@@ -14,8 +14,9 @@ const atlas = require('world-atlas/countries-110m.json');
 const ne = JSON.parse(fs.readFileSync(process.argv[2] || 'ne_50m_admin_0_countries.geojson', 'utf8'));
 const OUT = new URL('./data/arrow-atlas.json', import.meta.url).pathname;
 
-const TARGETS = [100, 200, 350, 550, 800]; // land cells per difficulty tier (dense, maze-like boards)
-const MAX_DIM = 40;                        // widest/tallest board in cells
+const TARGETS = [140, 380, 620, 880, 1150]; // land cells per difficulty tier (dense, maze-like boards: ~40 to ~250 arrows)
+const MAX_DIM = 46;                        // widest/tallest board in cells for roundish countries
+const MAX_TALL = 64, MAX_WIDE = 56;        // long side for tall (Chile, Norway) and wide (Cuba, Malaysia) shapes; phones are tall, so tall boards get more room
 const REF = 100;                       // outline paths are stored in a REF×REF box; each tier stores k = cells per unit
 
 // World Tour order: recognisable shapes first, then the rest by area.
@@ -57,7 +58,7 @@ function mainland(f) {
 
 // Rasterise at k cells per REF unit (the outline is fitted into a REF×REF box once).
 function rasteriseAt(feature, proj, k) {
-  const S = Math.ceil(REF * k);
+  const S = Math.ceil(REF * k) + 1;
   const cells = [];
   for (let r = 0; r < S; r++) { cells.push([]); for (let c = 0; c < S; c++) cells[r].push(d3.geoContains(feature, proj.invert([(c + 0.5) / k, (r + 0.5) / k])) ? 1 : 0); }
   // drop connected components under 4 cells (stray islands make unfair one-cell puzzles)
@@ -74,13 +75,17 @@ function rasteriseAt(feature, proj, k) {
   const rows = cells.slice(r0, r1_ + 1).map(row => row.slice(c0, c1 + 1).join(''));
   return { k: Math.round(k * 1000) / 1000, x: c0, y: r0, rows, count: rows.join('').split('1').length - 1, w: rows[0].length, h: rows.length };
 }
-// Find the scale whose land-cell count is closest to the target, keeping the board at most MAX_DIM cells across.
+// Find the scale whose land-cell count is closest to the target, keeping the board within the dimension caps.
+// Elongated countries would otherwise cap out at ~130 cells: their long side is allowed extra room.
 function rasteriseTarget(feature, proj, target) {
-  let lo = 0.06, hi = MAX_DIM / REF, best = null; // hi keeps the long side within MAX_DIM
+  const probe = rasteriseAt(feature, proj, 0.3);
+  const tall = probe.h > probe.w * 1.5, wide = probe.w > probe.h * 1.5;
+  const maxW = wide ? MAX_WIDE : MAX_DIM, maxH = tall ? MAX_TALL : MAX_DIM;
+  let lo = 0.06, hi = Math.max(maxW, maxH) / REF, best = null; // hi keeps the long side within the cap
   for (let i = 0; i < 18; i++) {
     const k = (lo + hi) / 2; const m = rasteriseAt(feature, proj, k);
     if (m.count < target) lo = k; else hi = k;
-    if (Math.max(m.w, m.h) <= MAX_DIM && (!best || Math.abs(m.count - target) < Math.abs(best.count - target))) best = m;
+    if (m.w <= maxW && m.h <= maxH && (!best || Math.abs(m.count - target) < Math.abs(best.count - target))) best = m;
   }
   return best;
 }

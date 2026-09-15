@@ -9,8 +9,9 @@ const data = JSON.parse(fs.readFileSync(path.join(root, 'games/data/arrow-atlas.
 const html = fs.readFileSync(path.join(root, 'arrow-atlas.html'), 'utf8');
 // Pull the pure pieces of the engine out of the IIFE so the exact production code is tested.
 const grab = re => { const m = js.match(re); if (!m) throw new Error('could not find ' + re); return m[0]; };
-const src = [grab(/const DIRS = [^\n]+/), grab(/const PALETTE = [^\n]+/), grab(/const BASE_TIER = [^\n]+/), grab(/const SPIKE = [^\n]+/), grab(/const TIER_OF = [^\n]+/), grab(/const MAXLEN_OF = [^\n]+/), grab(/function mulberry32[^\n]+/), grab(/function generate\(mask, maxLen, seed\) \{[\s\S]*?\n  \}\n/)].join('\n');
-const { generate, TIER_OF, MAXLEN_OF, DIRS } = new Function(src + '\nreturn { generate, TIER_OF, MAXLEN_OF, DIRS };')();
+const src = [grab(/const DIRS = [^\n]+/), grab(/const PALETTE = [^\n]+/), grab(/const BASE_TIER = [^\n]+/), grab(/const SKILL_UP = [^\n]+/), grab(/const skillShift = [^\n]+/), grab(/const tierFor = [^\n]+/), grab(/const rateRun = [\s\S]*?\n  \};\n/), grab(/const nextSkill = [^\n]+/), grab(/const MAXLEN_OF = [^\n]+/), grab(/function mulberry32[^\n]+/), grab(/function generate\(mask, maxLen, seed\) \{[\s\S]*?\n  \}\n/)].join('\n');
+const { generate, BASE_TIER, tierFor, rateRun, nextSkill, MAXLEN_OF, DIRS } = new Function(src + '\nreturn { generate, BASE_TIER, tierFor, rateRun, nextSkill, MAXLEN_OF, DIRS };')();
+const TIER_OF = i => tierFor(i, 0);
 let tests = 0;
 const test = (name, fn) => { tests++; try { fn(); console.log('  ✓ ' + name); } catch (e) { console.log('  ✗ ' + name + '\n    ' + e.message); process.exitCode = 1; } };
 
@@ -31,9 +32,9 @@ test('70 levels with name, capital, outline and 5 tiers', () => {
   for (const L of data.levels) { assert.ok(L.name && L.cap && L.d.startsWith('M'), L.name); assert.equal(L.tiers.length, 5); assert.ok(L.cont, `${L.name} has no continent`); }
 });
 test('every level id is unique', () => assert.equal(new Set(data.levels.map(l => l.id)).size, data.levels.length));
-test('tiers grow in cell count and stay within 40 cells', () => {
+test('tiers grow in cell count and stay within 46 cells (64 tall / 56 wide for elongated shapes)', () => {
   for (const L of data.levels) {
-    for (let t = 0; t < 5; t++) { const m = L.tiers[t]; assert.ok(m.count >= 20, `${L.name} tier ${t} has only ${m.count} cells`); assert.ok(m.w <= 40 && m.h <= 40, `${L.name} tier ${t} is ${m.w}x${m.h}`); assert.equal(m.rows.length, m.h); assert.ok(m.rows.every(r => r.length === m.w)); }
+    for (let t = 0; t < 5; t++) { const m = L.tiers[t]; assert.ok(m.count >= 20, `${L.name} tier ${t} has only ${m.count} cells`); assert.ok(m.w <= 56 && m.h <= 64 && (m.w <= 46 || m.h <= 46), `${L.name} tier ${t} is ${m.w}x${m.h}`); assert.equal(m.rows.length, m.h); assert.ok(m.rows.every(r => r.length === m.w)); }
     for (let t = 1; t < 5; t++) assert.ok(L.tiers[t].count >= L.tiers[t - 1].count, `${L.name} tier ${t} smaller than tier ${t - 1}`);
   }
 });
@@ -53,6 +54,20 @@ test('generation is deterministic for a seed', () => {
 });
 test('100 random seeds on the hardest boards all generate', () => {
   for (let s = 0; s < 100; s++) { const L = data.levels[s % data.levels.length]; assert.ok(solvable(generate(L.tiers[4], 4, 5000 + s))); }
+});
+test('boards are dense: Hard tour levels average well over 115 arrows, Normal over 80', () => {
+  const avg = tier => { const idx = data.levels.map((_, i) => i).filter(i => BASE_TIER(i) === tier); return idx.reduce((n, i) => n + generate(data.levels[i].tiers[tier], MAXLEN_OF[tier], (i + 1) * 1000).pieces.length, 0) / idx.length; };
+  assert.ok(avg(1) > 80, `Normal averages ${avg(1)}`); assert.ok(avg(2) > 115, `Hard averages ${avg(2)}`);
+});
+test('adaptive difficulty: clean quick clears step the tier up, repeated losses ease it off, levels 1-2 stay Normal', () => {
+  const perfect = { won: true, wrong: 0, hints: 0, retries: 0, secPerArrow: 0.8 };
+  const sloppy = { won: true, wrong: 2, hints: 1, retries: 0, secPerArrow: 1.5 };
+  const lost = { won: false, wrong: 4, hints: 0, retries: 1, secPerArrow: 2 };
+  let s = 0; s = nextSkill(s, perfect); assert.equal(tierFor(12, s), BASE_TIER(12), 'one clear is not enough'); s = nextSkill(s, perfect); assert.equal(tierFor(12, s), BASE_TIER(12) + 1, 'two clean clears step up');
+  assert.equal(tierFor(0, s), 0); assert.equal(tierFor(1, s), 0); assert.equal(tierFor(69, 2), 4, 'never above Master');
+  for (let k = 0; k < 6; k++) s = nextSkill(s, sloppy); assert.equal(tierFor(12, s), BASE_TIER(12), 'sloppy wins settle back to the base tier');
+  s = nextSkill(s, lost); assert.equal(tierFor(12, s), BASE_TIER(12), 'one loss keeps the tier'); s = nextSkill(s, lost); assert.equal(tierFor(12, s), BASE_TIER(12) - 1, 'two losses ease off');
+  assert.equal(tierFor(2, -2), 0, 'never below Normal'); assert.equal(rateRun(lost), -1); assert.ok(rateRun(perfect) === 1 && rateRun(sloppy) < 0.1);
 });
 test('data file stays under 600 KB', () => assert.ok(fs.statSync(path.join(root, 'games/data/arrow-atlas.json')).size < 600 * 1024));
 test('page copy quotes 70 levels and keeps the no-inline-style rule', () => { assert.ok(html.includes('70 countries')); assert.ok(!/<[a-z][^>]*\sstyle="/i.test(html)); });
