@@ -57,7 +57,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="css/arrow-atlas.css?v=11" />
+    <link rel="stylesheet" href="css/arrow-atlas.css?v=12" />
     <link rel="preload" href="games/data/arrow-atlas.json?v=4" as="fetch" crossorigin="anonymous" />
 
     <!-- SCHEMA -->
@@ -193,6 +193,10 @@
           </button>
         </div>
 
+        <div class="aa-world" id="aaWorld">
+          <svg class="aa-world-map" id="aaWorldMap" viewBox="0 0 1000 520" role="img" aria-label="World map of the tour: cleared countries are numbered"><g class="aa-world-land"></g><g class="aa-world-labels"></g></svg>
+          <p class="aa-world-cap" id="aaWorldCap"></p>
+        </div>
         <div class="aa-hero">
           <h1 class="aa-title">Arrow Atlas</h1>
           <p class="aa-tagline">Clear the arrows. Reveal the country.</p>
@@ -228,7 +232,6 @@
             <div class="aa-card" id="aaCard" role="dialog" aria-live="polite"></div>
           </div>
         </div>
-        <div class="aa-gfoot"><button type="button" class="aa-btn aa-btn--ghost" id="aaRestart">Restart</button></div>
       </section>
     </main>
 
@@ -398,6 +401,6 @@
       </div>
     </div>
 
-    <script src="js/arrow-atlas.js?v=12"></script>
+    <script src="js/arrow-atlas.js?v=13"></script>
   </body>
 </html>

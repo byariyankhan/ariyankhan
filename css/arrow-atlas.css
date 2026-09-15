@@ -66,8 +66,23 @@ button{ font-family:inherit; }
 .aa-daily strong{ font-size:22px; font-weight:900; line-height:1.1; }
 .aa-daily-sub{ font-size:12px; opacity:.85; line-height:1.35; }
 .aa-daily .aa-btn{ margin-top:auto; background:rgba(0,0,0,.22); box-shadow:none; padding:8px 14px; font-size:13px; border-radius:12px; }
-.aa-hero{ text-align:center; margin:auto 0; padding:10px 0; }
-.aa-title{ font-size:clamp(40px,11vw,56px); font-weight:900; margin:0; letter-spacing:-.5px; color:var(--line); }
+/* lobby world map: every country faint, tour countries outlined, cleared ones filled and numbered */
+.aa-world{ margin:2px 0 0; }
+.aa-world-map{ display:block; width:100%; height:auto; overflow:visible; }
+.aa-world-land path{ fill:color-mix(in srgb, var(--line) 9%, var(--bg)); stroke:var(--bg); stroke-width:.7; stroke-linejoin:round; }
+.aa-world-land path.is-tour{ fill:color-mix(in srgb, var(--line) 18%, var(--bg)); stroke:color-mix(in srgb, var(--line) 45%, var(--bg)); stroke-width:1; cursor:pointer; }
+.aa-world-land path.is-done{ fill:var(--good); stroke:var(--bg); }
+.aa-world-land path.is-next{ fill:var(--accent2); stroke:var(--bg); animation:aa-next 1.4s ease-in-out infinite alternate; }
+.aa-world-land path.is-locked{ cursor:default; }
+.aa-world-land path.is-tour:hover, .aa-world-land path.is-tour:focus-visible{ filter:brightness(1.12); outline:none; }
+.aa-world-labels text{ font-family:inherit; font-weight:900; font-size:22px; fill:#fff; text-anchor:middle; dominant-baseline:central; pointer-events:none; paint-order:stroke; stroke:rgba(0,0,0,.28); stroke-width:3px; stroke-linejoin:round; }
+.aa-world-labels circle{ fill:var(--good); pointer-events:none; }
+.aa-world-labels .is-next circle{ fill:var(--accent2); }
+.aa-world-cap{ font-size:12px; color:var(--muted); text-align:center; margin:6px 0 0; font-weight:800; }
+@keyframes aa-next{ from{ filter:brightness(1); } to{ filter:brightness(1.25); } }
+@media(prefers-reduced-motion:reduce){ .aa-world-land path.is-next{ animation:none; } }
+.aa-hero{ text-align:center; margin:auto 0; padding:6px 0; }
+.aa-title{ font-size:clamp(30px,8vw,44px); font-weight:900; margin:0; letter-spacing:-.5px; color:var(--line); }
 .aa-tagline{ margin:6px 0 0; color:var(--muted); font-size:15px; }
 .aa-path{ display:flex; align-items:center; justify-content:center; gap:10px; padding:16px 0 6px; position:relative; }
 .aa-path::before{ content:''; position:absolute; left:8%; right:8%; top:50%; height:14px; margin-top:-2px; background:var(--bg2); border-radius:14px; z-index:0; }
@@ -127,7 +142,6 @@ button{ font-family:inherit; }
 @keyframes aa-shake{ 0%,100%{ opacity:1; } 30%,70%{ opacity:.25; } }
 @keyframes aa-glow{ from{ opacity:.5; } to{ opacity:1; } }
 .aa-confetti{ position:absolute; inset:0; width:100%; height:100%; pointer-events:none; z-index:3; }
-.aa-gfoot{ display:flex; justify-content:center; }
 
 /* Toast + overlay card */
 .aa-toast{ position:absolute; left:50%; bottom:10px; transform:translateX(-50%); z-index:4; max-width:min(92%,460px); background:var(--ink); color:var(--bg); font-size:14px; font-weight:800; padding:10px 16px; border-radius:30px; text-align:center; pointer-events:none; box-shadow:var(--shadow); }
