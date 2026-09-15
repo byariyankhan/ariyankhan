@@ -165,7 +165,7 @@ $page_description = $page_count > 0
     <site-footer data-base-path="../"></site-footer>
 
     <script src="../js/site-nav.js?v=9"></script>
-    <script src="../js/site-footer.js?v=8"></script>
+    <script src="../js/site-footer.js?v=9"></script>
     <script src="../js/main.js?v=23"></script>
   </body>
 </html>
