@@ -703,8 +703,10 @@
     p.el.classList.add('is-going');
     track.style.transition = `stroke-dashoffset ${dur}s cubic-bezier(.45,0,1,1)`;
     track.style.strokeDashoffset = String(-travel);
-    head.style.transition = `transform ${dur * (p.exitLen / travel)}s cubic-bezier(.45,0,1,1), opacity .15s ${dur * (p.exitLen / travel)}s`;
-    head.style.transform = `translate(${p.exitLen}px, 0)`; // local frame: the head group is already rotated to point forward
+    // the head rides the same curve as the body (same distance, duration and easing) so they never part;
+    // it fades once it crosses the board edge and the viewBox clips whatever is left
+    head.style.transition = `transform ${dur}s cubic-bezier(.45,0,1,1), opacity .12s ${dur * (p.exitLen / travel)}s`;
+    head.style.transform = `translate(${travel}px, 0)`; // local frame: the head group is already rotated to point forward
     head.style.opacity = '0';
     setTimeout(() => p.el.remove(), dur * 1000 + 80);
     SFX.shoot(); vibe(12);
