@@ -457,7 +457,8 @@ text, `#level-mode` deep links (`#africa-hard`). English only, continuous play
 `arrow-atlas.html` is the second game: the casual, addictive one. Each level is a
 country's outline filled with arrows; tap an arrow to shoot it off the board if its
 run to the edge is clear, a blocked tap costs one of 4 hearts, Classic (count-up) or
-Rush (90 s countdown) timer, and clearing the board reveals the country for a
+Rush (90 s countdown) timer, Deep Focus (no clock, no hearts, unlimited hints; 3 hints
+per level otherwise), and clearing the board reveals the country for a
 3-option quiz plus capital/population/region. 70-level World Tour with sequential
 unlock (skip allowed after two fails), stars, best times and progress in
 `localStorage` (`aa:v1:*`), share text, `#level-N` deep links.
@@ -477,7 +478,7 @@ unlock (skip allowed after two fails), stars, best times and progress in
 - **Data**: `games/data/arrow-atlas.json` built by `games/build-arrow-atlas.mjs`
   from world-atlas 110m + Natural Earth 50m properties: per country the outline
   (`d`, in a 100×100 box) and five `tiers` of grid masks sized by land-cell count
-  (90/170/280/420/600 cells, ≤34 cells across). `TOUR` and `CAPITALS` in the build
+  (100/200/350/550/800 cells, ≤40 cells across). `TOUR` and `CAPITALS` in the build
   script define the level order and quiz facts. Versioned with `?v=` +
   `DATA_VERSION`; served immutable by `games/data/.htaccess`.
 - **Adding countries**: append to `TOUR` and `CAPITALS`, rebuild, bump

@@ -14,11 +14,13 @@
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
   const SVG_NS = 'http://www.w3.org/2000/svg';
-  const DATA_VERSION = '2';
+  const DATA_VERSION = '3';
   const STORE = 'aa:v1:';
   const LIVES = 4;
   const RUSH_SECONDS = 90;
   const HINT_PENALTY_MS = 5000;
+  const HINTS_PER_LEVEL = 3;       // Classic and Rush; Deep Focus is unlimited
+  const MODES = { classic: 'Classic', rush: 'Rush', focus: 'Deep Focus' };
   const TIER_OF = i => i < 5 ? 0 : i < 15 ? 1 : i < 30 ? 2 : i < 50 ? 3 : 4;
   const MAXLEN_OF = [4, 5, 6, 7, 8];
   const DIRS = { r: [0, 1], l: [0, -1], d: [1, 0], u: [-1, 0] };
@@ -32,7 +34,7 @@
   const el = {
     select: $('#aaSelect'), levels: $('#aaLevels'), progress: $('#aaProgress'), progressBar: $('#aaProgressBar'), modes: $('#aaModes'),
     game: $('#aaGame'), boardWrap: $('#aaBoardWrap'), board: $('#aaBoard'), toast: $('#aaToast'), confetti: $('#aaConfetti'),
-    hudLevel: $('#aaHudLevel'), hudMode: $('#aaHudMode'), hudTime: $('#aaHudTime'), hudLeft: $('#aaHudLeft'), hudLives: $('#aaHudLives'),
+    hudLevel: $('#aaHudLevel'), hudMode: $('#aaHudMode'), hudTime: $('#aaHudTime'), hudLeft: $('#aaHudLeft'), hudLives: $('#aaHudLives'), hudLivesWrap: $('#aaHudLivesWrap'), hudPct: $('#aaHudPct'), boardBar: $('#aaBoardBar'),
     btnHint: $('#aaHint'), btnRestart: $('#aaRestart'), btnLevels: $('#aaBackToLevels'), btnSound: $('#aaSound'),
     overlay: $('#aaOverlay'), card: $('#aaCard'),
     loading: $('#aaLoading'), error: $('#aaError'),
@@ -41,7 +43,7 @@
 
   let DATA = null;
   const state = {
-    mode: store.get('mode') === 'rush' ? 'rush' : 'classic', muted: !!store.get('muted', false),
+    mode: MODES[store.get('mode')] ? store.get('mode') : 'classic', muted: !!store.get('muted', false),
     idx: -1, level: null, tier: 0, mask: null, pieces: [], occ: null, W: 0, H: 0, left: 0,
     lives: LIVES, startedAt: 0, elapsed: 0, timerId: 0, finished: false, hintsUsed: 0, fails: 0, seedBump: 0, busy: false,
   };
@@ -97,7 +99,7 @@
     el.progress.textContent = `${done}/${n} countries cleared · ${learned} named correctly`;
     el.progressBar.style.width = `${(done / n) * 100}%`;
     el.modes.innerHTML = '';
-    for (const m of [['classic', 'Classic', 'Timer counts up, 4 hearts'], ['rush', 'Rush', `${RUSH_SECONDS}s countdown, 4 hearts`]]) {
+    for (const m of [['classic', 'Classic', 'Timer counts up, 4 hearts, 3 hints'], ['rush', 'Rush', `${RUSH_SECONDS}s countdown, 4 hearts, 3 hints`], ['focus', 'Deep Focus', 'No clock, no hearts. Just clear the map.']]) {
       const b = document.createElement('button');
       b.type = 'button'; b.className = 'aa-mode' + (m[0] === state.mode ? ' is-active' : ''); b.dataset.mode = m[0]; b.setAttribute('aria-pressed', String(m[0] === state.mode));
       b.innerHTML = `<strong>${m[1]}</strong><span>${m[2]}</span>`;
@@ -258,7 +260,7 @@
     const total = state.pieces.length;
     const done = total - state.left;
     const k = total ? done / total : 0;
-    state.outlineEl?.style.setProperty('fill-opacity', String(0.05 + 0.75 * k * k));
+    state.outlineEl?.style.setProperty('fill-opacity', String(0.035 + 0.8 * k * k));
   }
 
   // ── Game lifecycle ──
@@ -282,17 +284,24 @@
 
   function renderHud() {
     el.hudLevel.textContent = `Level ${state.idx + 1}`;
-    el.hudMode.textContent = state.mode === 'rush' ? 'Rush' : 'Classic';
+    el.hudMode.textContent = MODES[state.mode];
+    const focus = state.mode === 'focus';
+    el.hudLivesWrap.hidden = focus;
+    const hintsLeft = HINTS_PER_LEVEL - state.hintsUsed;
+    el.btnHint.textContent = focus ? 'Hint' : `Hint (${Math.max(0, hintsLeft)})`;
+    el.btnHint.disabled = state.finished || (!focus && hintsLeft <= 0);
+    const pct = state.pieces.length ? Math.round(((state.pieces.length - state.left) / state.pieces.length) * 100) : 0;
+    el.hudPct.textContent = `${pct}%`;
+    el.boardBar.style.width = `${pct}%`;
     el.hudLeft.textContent = String(state.left);
     el.hudLives.innerHTML = Array.from({ length: LIVES }, (_, k) => `<span class="${k < state.lives ? 'is-on' : 'is-off'}">♥</span>`).join('');
     el.hudLives.setAttribute('aria-label', `${state.lives} of ${LIVES} hearts`);
-    el.btnHint.disabled = state.finished;
     renderTime();
   }
   const currentElapsed = () => state.startedAt ? state.elapsed + (performance.now() - state.startedAt) : state.elapsed;
   function renderTime() {
     const e = currentElapsed();
-    el.hudTime.textContent = state.mode === 'rush' ? fmtTime(RUSH_SECONDS * 1000 - e) : fmtTime(e);
+    el.hudTime.textContent = state.mode === 'focus' ? '∞' : state.mode === 'rush' ? fmtTime(RUSH_SECONDS * 1000 - e) : fmtTime(e);
     el.hudTime.classList.toggle('is-low', state.mode === 'rush' && RUSH_SECONDS * 1000 - e < 15000);
   }
   function startTimer() {
@@ -331,34 +340,41 @@
     setTimeout(() => p.el.remove(), dur * 1000 + 80);
     SFX.shoot();
     updateReveal(); renderHud();
+    const done = state.pieces.length - state.left, half = Math.ceil(state.pieces.length / 2);
     if (state.left === 0) winLevel();
+    else if (done === half) toast('50% cleared. The shape is starting to show.');
+    else if (state.left === 5 && state.pieces.length > 20) toast('5 arrows left!');
   }
   function blocked(p, blocker) {
-    state.lives--;
+    const focus = state.mode === 'focus';
+    if (!focus) state.lives--;
     SFX.block();
     p.el.classList.remove('is-shake'); void p.el.getBBox(); p.el.classList.add('is-shake');
     blocker.el.classList.add('is-blocker');
     setTimeout(() => blocker.el.classList.remove('is-blocker'), 600);
     setTimeout(() => p.el.classList.remove('is-shake'), 400);
     renderHud();
-    if (state.lives <= 0) failLevel('Out of hearts.');
+    if (focus) toast('Blocked. The red arrow is in the way. No penalty in Deep Focus.', 'bad');
+    else if (state.lives <= 0) failLevel('Out of hearts.');
     else toast(state.lives === 1 ? 'Blocked! Last heart, look before you tap.' : 'Blocked! The red arrow is in the way.', 'bad');
   }
   function hint() {
     if (state.finished) return;
+    const focus = state.mode === 'focus';
+    if (!focus && state.hintsUsed >= HINTS_PER_LEVEL) { toast('No hints left on this level.', 'bad'); return; }
     const p = state.pieces.find(q => !q.gone && !blockerOf(q));
     if (!p) return;
     startTimer();
-    state.hintsUsed++; state.elapsed += HINT_PENALTY_MS;
+    state.hintsUsed++; if (!focus) state.elapsed += HINT_PENALTY_MS;
     $$('.aa-piece.is-hint', el.board).forEach(g => g.classList.remove('is-hint'));
     p.el.classList.add('is-hint');
     setTimeout(() => p.el.classList.remove('is-hint'), 2500);
-    toast(`Hint: the glowing arrow is free. +${HINT_PENALTY_MS / 1000}s on the clock.`, 'hint');
-    renderTime();
+    toast(focus ? 'Hint: the glowing arrow is free.' : `Hint: the glowing arrow is free. +${HINT_PENALTY_MS / 1000}s on the clock, ${HINTS_PER_LEVEL - state.hintsUsed} left.`, 'hint');
+    renderHud();
   }
 
   // ── End of level ──
-  function stars() { const lost = LIVES - state.lives; return lost === 0 ? 3 : lost === 1 ? 2 : 1; }
+  function stars() { if (state.mode === 'focus') return state.hintsUsed === 0 ? 3 : state.hintsUsed <= 2 ? 2 : 1; const lost = LIVES - state.lives; return lost === 0 ? 3 : lost === 1 ? 2 : 1; }
   function winLevel() {
     stopTimer(); state.finished = true; state.busy = true;
     state.outlineEl?.style.setProperty('fill-opacity', '0.9');
@@ -394,7 +410,7 @@
       <p class="aa-card-kicker">${quizRight ? 'Correct!' : `It was`}</p>
       <h3>${L.name}</h3>
       <p class="aa-stars" aria-label="${s} of 3 stars">${'★'.repeat(s)}${'☆'.repeat(3 - s)}</p>
-      <div class="aa-stats"><span><b>${fmtTime(t, true)}</b>time</span><span><b>${LIVES - state.lives}</b>hearts lost</span><span><b>${state.hintsUsed}</b>hints</span><span><b>${state.pieces.length}</b>arrows</span></div>
+      <div class="aa-stats"><span><b>${fmtTime(t, true)}</b>time</span><span><b>${state.mode === 'focus' ? '∞' : LIVES - state.lives}</b>${state.mode === 'focus' ? 'hearts' : 'hearts lost'}</span><span><b>${state.hintsUsed}</b>hints</span><span><b>${state.pieces.length}</b>arrows</span></div>
       <p class="aa-facts">${facts}</p>
       <p class="aa-best">${isBest ? (prev ? `New best time! Previous ${fmtTime(prev.t, true)}.` : 'First clear. That is your time to beat.') : `Your best: ${fmtTime(prev.t, true)}.`}</p>
       <div class="aa-actions">
@@ -443,7 +459,7 @@
   async function share() {
     const n = DATA.levels.length, done = DATA.levels.filter((_, i) => cleared(i)).length;
     const rec = cleared(state.idx);
-    const text = `Arrow Atlas: I cleared ${state.level.name} (level ${state.idx + 1}) in ${fmtTime(rec?.t ?? state.elapsed, true)} ${'★'.repeat(rec?.stars || stars())} and ${done}/${n} countries so far.\nYour turn: https://ariyankhan.com/arrow-atlas.html#level-${state.idx + 1}`;
+    const text = `Arrow Atlas: I cleared ${state.level.name} (level ${state.idx + 1}, ${MODES[state.mode]}) in ${fmtTime(rec?.t ?? state.elapsed, true)} ${'★'.repeat(rec?.stars || stars())} and ${done}/${n} countries so far.\nYour turn: https://ariyankhan.com/arrow-atlas.html#level-${state.idx + 1}`;
     const flash = $('.aa-flash', el.card);
     try {
       if (navigator.share) { await navigator.share({ text }); return; }

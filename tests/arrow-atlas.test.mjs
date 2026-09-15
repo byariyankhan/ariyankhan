@@ -31,9 +31,9 @@ test('70 levels with name, capital, outline and 5 tiers', () => {
   for (const L of data.levels) { assert.ok(L.name && L.cap && L.d.startsWith('M'), L.name); assert.equal(L.tiers.length, 5); assert.ok(L.cont, `${L.name} has no continent`); }
 });
 test('every level id is unique', () => assert.equal(new Set(data.levels.map(l => l.id)).size, data.levels.length));
-test('tiers grow in cell count and stay within 34 cells', () => {
+test('tiers grow in cell count and stay within 40 cells', () => {
   for (const L of data.levels) {
-    for (let t = 0; t < 5; t++) { const m = L.tiers[t]; assert.ok(m.count >= 20, `${L.name} tier ${t} has only ${m.count} cells`); assert.ok(m.w <= 34 && m.h <= 34, `${L.name} tier ${t} is ${m.w}x${m.h}`); assert.equal(m.rows.length, m.h); assert.ok(m.rows.every(r => r.length === m.w)); }
+    for (let t = 0; t < 5; t++) { const m = L.tiers[t]; assert.ok(m.count >= 20, `${L.name} tier ${t} has only ${m.count} cells`); assert.ok(m.w <= 40 && m.h <= 40, `${L.name} tier ${t} is ${m.w}x${m.h}`); assert.equal(m.rows.length, m.h); assert.ok(m.rows.every(r => r.length === m.w)); }
     for (let t = 1; t < 5; t++) assert.ok(L.tiers[t].count >= L.tiers[t - 1].count, `${L.name} tier ${t} smaller than tier ${t - 1}`);
   }
 });
@@ -54,6 +54,6 @@ test('generation is deterministic for a seed', () => {
 test('100 random seeds on the hardest boards all generate', () => {
   for (let s = 0; s < 100; s++) { const L = data.levels[s % data.levels.length]; assert.ok(solvable(generate(L.tiers[4], 4, 5000 + s))); }
 });
-test('data file stays under 350 KB', () => assert.ok(fs.statSync(path.join(root, 'games/data/arrow-atlas.json')).size < 350 * 1024));
+test('data file stays under 600 KB', () => assert.ok(fs.statSync(path.join(root, 'games/data/arrow-atlas.json')).size < 600 * 1024));
 test('page copy quotes 70 levels and keeps the no-inline-style rule', () => { assert.ok(html.includes('70 countries')); assert.ok(!/<[a-z][^>]*\sstyle="/i.test(html)); });
 console.log(process.exitCode ? `\nsome of ${tests} tests failed` : `\nall ${tests} tests passed`);

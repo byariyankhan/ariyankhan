@@ -2,7 +2,7 @@
   "id": "/arrow-atlas.html",
   "name": "Arrow Atlas — Map Arrow Puzzle",
   "short_name": "Arrow Atlas",
-  "description": "Tap arrows to clear real country maps, keep your hearts, beat the clock and name the country. Free geography puzzle by Ariyan Khan.",
+  "description": "Tap-away arrow puzzle and deep-focus game on real country maps. Clear the maze, reveal the country, name it. By Ariyan Khan.",
   "start_url": "/arrow-atlas.html?utm_source=pwa",
   "scope": "/",
   "display": "standalone",

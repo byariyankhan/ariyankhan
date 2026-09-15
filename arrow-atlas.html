@@ -15,10 +15,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 
     <!-- SEO -->
-    <title>Arrow Atlas — Free Tap-Away Arrow Puzzle on Country Maps</title>
+    <title>Arrow Atlas — Arrow Puzzle &amp; Deep Focus Game on Country Maps</title>
     <meta
       name="description"
-      content="Free arrow puzzle on real country maps. Tap arrows to shoot them off the board, keep your 4 hearts, beat the clock and guess the country. 70 levels, no sign-up."
+      content="Free tap-away arrow puzzle on real country maps. Beat the clock with 4 hearts, or switch to Deep Focus and just clear the map. 70 countries, no sign-up."
     />
     <meta name="author" content="Ariyan Khan" />
     <meta name="robots" content="index, follow, max-image-preview:large" />
@@ -61,8 +61,8 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="css/style.css?v=18" />
-    <link rel="stylesheet" href="css/arrow-atlas.css?v=2" />
-    <link rel="preload" href="games/data/arrow-atlas.json?v=2" as="fetch" crossorigin="anonymous" />
+    <link rel="stylesheet" href="css/arrow-atlas.css?v=3" />
+    <link rel="preload" href="games/data/arrow-atlas.json?v=3" as="fetch" crossorigin="anonymous" />
 
     <!-- SCHEMA -->
     <script type="application/ld+json">
@@ -73,7 +73,7 @@
           "@type": "WebPage",
           "@id": "https://ariyankhan.com/arrow-atlas.html#webpage",
           "url": "https://ariyankhan.com/arrow-atlas.html",
-          "name": "Arrow Atlas — Free Tap-Away Arrow Puzzle on Country Maps",
+          "name": "Arrow Atlas — Arrow Puzzle & Deep Focus Game on Country Maps",
           "description": "Free arrow puzzle game played on real country maps. Tap arrows to shoot them off the board, keep your four hearts, beat the clock, then guess which country you cleared. 70 levels on a world tour.",
           "inLanguage": "en-US",
           "datePublished": "2026-09-15",
@@ -86,10 +86,10 @@
           "@type": ["VideoGame", "WebApplication"],
           "@id": "https://ariyankhan.com/arrow-atlas.html#game",
           "name": "Arrow Atlas",
-          "alternateName": ["Tap Away Arrow Puzzle", "Country Map Arrow Game", "Map Unblock Puzzle"],
+          "alternateName": ["Atlas Arrow Puzzle", "Tap Away Arrow Puzzle", "Deep Focus Map Game", "Country Map Arrow Game"],
           "url": "https://ariyankhan.com/arrow-atlas.html",
           "description": "A tap-away arrow puzzle where every board is a real country. Tap an arrow to shoot it off the board if its path is clear; a blocked tap costs one of four hearts. Clear the board to reveal the country, name it in a three-option quiz, and collect it on a 70-level world tour. Classic (count-up timer) and Rush (90-second countdown) modes.",
-          "genre": ["Puzzle", "Casual", "Educational", "Geography"],
+          "genre": ["Puzzle", "Casual", "Educational", "Geography", "Relaxation"],
           "gamePlatform": "Web browser",
           "playMode": "SinglePlayer",
           "numberOfPlayers": { "@type": "QuantitativeValue", "minValue": 1, "maxValue": 1 },
@@ -103,7 +103,7 @@
             "70 country boards on a world tour, from Italy and Bangladesh to Iceland",
             "Tap-away mechanic: shoot arrows off the board when their path is clear",
             "4 hearts per level; a blocked arrow costs one",
-            "Classic mode (timer counts up) and Rush mode (90-second countdown)",
+            "Classic mode (timer counts up), Rush mode (90-second countdown) and Deep Focus mode (no clock, no hearts, unlimited hints)",
             "Board clears reveal the country shape; a 3-option quiz asks which country it was",
             "Country facts on every clear: capital, population, region",
             "Stars, best times and tour progress saved in your browser",
@@ -132,7 +132,7 @@
           "mainEntity": [
             { "@type": "Question", "name": "How do I play Arrow Atlas?", "acceptedAnswer": { "@type": "Answer", "text": "Every arrow slides in the direction it points. Tap one and, if nothing is in its path, it shoots off the board. If another arrow is in the way it stays put and you lose a heart. Clear every arrow to reveal the country underneath, then pick its name from three options." } },
             { "@type": "Question", "name": "Is it free and do I need an account?", "acceptedAnswer": { "@type": "Answer", "text": "Yes it is free and no account is needed. Progress, stars and best times are saved in your own browser. Nothing is uploaded." } },
-            { "@type": "Question", "name": "What is the difference between Classic and Rush?", "acceptedAnswer": { "@type": "Answer", "text": "Classic counts your time up so you can play at your own pace and chase a best time. Rush gives you 90 seconds per board; when the clock hits zero the level is failed. Both give four hearts." } },
+            { "@type": "Question", "name": "What is the difference between Classic, Rush and Deep Focus?", "acceptedAnswer": { "@type": "Answer", "text": "Classic counts your time up so you can chase a best time. Rush gives you 90 seconds per board; when the clock hits zero the level is failed. Both give four hearts and three hints. Deep Focus has no clock and no hearts: a blocked tap simply bounces, hints are unlimited, and you clear the map at whatever pace clears your head." } },
             { "@type": "Question", "name": "Can a level become impossible?", "acceptedAnswer": { "@type": "Answer", "text": "No. Boards are generated so that a solution always exists, and removing an arrow can only free space for the others, so whatever order you tap in you can never get stuck. If you are out of ideas, use a hint: it lights up an arrow that is free right now and adds five seconds to your clock." } },
             { "@type": "Question", "name": "Are the puzzles the same for everyone?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. Each level has a fixed layout, so when you share a time on level 12 your friend faces exactly the same board. Choosing “New layout” after a fail gives you a fresh arrangement of the same country." } },
             { "@type": "Question", "name": "Why are the countries hidden until I finish?", "acceptedAnswer": { "@type": "Answer", "text": "That is the geography part. The board is the country's real outline and it fades in as you clear arrows, so you are quietly learning shapes while you play. The quiz at the end checks whether you spotted it, and the level card shows the capital, population and region." } },
@@ -158,12 +158,13 @@
         <h1 class="section-title">Arrow <span class="yl">Atlas</span></h1>
         <p class="section-desc">
           Tap arrows to shoot them off the board. A blocked arrow costs a heart, you have four, and the clock is
-          running. Clear the board and a country appears underneath. Can you name it? 70 countries, one world tour.
+          running. Or switch to Deep Focus: no clock, no hearts, just you and the maze. Clear the board and a
+          country appears underneath. Can you name it? 70 countries, one world tour.
         </p>
         <ul class="aa-trust">
           <li><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>70 countries</li>
           <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20s-7-4.5-7-10a4 4 0 0 1 7-2.5A4 4 0 0 1 19 10c0 5.5-7 10-7 10z"/></svg>4 hearts per level</li>
-          <li><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2M9 3h6"/></svg>Classic &amp; Rush timers</li>
+          <li><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2M9 3h6"/></svg>Classic, Rush &amp; Deep Focus</li>
           <li><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M11 18h2"/></svg>Phone &amp; desktop</li>
         </ul>
       </header>
@@ -195,16 +196,18 @@
             <div class="aa-hud-stats">
               <span><b id="aaHudTime">0:00</b>time</span>
               <span><b id="aaHudLeft">0</b>arrows left</span>
-              <span><b class="aa-lives" id="aaHudLives" role="img" aria-label="4 of 4 hearts"></b>hearts</span>
+              <span><b id="aaHudPct">0%</b>cleared</span>
+              <span id="aaHudLivesWrap"><b class="aa-lives" id="aaHudLives" role="img" aria-label="4 of 4 hearts"></b>hearts</span>
             </div>
             <div class="aa-hud-actions">
-              <button type="button" class="aa-btn aa-btn--small" id="aaHint" title="Light up a free arrow (H). Adds 5 seconds.">Hint</button>
+              <button type="button" class="aa-btn aa-btn--small" id="aaHint" title="Light up a free arrow (H). Adds 5 seconds; 3 per level outside Deep Focus.">Hint (3)</button>
               <button type="button" class="aa-btn aa-btn--small" id="aaRestart">Restart</button>
               <button type="button" class="aa-btn aa-btn--small" id="aaSound" aria-pressed="true">Sound: on</button>
               <button type="button" class="aa-btn aa-btn--small" id="aaBackToLevels">World Tour</button>
             </div>
           </div>
           <div class="aa-board-wrap" id="aaBoardWrap">
+            <div class="aa-board-track" aria-hidden="true"><div class="aa-board-bar" id="aaBoardBar"></div></div>
             <svg id="aaBoard" class="aa-board" viewBox="0 0 10 10" role="group" aria-label="Puzzle board. Tap an arrow to shoot it off the board."></svg>
             <canvas class="aa-confetti" id="aaConfetti" hidden></canvas>
             <div class="aa-toast" id="aaToast" role="status" aria-live="polite" hidden></div>
@@ -245,8 +248,9 @@
         </div>
         <p>
           Classic mode counts up, for chasing best times. Rush mode gives you 90 seconds a board, for when you want
-          your hands to shake. Both use the same four hearts, and both save stars and best times per level in your
-          browser.
+          your hands to shake. Both use the same four hearts and three hints. Deep Focus removes the clock and the
+          hearts entirely: a blocked tap just bounces, hints are unlimited, and the only goal is the slow satisfaction
+          of watching a country emerge from the maze. All three save stars and best times per level in your browser.
         </p>
       </section>
 
@@ -292,9 +296,9 @@
         </div>
         <div class="faq-item">
           <button class="faq-q" id="aa-faq-q-3" type="button" aria-expanded="false" aria-controls="aa-faq-a-3">
-            <span class="faq-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2M9 3h6"/></svg></span><span class="faq-q-text">What is the difference between Classic and Rush?</span><span class="faq-chevron" aria-hidden="true"></span>
+            <span class="faq-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2M9 3h6"/></svg></span><span class="faq-q-text">What is the difference between Classic, Rush and Deep Focus?</span><span class="faq-chevron" aria-hidden="true"></span>
           </button>
-          <div class="faq-a" id="aa-faq-a-3" role="region" aria-labelledby="aa-faq-q-3" aria-hidden="true"><p>Classic counts your time up so you can play at your own pace and chase a best time. Rush gives you 90 seconds per board; when the clock hits zero the level is failed. Both give four hearts.</p></div>
+          <div class="faq-a" id="aa-faq-a-3" role="region" aria-labelledby="aa-faq-q-3" aria-hidden="true"><p>Classic counts your time up so you can chase a best time. Rush gives you 90 seconds per board; when the clock hits zero the level is failed. Both give four hearts and three hints. Deep Focus has no clock and no hearts: a blocked tap simply bounces, hints are unlimited, and you clear the map at whatever pace clears your head.</p></div>
         </div>
         <div class="faq-item">
           <button class="faq-q" id="aa-faq-q-4" type="button" aria-expanded="false" aria-controls="aa-faq-a-4">
@@ -345,6 +349,6 @@
 
     <script src="js/site-nav.js?v=11"></script>
     <script src="js/site-footer.js?v=13"></script>
-    <script src="js/arrow-atlas.js?v=2"></script>
+    <script src="js/arrow-atlas.js?v=3"></script>
   </body>
 </html>
