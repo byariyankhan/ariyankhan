@@ -39,6 +39,10 @@ across the niches and formats listed below.
 - [Video Editor for History & Geopolitics Channels](https://ariyankhan.com/service/video-editor-for-history-and-geopolitics-channels.html): Animated map sequences, narrative-paced editing, archival footage integration, and on-screen citation graphics
 - [Video Editor for True Crime YouTube Channels](https://ariyankhan.com/service/video-editor-for-true-crime-youtube-channels.html): Case-timeline pacing, evidence-reveal suspense editing, redaction graphics, and archival footage integration
 
+## Free Tools
+
+- [AI Metadata Remover](https://ariyankhan.com/ai-metadata-remover.html): Free browser-based tool that strips C2PA Content Credentials, XMP, IPTC, EXIF/GPS and Stable Diffusion prompt data from JPG, PNG and WebP images. No upload, no account, pixels never re-encoded. Also detects which AI generator (ChatGPT, Gemini, Firefly, Midjourney, Stable Diffusion) tagged the file. Cannot remove pixel watermarks such as SynthID.
+
 ## Blog
 
 - [Blog Home](https://ariyankhan.com/blog/)

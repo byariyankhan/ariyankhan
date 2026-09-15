@@ -141,6 +141,19 @@ Fill out the contact form at https://ariyankhan.com/#contact with your project d
 - X (Twitter): https://x.com/byariyankhan
 - Upwork: https://www.upwork.com/freelancers/ariyankhan
 
+## Free Tools
+- AI Metadata Remover: https://ariyankhan.com/ai-metadata-remover.html
+  Free, browser-only tool that removes C2PA / JUMBF Content Credentials, XMP, IPTC, EXIF (camera, GPS,
+  software), JPEG comments, PNG text chunks (Stable Diffusion "parameters", ComfyUI "prompt"/"workflow"),
+  WebP EXIF/XMP/C2PA chunks and hidden trailing data from JPG, PNG and WebP images. The file container is
+  rewritten and pixel data is copied byte-for-byte, so quality is untouched and the file is usually smaller.
+  Nothing is uploaded — there is no server endpoint, no account and no quota; batch, drag-and-drop and
+  clipboard paste are supported. Two modes: "Remove everything" (recommended) or "Keep camera EXIF".
+  The report names the AI generator signature it found (ChatGPT/DALL·E, Google Gemini/Imagen, Adobe
+  Firefly, Midjourney, Stable Diffusion/ComfyUI, Microsoft Designer). Honest limits: it cannot remove
+  pixel-level watermarks such as Google SynthID, cannot fool pixel-based AI detectors and handles still
+  images only (no video). Built by Ariyan Khan for his own thumbnail / B-roll workflow.
+
 ## Blog
 Practical articles on hiring, cost, and working with a video editor.
 - Blog Home: https://ariyankhan.com/blog/
@@ -160,6 +173,7 @@ Practical articles on hiring, cost, and working with a video editor.
 ## All Pages
 - Home: https://ariyankhan.com/
 - About: https://ariyankhan.com/about.html
+- AI Metadata Remover (free tool): https://ariyankhan.com/ai-metadata-remover.html
 - Talking Head Video Editing: https://ariyankhan.com/talking-head-video-editing.html
 - Documentary Video Editing: https://ariyankhan.com/documentary-video-editing.html
 - Short Form Video Editing: https://ariyankhan.com/short-form-video-editing.html

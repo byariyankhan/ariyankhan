@@ -6,6 +6,9 @@ Static HTML/CSS/JS + PHP site. No build framework. Namecheap shared hosting.
 
 ## Deploy
 
+> **Moving to the Hostinger KVM VPS (in progress):** see "VPS deployment
+> (Docker)" below. The Namecheap options here are the legacy path.
+
 ### Option 1 — Git Push (preferred)
 
 ```bash
@@ -41,6 +44,51 @@ bash deploy.sh --dry-run               # preview without uploading
 
 ---
 
+## VPS deployment (Docker)
+
+The site runs as one self-contained Docker Compose project on the shared
+Hostinger KVM VPS, next to the other sites already there. It binds **no public
+port**: `ariyankhan-web` listens on `127.0.0.1:${WEB_PORT:-8081}` and the VPS's
+existing reverse proxy routes `ariyankhan.com` to it (Traefik labels are on the
+container for proxies that read them). All state is in this project's own named
+volumes (`site`, `site_data`), so moving the site to its own VPS later is: run
+the same compose there, copy the `site_data` volume, flip DNS.
+
+| File | Purpose |
+|------|---------|
+| `deploy/docker-compose.yml` | Shared-VPS project: `fetch` (clones this repo into the `site` volume) + `web` (php:8.4-apache) |
+| `deploy/docker-compose.standalone.yml` | Same, plus Caddy on :80/:443 with automatic TLS — only for a VPS where nothing else uses those ports |
+| `deploy/web-entrypoint.sh` | Enables Apache modules, `AllowOverride All`, and writes `mail-config.local.php` / `admin-config.local.php` from env vars |
+
+**Deploy / redeploy:** push to `main`, then re-run the project in hPanel → VPS →
+Docker Manager (or the Hostinger API `VPS_createNewProject` with
+`deploy/docker-compose.yml`). `fetch` re-clones `main`; `data/` (SQLite: tracker,
+inbox, reviews) is untouched because it lives on `site_data`.
+
+**Secrets** are never in git: set them as the project's environment in Docker
+Manager. `deploy/web-entrypoint.sh` turns them into the two gitignored PHP files
+on every start:
+
+| Env var | Ends up in |
+|---------|-----------|
+| `SMTP_HOST`, `SMTP_USER`, `SMTP_PASS`, `SMTP_PORT`, `TO_EMAIL`, `SITE_URL` | `mail-config.local.php` (contact form, tracker + inbox mail) |
+| `IMAP_HOST`, `IMAP_PORT`, `IMAP_USER`, `IMAP_PASS` | `mail-config.local.php` (inbox) |
+| `MCP_TOKEN` | `mail-config.local.php` → `mcp.php` auth |
+| `ADMIN_PASSWORD` | `admin-config.local.php` → `/admin/` login |
+| `WEB_PORT` (default 8081), `SITE_BRANCH` (default `main`) | compose itself |
+
+**Migrating the old database from Namecheap:** download `data/tracker.sqlite`
+(and `data/inbox.sqlite` if present) from cPanel File Manager, upload to the
+VPS, then `docker cp tracker.sqlite ariyankhan-web:/var/www/html/data/` and
+`docker exec ariyankhan-web chown www-data:www-data /var/www/html/data/tracker.sqlite`.
+
+**Proxy note:** `.htaccess` forces HTTPS via `%{HTTPS}` *or*
+`X-Forwarded-Proto`, so any proxy that sets that header (all of them do) works
+without a redirect loop. `RedirectMatch 404 ^/(deploy|tests)` keeps the tooling
+directories unreachable over the web.
+
+---
+
 ## File Map
 
 | File | Purpose |
@@ -69,6 +117,9 @@ bash deploy.sh --dry-run               # preview without uploading
 | `js/review-card.js` | Auto-rotating testimonial card behavior — see "Review Card" section below |
 | `js/reviews-data.js` | Curated review text (`window.CURATED_REVIEWS`), single source of truth |
 | `css/review-card.css` | Review card + testimonial section design, shared across pages |
+| `ai-metadata-remover.html` | Free SEO tool page: strips C2PA/XMP/IPTC/EXIF/PNG-text metadata from images in the browser — see "AI Metadata Remover" section below |
+| `js/ai-metadata-remover.js` | The byte-level JPEG/PNG/WebP metadata stripper + page UI (no server, no upload) |
+| `css/ai-metadata-remover.css` | Tool page layout, drop zone, result cards, content sections |
 
 ---
 
@@ -394,6 +445,39 @@ before touching avatar/ring CSS:**
    to nothing on every rotation instead of staying put.
 
 ---
+
+## AI Metadata Remover (free tool page)
+
+`ai-metadata-remover.html` is an organic-traffic page: a free, in-browser tool that
+removes AI/provenance metadata from images, wrapped in SEO content (what it
+removes, generator table, honest limits, FAQ with `FAQPage` schema, `WebApplication`
+schema). Linked from the shared footer on every page, listed in `sitemap.xml`,
+`llms.txt` and `llms-full.txt`.
+
+**How it works (`js/ai-metadata-remover.js`):** the file is read with the File API
+and the *container* is rewritten — pixel data is copied byte-for-byte, never
+decoded or re-encoded, so quality is untouched and there is no server round-trip
+at all (`.htaccess` CSP has `blob:` in `img-src` so the result thumbnails can render).
+
+| Format | Kept | Removed |
+|--------|------|---------|
+| JPEG | SOI, APP0 JFIF, APP2 `ICC_PROFILE`, APP14 Adobe, DQT/DHT/SOF/DRI/SOS…EOI | APP1 EXIF (optional keep), APP1 XMP + extended XMP, APP2 MPF/FlashPix, APP11 JUMBF (C2PA), APP12 Ducky, APP13 IPTC/Photoshop, other APPn, COM, anything after EOI |
+| PNG | IHDR, PLTE, IDAT, IEND, tRNS, gAMA, cHRM, sRGB, iCCP, sBIT, bKGD, pHYs, hIST, sPLT, APNG (acTL/fcTL/fdAT), cICP/mDCV/cLLI | eXIf (optional keep), tEXt/zTXt/iTXt (SD `parameters`, ComfyUI `prompt`/`workflow`, XMP), caBX (C2PA), tIME, unknown chunks, anything after IEND |
+| WebP | VP8/VP8L/VP8X/ALPH/ANIM/ANMF/ICCP (VP8X EXIF/XMP flag bits cleared, RIFF size fixed) | EXIF (optional keep), `XMP `, `C2PA`, unknown chunks, trailing data |
+| Anything else the browser can decode | — | Re-encoded from pixels to a fresh PNG via canvas (lossless but not byte-identical; animation lost) |
+
+Every removed/kept block is scanned for generator signatures (`SIGNATURES` array)
+so the result card can say "C2PA Content Credentials", "OpenAI / ChatGPT / DALL·E",
+"Stable Diffusion / ComfyUI / A1111", etc. If the user chose "Keep camera EXIF" and
+that EXIF block itself contains a signature, the card shows a warning.
+
+**Testing:** `node tests/ai-metadata-remover.test.mjs` builds synthetic JPEG/PNG/WebP
+fixtures with EXIF/XMP/C2PA/IPTC/text chunks, runs the stripper and asserts the
+output parses clean. Needs Node only (no browser).
+
+**Honest limits (keep the copy honest):** it cannot remove pixel watermarks
+(SynthID etc.), cannot beat pixel-based detectors, and does nothing for video.
+Don't market it as "make AI images undetectable".
 
 ## Do Not
 

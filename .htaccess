@@ -12,8 +12,15 @@ RewriteCond %{HTTP_HOST} ^www\.(.+)$ [NC]
 RewriteRule ^ https://%1%{REQUEST_URI} [L,R=301]
 
 # ── Force HTTPS ──────────────────────────────────
+#    Behind a TLS-terminating proxy (Caddy on the VPS, Cloudflare) Apache
+#    itself only ever sees plain HTTP, so also trust X-Forwarded-Proto or
+#    this loops forever.
 RewriteCond %{HTTPS} off
+RewriteCond %{HTTP:X-Forwarded-Proto} !=https
 RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+# ── Never serve deploy/test tooling ──────────────
+RedirectMatch 404 ^/(deploy|tests)(/|$)
 
 ## Missing paths: keep a real 404 status and hand off to /404.html
 RewriteCond %{REQUEST_URI} !^/404\.html$ [NC]
@@ -29,7 +36,7 @@ RewriteRule ^ - [R=404,L]
   Header always set Referrer-Policy "strict-origin-when-cross-origin"
   Header always set Permissions-Policy "camera=(), microphone=(), geolocation=()"
   Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
-  Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://www.google-analytics.com; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://img.youtube.com https://i.ytimg.com; frame-src https://www.youtube.com https://drive.google.com https://www.facebook.com; connect-src 'self' https://www.google-analytics.com https://region1.google-analytics.com https://analytics.google.com https://www.youtube.com; object-src 'none'; base-uri 'self'; form-action 'self'"
+  Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://www.google-analytics.com; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://img.youtube.com https://i.ytimg.com; frame-src https://www.youtube.com https://drive.google.com https://www.facebook.com; connect-src 'self' https://www.google-analytics.com https://region1.google-analytics.com https://analytics.google.com https://www.youtube.com; object-src 'none'; base-uri 'self'; form-action 'self'"
 </IfModule>
 
 # ── Gzip compression ─────────────────────────────
