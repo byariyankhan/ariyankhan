@@ -272,6 +272,31 @@ if (!is_array($data)) {
   respond(400, ['ok' => false, 'error' => 'Invalid request payload']);
 }
 
+/* ── Spam gate (no CAPTCHA needed) ───────────────────────────────
+   1. Honeypot: the hidden "website" field is empty for humans. Bots that
+      fill it get a fake success so they don't retry.
+   2. Fill time: the page sends its load timestamp; anything submitted in
+      under 3 seconds is not a person. Negative values (client clock ahead
+      of ours) are ignored rather than punished.
+   3. Rate limit: max 5 messages per IP per hour, tracked in the temp dir. */
+if (trim((string) ($data['website'] ?? '')) !== '') {
+  respond(200, ['ok' => true]);
+}
+$loaded_at = (int) ($data['t'] ?? 0);
+$elapsed_ms = (int) round(microtime(true) * 1000) - $loaded_at;
+if ($loaded_at > 0 && $elapsed_ms >= 0 && $elapsed_ms < 3000) {
+  respond(429, ['ok' => false, 'error' => 'That was quick — please take a moment and send again.']);
+}
+$client_ip = trim(explode(',', (string) ($_SERVER['HTTP_CF_CONNECTING_IP'] ?? $_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR'] ?? '0'))[0]);
+$rate_file = sys_get_temp_dir() . '/ak-contact-' . hash('sha256', $client_ip) . '.json';
+$hits = is_file($rate_file) ? (json_decode((string) file_get_contents($rate_file), true) ?: []) : [];
+$hits = array_values(array_filter($hits, static fn ($ts) => is_int($ts) && $ts > time() - 3600));
+if (count($hits) >= 5) {
+  respond(429, ['ok' => false, 'error' => 'Too many messages from this connection. Please try again in an hour.']);
+}
+$hits[] = time();
+@file_put_contents($rate_file, json_encode($hits), LOCK_EX);
+
 $name = clean_line((string) ($data['name'] ?? ''));
 $email = filter_var(trim((string) ($data['email'] ?? '')), FILTER_SANITIZE_EMAIL);
 $whatsapp = clean_line((string) ($data['whatsapp'] ?? ''));

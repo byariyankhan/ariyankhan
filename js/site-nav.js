@@ -80,7 +80,7 @@
   }
 
   function buildNavComponent(isHomePage, homePath) {
-    const basePath = homePath.replace(/index\.html$/, '');
+    const basePath = homePath === '/' ? '/' : homePath.replace(/index\.html$/, '');
     const logoHref = isHomePage ? '#home' : homePath;
     const contactItem = NAV_ITEMS.find(item => item.id === 'contact');
     const contactHref = buildHref(contactItem, isHomePage, homePath, basePath);
@@ -129,7 +129,7 @@
       if (this.dataset.rendered === 'true') return;
 
       const isHomePage = this.dataset.page === 'home';
-      const homePath = this.dataset.homePath || 'index.html';
+      const homePath = this.dataset.homePath || '/';
 
       this.style.display = 'contents';
       this.innerHTML = buildNavComponent(isHomePage, homePath);

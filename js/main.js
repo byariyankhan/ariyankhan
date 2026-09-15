@@ -11,6 +11,10 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape') closeAllDropdowns();
 });
 
+// Page-load timestamp: send-mail.php rejects submissions that arrive
+// suspiciously fast (bots fill forms in milliseconds).
+const CF_LOADED_AT = Date.now();
+
 /* ── Stars ── */
 (function () {
   const starsRoot = document.getElementById('stars');
@@ -763,6 +767,8 @@ async function handleSubmit(btn) {
         'Accept': 'application/json',
       },
       body: JSON.stringify({
+        website: document.getElementById('cf-website')?.value || '',
+        t: CF_LOADED_AT,
         name,
         email,
         whatsapp,

@@ -932,6 +932,8 @@ section{ position:relative; z-index:1; padding:80px 22px; }
 /* ── CONTACT FORM ── */
 .cf-group{ margin-bottom:0; padding:18px 0; border-bottom:1px solid #1a1a1a; }
 /* Label starts exactly at the box's left edge (no indent) */
+/* Honeypot: invisible to people, tempting to bots. Never display:none (some bots skip those). */
+.cf-hp{ position:absolute; left:-9999px; top:auto; width:1px; height:1px; overflow:hidden; opacity:0; pointer-events:none; }
 .cf-label{ display:block; font-size:11px; font-weight:700; letter-spacing:3px; color:var(--muted); margin-bottom:8px; padding-left:0; font-family:'Barlow Condensed',sans-serif; }
 .cf-input{
   width:100%;
