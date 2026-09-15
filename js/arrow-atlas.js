@@ -780,13 +780,14 @@
 
   // ── First open: welcome and terms. Every launch: the logo and a line to set the mood ──
   const QUOTES = [
-    'A few quiet minutes of focus each day train attention the way a walk trains the legs.',
-    'One clear move at a time. That is all a busy mind needs to settle.',
-    'The right arrow is always on the board. Slow down and it shows itself.',
-    'Puzzles before bed can help the day wind down. Play a board, then rest well.',
-    'Attention is a muscle. Every board you finish is one more rep.',
+    'Endless scrolling has shrunk your attention span? Play 30 minutes a day for 21 days and watch your focus come back.',
+    'Your brain has learned to skim. Teach it to look again: one board, one right move at a time.',
+    '21 days. 30 minutes a day. One country at a time. That is how focus is rebuilt.',
+    'No feed, no noise, no timer. Just you, a map and the next clear move.',
+    'Attention is a muscle. Every board you clear is one more rep.',
+    'Cannot sit with one thing for ten minutes any more? Start with one board tonight.',
+    'Play a board before bed instead of the feed. Wind down, then sleep well.',
     'Look before you tap. Patience clears more boards than speed.',
-    'Every country you clear is one you will recognise on a map for good.',
   ];
   function showSplash(then) {
     if (!el.splash) { then?.(); return; }
