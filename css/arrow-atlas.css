@@ -27,7 +27,9 @@ button{ font-family:inherit; }
 .aa-app [hidden], .aa-sheet [hidden], .aa-page [hidden], .aa-sheet[hidden], .aa-gate[hidden], .aa-splash[hidden]{ display:none !important; }
 
 /* ── App frame ── */
-.aa-app{ min-height:100dvh; max-width:640px; margin:0 auto; padding:calc(10px + env(safe-area-inset-top, 0px)) 16px calc(16px + env(safe-area-inset-bottom, 0px)); display:flex; flex-direction:column; }
+/* a game, not a document: no pinch or double-tap zoom anywhere, so quick taps never shove the board off screen */
+html, body{ touch-action:manipulation; overscroll-behavior:none; }
+.aa-app{ touch-action:manipulation; min-height:100dvh; max-width:640px; margin:0 auto; padding:calc(10px + env(safe-area-inset-top, 0px)) 16px calc(16px + env(safe-area-inset-bottom, 0px)); display:flex; flex-direction:column; }
 .aa-screen{ display:flex; flex-direction:column; flex:1; min-height:0; padding:0; }
 .aa-icon{ width:42px; height:42px; border-radius:50%; border:none; background:transparent; color:var(--line); cursor:pointer; display:inline-flex; align-items:center; justify-content:center; padding:0; font-size:18px; font-weight:900; transition:background .15s, transform .15s; }
 .aa-icon svg{ width:26px; height:26px; fill:none; stroke:currentColor; stroke-width:1.9; stroke-linecap:round; stroke-linejoin:round; }

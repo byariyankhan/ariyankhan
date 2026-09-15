@@ -548,9 +548,12 @@ unlock (skip allowed after two fails), stars, best times and progress in
   `sideBurst(level)` (streamers from both screen edges on the shared particle
   canvas, level 0-3 from `comboLevel`: Good / Great / Amazing / Unstoppable)
   with `SFX.cheer(level)`, a jingle that rises three semitones per level, and a
-  short 1.4 s toast. Outside a combo, one arrow travelling `LONG_SHOT` (16)
-  cells or more earns a level-0 cheer on its own. `fxEmit()` runs one animation loop for every emitter, including the win
+  short 1.4 s toast; after a cheer the next `CHEER_HOLD` (3) shots stay quiet.
+  Long shots on their own never cheer. `fxEmit()` runs one animation loop for every emitter, including the win
   fountain `confetti()`; nothing is drawn under reduced motion.
+- **No zoom**: the viewport meta sets `maximum-scale=1, user-scalable=no` and
+  `html, body, .aa-app` carry `touch-action: manipulation`, so fast double taps
+  and stray pinches can no longer zoom the page and push the board off screen.
 - **Armed arrows and lane preview** (as in the reference apps): a blocked tap
   costs a heart once and leaves the arrow *armed* (it just turns red);
   after every shot `releaseArmed()` fires any armed arrow whose lane is now clear

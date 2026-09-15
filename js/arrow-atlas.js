@@ -28,7 +28,7 @@
   const comboLevel = n => n >= 12 ? 3 : n >= 8 ? 2 : n >= 5 ? 1 : 0;
   // a cheer only when the combo *reaches* a step (x3, x5, x8, x12, then every fifth), never on every shot
   const comboStep = n => n === 3 || n === 5 || n === 8 || n === 12 || (n > 12 && (n - 12) % 5 === 0);
-  const LONG_SHOT = 16;           // an arrow that travels this many cells earns a small cheer on its own (rare)
+  const CHEER_HOLD = 3;           // after a cheer, the next three shots stay quiet whatever the combo
   const MILESTONES = [25, 50, 75, 90];
   const RUSH_SECONDS = 90;
   const HINT_PENALTY_MS = 5000;
@@ -84,7 +84,7 @@
     mode: 'classic', muted: !!store.get('muted', false), music: store.get('music', true) !== false, vibe: store.get('vibe', true) !== false, guides: !!store.get('guides', false),
     idx: -1, level: null, tier: 0, mask: null, pieces: [], occ: null, W: 0, H: 0, left: 0,
     lives: LIVES, livesMax: LIVES, startedAt: 0, elapsed: 0, timerId: 0, finished: false, hintsUsed: 0, wrong: 0, fails: 0, seedBump: 0, busy: false,
-    combo: 0, bestCombo: 0, lastShot: 0, shown: new Set(), daily: null,
+    combo: 0, bestCombo: 0, lastShot: 0, cheerHold: 0, shown: new Set(), daily: null,
   };
 
   // ── Helpers ──
@@ -602,7 +602,7 @@
     state.maskInfo = maskFor(state.level, state.tier);
     const gen = bestBoard(state.maskInfo, state.tier, (daily ? daily.seed : (i + 1) * 1000) + state.seedBump);
     const livesMax = livesFor(state.mode);
-    Object.assign(state, { W: gen.W, H: gen.H, pieces: gen.pieces, occ: gen.occ, land: gen.land, left: gen.pieces.length, lives: livesMax, livesMax, elapsed: 0, startedAt: 0, finished: false, hintsUsed: 0, wrong: 0, busy: false, combo: 0, bestCombo: 0, lastShot: 0, shown: new Set(), armed: new Set() });
+    Object.assign(state, { W: gen.W, H: gen.H, pieces: gen.pieces, occ: gen.occ, land: gen.land, left: gen.pieces.length, lives: livesMax, livesMax, elapsed: 0, startedAt: 0, finished: false, hintsUsed: 0, wrong: 0, busy: false, combo: 0, bestCombo: 0, lastShot: 0, cheerHold: 0, shown: new Set(), armed: new Set() });
     el.error.hidden = true; el.loading.hidden = true;
     if (daily) { if (history.replaceState) history.replaceState(null, '', location.pathname + location.search + '#daily'); } else setHash(i);
     scrollToGame();
@@ -722,12 +722,13 @@
     const pct = Math.round(((state.pieces.length - state.left) / state.pieces.length) * 100);
     const m = MILESTONES.find(x => pct >= x && !state.shown.has(x));
     // a cheer (confetti from both sides, rising jingle) for a combo of three or more, or for one long shot
-    const cheer = comboStep(state.combo) ? comboLevel(state.combo) : (state.combo < 3 && travel >= LONG_SHOT) ? 0 : -1;
-    if (cheer >= 0 && state.left > 0) { sideBurst(cheer); SFX.cheer(cheer); }
+    // a cheer only when the combo reaches a step, and never within three shots of the last cheer
+    if (state.cheerHold > 0) state.cheerHold--;
+    const cheer = state.cheerHold === 0 && comboStep(state.combo) ? comboLevel(state.combo) : -1;
+    if (cheer >= 0 && state.left > 0) { state.cheerHold = CHEER_HOLD; sideBurst(cheer); SFX.cheer(cheer); }
     if (state.left === 0) winLevel();
     else if (m) { state.shown.add(m); toast(({ 25: 'Nice start. 25% cleared.', 50: 'Halfway. The shape is showing.', 75: '75% cleared. Keep the rhythm.', 90: 'Almost there!' })[m]); }
-    else if (cheer >= 0 && comboStep(state.combo)) toast(`${COMBO_WORDS[cheer]} Combo x${state.combo}`, 'combo', 1400);
-    else if (cheer === 0) toast('Long shot!', 'combo', 1400);
+    else if (cheer >= 0) toast(`${COMBO_WORDS[cheer]} Combo x${state.combo}`, 'combo', 1400);
   }
   function blocked(p, blocker) {
     if (state.armed.has(p)) { bounce(p); SFX.block(); toast('Still blocked. It will go by itself once its lane clears.', 'hint'); return; }
