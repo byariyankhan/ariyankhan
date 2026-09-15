@@ -6,6 +6,9 @@ Static HTML/CSS/JS + PHP site. No build framework. Namecheap shared hosting.
 
 ## Deploy
 
+> **Moving to the Hostinger KVM VPS (in progress):** see "VPS deployment
+> (Docker)" below. The Namecheap options here are the legacy path.
+
 ### Option 1 — Git Push (preferred)
 
 ```bash
@@ -38,6 +41,51 @@ bash deploy.sh --dry-run               # preview without uploading
 ```
 
 **Never commit:** `.env`, `mail-config.local.php`, `admin-config.local.php` (credentials), `data/` (tracker database) — all in `.gitignore`
+
+---
+
+## VPS deployment (Docker)
+
+The site runs as one self-contained Docker Compose project on the shared
+Hostinger KVM VPS, next to the other sites already there. It binds **no public
+port**: `ariyankhan-web` listens on `127.0.0.1:${WEB_PORT:-8081}` and the VPS's
+existing reverse proxy routes `ariyankhan.com` to it (Traefik labels are on the
+container for proxies that read them). All state is in this project's own named
+volumes (`site`, `site_data`), so moving the site to its own VPS later is: run
+the same compose there, copy the `site_data` volume, flip DNS.
+
+| File | Purpose |
+|------|---------|
+| `deploy/docker-compose.yml` | Shared-VPS project: `fetch` (clones this repo into the `site` volume) + `web` (php:8.4-apache) |
+| `deploy/docker-compose.standalone.yml` | Same, plus Caddy on :80/:443 with automatic TLS — only for a VPS where nothing else uses those ports |
+| `deploy/web-entrypoint.sh` | Enables Apache modules, `AllowOverride All`, and writes `mail-config.local.php` / `admin-config.local.php` from env vars |
+
+**Deploy / redeploy:** push to `main`, then re-run the project in hPanel → VPS →
+Docker Manager (or the Hostinger API `VPS_createNewProject` with
+`deploy/docker-compose.yml`). `fetch` re-clones `main`; `data/` (SQLite: tracker,
+inbox, reviews) is untouched because it lives on `site_data`.
+
+**Secrets** are never in git: set them as the project's environment in Docker
+Manager. `deploy/web-entrypoint.sh` turns them into the two gitignored PHP files
+on every start:
+
+| Env var | Ends up in |
+|---------|-----------|
+| `SMTP_HOST`, `SMTP_USER`, `SMTP_PASS`, `SMTP_PORT`, `TO_EMAIL`, `SITE_URL` | `mail-config.local.php` (contact form, tracker + inbox mail) |
+| `IMAP_HOST`, `IMAP_PORT`, `IMAP_USER`, `IMAP_PASS` | `mail-config.local.php` (inbox) |
+| `MCP_TOKEN` | `mail-config.local.php` → `mcp.php` auth |
+| `ADMIN_PASSWORD` | `admin-config.local.php` → `/admin/` login |
+| `WEB_PORT` (default 8081), `SITE_BRANCH` (default `main`) | compose itself |
+
+**Migrating the old database from Namecheap:** download `data/tracker.sqlite`
+(and `data/inbox.sqlite` if present) from cPanel File Manager, upload to the
+VPS, then `docker cp tracker.sqlite ariyankhan-web:/var/www/html/data/` and
+`docker exec ariyankhan-web chown www-data:www-data /var/www/html/data/tracker.sqlite`.
+
+**Proxy note:** `.htaccess` forces HTTPS via `%{HTTPS}` *or*
+`X-Forwarded-Proto`, so any proxy that sets that header (all of them do) works
+without a redirect loop. `RedirectMatch 404 ^/(deploy|tests)` keeps the tooling
+directories unreachable over the web.
 
 ---
 

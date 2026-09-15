@@ -1,0 +1,87 @@
+# ariyankhan.com — dedicated-VPS variant: same fetch + web as
+# deploy/docker-compose.yml, plus Caddy owning :80/:443 for TLS. Use this only
+# on a VPS where nothing else listens on 80/443 (e.g. after moving the site to
+# its own machine). With CF_API_TOKEN set, certificates come via Cloudflare
+# DNS so the Cloudflare proxy (orange cloud) can stay on; without it, plain
+# HTTP-01 (DNS must then point straight at the VPS, grey cloud).
+#
+# Extra environment: SITE_DOMAIN, ACME_EMAIL, CF_API_TOKEN
+
+services:
+  fetch:
+    image: alpine/git:latest
+    volumes:
+      - site:/site
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        set -e
+        find /site -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+        git clone --depth 1 --branch "${SITE_BRANCH:-main}" https://github.com/byariyankhan/ariyankhan.git /site
+        rm -rf /site/.git
+        echo "site fetched @ $(date -u)"
+
+  web:
+    image: php:8.4-apache
+    container_name: ariyankhan-web
+    restart: unless-stopped
+    depends_on:
+      fetch:
+        condition: service_completed_successfully
+    volumes:
+      - site:/var/www/html
+      - site_data:/var/www/html/data
+    environment:
+      SITE_URL: ${SITE_URL:-https://ariyankhan.com}
+      TO_EMAIL: ${TO_EMAIL:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      IMAP_HOST: ${IMAP_HOST:-}
+      IMAP_PORT: ${IMAP_PORT:-993}
+      IMAP_USER: ${IMAP_USER:-}
+      IMAP_PASS: ${IMAP_PASS:-}
+      MCP_TOKEN: ${MCP_TOKEN:-}
+      ALLOW_SELF_SIGNED: ${ALLOW_SELF_SIGNED:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+    command: ["bash", "/var/www/html/deploy/web-entrypoint.sh"]
+
+  caddy:
+    image: ghcr.io/caddybuilds/caddy-cloudflare:2
+    restart: unless-stopped
+    depends_on:
+      - web
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      SITE_DOMAIN: ${SITE_DOMAIN:-ariyankhan.com}
+      ACME_EMAIL: ${ACME_EMAIL:-hi@ariyankhan.com}
+      CF_API_TOKEN: ${CF_API_TOKEN:-}
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        if [ -n "$$CF_API_TOKEN" ]; then TLS='tls { dns cloudflare {env.CF_API_TOKEN} }'; else TLS=''; fi
+        cat > /etc/caddy/Caddyfile <<CADDY
+        {
+          email $$ACME_EMAIL
+        }
+        $$SITE_DOMAIN, www.$$SITE_DOMAIN {
+          encode zstd gzip
+          reverse_proxy web:80
+          $$TLS
+        }
+        CADDY
+        caddy fmt --overwrite /etc/caddy/Caddyfile
+        exec caddy run --config /etc/caddy/Caddyfile --adapter caddyfile
+
+volumes:
+  site:
+  site_data:
+  caddy_data:
+  caddy_config:

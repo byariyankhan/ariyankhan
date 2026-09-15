@@ -1,0 +1,81 @@
+# ariyankhan.com — self-contained Docker Compose project for a shared VPS.
+#
+# Designed to live next to other sites on the same Hostinger KVM: it binds NO
+# public port. The `web` container listens on 127.0.0.1:${WEB_PORT} (default
+# 8081) and whichever reverse proxy already fronts the VPS (Traefik, Nginx
+# Proxy Manager, Caddy, Coolify/Dokploy…) routes ariyankhan.com to it. Every
+# piece of state is in this project's own named volumes, so moving the site to
+# its own VPS later is: run the same compose there, copy the `site_data`
+# volume, flip DNS. Nothing is shared with the neighbours.
+#
+#   fetch — one-shot: clones the GitHub repo (SITE_BRANCH, default main) into
+#           the `site` volume. Re-running the project = deploy latest main.
+#   web   — php:8.4-apache, mod_rewrite/.htaccess, SQLite on `site_data`,
+#           secrets materialised from env by deploy/web-entrypoint.sh.
+#
+# For a dedicated VPS with nothing else on :80/:443 use
+# deploy/docker-compose.standalone.yml instead (adds Caddy for TLS).
+#
+# Environment (Docker Manager → project env / .env):
+#   WEB_PORT, SITE_BRANCH,
+#   SITE_URL, TO_EMAIL, SMTP_HOST, SMTP_USER, SMTP_PASS, SMTP_PORT,
+#   IMAP_HOST, IMAP_PORT, IMAP_USER, IMAP_PASS, MCP_TOKEN, ADMIN_PASSWORD
+
+services:
+  fetch:
+    image: alpine/git:latest
+    volumes:
+      - site:/site
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        set -e
+        find /site -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+        git clone --depth 1 --branch "${SITE_BRANCH:-main}" https://github.com/byariyankhan/ariyankhan.git /site
+        rm -rf /site/.git
+        echo "site fetched @ $(date -u)"
+
+  web:
+    image: php:8.4-apache
+    container_name: ariyankhan-web
+    restart: unless-stopped
+    depends_on:
+      fetch:
+        condition: service_completed_successfully
+    ports:
+      - "127.0.0.1:${WEB_PORT:-8081}:80"
+    volumes:
+      - site:/var/www/html
+      - site_data:/var/www/html/data
+    environment:
+      SITE_URL: ${SITE_URL:-https://ariyankhan.com}
+      TO_EMAIL: ${TO_EMAIL:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      IMAP_HOST: ${IMAP_HOST:-}
+      IMAP_PORT: ${IMAP_PORT:-993}
+      IMAP_USER: ${IMAP_USER:-}
+      IMAP_PASS: ${IMAP_PASS:-}
+      MCP_TOKEN: ${MCP_TOKEN:-}
+      ALLOW_SELF_SIGNED: ${ALLOW_SELF_SIGNED:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+    command: ["bash", "/var/www/html/deploy/web-entrypoint.sh"]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS -o /dev/null -H 'X-Forwarded-Proto: https' http://localhost/ || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    # If the VPS proxy is Traefik (Coolify / Dokploy / plain), these labels
+    # route the host straight to this container; harmless for any other proxy.
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.ariyankhan.rule: "Host(`ariyankhan.com`) || Host(`www.ariyankhan.com`)"
+      traefik.http.routers.ariyankhan.entrypoints: "websecure"
+      traefik.http.routers.ariyankhan.tls.certresolver: "letsencrypt"
+      traefik.http.services.ariyankhan.loadbalancer.server.port: "80"
+
+volumes:
+  site:
+  site_data:
