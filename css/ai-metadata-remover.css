@@ -127,6 +127,10 @@
 }
 
 /* ── Content sections ── */
+/* style.css pads EVERY <section> by (100vw-1000px)/2 at >=1200px (homepage
+   full-bleed sections). Ours already sit in a centred max-width box, so that
+   padding squeezes the text into a one-word-per-line column on wide screens. */
+.amr-page section.amr-section, .amr-page section.amr-results{ padding-left:0; padding-right:0; }
 .amr-section{ margin:0 auto 70px; max-width:880px; }
 .amr-section .tag-pill{ margin-bottom:14px; }
 .amr-section .section-title{ font-size:clamp(28px,5vw,40px); }
