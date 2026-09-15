@@ -127,7 +127,10 @@ button{ font-family:inherit; }
 /* a shot arrow lights up with a three-colour gradient that streams along it */
 .aa-piece.is-going .aa-track{ stroke:url(#aaGrad); stroke-width:.24; }
 .aa-piece.is-going .aa-head{ fill:url(#aaGrad); stroke:none; }
-.aa-grad-1{ stop-color:var(--accent); } .aa-grad-2{ stop-color:var(--accent2); } .aa-grad-3{ stop-color:var(--good); }
+/* three shades of the theme's success green stream along a shot arrow (plain-hex fallbacks for browsers without color-mix) */
+.aa-grad-1{ stop-color:var(--good); }
+.aa-grad-2{ stop-color:#9BE7B8; stop-color:color-mix(in srgb, var(--good) 45%, #FFFFFF); }
+.aa-grad-3{ stop-color:#1F6E48; stop-color:color-mix(in srgb, var(--good) 65%, #0B3D2E); }
 .aa-piece:hover .aa-track, .aa-piece:focus-visible .aa-track{ stroke:var(--accent); stroke-width:.24; }
 .aa-piece:hover .aa-head, .aa-piece:focus-visible .aa-head{ fill:var(--accent); stroke:var(--accent); }
 .aa-piece.is-going{ pointer-events:none; }
