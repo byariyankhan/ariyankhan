@@ -532,6 +532,15 @@ unlock (skip allowed after two fails), stars, best times and progress in
   `#aaAbout` section under the app (the settings "How to play" and "About"
   rows scroll to it); the homepage has a "Games" section linking both games
   with keyword anchor text; sitemap priority 1.0 with an image entry.
+- **Armed arrows and lane preview** (as in the reference apps): a blocked tap
+  costs a heart once and leaves the arrow *armed* (red, with a faint red lane);
+  after every shot `releaseArmed()` fires any armed arrow whose lane is now clear
+  (`shoot(p, true)`: no combo/milestone chatter), one at a time so cascades chain.
+  Tapping an armed arrow again costs nothing. Pressing and holding an arrow for
+  260 ms (`peek()`) draws its lane, green if it can go and red if not, and marks
+  the arrow; the next tap anywhere clears it (`clearPeek()`). Taps are handled on
+  pointerdown/pointerup with a 12 px move tolerance; keyboard: Enter/Space tap,
+  L peeks. Lanes live in the `.aa-lanes` group above the pieces.
 - **Legal**: the game has its own `arrow-atlas-privacy.html` and
   `arrow-atlas-terms.html` (what is stored on the device, Google Analytics, fonts,
   permissions, children, no account), linked from the welcome gate and Settings;

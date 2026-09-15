@@ -112,7 +112,7 @@ button{ font-family:inherit; }
 .aa-board-wrap{ position:relative; flex:1; min-height:0; display:flex; align-items:center; justify-content:center; padding:6px 0; }
 .aa-board-track{ position:absolute; left:0; right:0; top:0; height:4px; background:var(--bg2); border-radius:4px; }
 .aa-board-bar{ height:100%; width:0; background:var(--accent); border-radius:4px; transition:width .3s; }
-.aa-board{ display:block; width:100%; height:auto; max-height:calc(100dvh - 210px); touch-action:manipulation; user-select:none; -webkit-user-select:none; }
+.aa-board{ display:block; width:100%; height:auto; max-height:calc(100dvh - 210px); touch-action:manipulation; user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; }
 .aa-board--tall{ max-height:calc(100dvh - 190px); }
 .aa-outline{ fill:var(--accent); fill-opacity:0; stroke:none; transition:fill-opacity .35s; pointer-events:none; }
 .aa-guides{ display:none; }
@@ -125,6 +125,18 @@ button{ font-family:inherit; }
 .aa-piece:hover .aa-track, .aa-piece:focus-visible .aa-track{ stroke:var(--accent); stroke-width:.17; }
 .aa-piece:hover .aa-head, .aa-piece:focus-visible .aa-head{ fill:var(--accent); stroke:var(--accent); }
 .aa-piece.is-going{ pointer-events:none; }
+/* armed: a blocked arrow stays red until its lane clears, then goes by itself */
+.aa-piece.is-armed .aa-track{ stroke:var(--bad); }
+.aa-piece.is-armed .aa-head{ fill:var(--bad); stroke:var(--bad); }
+/* press and hold: the lane it would travel, green if clear, red if not */
+.aa-piece.is-peek-free .aa-track{ stroke:var(--good); stroke-width:.17; }
+.aa-piece.is-peek-free .aa-head{ fill:var(--good); stroke:var(--good); }
+.aa-piece.is-peek-blocked .aa-track{ stroke:var(--bad); stroke-width:.17; }
+.aa-piece.is-peek-blocked .aa-head{ fill:var(--bad); stroke:var(--bad); }
+.aa-lanes line{ stroke-width:.14; stroke-linecap:round; pointer-events:none; opacity:.4; }
+.aa-lane--free{ stroke:var(--good); }
+.aa-lane--blocked, .aa-lane--armed{ stroke:var(--bad); }
+.aa-lane--peek{ animation:aa-glow .6s ease-in-out infinite alternate; }
 .aa-piece.is-blocker .aa-track{ stroke:var(--bad) !important; stroke-width:.2; }
 .aa-piece.is-blocker .aa-head{ fill:var(--bad) !important; stroke:var(--bad) !important; }
 .aa-piece.is-hint .aa-track{ stroke:var(--accent) !important; stroke-width:.22; animation:aa-glow .5s ease-in-out infinite alternate; }

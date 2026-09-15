@@ -549,12 +549,19 @@
       headG.appendChild(svgEl('path', { d: 'M-0.26 -0.22 L0.08 0 L-0.26 0.22 Z', class: 'aa-head' }));
       g.appendChild(headG);
       p.bodyLen = bodyLen; p.exitLen = exitLen;
-      g.addEventListener('click', () => tapPiece(p));
-      g.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); tapPiece(p); } });
+      // a tap shoots (or fails); pressing and holding shows the arrow's lane instead: green if it can go, red if not
+      let holdTimer = 0, held = false, down = null;
+      g.addEventListener('pointerdown', e => { if (e.pointerType === 'mouse' && e.button !== 0) return; held = false; down = [e.clientX, e.clientY]; clearTimeout(holdTimer); holdTimer = setTimeout(() => { held = true; peek(p); }, HOLD_MS); });
+      g.addEventListener('pointermove', e => { if (down && Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 12) { clearTimeout(holdTimer); down = null; } });
+      g.addEventListener('pointerup', () => { clearTimeout(holdTimer); if (!down) return; down = null; if (held) { held = false; return; } tapPiece(p); });
+      g.addEventListener('pointercancel', () => { clearTimeout(holdTimer); down = null; });
+      g.addEventListener('contextmenu', e => e.preventDefault());
+      g.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); tapPiece(p); } else if (e.key === 'l' || e.key === 'L') { e.preventDefault(); peek(p); } });
       p.el = g;
       piecesG.appendChild(g);
     }
     svg.appendChild(piecesG);
+    state.lanesEl = svgEl('g', { class: 'aa-lanes' }); svg.appendChild(state.lanesEl);
     updateReveal();
   }
   function updateReveal() {
@@ -580,7 +587,7 @@
     state.maskInfo = maskFor(state.level, state.tier);
     const gen = bestBoard(state.maskInfo, state.tier, (daily ? daily.seed : (i + 1) * 1000) + state.seedBump);
     const livesMax = livesFor(state.mode);
-    Object.assign(state, { W: gen.W, H: gen.H, pieces: gen.pieces, occ: gen.occ, land: gen.land, left: gen.pieces.length, lives: livesMax, livesMax, elapsed: 0, startedAt: 0, finished: false, hintsUsed: 0, wrong: 0, busy: false, combo: 0, bestCombo: 0, lastShot: 0, shown: new Set() });
+    Object.assign(state, { W: gen.W, H: gen.H, pieces: gen.pieces, occ: gen.occ, land: gen.land, left: gen.pieces.length, lives: livesMax, livesMax, elapsed: 0, startedAt: 0, finished: false, hintsUsed: 0, wrong: 0, busy: false, combo: 0, bestCombo: 0, lastShot: 0, shown: new Set(), armed: new Set() });
     el.error.hidden = true; el.loading.hidden = true;
     if (daily) { if (history.replaceState) history.replaceState(null, '', location.pathname + location.search + '#daily'); } else setHash(i);
     scrollToGame();
@@ -629,16 +636,56 @@
     while (y >= 0 && y < state.H && x >= 0 && x < state.W) { const o = state.occ[y][x]; if (o >= 0 && o !== p.idx) return state.pieces[o]; y += dr; x += dc; }
     return null;
   }
+  const HOLD_MS = 260;
+  // The lane an arrow would travel: from its tip to the board edge, or to the arrow in its way.
+  function laneLine(p, cls) {
+    const [dr, dc] = DIRS[p.dir]; const [hy, hx] = p.cells[0];
+    let y = hy + dr, x = hx + dc, n = 0;
+    while (y >= 0 && y < state.H && x >= 0 && x < state.W && state.occ[y][x] < 0) { y += dr; x += dc; n++; }
+    const hit = y >= 0 && y < state.H && x >= 0 && x < state.W;   // stopped on a piece rather than the edge
+    const len = n + (hit ? 0.5 : 1) - 0.32;
+    const x1 = hx + 0.5 + dc * 0.32, y1 = hy + 0.5 + dr * 0.32;
+    return svgEl('line', { x1, y1, x2: x1 + dc * Math.max(0, len), y2: y1 + dr * Math.max(0, len), class: 'aa-lane ' + cls, 'data-i': p.idx });
+  }
+  // Press and hold: show whether this arrow can go. Any tap afterwards clears it.
+  function peek(p) {
+    if (state.finished || p.gone) return;
+    clearPeek();
+    const free = !blockerOf(p);
+    p.el.classList.add(free ? 'is-peek-free' : 'is-peek-blocked');
+    state.lanesEl.appendChild(laneLine(p, free ? 'aa-lane--free aa-lane--peek' : 'aa-lane--blocked aa-lane--peek'));
+    vibe(8);
+  }
+  function clearPeek() {
+    $$('.aa-piece.is-peek-free, .aa-piece.is-peek-blocked', el.board).forEach(g => g.classList.remove('is-peek-free', 'is-peek-blocked'));
+    $$('.aa-lane--peek', el.board).forEach(l => l.remove());
+  }
+  // A blocked arrow stays armed (red) and goes by itself the moment its lane clears.
+  function arm(p) {
+    state.armed.add(p); p.el.classList.add('is-armed');
+    state.lanesEl.appendChild(laneLine(p, 'aa-lane--armed'));
+  }
+  function disarm(p) {
+    state.armed.delete(p); p.el?.classList.remove('is-armed');
+    $$(`.aa-lane--armed[data-i="${p.idx}"]`, el.board).forEach(l => l.remove());
+  }
+  function releaseArmed() {
+    if (state.finished) return;
+    for (const p of Array.from(state.armed)) if (!p.gone && !blockerOf(p)) { disarm(p); shoot(p, true); return; }   // one at a time, each shot re-checks
+  }
   function tapPiece(p) {
     if (state.finished || p.gone || state.busy) return;
+    clearPeek();
     startTimer();
     const blocker = blockerOf(p);
     if (blocker) { blocked(p, blocker); return; }
     shoot(p);
   }
-  function shoot(p) {
+  function shoot(p, auto = false) {
     p.gone = true; state.left--;
+    if (state.armed.has(p)) disarm(p);
     for (const [y, x] of p.cells) state.occ[y][x] = -1;
+    if (state.armed.size) setTimeout(releaseArmed, auto ? 90 : 160);   // armed arrows whose lane just opened go by themselves
     const travel = p.bodyLen + p.exitLen;
     const dur = Math.min(0.7, 0.15 + travel * 0.03);
     const track = p.el.querySelector('.aa-track'), head = p.el.querySelector('.aa-head');
@@ -653,6 +700,7 @@
     const now = performance.now();
     state.combo = now - state.lastShot < COMBO_WINDOW_MS ? state.combo + 1 : 1; state.lastShot = now; state.bestCombo = Math.max(state.bestCombo, state.combo);
     updateReveal(); renderHud();
+    if (auto) { if (state.left === 0) winLevel(); return; }   // no combo or milestone chatter for arrows that went on their own
     const pct = Math.round(((state.pieces.length - state.left) / state.pieces.length) * 100);
     const m = MILESTONES.find(x => pct >= x && !state.shown.has(x));
     if (state.left === 0) winLevel();
@@ -660,7 +708,9 @@
     else if (state.combo >= 3) toast(`Combo x${state.combo}!`, 'combo');
   }
   function blocked(p, blocker) {
+    if (state.armed.has(p)) { p.el.classList.remove('is-shake'); void p.el.getBBox(); p.el.classList.add('is-shake'); setTimeout(() => p.el.classList.remove('is-shake'), 400); toast('Still blocked. It will go by itself once its lane clears.', 'hint'); return; }
     state.lives--; state.wrong++;
+    arm(p);
     SFX.block(); vibe(60);
     p.el.classList.remove('is-shake'); void p.el.getBBox(); p.el.classList.add('is-shake');
     blocker.el.classList.add('is-blocker');
@@ -668,7 +718,7 @@
     setTimeout(() => p.el.classList.remove('is-shake'), 400);
     renderHud();
     if (state.lives <= 0) failLevel('Out of hearts.');
-    else toast(state.lives === 1 ? 'Blocked! Last heart, look before you tap.' : 'Blocked! The red arrow is in the way.', 'bad');
+    else toast(state.lives === 1 ? 'Blocked! Last heart. It stays red and goes by itself once its lane clears.' : 'Blocked! It stays red and goes by itself once its lane clears.', 'bad');
   }
   function hint() {
     if (state.finished) return;
