@@ -23,9 +23,12 @@
   const RUSH_SECONDS = 90;
   const HINT_PENALTY_MS = 5000;
   const HINTS_PER_LEVEL = 3;       // Classic and Rush; Deep Focus is unlimited
-  const MODES = { classic: 'Classic', rush: 'Rush', onelife: 'One Life', focus: 'Deep Focus' };
-  const livesFor = mode => mode === 'onelife' ? 1 : mode === 'focus' ? Infinity : LIVES;
-  const TIER_OF = i => i < 5 ? 0 : i < 15 ? 1 : i < 30 ? 2 : i < 50 ? 3 : 4;
+  const MODES = { classic: 'Classic' };  // one way to play: difficulty ramps with the level, every 5th level spikes
+  const livesFor = () => LIVES;
+  const BASE_TIER = i => i < 5 ? 0 : i < 15 ? 1 : i < 30 ? 2 : i < 50 ? 3 : 4;
+  const SPIKE = i => (i + 1) % 5 === 0;
+  const TIER_OF = i => Math.min(4, BASE_TIER(i) + (SPIKE(i) ? 1 : 0));
+  const LEVEL_DIFF = i => { const t = TIER_OF(i); return t <= 1 ? (SPIKE(i) ? 'Hard' : 'Normal') : DIFF_OF(t); };
   const MAXLEN_OF = [4, 5, 6, 7, 8];
   const DIRS = { r: [0, 1], l: [0, -1], d: [1, 0], u: [-1, 0] };
   const PALETTE = ['#FFED54', '#5CD6FF', '#8CFF7A', '#FF9AD5', '#C79BFF', '#FFB347', '#6EE7B7', '#FDBA74', '#F97373', '#38BDF8'];
@@ -36,7 +39,7 @@
   };
 
   const el = {
-    select: $('#aaSelect'), levels: $('#aaLevels'), progress: $('#aaProgress'), progressBar: $('#aaProgressBar'), modes: $('#aaModes'), modeDesc: $('#aaModeDesc'), modeDescSheet: $('#aaModeDescSheet'), modeTileName: $('#aaModeTileName'), modeTile: $('#aaModeTile'), streak: $('#aaStreak'), daily: $('#aaDaily'), hudDiff: $('#aaHudDiff'), play: $('#aaPlay'), playSub: $('#aaPlaySub'), path: $('#aaPath'),
+    select: $('#aaSelect'), levels: $('#aaLevels'), progress: $('#aaProgress'), progressBar: $('#aaProgressBar'), streak: $('#aaStreak'), daily: $('#aaDaily'), hudDiff: $('#aaHudDiff'), play: $('#aaPlay'), playSub: $('#aaPlaySub'), path: $('#aaPath'), btnVibe: $('#aaVibe'), btnGuides: $('#aaGuides'), howTo: $('#aaHowTo'), aboutPanel: $('#aaAboutPanel'),
     sheet: $('#aaSheet'), levelsSheet: $('#aaLevelsSheet'), levelsBtn: $('#aaLevelsBtn'), settingsBtns: $$('#aaSettings, #aaSettingsG'), themeBtn: $('#aaTheme'), themes: $('#aaThemes'),
     game: $('#aaGame'), boardWrap: $('#aaBoardWrap'), board: $('#aaBoard'), toast: $('#aaToast'), confetti: $('#aaConfetti'),
     hudLevel: $('#aaHudLevel'), hudMode: $('#aaHudMode'), hudTime: $('#aaHudTime'), hudLeft: $('#aaHudLeft'), hudLives: $('#aaHudLives'), hudLivesWrap: $('#aaHudLivesWrap'), hudPct: $('#aaHudPct'), boardBar: $('#aaBoardBar'),
@@ -48,7 +51,7 @@
 
   let DATA = null;
   const state = {
-    mode: MODES[store.get('mode')] ? store.get('mode') : 'classic', muted: !!store.get('muted', false),
+    mode: 'classic', muted: !!store.get('muted', false), vibe: store.get('vibe', true) !== false, guides: !!store.get('guides', false),
     idx: -1, level: null, tier: 0, mask: null, pieces: [], occ: null, W: 0, H: 0, left: 0,
     lives: LIVES, livesMax: LIVES, startedAt: 0, elapsed: 0, timerId: 0, finished: false, hintsUsed: 0, fails: 0, seedBump: 0, busy: false,
     combo: 0, bestCombo: 0, lastShot: 0, shown: new Set(), daily: null,
@@ -85,7 +88,13 @@
     } catch { /* silent */ }
   }
   const SFX = { shoot: () => beep([[880, 0, 0.07], [1320, 0.04, 0.08]]), block: () => beep([[150, 0, 0.18, 'square', 0.04]]), win: () => beep([[523, 0, 0.12], [659, 0.1, 0.12], [784, 0.2, 0.12], [1047, 0.3, 0.35]]), lose: () => beep([[300, 0, 0.2, 'triangle'], [220, 0.2, 0.35, 'triangle']]) };
-  function renderSound() { el.btnSound.setAttribute('aria-pressed', String(!state.muted)); el.btnSound.setAttribute('aria-label', state.muted ? 'Sound off' : 'Sound on'); el.btnSound.textContent = state.muted ? 'Off' : 'On'; }
+  function vibe(ms) { if (state.vibe && navigator.vibrate) { try { navigator.vibrate(ms); } catch { /* ignore */ } } }
+  function renderToggles() {
+    el.btnVibe?.setAttribute('aria-checked', String(state.vibe));
+    el.btnGuides?.setAttribute('aria-checked', String(state.guides));
+    el.board.classList.toggle('aa-board--guides', state.guides);
+  }
+  function renderSound() { el.btnSound.setAttribute('aria-checked', String(!state.muted)); el.btnSound.setAttribute('aria-label', state.muted ? 'Sound off' : 'Sound on'); }
 
   let toastTimer = 0;
   function toast(msg, kind = '') { el.toast.textContent = msg; el.toast.className = 'aa-toast' + (kind ? ' aa-toast--' + kind : ''); el.toast.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => { el.toast.hidden = true; }, 2800); }
@@ -111,19 +120,8 @@
     el.streak.textContent = streak >= 2 ? `🔥 ${streak} in a row` : dStreak.count >= 2 ? `🔥 ${dStreak.count}-day daily streak` : '';
     renderDaily();
     el.progressBar.style.width = `${(done / n) * 100}%`;
-    el.modes.innerHTML = '';
-    const modeList = [['classic', 'Classic', 'Timer counts up · 4 hearts · 3 hints'], ['rush', 'Rush', `${RUSH_SECONDS} second countdown · 4 hearts · 3 hints`], ['onelife', 'One Life', 'One heart. One blocked tap and it is over.'], ['focus', 'Deep Focus', 'No clock, no hearts, unlimited hints. Just clear the map.']];
-    for (const m of modeList) {
-      const b = document.createElement('button');
-      b.type = 'button'; b.className = 'aa-mode' + (m[0] === state.mode ? ' is-active' : ''); b.dataset.mode = m[0]; b.setAttribute('aria-pressed', String(m[0] === state.mode));
-      b.textContent = m[1];
-      b.addEventListener('click', () => { state.mode = m[0]; store.set('mode', m[0]); renderSelect(); });
-      el.modes.appendChild(b);
-    }
-    const cur = modeList.find(m => m[0] === state.mode);
-    el.modeDesc.textContent = cur[2]; el.modeDescSheet.textContent = cur[2]; el.modeTileName.textContent = cur[1];
     const nextIdx = DATA.levels.findIndex((_, j) => !cleared(j) && unlocked(j));
-    el.playSub.textContent = nextIdx < 0 ? 'All 70 cleared · replay any level' : `Level ${nextIdx + 1} · ${DIFF_OF(TIER_OF(nextIdx))}`;
+    el.playSub.textContent = nextIdx < 0 ? 'All 70 cleared · replay any level' : `Level ${nextIdx + 1} · ${LEVEL_DIFF(nextIdx)}`;
     el.play.dataset.level = nextIdx < 0 ? 0 : nextIdx;
     el.play.querySelector('.aa-play-label').textContent = done ? 'Continue' : 'Play';
     // level path: current level plus the next four
@@ -148,7 +146,7 @@
       b.appendChild(svg);
       const t = document.createElement('span'); t.className = 'aa-level-num'; t.textContent = String(i + 1); b.appendChild(t);
       const s = document.createElement('span'); s.className = 'aa-level-sub';
-      s.textContent = rec ? `${L.name} ${'★'.repeat(rec.stars)}` : open ? DIFF_OF(TIER_OF(i)) : '🔒';
+      s.textContent = rec ? `${L.name} ${'★'.repeat(rec.stars)}` : open ? LEVEL_DIFF(i) : '🔒';
       b.appendChild(s);
       b.addEventListener('click', () => startLevel(i));
       el.levels.appendChild(b);
@@ -266,12 +264,24 @@
     const { W, H, pieces } = state;
     const svg = el.board;
     svg.innerHTML = '';
-    svg.setAttribute('viewBox', `-0.5 -0.5 ${W + 1} ${H + 1}`);
+    svg.setAttribute('viewBox', `-0.6 -0.6 ${W + 1.2} ${H + 1.2}`);
     svg.classList.toggle('aa-board--tall', H > W * 1.25);
     const t = state.maskInfo;
     const outline = svgEl('path', { d: state.level.d, class: 'aa-outline', transform: `translate(${-t.x} ${-t.y}) scale(${t.k})` });
     svg.appendChild(outline);
     state.outlineEl = outline;
+    // Grid-aligned frame around the land cells + guide dots (Settings → Guideline)
+    const land = state.land; let frame = ''; const dots = svgEl('g', { class: 'aa-guides' });
+    for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) {
+      if (!land[r][c]) continue;
+      dots.appendChild(svgEl('circle', { cx: c + 0.5, cy: r + 0.5, r: 0.09 }));
+      if (r === 0 || !land[r - 1][c]) frame += `M${c} ${r}h1`;
+      if (r === H - 1 || !land[r + 1][c]) frame += `M${c} ${r + 1}h1`;
+      if (c === 0 || !land[r][c - 1]) frame += `M${c} ${r}v1`;
+      if (c === W - 1 || !land[r][c + 1]) frame += `M${c + 1} ${r}v1`;
+    }
+    svg.appendChild(svgEl('path', { d: frame, class: 'aa-frame' }));
+    svg.appendChild(dots);
     const piecesG = svgEl('g', { class: 'aa-pieces' });
     for (const p of pieces) {
       const g = svgEl('g', { class: 'aa-piece', 'data-i': p.idx, tabindex: '0', role: 'button', 'aria-label': `Arrow pointing ${({ r: 'right', l: 'left', u: 'up', d: 'down' })[p.dir]}` });
@@ -289,7 +299,7 @@
       track.style.strokeDashoffset = '0';
       g.appendChild(track);
       const headG = svgEl('g', { class: 'aa-head-g', transform: `translate(${tipX} ${tipY}) rotate(${ARROW[p.dir]})` });
-      headG.appendChild(svgEl('path', { d: 'M-0.34 -0.3 L0.08 0 L-0.34 0.3', class: 'aa-head' }));
+      headG.appendChild(svgEl('path', { d: 'M-0.26 -0.22 L0.08 0 L-0.26 0.22 Z', class: 'aa-head' }));
       g.appendChild(headG);
       p.bodyLen = bodyLen; p.exitLen = exitLen;
       g.addEventListener('click', () => tapPiece(p));
@@ -324,23 +334,22 @@
     el.select.hidden = true; el.game.hidden = false; el.overlay.hidden = true; el.error.hidden = true; el.loading.hidden = true;
     if (daily) { if (history.replaceState) history.replaceState(null, '', location.pathname + location.search + '#daily'); } else setHash(i);
     scrollToGame();
+    const diff = daily ? DIFF_OF(state.tier) : LEVEL_DIFF(i);
+    state.diff = diff;
     renderBoard(); renderHud();
-    const diff = DIFF_OF(state.tier);
     if (i === 0 && !cleared(0) && !daily) toast('Tap an arrow to shoot it off the board. If another arrow is in its way, you lose a heart.', 'hint');
-    else if (diff !== 'Normal') toast(`${diff.toUpperCase()} LEVEL · ${state.pieces.length} arrows${state.mode === 'onelife' ? ' · one heart' : ''}`, 'hard');
+    else if (diff !== 'Normal') toast(`${diff.toUpperCase()} LEVEL · ${state.pieces.length} arrows`, 'hard');
     else toast(`${daily ? 'Daily board' : 'Level ' + (i + 1)} · ${state.pieces.length} arrows · which country is this?`);
   }
 
   function renderHud() {
     el.hudLevel.textContent = state.daily ? 'Daily' : `Level ${state.idx + 1}`;
-    el.hudMode.textContent = MODES[state.mode];
-    el.hudDiff.textContent = DIFF_OF(state.tier);
-    el.hudDiff.className = 'aa-hud-diff aa-hud-diff--' + DIFF_OF(state.tier).toLowerCase().replace(' ', '-');
-    const focus = state.mode === 'focus';
-    el.hudLivesWrap.hidden = focus;
+    const diffLabel = state.diff || DIFF_OF(state.tier);
+    el.hudDiff.textContent = diffLabel;
+    el.hudDiff.className = 'aa-hud-diff aa-hud-diff--' + diffLabel.toLowerCase().replace(' ', '-');
     const hintsLeft = HINTS_PER_LEVEL - state.hintsUsed;
-    el.btnHint.textContent = focus ? '💡 ∞' : `💡 ${Math.max(0, hintsLeft)}`;
-    el.btnHint.disabled = state.finished || (!focus && hintsLeft <= 0);
+    el.btnHint.textContent = `💡 ${Math.max(0, hintsLeft)}`;
+    el.btnHint.disabled = state.finished || hintsLeft <= 0;
     const pct = state.pieces.length ? Math.round(((state.pieces.length - state.left) / state.pieces.length) * 100) : 0;
     el.hudPct.textContent = `${pct}%`;
     el.boardBar.style.width = `${pct}%`;
@@ -354,13 +363,12 @@
   const currentElapsed = () => state.startedAt ? state.elapsed + (performance.now() - state.startedAt) : state.elapsed;
   function renderTime() {
     const e = currentElapsed();
-    el.hudTime.textContent = state.mode === 'focus' ? '∞' : state.mode === 'rush' ? fmtTime(RUSH_SECONDS * 1000 - e) : fmtTime(e);
-    el.hudTime.classList.toggle('is-low', state.mode === 'rush' && RUSH_SECONDS * 1000 - e < 15000);
+    el.hudTime.textContent = fmtTime(e);
   }
   function startTimer() {
     if (state.startedAt || state.finished) return;
     state.startedAt = performance.now();
-    state.timerId = setInterval(() => { renderTime(); if (state.mode === 'rush' && currentElapsed() >= RUSH_SECONDS * 1000) failLevel('Time is up!'); }, 200);
+    state.timerId = setInterval(renderTime, 500);
   }
   function stopTimer() { if (state.startedAt) { state.elapsed += performance.now() - state.startedAt; state.startedAt = 0; } clearInterval(state.timerId); state.timerId = 0; }
 
@@ -391,7 +399,7 @@
     head.style.transform = `translate(${p.exitLen}px, 0)`; // local frame: the head group is already rotated to point forward
     head.style.opacity = '0';
     setTimeout(() => p.el.remove(), dur * 1000 + 80);
-    SFX.shoot();
+    SFX.shoot(); vibe(12);
     const now = performance.now();
     state.combo = now - state.lastShot < COMBO_WINDOW_MS ? state.combo + 1 : 1; state.lastShot = now; state.bestCombo = Math.max(state.bestCombo, state.combo);
     updateReveal(); renderHud();
@@ -402,35 +410,32 @@
     else if (state.combo >= 3) toast(`Combo x${state.combo}!`, 'combo');
   }
   function blocked(p, blocker) {
-    const focus = state.mode === 'focus';
-    if (!focus) state.lives--;
-    SFX.block();
+    state.lives--;
+    SFX.block(); vibe(60);
     p.el.classList.remove('is-shake'); void p.el.getBBox(); p.el.classList.add('is-shake');
     blocker.el.classList.add('is-blocker');
     setTimeout(() => blocker.el.classList.remove('is-blocker'), 600);
     setTimeout(() => p.el.classList.remove('is-shake'), 400);
     renderHud();
-    if (focus) toast('Blocked. The red arrow is in the way. No penalty in Deep Focus.', 'bad');
-    else if (state.lives <= 0) failLevel('Out of hearts.');
+    if (state.lives <= 0) failLevel('Out of hearts.');
     else toast(state.lives === 1 ? 'Blocked! Last heart, look before you tap.' : 'Blocked! The red arrow is in the way.', 'bad');
   }
   function hint() {
     if (state.finished) return;
-    const focus = state.mode === 'focus';
-    if (!focus && state.hintsUsed >= HINTS_PER_LEVEL) { toast('No hints left on this level.', 'bad'); return; }
+    if (state.hintsUsed >= HINTS_PER_LEVEL) { toast('No hints left on this level.', 'bad'); return; }
     const p = state.pieces.find(q => !q.gone && !blockerOf(q));
     if (!p) return;
     startTimer();
-    state.hintsUsed++; if (!focus) state.elapsed += HINT_PENALTY_MS;
+    state.hintsUsed++; state.elapsed += HINT_PENALTY_MS;
     $$('.aa-piece.is-hint', el.board).forEach(g => g.classList.remove('is-hint'));
     p.el.classList.add('is-hint');
     setTimeout(() => p.el.classList.remove('is-hint'), 2500);
-    toast(focus ? 'Hint: the glowing arrow is free.' : `Hint: the glowing arrow is free. +${HINT_PENALTY_MS / 1000}s on the clock, ${HINTS_PER_LEVEL - state.hintsUsed} left.`, 'hint');
+    toast(`Hint: the glowing arrow is free. ${HINTS_PER_LEVEL - state.hintsUsed} left.`, 'hint');
     renderHud();
   }
 
   // ── End of level ──
-  function stars() { if (state.mode === 'focus') return state.hintsUsed === 0 ? 3 : state.hintsUsed <= 2 ? 2 : 1; const lost = state.livesMax - state.lives; return lost === 0 ? 3 : lost === 1 ? 2 : 1; }
+  function stars() { const lost = state.livesMax - state.lives; return lost === 0 ? 3 : lost === 1 ? 2 : 1; }
   function winLevel() {
     stopTimer(); state.finished = true; state.busy = true;
     state.outlineEl?.style.setProperty('fill-opacity', '0.9');
@@ -473,7 +478,7 @@
       <p class="aa-card-kicker">${milestone ? `Milestone · ${i + 1} countries` : streak >= 2 ? `${streak} in a row · ` : ''}${quizRight ? 'Correct!' : 'It was'}</p>
       <h3>${L.name}</h3>
       <p class="aa-stars" aria-label="${s} of 3 stars">${'★'.repeat(s)}${'☆'.repeat(3 - s)}</p>
-      <div class="aa-stats"><span><b>${fmtTime(t, true)}</b>time</span><span><b>${state.mode === 'focus' ? '∞' : LIVES - state.lives}</b>${state.mode === 'focus' ? 'hearts' : 'hearts lost'}</span><span><b>${state.hintsUsed}</b>hints</span><span><b>x${state.bestCombo}</b>best combo</span></div>
+      <div class="aa-stats"><span><b>${fmtTime(t, true)}</b>time</span><span><b>${LIVES - state.lives}</b>hearts lost</span><span><b>${state.hintsUsed}</b>hints</span><span><b>x${state.bestCombo}</b>best combo</span></div>
       <p class="aa-facts">${facts}</p>
       <p class="aa-best">${isBest ? (prev ? `New best time! Previous ${fmtTime(prev.t, true)}.` : 'First clear. That is your time to beat.') : `Your best: ${fmtTime(prev.t, true)}.`}</p>
       <div class="aa-actions">
@@ -523,7 +528,7 @@
   async function share() {
     const n = DATA.levels.length, done = DATA.levels.filter((_, i) => cleared(i)).length;
     const rec = state.daily ? store.get(`daily:${state.daily.key}`) : cleared(state.idx);
-    const text = `Arrow Atlas: I cleared ${state.level.name} (${state.daily ? 'daily board ' + state.daily.key : 'level ' + (state.idx + 1)}, ${MODES[state.mode]}) in ${fmtTime(rec?.t ?? state.elapsed, true)} ${'★'.repeat(rec?.stars || stars())} and ${done}/${n} countries so far.\nYour turn: https://ariyankhan.com/arrow-atlas.html${state.daily ? '#daily' : '#level-' + (state.idx + 1)}`;
+    const text = `Arrow Atlas: I cleared ${state.level.name} (${state.daily ? 'daily board ' + state.daily.key : 'level ' + (state.idx + 1)}) in ${fmtTime(rec?.t ?? state.elapsed, true)} ${'★'.repeat(rec?.stars || stars())} and ${done}/${n} countries so far.\nYour turn: https://ariyankhan.com/arrow-atlas.html${state.daily ? '#daily' : '#level-' + (state.idx + 1)}`;
     const flash = $('.aa-flash', el.card);
     try {
       if (navigator.share) { await navigator.share({ text }); return; }
@@ -554,7 +559,6 @@
   const openSheet = sh => { sh.hidden = false; document.body.style.overflow = 'hidden'; };
   const closeSheets = () => { el.sheet.hidden = true; el.levelsSheet.hidden = true; document.body.style.overflow = ''; };
   el.settingsBtns.forEach(b => b.addEventListener('click', () => openSheet(el.sheet)));
-  el.modeTile.addEventListener('click', () => openSheet(el.sheet));
   el.levelsBtn.addEventListener('click', () => { renderSelect(); openSheet(el.levelsSheet); });
   $$('[data-close-sheet]').forEach(b => b.addEventListener('click', closeSheets));
   $$('.aa-sheet').forEach(sh => sh.addEventListener('click', e => { if (e.target === sh) closeSheets(); }));
@@ -573,6 +577,10 @@
   applyTheme(THEMES.includes(store.get('theme')) ? store.get('theme') : 'paper');
   el.btnLevels.addEventListener('click', () => { if (state.left < state.pieces.length && !state.finished && !confirm('Leave this level? Progress on it will be lost.')) return; goToLevels(); });
   el.btnSound.addEventListener('click', () => { state.muted = !state.muted; store.set('muted', state.muted); renderSound(); if (!state.muted) SFX.shoot(); });
+  el.btnVibe?.addEventListener('click', () => { state.vibe = !state.vibe; store.set('vibe', state.vibe); renderToggles(); vibe(20); });
+  el.btnGuides?.addEventListener('click', () => { state.guides = !state.guides; store.set('guides', state.guides); renderToggles(); });
+  el.howTo?.addEventListener('click', () => { el.aboutPanel.open = true; el.aboutPanel.scrollIntoView({ behavior: 'smooth', block: 'start' }); });
+  renderToggles();
   document.addEventListener('keydown', e => { if (!el.game.hidden && !state.finished && (e.key === 'h' || e.key === 'H') && !/input|textarea/i.test(document.activeElement?.tagName || '')) hint(); });
   document.addEventListener('visibilitychange', () => { if (document.hidden && state.startedAt && !state.finished) { stopTimer(); } });
   el.board.addEventListener('pointerdown', () => { if (!state.startedAt && !state.finished && state.elapsed) startTimer(); });

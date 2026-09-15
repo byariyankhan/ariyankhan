@@ -9,7 +9,7 @@ const data = JSON.parse(fs.readFileSync(path.join(root, 'games/data/arrow-atlas.
 const html = fs.readFileSync(path.join(root, 'arrow-atlas.html'), 'utf8');
 // Pull the pure pieces of the engine out of the IIFE so the exact production code is tested.
 const grab = re => { const m = js.match(re); if (!m) throw new Error('could not find ' + re); return m[0]; };
-const src = [grab(/const DIRS = [^\n]+/), grab(/const PALETTE = [^\n]+/), grab(/const TIER_OF = [^\n]+/), grab(/const MAXLEN_OF = [^\n]+/), grab(/function mulberry32[^\n]+/), grab(/function generate\(mask, maxLen, seed\) \{[\s\S]*?\n  \}\n/)].join('\n');
+const src = [grab(/const DIRS = [^\n]+/), grab(/const PALETTE = [^\n]+/), grab(/const BASE_TIER = [^\n]+/), grab(/const SPIKE = [^\n]+/), grab(/const TIER_OF = [^\n]+/), grab(/const MAXLEN_OF = [^\n]+/), grab(/function mulberry32[^\n]+/), grab(/function generate\(mask, maxLen, seed\) \{[\s\S]*?\n  \}\n/)].join('\n');
 const { generate, TIER_OF, MAXLEN_OF, DIRS } = new Function(src + '\nreturn { generate, TIER_OF, MAXLEN_OF, DIRS };')();
 let tests = 0;
 const test = (name, fn) => { tests++; try { fn(); console.log('  ✓ ' + name); } catch (e) { console.log('  ✗ ' + name + '\n    ' + e.message); process.exitCode = 1; } };
