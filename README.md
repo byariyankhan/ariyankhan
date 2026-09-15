@@ -485,23 +485,29 @@ unlock (skip allowed after two fails), stars, best times and progress in
 
 - **Engine**: `js/arrow-atlas.js` (no libraries), styles in `css/arrow-atlas.css`
   (`.aa-` prefix). Puzzles are generated in the browser from a fixed seed per level
-  (`mulberry32`), so every player gets the same board. `generate()` works backwards
-  from an empty board — each new piece must have a clear run to the edge past the
-  pieces placed before it — so the reverse order is always a solution and no move
-  order can get stuck. `generate()` runs in two phases: first the boundary cells are traced into snakes
-  that hug the outline (every head continues its own last segment; a run may cross
-  non-land and other border cells, and border pieces are ordered so whoever is
-  pointed at is removed first — pieces that cannot be ordered are dropped back to
-  the interior pass — which is what makes the country's outline out of arrows, as
-  in the reference apps); then the interior is filled most-constrained-cell-first,
-  looking "through" border pieces because they are newer, with the body's first
-  step straight behind the head so arrowheads are always in line. Bodies snake backwards through empty cells (random walk,
-  never onto the head's exit line) so boards read like a maze; a piece is drawn as one track path and
-  shot with a stroke-dashoffset transition so it flows out along its own track. Dead
-  cells are absorbed into a neighbouring piece (head moves forward, or tail extends,
-  with the removal-order invariant re-checked, re-ordering the piece to newest when
-  its line is clear); if that fails the seed is bumped and it retries. 1,050 boards
-  in tests: 0 failures, 0 unsolvable, ~4 ms (Normal) to ~230 ms (Master) each.
+  and tier (`mulberry32`). `generate()` gives every piece an order number `ord`;
+  the solution removes pieces newest-first, and two pairwise rules keep that valid
+  whatever the player does: everything on a piece's exit run must be newer than it,
+  everything whose run crosses one of its cells must be older. A new piece either
+  gets the newest number or is slotted (fractional ord) between the pieces its run
+  crosses and the pieces it points at. Difficulty is not the arrow count but how few
+  arrows are free at any moment ("narrow play", as in the reference apps): with
+  probability `narrow` a piece aims at existing pieces, with `chain` it sits on the
+  run of the newest still-open piece, `far` puts it further down that run
+  (`NARROW_OF`/`CHAIN_OF`/`FAR_OF` per tier). Heads always continue their last
+  segment; bodies random-walk backwards (never onto their own run), hug the coast
+  when they start on it (so the outline is drawn by arrows), step into nooks that
+  nothing else could reach, and are shortened until they leave no cell without an
+  option; cells with one option are placed first; dead cells are absorbed into a
+  neighbouring piece (tail first, the receiving chain renumbered newer if needed).
+  Measured on the tour boards: arrows free at the start went from ~25% of the board
+  (plain most-constrained generation) to ~5-7%, free at any moment from ~12% to
+  ~4%; 1,050 boards: 0 failures, 0 unsolvable, ~7 ms (Normal) to ~250 ms (Master).
+  `scratchpad/aa-free.mjs`-style profiling: count free pieces along a random solve.
+- **First open / launch**: `#aaGate` (welcome, Terms + Privacy links, Accept,
+  stored in `aa:v1:welcomed`), then `#aaSplash` (logo + one line from `QUOTES`,
+  rotating per launch in `aa:v1:launches`, tap or 2.4 s to dismiss, skipped for
+  `#level-N`/`#daily` deep links and once per browser session).
 - **Data**: `games/data/arrow-atlas.json` built by `games/build-arrow-atlas.mjs`
   from world-atlas 110m + Natural Earth 50m properties: per country the outline
   (`d`, in a 100×100 box) and five `tiers` of grid masks sized by land-cell count

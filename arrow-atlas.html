@@ -57,7 +57,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="css/arrow-atlas.css?v=10" />
+    <link rel="stylesheet" href="css/arrow-atlas.css?v=11" />
     <link rel="preload" href="games/data/arrow-atlas.json?v=4" as="fetch" crossorigin="anonymous" />
 
     <!-- SCHEMA -->
@@ -140,6 +140,41 @@
     </script>
   </head>
   <body class="aa-body">
+    <!-- ── FIRST OPEN: welcome and terms ── -->
+    <div class="aa-gate" id="aaGate" hidden>
+      <div class="aa-gate-inner">
+        <h2 class="aa-gate-title">Welcome to<br />Arrow Atlas</h2>
+        <svg class="aa-gate-art" viewBox="0 0 140 140" aria-hidden="true" focusable="false">
+          <g class="aa-gate-lines">
+            <path class="c1" d="M20 22v86h44" /><path class="c1 h" d="M64 102l10 6-10 6z" />
+            <path class="c2" d="M38 20h44v46" /><path class="c2 h" d="M76 66l6 10 6-10z" />
+            <path class="c3" d="M74 42h-30v26h34" /><path class="c3 h" d="M78 62l10 6-10 6z" />
+            <path class="c1" d="M118 40v82" /><path class="c1 h" d="M112 40l6-10 6 10z" />
+            <path class="c1" d="M96 90h-22" /><path class="c1 h" d="M74 84l-10 6 10 6z" />
+            <path class="c1" d="M28 120h30" /><path class="c1 h" d="M58 114l10 6-10 6z" />
+            <path class="c2" d="M100 24v-6" /><path class="c2 h" d="M94 18l6-10 6 10z" />
+            <path class="c3" d="M30 38v18" /><path class="c3 h" d="M24 56l6 10 6-10z" />
+          </g>
+          <circle class="aa-gate-dot" cx="72" cy="86" r="4" /><circle class="aa-gate-dot" cx="108" cy="72" r="4" /><circle class="aa-gate-dot" cx="52" cy="24" r="4" />
+        </svg>
+        <p class="aa-gate-text">Please read and accept our <a href="terms-and-conditions.html">Terms of Service</a> and <a href="privacy-policy.html">Privacy Policy</a>.</p>
+        <button type="button" class="aa-btn aa-gate-accept" id="aaAccept">Accept</button>
+      </div>
+    </div>
+    <!-- ── LAUNCH: logo and a line to set the mood ── -->
+    <div class="aa-splash" id="aaSplash" hidden>
+      <div class="aa-splash-inner">
+        <div class="aa-splash-logo" aria-hidden="true">
+          <svg viewBox="0 0 64 64" focusable="false">
+            <path class="s1" d="M12 52h22V30" /><path class="s1 h" d="M27 31l7-11 7 11z" />
+            <path class="s2" d="M22 40h20V18" /><path class="s2 h" d="M35 19l7-11 7 11z" />
+            <path class="s3" d="M52 12v34" /><path class="s3 h" d="M45 45l7 11 7-11z" />
+          </svg>
+        </div>
+        <p class="aa-splash-quote" id="aaSplashQuote"></p>
+        <p class="aa-splash-by">— Arrow Atlas</p>
+      </div>
+    </div>
     <main class="aa-app" id="aaApp">
       <!-- ── HOME ── -->
       <section class="aa-screen aa-home" id="aaSelect" aria-label="Home">
@@ -363,6 +398,6 @@
       </div>
     </div>
 
-    <script src="js/arrow-atlas.js?v=10"></script>
+    <script src="js/arrow-atlas.js?v=11"></script>
   </body>
 </html>

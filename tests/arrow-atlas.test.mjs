@@ -9,8 +9,8 @@ const data = JSON.parse(fs.readFileSync(path.join(root, 'games/data/arrow-atlas.
 const html = fs.readFileSync(path.join(root, 'arrow-atlas.html'), 'utf8');
 // Pull the pure pieces of the engine out of the IIFE so the exact production code is tested.
 const grab = re => { const m = js.match(re); if (!m) throw new Error('could not find ' + re); return m[0]; };
-const src = [grab(/const DIRS = [^\n]+/), grab(/const PALETTE = [^\n]+/), grab(/const BASE_TIER = [^\n]+/), grab(/const SKILL_UP = [^\n]+/), grab(/const skillShift = [^\n]+/), grab(/const tierFor = [^\n]+/), grab(/const rateRun = [\s\S]*?\n  \};\n/), grab(/const nextSkill = [^\n]+/), grab(/const MAXLEN_OF = [^\n]+/), grab(/function mulberry32[^\n]+/), grab(/function generate\(mask, maxLen, seed\) \{[\s\S]*?\n  \}\n/)].join('\n');
-const { generate, BASE_TIER, tierFor, rateRun, nextSkill, MAXLEN_OF, DIRS } = new Function(src + '\nreturn { generate, BASE_TIER, tierFor, rateRun, nextSkill, MAXLEN_OF, DIRS };')();
+const src = [grab(/const DIRS = [^\n]+/), grab(/const PALETTE = [^\n]+/), grab(/const BASE_TIER = [^\n]+/), grab(/const SKILL_UP = [^\n]+/), grab(/const skillShift = [^\n]+/), grab(/const tierFor = [^\n]+/), grab(/const rateRun = [\s\S]*?\n  \};\n/), grab(/const nextSkill = [^\n]+/), grab(/const MAXLEN_OF = [^\n]+/), grab(/const NARROW_OF = [^\n]+/), grab(/const CHAIN_OF = [^\n]+/), grab(/const FAR_OF = [^\n]+/), grab(/const GEN_OPTS = [^\n]+/), grab(/function mulberry32[^\n]+/), grab(/function generate\(mask, maxLen, seed[^)]*\) \{[\s\S]*?\n  \}\n/)].join('\n');
+const { generate, BASE_TIER, tierFor, rateRun, nextSkill, MAXLEN_OF, GEN_OPTS, DIRS } = new Function(src + '\nreturn { generate, BASE_TIER, tierFor, rateRun, nextSkill, MAXLEN_OF, GEN_OPTS, DIRS };')();
 const TIER_OF = i => tierFor(i, 0);
 let tests = 0;
 const test = (name, fn) => { tests++; try { fn(); console.log('  ✓ ' + name); } catch (e) { console.log('  ✗ ' + name + '\n    ' + e.message); process.exitCode = 1; } };
@@ -41,7 +41,7 @@ test('tiers grow in cell count and stay within 46 cells (64 tall / 56 wide for e
 test('every level generates a solvable board at its tour tier (fixed seed) and covers every land cell', () => {
   data.levels.forEach((L, i) => {
     const tier = TIER_OF(i); const mask = L.tiers[tier];
-    const b = generate(mask, MAXLEN_OF[tier], (i + 1) * 1000);
+    const b = generate(mask, MAXLEN_OF[tier], (i + 1) * 1000, GEN_OPTS(tier));
     assert.ok(solvable(b), `${L.name} unsolvable`);
     const land = mask.rows.join('').split('1').length - 1;
     assert.equal(b.pieces.reduce((n, p) => n + p.cells.length, 0), land, `${L.name} pieces do not cover the mask`);
@@ -68,6 +68,12 @@ test('adaptive difficulty: clean quick clears step the tier up, repeated losses 
   for (let k = 0; k < 6; k++) s = nextSkill(s, sloppy); assert.equal(tierFor(12, s), BASE_TIER(12), 'sloppy wins settle back to the base tier');
   s = nextSkill(s, lost); assert.equal(tierFor(12, s), BASE_TIER(12), 'one loss keeps the tier'); s = nextSkill(s, lost); assert.equal(tierFor(12, s), BASE_TIER(12) - 1, 'two losses ease off');
   assert.equal(tierFor(2, -2), 0, 'never below Normal'); assert.equal(rateRun(lost), -1); assert.ok(rateRun(perfect) === 1 && rateRun(sloppy) < 0.1);
+});
+test('narrow play: on Hard tour boards fewer than 10% of the arrows are free at the start', () => {
+  const freeAtStart = b => b.pieces.filter(p => { const [dr, dc] = DIRS[p.dir]; let [y, x] = p.cells[0]; y += dr; x += dc; while (y >= 0 && y < b.H && x >= 0 && x < b.W) { if (b.occ[y][x] >= 0) return false; y += dr; x += dc; } return true; }).length;
+  const idx = data.levels.map((_, i) => i).filter(i => BASE_TIER(i) === 2);
+  const ratio = idx.reduce((n, i) => { const b = generate(data.levels[i].tiers[2], MAXLEN_OF[2], (i + 1) * 1000, GEN_OPTS(2)); return n + freeAtStart(b) / b.pieces.length; }, 0) / idx.length;
+  assert.ok(ratio < 0.10, `free at start: ${(ratio * 100).toFixed(1)}%`);
 });
 test('data file stays under 600 KB', () => assert.ok(fs.statSync(path.join(root, 'games/data/arrow-atlas.json')).size < 600 * 1024));
 test('page copy quotes 70 levels and keeps the no-inline-style rule', () => { assert.ok(html.includes('70 countries')); assert.ok(!/<[a-z][^>]*\sstyle="/i.test(html)); });
