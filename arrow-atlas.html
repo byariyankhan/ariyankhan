@@ -15,10 +15,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 
     <!-- SEO -->
-    <title>Arrow Atlas — Arrow Puzzle &amp; Deep Focus Game on Country Maps</title>
+    <title>Arrow Atlas — Tap-Away Arrow Puzzle on Country Maps</title>
     <meta
       name="description"
-      content="Free tap-away arrow puzzle on real country maps. Beat the clock with 4 hearts, or switch to Deep Focus and just clear the map. 70 countries, no sign-up."
+      content="Free tap-away arrow puzzle on real country maps. Shoot arrows off the board, keep your 4 hearts, reveal and name the country. 70 levels, harder as you go, no sign-up."
     />
     <meta name="author" content="Ariyan Khan" />
     <meta name="robots" content="index, follow, max-image-preview:large" />
@@ -57,7 +57,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="css/arrow-atlas.css?v=6" />
+    <link rel="stylesheet" href="css/arrow-atlas.css?v=7" />
     <link rel="preload" href="games/data/arrow-atlas.json?v=3" as="fetch" crossorigin="anonymous" />
 
     <!-- SCHEMA -->
@@ -69,7 +69,7 @@
           "@type": "WebPage",
           "@id": "https://ariyankhan.com/arrow-atlas.html#webpage",
           "url": "https://ariyankhan.com/arrow-atlas.html",
-          "name": "Arrow Atlas — Arrow Puzzle & Deep Focus Game on Country Maps",
+          "name": "Arrow Atlas — Tap-Away Arrow Puzzle on Country Maps",
           "description": "Free arrow puzzle game played on real country maps. Tap arrows to shoot them off the board, keep your four hearts, beat the clock, then guess which country you cleared. 70 levels on a world tour.",
           "inLanguage": "en-US",
           "datePublished": "2026-09-15",
@@ -82,9 +82,9 @@
           "@type": ["VideoGame", "WebApplication"],
           "@id": "https://ariyankhan.com/arrow-atlas.html#game",
           "name": "Arrow Atlas",
-          "alternateName": ["Atlas Arrow Puzzle", "Tap Away Arrow Puzzle", "Deep Focus Map Game", "Country Map Arrow Game"],
+          "alternateName": ["Atlas Arrow Puzzle", "Tap Away Arrow Puzzle", "Country Map Arrow Game"],
           "url": "https://ariyankhan.com/arrow-atlas.html",
-          "description": "A tap-away arrow puzzle where every board is a real country. Tap an arrow to shoot it off the board if its path is clear; a blocked tap costs one of four hearts. Clear the board to reveal the country, name it in a three-option quiz, and collect it on a 70-level world tour. Classic (count-up timer) and Rush (90-second countdown) modes.",
+          "description": "A tap-away arrow puzzle where every board is a real country. Tap an arrow to shoot it off the board if its path is clear; a blocked tap costs one of four hearts. Clear the board to reveal the country, name it in a three-option quiz, and collect it on a 70-level world tour. Difficulty ramps automatically as the tour goes on.",
           "genre": ["Puzzle", "Casual", "Educational", "Geography", "Relaxation"],
           "gamePlatform": "Web browser",
           "playMode": "SinglePlayer",
@@ -99,8 +99,7 @@
             "70 country boards on a world tour, from Italy and Bangladesh to Iceland",
             "Tap-away mechanic: shoot arrows off the board when their path is clear",
             "4 hearts per level; a blocked arrow costs one",
-            "Classic (timer counts up), Rush (90-second countdown), One Life (one heart) and Deep Focus (no clock, no hearts, unlimited hints) modes",
-            "Difficulty tiers Normal, Hard, Super Hard and Expert; milestones every 10 levels; win streaks; combo counter; daily bonus board",
+                        "Difficulty ramps automatically: Normal, Hard, Super Hard and Expert boards, with a Hard spike every 5th level; milestones every 10 levels; win streaks; combo counter; daily bonus board",
             "Board clears reveal the country shape; a 3-option quiz asks which country it was",
             "Country facts on every clear: capital, population, region",
             "Stars, best times and tour progress saved in your browser",
@@ -129,7 +128,7 @@
           "mainEntity": [
             { "@type": "Question", "name": "How do I play Arrow Atlas?", "acceptedAnswer": { "@type": "Answer", "text": "Every arrow slides in the direction it points. Tap one and, if nothing is in its path, it shoots off the board. If another arrow is in the way it stays put and you lose a heart. Clear every arrow to reveal the country underneath, then pick its name from three options." } },
             { "@type": "Question", "name": "Is it free and do I need an account?", "acceptedAnswer": { "@type": "Answer", "text": "Yes it is free and no account is needed. Progress, stars and best times are saved in your own browser. Nothing is uploaded." } },
-            { "@type": "Question", "name": "What is the difference between Classic, Rush and Deep Focus?", "acceptedAnswer": { "@type": "Answer", "text": "Classic counts your time up so you can chase a best time. Rush gives you 90 seconds per board; when the clock hits zero the level is failed. Both give four hearts and three hints. Deep Focus has no clock and no hearts: a blocked tap simply bounces, hints are unlimited, and you clear the map at whatever pace clears your head." } },
+            { "@type": "Question", "name": "How does the difficulty work?", "acceptedAnswer": { "@type": "Answer", "text": "It ramps by itself. Early boards have about 100 cells and short arrows; by the end of the tour boards have up to 800 cells with arrows that snake up to eight cells long. Levels are labelled Normal, Hard, Super Hard and Expert, and every fifth level is a Hard spike. There is no clock to beat: four hearts and three hints per level, that is all." } },
             { "@type": "Question", "name": "Can a level become impossible?", "acceptedAnswer": { "@type": "Answer", "text": "No. Boards are generated so that a solution always exists, and removing an arrow can only free space for the others, so whatever order you tap in you can never get stuck. If you are out of ideas, use a hint: it lights up an arrow that is free right now and adds five seconds to your clock." } },
             { "@type": "Question", "name": "Are the puzzles the same for everyone?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. Each level has a fixed layout, so when you share a time on level 12 your friend faces exactly the same board. Choosing “New layout” after a fail gives you a fresh arrangement of the same country. Today's Country is likewise the same bonus board for everyone that day." } },
             { "@type": "Question", "name": "Why are the countries hidden until I finish?", "acceptedAnswer": { "@type": "Answer", "text": "That is the geography part. The board is the country's real outline and it fades in as you clear arrows, so you are quietly learning shapes while you play. The quiz at the end checks whether you spotted it, and the level card shows the capital, population and region." } },
@@ -157,12 +156,6 @@
             <span class="aa-tile-track"><span class="aa-tile-bar" id="aaProgressBar"></span></span>
             <span class="aa-tile-cta">All levels</span>
           </button>
-          <button type="button" class="aa-tile aa-tile--mode" id="aaModeTile">
-            <span class="aa-tile-kicker">Mode</span>
-            <span class="aa-tile-big" id="aaModeTileName">Classic</span>
-            <span class="aa-tile-sub" id="aaModeDesc"></span>
-            <span class="aa-tile-cta">Change</span>
-          </button>
         </div>
 
         <div class="aa-hero">
@@ -187,7 +180,7 @@
           </div>
         </header>
         <div class="aa-status">
-          <span class="aa-status-left"><span id="aaHudLivesWrap"><b class="aa-lives" id="aaHudLives" role="img" aria-label="4 of 4 hearts"></b></span><b class="aa-time" id="aaHudTime">0:00</b></span>
+          <span class="aa-status-left"><span id="aaHudLivesWrap"><b class="aa-lives" id="aaHudLives" role="img" aria-label="4 of 4 hearts"></b></span><b class="aa-time" id="aaHudTime" hidden>0:00</b></span>
           <span class="aa-status-mid"><b id="aaHudLeft">0</b> left · <b id="aaHudPct">0%</b></span>
           <button type="button" class="aa-icon aa-hintbtn" id="aaHint" title="Light up a free arrow (H)">💡 3</button>
         </div>
@@ -213,15 +206,28 @@
       </div>
     </div>
 
-    <!-- ── SETTINGS SHEET ── -->
-    <div class="aa-sheet" id="aaSheet" hidden>
+    <!-- ── SETTINGS PAGE ── -->
+    <div class="aa-sheet aa-sheet--page" id="aaSheet" hidden>
       <div class="aa-sheet-panel" role="dialog" aria-label="Settings">
-        <div class="aa-sheet-head"><h2>Settings</h2><button type="button" class="aa-icon" data-close-sheet aria-label="Close">✕</button></div>
-        <div class="aa-setting"><span>Sound</span><button type="button" class="aa-btn aa-btn--small" id="aaSound" aria-pressed="true">On</button></div>
-        <div class="aa-setting aa-setting--col"><span>Colours</span><div class="aa-themes" id="aaThemes"></div></div>
-        <div class="aa-setting aa-setting--col"><span>Mode</span><div class="aa-modes" id="aaModes" role="group" aria-label="Mode"></div><p class="aa-mode-desc" id="aaModeDescSheet"></p></div>
+        <div class="aa-sheet-head"><button type="button" class="aa-icon" data-close-sheet aria-label="Back"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H6M11 6l-6 6 6 6"/></svg></button><h2>Settings</h2></div>
+        <div class="aa-group">
+          <div class="aa-row"><span class="aa-row-ico">🔊</span><span class="aa-row-label">Sound</span><button type="button" class="aa-switch" id="aaSound" role="switch" aria-checked="true" aria-label="Sound"></button></div>
+          <div class="aa-row"><span class="aa-row-ico">📳</span><span class="aa-row-label">Vibration</span><button type="button" class="aa-switch" id="aaVibe" role="switch" aria-checked="true" aria-label="Vibration"></button></div>
+          <div class="aa-row"><span class="aa-row-ico">▦</span><span class="aa-row-label">Guideline</span><button type="button" class="aa-switch" id="aaGuides" role="switch" aria-checked="false" aria-label="Guideline dots on the board"></button></div>
+        </div>
+        <div class="aa-group">
+          <div class="aa-row aa-row--col"><span class="aa-row-label">Colours</span><div class="aa-themes" id="aaThemes"></div></div>
+        </div>
+        <div class="aa-group">
+          <button type="button" class="aa-row aa-row--link" id="aaHowTo"><span class="aa-row-ico">❓</span><span class="aa-row-label">How to play</span><span class="aa-row-chev">›</span></button>
+          <a class="aa-row aa-row--link" href="/#contact"><span class="aa-row-ico">💬</span><span class="aa-row-label">Feedback</span><span class="aa-row-chev">›</span></a>
+        </div>
+        <div class="aa-group">
+          <a class="aa-row aa-row--link" href="privacy-policy.html"><span class="aa-row-ico">🔒</span><span class="aa-row-label">Privacy Policy</span><span class="aa-row-chev">›</span></a>
+          <a class="aa-row aa-row--link" href="terms-and-conditions.html"><span class="aa-row-ico">📄</span><span class="aa-row-label">Terms of Service</span><span class="aa-row-chev">›</span></a>
+        </div>
         <details class="aa-about" id="aaAboutPanel">
-          <summary class="aa-about-summary">How to play &amp; about</summary>
+          <summary class="aa-about-summary">About Arrow Atlas</summary>
           <div class="aa-page">
       <!-- ── HOW TO PLAY ── -->
       <section class="aa-section" id="how">
@@ -252,11 +258,10 @@
           </p>
         </div>
         <p>
-          Classic mode counts up, for chasing best times. Rush mode gives you 90 seconds a board, for when you want
-          your hands to shake. One Life gives you a single heart. All three use three hints a level. Deep Focus removes
-          the clock and the hearts entirely: a blocked tap just bounces, hints are unlimited, and the only goal is the
-          slow satisfaction of watching a country emerge from the maze. Every mode saves stars and best times per level
-          in your browser.
+          There is no clock to beat. Every level gives four hearts and three hints, and the difficulty ramps on its own:
+          levels are labelled Normal, Hard, Super Hard and Expert, with a Hard spike every fifth level. Quick consecutive
+          taps build a combo, clearing levels back to back builds a win streak, every tenth level is a milestone, and the
+          Today's Country board gives everyone the same bonus puzzle each day.
         </p>
         <p>
           Levels are labelled Normal, Hard, Super Hard and Expert as the boards grow. Quick consecutive taps build a
@@ -307,9 +312,9 @@
         </div>
         <div class="faq-item">
           <button class="faq-q" id="aa-faq-q-3" type="button" aria-expanded="false" aria-controls="aa-faq-a-3">
-            <span class="faq-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2M9 3h6"/></svg></span><span class="faq-q-text">What is the difference between Classic, Rush and Deep Focus?</span><span class="faq-chevron" aria-hidden="true"></span>
+            <span class="faq-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2M9 3h6"/></svg></span><span class="faq-q-text">How does the difficulty work?</span><span class="faq-chevron" aria-hidden="true"></span>
           </button>
-          <div class="faq-a" id="aa-faq-a-3" role="region" aria-labelledby="aa-faq-q-3" aria-hidden="true"><p>Classic counts your time up so you can chase a best time. Rush gives you 90 seconds per board; when the clock hits zero the level is failed. Both give four hearts and three hints. Deep Focus has no clock and no hearts: a blocked tap simply bounces, hints are unlimited, and you clear the map at whatever pace clears your head.</p></div>
+          <div class="faq-a" id="aa-faq-a-3" role="region" aria-labelledby="aa-faq-q-3" aria-hidden="true"><p>It ramps by itself. Early boards have about 100 cells and short arrows; by the end of the tour boards have up to 800 cells with arrows that snake up to eight cells long. Levels are labelled Normal, Hard, Super Hard and Expert, and every fifth level is a Hard spike. There is no clock to beat: four hearts and three hints per level, that is all.</p></div>
         </div>
         <div class="faq-item">
           <button class="faq-q" id="aa-faq-q-4" type="button" aria-expanded="false" aria-controls="aa-faq-a-4">
@@ -356,10 +361,10 @@
       </div>
           </div>
         </details>
-        <p class="aa-credit">Made by <a href="https://www.youtube.com/@ariyankhan" target="_blank" rel="noopener">Ariyan Khan</a> · <a href="/">ariyankhan.com</a> · <a href="piece-the-world.html">Piece the World</a></p>
+        <p class="aa-credit">Arrow Atlas · made by <a href="https://www.youtube.com/@ariyankhan" target="_blank" rel="noopener">Ariyan Khan</a></p>
       </div>
     </div>
 
-    <script src="js/arrow-atlas.js?v=6"></script>
+    <script src="js/arrow-atlas.js?v=7"></script>
   </body>
 </html>

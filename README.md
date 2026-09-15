@@ -460,14 +460,16 @@ footer, and has its own look (`css/arrow-atlas.css`: Nunito, cream “paper” t
 plus “night” and “mint” via `data-theme` on `<html>`, picked in Settings or with
 the palette button). Home = streak chip, settings, a card carousel (Today's
 Country, World Tour progress, Mode), title, a level path and a Continue button;
-game = back / Level + difficulty / palette + settings, hearts + time + arrows left
-+ hint, the board, Restart. The level grid and Settings (sound, colours, mode,
-how-to-play/FAQ/about, links back to the site) are bottom sheets. This is the
+game = back / Level + difficulty / palette + settings, hearts + arrows left + hint,
+the board (grid-aligned frame around the land cells, optional guideline dots),
+Restart. The level grid is a bottom sheet; Settings is a full page like the
+reference apps: Sound / Vibration / Guideline switches, Colours, How to play,
+Feedback, Privacy Policy, Terms, and an About fold with the FAQ. This is the
 same shell we will wrap for Android/iOS (TWA / Capacitor). Each level is a
 country's outline filled with arrows; tap an arrow to shoot it off the board if its
-run to the edge is clear, a blocked tap costs one of 4 hearts, Classic (count-up) or
-Rush (90 s countdown) timer, One Life (1 heart), Deep Focus (no clock, no hearts, unlimited hints; 3 hints
-per level otherwise), difficulty labels Normal/Hard/Super Hard/Expert by tier, combo
+run to the edge is clear, a blocked tap costs one of 4 hearts, no clock (time is still recorded for the result card), 4 hearts and 3 hints per
+level, difficulty that ramps automatically (Normal/Hard/Super Hard/Expert by tier,
+plus a Hard spike every 5th level via `SPIKE`/`TIER_OF`/`LEVEL_DIFF`), combo
 counter (taps within 1.5 s), win streak, milestones every 10 levels, a Today's Country
 bonus board (date-seeded, same for everyone, `#daily`), and clearing the board reveals the country for a
 3-option quiz plus capital/population/region. 70-level World Tour with sequential
