@@ -526,10 +526,9 @@ unlock (skip allowed after two fails), stars, best times and progress in
   1000×520, Antarctica dropped, label point = centroid of the main landmass) is
   drawn on the home screen by `renderWorld()`: every country faint, the tour
   countries outlined and tappable (opens that level), cleared ones filled green
-  and numbered with their level, the next level pulsing purple. The map takes the
-  height left over in the lobby: `renderWorld()` sets the SVG height from its
-  scroll box (percent heights do not resolve in an indefinite flex column), so on
-  phones it is wider than the screen, scrolls sideways and opens on the next level.
+  and numbered with their level, the next level pulsing purple. The map fits the
+  screen width (bleeding into the side gutters) and the height left over in the
+  lobby is split evenly above and below it.
   Features world-atlas leaves without an id (Kosovo) get `n:<slug>` ids in both
   data files. Versioned with `MAP_VERSION`. There is no Restart button in the game any more (back out or
   fail and retry).
