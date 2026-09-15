@@ -485,42 +485,31 @@ unlock (skip allowed after two fails), stars, best times and progress in
 
 - **Engine**: `js/arrow-atlas.js` (no libraries), styles in `css/arrow-atlas.css`
   (`.aa-` prefix). Puzzles are generated in the browser from a fixed seed per level
-  and tier (`mulberry32`). `generate()` gives every piece an order number `ord`;
-  the solution removes pieces newest-first, and two pairwise rules keep that valid
-  whatever the player does: everything on a piece's exit run must be newer than it,
-  everything whose run crosses one of its cells must be older. A new piece either
-  gets the newest number or is slotted (fractional ord) between the pieces its run
-  crosses and the pieces it points at. Difficulty is not the arrow count but how few
-  arrows are free at any moment ("narrow play", as in the reference apps): with
-  probability `narrow` a piece aims at existing pieces, with `chain` it sits on the
-  run of the newest still-open piece, `far` puts it further down that run
-  (`NARROW_OF`/`CHAIN_OF`/`FAR_OF` per tier). Heads always continue their last
-  segment; bodies random-walk backwards (never onto their own run), hug the coast
-  when they start on it (so the outline is drawn by arrows), step into nooks that
-  nothing else could reach, and are shortened until they leave no cell without an
-  option; cells with one option are placed first; dead cells are absorbed into a
-  neighbouring piece (tail first, the receiving chain renumbered newer if needed).
-  Measured on the tour boards: arrows free at the start went from ~25% of the board
-  (plain most-constrained generation) to ~5-7%, free at any moment from ~12% to
-  ~4%; 1,050 boards: 0 failures, 0 unsolvable, ~7 ms (Normal) to ~250 ms (Master).
-  `scratchpad/aa-free.mjs`-style profiling: count free pieces along a random solve.
-- **Smarter placement** (what the reference boards do that a plain fill does not):
-  `holes` leaves a share of inland cells empty (never two side by side, never on
-  the coast; leftover isolated inland cells become gaps too), so runs cross gaps
-  and an arrow's blocker can sit a cell or two away, a trap that looks free;
-  `bundle` gives a placed piece a parallel twin (and sometimes a third rung)
-  pointing the same way, the ladders the eye cannot sort; `rail` makes some
-  pieces run long and straight across the board; among blocked directions a
-  `far` roll picks the one whose blocker is furthest; and a cell that could only
-  hold a lone arrowhead first tries to join a neighbour, then grows a snake
-  inland tail-first (`buildFromTail`) with the head at the far end. Measured on
-  the tour: ladders ~31% of arrows, traps 12-25% by tier, gaps 4-12%.
-- **Board choice**: `bestBoard()` generates `CANDIDATES_OF[tier]` boards (1/2/3/3/2)
-  from the level seed and keeps the best by `boardScore()` (free arrows ×3 + lone arrowheads − traps × 0.3),
-  so a tier's difficulty does not hinge on one seed. `startLevel` shows the game
-  screen with "Drawing the board…" and yields a frame first, because a Master board
-  takes up to ~1 s on a phone. Measured on the 168-country tour: free at the start
-  ~8% (Normal), ~7% (Hard), ~6.6% (Master); free at any moment ~4-5%.
+  and tier (`mulberry32`), in two stages, like a maze that is drawn first and
+  signposted after. (1) Layout: a share of inland cells (`HOLE_OF`) is carved out
+  as straight lanes of 1..`LANE_OF` cells (never on the coast, never beside another
+  gap); then the shape is covered with long snakes (`MAXLEN_OF`): each walk starts
+  at the most hemmed-in free cell, prefers straight runs (`RAIL_OF`), hugs the
+  coast when it starts there, steps into any nook it passes, and lone leftovers
+  join a neighbouring snake's end. (2) Signposting: "A blocks B" when A's cells lie
+  on B's run; orientations are legal as long as that graph stays acyclic, checked
+  by a path search when each snake picks its head end (snakes with the fewest
+  legal ends go first; one with none is split in two; a lone inland cell that fits
+  nowhere becomes a gap). Among legal ends: never one that is free from the start
+  when the other can point at something, then (`FAR_OF`) the end with a gap right
+  ahead — the arrow it frees when it goes is that far away — then (`NARROW_OF`)
+  the end with more pieces on its run. Ords come from a topological order, so the
+  solution removes newest-first and any other order stays solvable. ~10-40 ms a
+  board; the whole thing is why play is a search rather than trail-following.
+- **Board choice**: `bestBoard()` generates `CANDIDATES_OF[tier]` boards (4/6/8/8/8)
+  from the level seed and keeps the best by `boardScore()`, a simulated player who
+  always takes the free arrow nearest the one just tapped: mean arrows free at any
+  moment + 2 × share of freed arrows within two cells of the tap + 0.15 × free at
+  the start + 0.03 × lone arrowheads. `startLevel` shows the game screen with
+  "Drawing the board…" and yields a frame first (~0.1-0.3 s per level on desktop).
+  Measured on the tour (trail player): arrows free at any moment ~4-5 (was ~17),
+  freed arrow within two cells of the tap 23-32% (was ~60%), five or more cells
+  away 34-51%, snakes 4.6-5.6 cells long, lone arrowheads 2-8%.
 - **Lobby world map**: `games/data/world-map.json` (built by
   `games/build-world-map.mjs` from world-atlas 110m, Natural Earth projection,
   1000×520, Antarctica dropped, label point = centroid of the main landmass) is
