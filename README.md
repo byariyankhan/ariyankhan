@@ -58,7 +58,11 @@ the same compose there, copy the `site_data` volume, flip DNS.
 |------|---------|
 | `deploy/docker-compose.yml` | Shared-VPS project: `fetch` (clones this repo into the `site` volume) + `web` (php:8.4-apache) |
 | `deploy/docker-compose.standalone.yml` | Same, plus Caddy on :80/:443 with automatic TLS — only for a VPS where nothing else uses those ports |
+| `deploy/nginx-ariyankhan.conf` | Host nginx server block that proxies the domain to the container (the VPS's other sites are plain nginx vhosts too) |
 | `deploy/web-entrypoint.sh` | Enables Apache modules, `AllowOverride All`, and writes `mail-config.local.php` / `admin-config.local.php` from env vars |
+
+**Live project:** VPS `srv1918310` (ID 1918310, IP 187.52.122.99), Docker
+project `ariyankhan`, container `ariyankhan-web` on `127.0.0.1:8747`.
 
 **Deploy / redeploy:** push to `main`, then re-run the project in hPanel → VPS →
 Docker Manager (or the Hostinger API `VPS_createNewProject` with
