@@ -13,7 +13,7 @@ RewriteRule ^ https://%1%{REQUEST_URI} [L,R=301]
 
 # ── /index.html → / (one canonical URL per page) ──
 RewriteCond %{THE_REQUEST} \s/+(.*/)?index\.html[?\s] [NC]
-RewriteRule ^(.*/)?index\.html$ /%1 [R=301,L,NE]
+RewriteRule ^(.*/)?index\.html$ https://%{HTTP_HOST}/%1 [R=301,L,NE]
 
 # ── Force HTTPS ──────────────────────────────────
 #    Behind a TLS-terminating proxy (Caddy on the VPS, Cloudflare) Apache

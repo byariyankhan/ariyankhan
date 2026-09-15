@@ -96,7 +96,7 @@
     return `
 <nav class="site-nav">
   <a href="${escapeAttr(logoHref)}" class="nav-logo">
-    <div class="logo-mark"><img src="${escapeAttr(basePath)}images/logo-avatar.webp" alt="" width="34" height="34" decoding="async"></div>
+    <div class="logo-mark"><img src="${escapeAttr(basePath)}images/logo-avatar.webp?v=3" alt="" width="34" height="34" decoding="async"></div>
     <span class="logo-text">ARIYAN <span>KHAN</span></span>
   </a>
 
