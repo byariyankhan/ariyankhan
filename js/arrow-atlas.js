@@ -36,7 +36,8 @@
   };
 
   const el = {
-    select: $('#aaSelect'), levels: $('#aaLevels'), progress: $('#aaProgress'), progressBar: $('#aaProgressBar'), modes: $('#aaModes'), modeDesc: $('#aaModeDesc'), streak: $('#aaStreak'), daily: $('#aaDaily'), hudDiff: $('#aaHudDiff'), play: $('#aaPlay'), playSub: $('#aaPlaySub'), about: $('#aaAbout'), aboutPanel: $('#aaAboutPanel'),
+    select: $('#aaSelect'), levels: $('#aaLevels'), progress: $('#aaProgress'), progressBar: $('#aaProgressBar'), modes: $('#aaModes'), modeDesc: $('#aaModeDesc'), modeDescSheet: $('#aaModeDescSheet'), modeTileName: $('#aaModeTileName'), modeTile: $('#aaModeTile'), streak: $('#aaStreak'), daily: $('#aaDaily'), hudDiff: $('#aaHudDiff'), play: $('#aaPlay'), playSub: $('#aaPlaySub'), path: $('#aaPath'),
+    sheet: $('#aaSheet'), levelsSheet: $('#aaLevelsSheet'), levelsBtn: $('#aaLevelsBtn'), settingsBtns: $$('#aaSettings, #aaSettingsG'), themeBtn: $('#aaTheme'), themes: $('#aaThemes'),
     game: $('#aaGame'), boardWrap: $('#aaBoardWrap'), board: $('#aaBoard'), toast: $('#aaToast'), confetti: $('#aaConfetti'),
     hudLevel: $('#aaHudLevel'), hudMode: $('#aaHudMode'), hudTime: $('#aaHudTime'), hudLeft: $('#aaHudLeft'), hudLives: $('#aaHudLives'), hudLivesWrap: $('#aaHudLivesWrap'), hudPct: $('#aaHudPct'), boardBar: $('#aaBoardBar'),
     btnHint: $('#aaHint'), btnRestart: $('#aaRestart'), btnLevels: $('#aaBackToLevels'), btnSound: $('#aaSound'),
@@ -84,7 +85,7 @@
     } catch { /* silent */ }
   }
   const SFX = { shoot: () => beep([[880, 0, 0.07], [1320, 0.04, 0.08]]), block: () => beep([[150, 0, 0.18, 'square', 0.04]]), win: () => beep([[523, 0, 0.12], [659, 0.1, 0.12], [784, 0.2, 0.12], [1047, 0.3, 0.35]]), lose: () => beep([[300, 0, 0.2, 'triangle'], [220, 0.2, 0.35, 'triangle']]) };
-  function renderSound() { el.btnSound.setAttribute('aria-pressed', String(!state.muted)); el.btnSound.setAttribute('aria-label', state.muted ? 'Sound off' : 'Sound on'); el.btnSound.textContent = state.muted ? '🔇' : '🔊'; }
+  function renderSound() { el.btnSound.setAttribute('aria-pressed', String(!state.muted)); el.btnSound.setAttribute('aria-label', state.muted ? 'Sound off' : 'Sound on'); el.btnSound.textContent = state.muted ? 'Off' : 'On'; }
 
   let toastTimer = 0;
   function toast(msg, kind = '') { el.toast.textContent = msg; el.toast.className = 'aa-toast' + (kind ? ' aa-toast--' + kind : ''); el.toast.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => { el.toast.hidden = true; }, 2800); }
@@ -104,9 +105,10 @@
     const n = DATA.levels.length;
     const done = DATA.levels.filter((_, i) => cleared(i)).length;
     const learned = DATA.levels.filter((_, i) => cleared(i)?.quiz).length;
-    el.progress.textContent = `${done}/${n} countries cleared · ${learned} named correctly`;
+    el.progress.textContent = `${done}/${n}`;
+    el.progress.setAttribute('aria-label', `${done} of ${n} countries cleared, ${learned} named correctly`);
     const streak = store.get('streak', 0), dStreak = store.get('dailyStreak', { count: 0, last: '' });
-    el.streak.textContent = streak >= 2 ? `🔥 ${streak}-level win streak` : dStreak.count >= 2 ? `🔥 ${dStreak.count}-day daily streak` : 'Clear levels in a row to build a win streak.';
+    el.streak.textContent = streak >= 2 ? `🔥 ${streak} in a row` : dStreak.count >= 2 ? `🔥 ${dStreak.count}-day daily streak` : '';
     renderDaily();
     el.progressBar.style.width = `${(done / n) * 100}%`;
     el.modes.innerHTML = '';
@@ -118,10 +120,23 @@
       b.addEventListener('click', () => { state.mode = m[0]; store.set('mode', m[0]); renderSelect(); });
       el.modes.appendChild(b);
     }
-    el.modeDesc.textContent = modeList.find(m => m[0] === state.mode)[2];
+    const cur = modeList.find(m => m[0] === state.mode);
+    el.modeDesc.textContent = cur[2]; el.modeDescSheet.textContent = cur[2]; el.modeTileName.textContent = cur[1];
     const nextIdx = DATA.levels.findIndex((_, j) => !cleared(j) && unlocked(j));
     el.playSub.textContent = nextIdx < 0 ? 'All 70 cleared · replay any level' : `Level ${nextIdx + 1} · ${DIFF_OF(TIER_OF(nextIdx))}`;
     el.play.dataset.level = nextIdx < 0 ? 0 : nextIdx;
+    el.play.querySelector('.aa-play-label').textContent = done ? 'Continue' : 'Play';
+    // level path: current level plus the next four
+    el.path.innerHTML = '';
+    const start = Math.max(0, (nextIdx < 0 ? n - 1 : nextIdx) - 1);
+    for (let i = start; i < Math.min(n, start + 5); i++) {
+      const d = document.createElement('button'); d.type = 'button';
+      d.className = 'aa-dot' + (cleared(i) ? ' is-done' : '') + (i === nextIdx ? ' is-current' : '') + (unlocked(i) ? '' : ' is-locked');
+      d.textContent = String(i + 1); d.disabled = !unlocked(i); d.setAttribute('aria-label', `Level ${i + 1}`);
+      d.addEventListener('click', () => startLevel(i));
+      el.path.appendChild(d);
+    }
+    renderThemes();
     el.levels.innerHTML = '';
     DATA.levels.forEach((L, i) => {
       const rec = cleared(i), open = unlocked(i);
@@ -324,7 +339,7 @@
     const focus = state.mode === 'focus';
     el.hudLivesWrap.hidden = focus;
     const hintsLeft = HINTS_PER_LEVEL - state.hintsUsed;
-    el.btnHint.textContent = focus ? 'Hint' : `Hint (${Math.max(0, hintsLeft)})`;
+    el.btnHint.textContent = focus ? '💡 ∞' : `💡 ${Math.max(0, hintsLeft)}`;
     el.btnHint.disabled = state.finished || (!focus && hintsLeft <= 0);
     const pct = state.pieces.length ? Math.round(((state.pieces.length - state.left) / state.pieces.length) * 100) : 0;
     el.hudPct.textContent = `${pct}%`;
@@ -535,7 +550,27 @@
   el.btnHint.addEventListener('click', hint);
   el.btnRestart.addEventListener('click', () => startLevel(state.idx, false, state.daily));
   el.play.addEventListener('click', () => startLevel(+el.play.dataset.level || 0));
-  el.about.addEventListener('click', () => { el.aboutPanel.open = true; el.aboutPanel.scrollIntoView({ behavior: 'smooth', block: 'start' }); });
+  // Sheets
+  const openSheet = sh => { sh.hidden = false; document.body.style.overflow = 'hidden'; };
+  const closeSheets = () => { el.sheet.hidden = true; el.levelsSheet.hidden = true; document.body.style.overflow = ''; };
+  el.settingsBtns.forEach(b => b.addEventListener('click', () => openSheet(el.sheet)));
+  el.modeTile.addEventListener('click', () => openSheet(el.sheet));
+  el.levelsBtn.addEventListener('click', () => { renderSelect(); openSheet(el.levelsSheet); });
+  $$('[data-close-sheet]').forEach(b => b.addEventListener('click', closeSheets));
+  $$('.aa-sheet').forEach(sh => sh.addEventListener('click', e => { if (e.target === sh) closeSheets(); }));
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSheets(); });
+  el.levels.addEventListener('click', e => { if (e.target.closest('.aa-level')) closeSheets(); });
+  // Themes
+  const THEMES = ['paper', 'night', 'mint'];
+  function applyTheme(t) { document.documentElement.dataset.theme = t; store.set('theme', t); $('meta[name="theme-color"]')?.setAttribute('content', t === 'night' ? '#0E0E10' : t === 'mint' ? '#E6F2EC' : '#F4EDE0'); renderThemes(); }
+  function renderThemes() {
+    if (!el.themes) return;
+    const cur = document.documentElement.dataset.theme || 'paper';
+    el.themes.innerHTML = '';
+    for (const t of THEMES) { const b = document.createElement('button'); b.type = 'button'; b.className = 'aa-theme' + (t === cur ? ' is-active' : ''); b.dataset.theme = t; b.textContent = t[0].toUpperCase() + t.slice(1); b.addEventListener('click', () => applyTheme(t)); el.themes.appendChild(b); }
+  }
+  el.themeBtn.addEventListener('click', () => { const cur = document.documentElement.dataset.theme || 'paper'; applyTheme(THEMES[(THEMES.indexOf(cur) + 1) % THEMES.length]); });
+  applyTheme(THEMES.includes(store.get('theme')) ? store.get('theme') : 'paper');
   el.btnLevels.addEventListener('click', () => { if (state.left < state.pieces.length && !state.finished && !confirm('Leave this level? Progress on it will be lost.')) return; goToLevels(); });
   el.btnSound.addEventListener('click', () => { state.muted = !state.muted; store.set('muted', state.muted); renderSound(); if (!state.muted) SFX.shoot(); });
   document.addEventListener('keydown', e => { if (!el.game.hidden && !state.finished && (e.key === 'h' || e.key === 'H') && !/input|textarea/i.test(document.activeElement?.tagName || '')) hint(); });

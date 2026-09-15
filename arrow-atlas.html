@@ -22,7 +22,7 @@
     />
     <meta name="author" content="Ariyan Khan" />
     <meta name="robots" content="index, follow, max-image-preview:large" />
-    <meta name="theme-color" content="#0d0d0d" />
+    <meta name="theme-color" content="#F4EDE0" />
     <link rel="canonical" href="https://ariyankhan.com/arrow-atlas.html" />
     <link rel="alternate" hreflang="en-US" href="https://ariyankhan.com/arrow-atlas.html" />
     <link rel="alternate" hreflang="x-default" href="https://ariyankhan.com/arrow-atlas.html" />
@@ -56,12 +56,8 @@
     <!-- FONTS -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700;800;900&family=Inter:wght@400;500;600;700;800&display=swap"
-      rel="stylesheet"
-    />
-    <link rel="stylesheet" href="css/style.css?v=18" />
-    <link rel="stylesheet" href="css/arrow-atlas.css?v=5" />
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="css/arrow-atlas.css?v=6" />
     <link rel="preload" href="games/data/arrow-atlas.json?v=3" as="fetch" crossorigin="anonymous" />
 
     <!-- SCHEMA -->
@@ -145,51 +141,55 @@
     </script>
   </head>
   <body class="aa-body">
-    <div id="stars"></div>
-
     <main class="aa-app" id="aaApp">
-      <header class="aa-top">
-        <a href="/" class="aa-brand" aria-label="Ariyan Khan — home"><img src="images/logo-avatar.webp?v=3" alt="" width="30" height="30" decoding="async" /></a>
-        <h1 class="aa-logo">Arrow <span class="yl">Atlas</span></h1>
-        <div class="aa-top-actions">
-          <button type="button" class="aa-icon" id="aaSound" aria-pressed="true" aria-label="Sound on">Sound: on</button>
-          <button type="button" class="aa-icon" id="aaAbout" aria-label="About this game">i</button>
-        </div>
-      </header>
+      <!-- ── HOME ── -->
+      <section class="aa-screen aa-home" id="aaSelect" aria-label="Home">
+        <header class="aa-home-top">
+          <span class="aa-chip" id="aaStreak"></span>
+          <button type="button" class="aa-icon" id="aaSettings" aria-label="Settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5 19.4 7.7v8.6L12 20.5 4.6 16.3V7.7z"/><circle cx="12" cy="12" r="3"/></svg></button>
+        </header>
 
-      <p class="aa-loading" id="aaLoading" hidden>Loading…</p>
-      <p class="aa-error" id="aaError" hidden></p>
-
-      <!-- ── HOME / WORLD TOUR ── -->
-      <section class="aa-screen" id="aaSelect" aria-label="World Tour">
-        <div class="aa-progress-wrap">
-          <p class="aa-progress" id="aaProgress">0/70 countries cleared</p>
-          <div class="aa-progress-track"><div class="aa-progress-bar" id="aaProgressBar"></div></div>
-          <p class="aa-streak" id="aaStreak"></p>
-        </div>
-
-        <button type="button" class="aa-play" id="aaPlay"><span class="aa-play-label">Play</span><span class="aa-play-sub" id="aaPlaySub">Level 1</span></button>
-
-        <div class="aa-modes-wrap">
-          <div class="aa-modes" id="aaModes" role="group" aria-label="Mode"></div>
-          <p class="aa-mode-desc" id="aaModeDesc"></p>
+        <div class="aa-cards" id="aaCards">
+          <div class="aa-tile aa-tile--daily" id="aaDaily"></div>
+          <button type="button" class="aa-tile aa-tile--tour" id="aaLevelsBtn">
+            <span class="aa-tile-kicker">World Tour</span>
+            <span class="aa-tile-big" id="aaProgress">0/70</span>
+            <span class="aa-tile-track"><span class="aa-tile-bar" id="aaProgressBar"></span></span>
+            <span class="aa-tile-cta">All levels</span>
+          </button>
+          <button type="button" class="aa-tile aa-tile--mode" id="aaModeTile">
+            <span class="aa-tile-kicker">Mode</span>
+            <span class="aa-tile-big" id="aaModeTileName">Classic</span>
+            <span class="aa-tile-sub" id="aaModeDesc"></span>
+            <span class="aa-tile-cta">Change</span>
+          </button>
         </div>
 
-        <div class="aa-daily" id="aaDaily"></div>
+        <div class="aa-hero">
+          <h1 class="aa-title">Arrow Atlas</h1>
+          <p class="aa-tagline">Clear the arrows. Reveal the country.</p>
+        </div>
 
-        <h2 class="aa-h2">World Tour</h2>
-        <div class="aa-levels" id="aaLevels"></div>
+        <div class="aa-path" id="aaPath" aria-label="Upcoming levels"></div>
+        <button type="button" class="aa-play" id="aaPlay"><span class="aa-play-label">Continue</span><span class="aa-play-sub" id="aaPlaySub">Level 1</span></button>
+        <p class="aa-loading" id="aaLoading" hidden>Loading…</p>
+        <p class="aa-error" id="aaError" hidden></p>
       </section>
 
       <!-- ── GAME ── -->
-      <section class="aa-screen aa-screen--game" id="aaGame" aria-label="Game" hidden>
-        <div class="aa-hud">
-          <button type="button" class="aa-icon" id="aaBackToLevels" aria-label="Back to World Tour">‹</button>
-          <div class="aa-hud-title"><span id="aaHudLevel">Level 1</span><span class="aa-hud-diff" id="aaHudDiff">Normal</span><span class="aa-hud-mode" id="aaHudMode">Classic</span></div>
-          <div class="aa-hud-stats">
-            <span id="aaHudLivesWrap"><b class="aa-lives" id="aaHudLives" role="img" aria-label="4 of 4 hearts"></b></span>
-            <span class="aa-hud-stat" title="Time"><b id="aaHudTime">0:00</b></span>
+      <section class="aa-screen aa-gamescreen" id="aaGame" aria-label="Game" hidden>
+        <header class="aa-gbar">
+          <button type="button" class="aa-icon" id="aaBackToLevels" aria-label="Back to home"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H6M11 6l-6 6 6 6"/></svg></button>
+          <div class="aa-gtitle"><span class="aa-glevel" id="aaHudLevel">Level 1</span><span class="aa-hud-diff" id="aaHudDiff">Normal</span><span id="aaHudMode" hidden>Classic</span></div>
+          <div class="aa-gactions">
+            <button type="button" class="aa-icon" id="aaTheme" aria-label="Change colours"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18c1.5 0 2-1 1.5-2s0-2 1.5-2h1.5A3.5 3.5 0 0 0 20 13.5 9.5 9.5 0 0 0 12 3z"/><circle cx="7.5" cy="11" r="1.2"/><circle cx="10.5" cy="7" r="1.2"/><circle cx="15" cy="7.5" r="1.2"/></svg></button>
+            <button type="button" class="aa-icon" id="aaSettingsG" aria-label="Settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5 19.4 7.7v8.6L12 20.5 4.6 16.3V7.7z"/><circle cx="12" cy="12" r="3"/></svg></button>
           </div>
+        </header>
+        <div class="aa-status">
+          <span class="aa-status-left"><span id="aaHudLivesWrap"><b class="aa-lives" id="aaHudLives" role="img" aria-label="4 of 4 hearts"></b></span><b class="aa-time" id="aaHudTime">0:00</b></span>
+          <span class="aa-status-mid"><b id="aaHudLeft">0</b> left · <b id="aaHudPct">0%</b></span>
+          <button type="button" class="aa-icon aa-hintbtn" id="aaHint" title="Light up a free arrow (H)">💡 3</button>
         </div>
         <div class="aa-board-wrap" id="aaBoardWrap">
           <div class="aa-board-track" aria-hidden="true"><div class="aa-board-bar" id="aaBoardBar"></div></div>
@@ -200,20 +200,29 @@
             <div class="aa-card" id="aaCard" role="dialog" aria-live="polite"></div>
           </div>
         </div>
-        <div class="aa-bottom">
-          <span class="aa-bottom-stat"><b id="aaHudLeft">0</b> arrows left · <b id="aaHudPct">0%</b></span>
-          <div class="aa-bottom-actions">
-            <button type="button" class="aa-btn aa-btn--small" id="aaHint" title="Light up a free arrow (H)">Hint (3)</button>
-            <button type="button" class="aa-btn aa-btn--small" id="aaRestart">Restart</button>
-          </div>
-        </div>
+        <div class="aa-gfoot"><button type="button" class="aa-btn aa-btn--ghost" id="aaRestart">Restart</button></div>
       </section>
     </main>
 
-    <!-- ── ABOUT (collapsed; opened with the i button) ── -->
-    <details class="aa-about" id="aaAboutPanel">
-      <summary class="aa-about-summary">About Arrow Atlas: how to play, the World Tour, FAQ</summary>
-      <div class="aa-page">
+    <!-- ── LEVELS SHEET ── -->
+    <div class="aa-sheet" id="aaLevelsSheet" hidden>
+      <div class="aa-sheet-panel" role="dialog" aria-label="World Tour levels">
+        <div class="aa-sheet-head"><h2>World Tour</h2><button type="button" class="aa-icon" data-close-sheet aria-label="Close">✕</button></div>
+        <p class="aa-sheet-note">Levels unlock in order: Normal, Hard, Super Hard, Expert. Every 10th level is a milestone.</p>
+        <div class="aa-levels" id="aaLevels"></div>
+      </div>
+    </div>
+
+    <!-- ── SETTINGS SHEET ── -->
+    <div class="aa-sheet" id="aaSheet" hidden>
+      <div class="aa-sheet-panel" role="dialog" aria-label="Settings">
+        <div class="aa-sheet-head"><h2>Settings</h2><button type="button" class="aa-icon" data-close-sheet aria-label="Close">✕</button></div>
+        <div class="aa-setting"><span>Sound</span><button type="button" class="aa-btn aa-btn--small" id="aaSound" aria-pressed="true">On</button></div>
+        <div class="aa-setting aa-setting--col"><span>Colours</span><div class="aa-themes" id="aaThemes"></div></div>
+        <div class="aa-setting aa-setting--col"><span>Mode</span><div class="aa-modes" id="aaModes" role="group" aria-label="Mode"></div><p class="aa-mode-desc" id="aaModeDescSheet"></p></div>
+        <details class="aa-about" id="aaAboutPanel">
+          <summary class="aa-about-summary">How to play &amp; about</summary>
+          <div class="aa-page">
       <!-- ── HOW TO PLAY ── -->
       <section class="aa-section" id="how">
         <div class="tag-pill">How To Play</div>
@@ -345,12 +354,12 @@
           <a href="ai-metadata-remover.html" class="aa-explore-link"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="m8 8 8 8M16 8l-8 8"/></svg>AI Metadata Remover</a>
         </div>
       </div>
+          </div>
+        </details>
+        <p class="aa-credit">Made by <a href="https://www.youtube.com/@ariyankhan" target="_blank" rel="noopener">Ariyan Khan</a> · <a href="/">ariyankhan.com</a> · <a href="piece-the-world.html">Piece the World</a></p>
       </div>
-    </details>
+    </div>
 
-    <site-footer></site-footer>
-
-    <script src="js/site-footer.js?v=13"></script>
-    <script src="js/arrow-atlas.js?v=5"></script>
+    <script src="js/arrow-atlas.js?v=6"></script>
   </body>
 </html>

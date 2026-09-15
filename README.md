@@ -454,11 +454,16 @@ text, `#level-mode` deep links (`#africa-hard`). English only, continuous play
 
 ## Arrow Atlas (tap-away arrow puzzle on country maps)
 
-`arrow-atlas.html` is the second game: the casual, addictive one. The page is an
-app shell: no site nav, the game fills the first screen (home = Play button, mode
-chips, daily card, level grid; game = one HUD row, board, one bottom row); the SEO
-content, FAQ and site footer sit in a collapsed `<details>` below, opened by the
-`i` button. Each level is a
+`arrow-atlas.html` is the second game: the casual, addictive one. It is a
+standalone game, not a site page: it does not load `css/style.css`, the nav or the
+footer, and has its own look (`css/arrow-atlas.css`: Nunito, cream “paper” theme
+plus “night” and “mint” via `data-theme` on `<html>`, picked in Settings or with
+the palette button). Home = streak chip, settings, a card carousel (Today's
+Country, World Tour progress, Mode), title, a level path and a Continue button;
+game = back / Level + difficulty / palette + settings, hearts + time + arrows left
++ hint, the board, Restart. The level grid and Settings (sound, colours, mode,
+how-to-play/FAQ/about, links back to the site) are bottom sheets. This is the
+same shell we will wrap for Android/iOS (TWA / Capacitor). Each level is a
 country's outline filled with arrows; tap an arrow to shoot it off the board if its
 run to the edge is clear, a blocked tap costs one of 4 hearts, Classic (count-up) or
 Rush (90 s countdown) timer, One Life (1 heart), Deep Focus (no clock, no hearts, unlimited hints; 3 hints
