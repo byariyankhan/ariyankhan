@@ -26,7 +26,9 @@
   const COMBO_WINDOW_MS = 1800;   // shots closer together than this chain into a combo; a wrong tap breaks it
   const COMBO_WORDS = ['Good!', 'Great!', 'Amazing!', 'Unstoppable!'];
   const comboLevel = n => n >= 12 ? 3 : n >= 8 ? 2 : n >= 5 ? 1 : 0;
-  const LONG_SHOT = 10;           // an arrow that travels this many cells earns a cheer on its own
+  // a cheer only when the combo *reaches* a step (x3, x5, x8, x12, then every fifth), never on every shot
+  const comboStep = n => n === 3 || n === 5 || n === 8 || n === 12 || (n > 12 && (n - 12) % 5 === 0);
+  const LONG_SHOT = 16;           // an arrow that travels this many cells earns a small cheer on its own (rare)
   const MILESTONES = [25, 50, 75, 90];
   const RUSH_SECONDS = 90;
   const HINT_PENALTY_MS = 5000;
@@ -168,7 +170,7 @@
   function renderSound() { el.btnSound.setAttribute('aria-checked', String(!state.muted)); el.btnSound.setAttribute('aria-label', state.muted ? 'Sound off' : 'Sound on'); }
 
   let toastTimer = 0;
-  function toast(msg, kind = '') { el.toast.textContent = msg; el.toast.className = 'aa-toast' + (kind ? ' aa-toast--' + kind : ''); el.toast.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => { el.toast.hidden = true; }, 2800); }
+  function toast(msg, kind = '', ms = 2800) { el.toast.textContent = msg; el.toast.className = 'aa-toast' + (kind ? ' aa-toast--' + kind : ''); el.toast.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => { el.toast.hidden = true; }, ms); }
 
   // ── Data ──
   async function loadData() {
@@ -720,12 +722,12 @@
     const pct = Math.round(((state.pieces.length - state.left) / state.pieces.length) * 100);
     const m = MILESTONES.find(x => pct >= x && !state.shown.has(x));
     // a cheer (confetti from both sides, rising jingle) for a combo of three or more, or for one long shot
-    const cheer = state.combo >= 3 ? comboLevel(state.combo) : travel >= LONG_SHOT ? 0 : -1;
+    const cheer = comboStep(state.combo) ? comboLevel(state.combo) : (state.combo < 3 && travel >= LONG_SHOT) ? 0 : -1;
     if (cheer >= 0 && state.left > 0) { sideBurst(cheer); SFX.cheer(cheer); }
     if (state.left === 0) winLevel();
     else if (m) { state.shown.add(m); toast(({ 25: 'Nice start. 25% cleared.', 50: 'Halfway. The shape is showing.', 75: '75% cleared. Keep the rhythm.', 90: 'Almost there!' })[m]); }
-    else if (state.combo >= 3) toast(`${COMBO_WORDS[cheer]} Combo x${state.combo}`, 'combo');
-    else if (cheer === 0) toast('Long shot!', 'combo');
+    else if (cheer >= 0 && comboStep(state.combo)) toast(`${COMBO_WORDS[cheer]} Combo x${state.combo}`, 'combo', 1400);
+    else if (cheer === 0) toast('Long shot!', 'combo', 1400);
   }
   function blocked(p, blocker) {
     if (state.armed.has(p)) { bounce(p); SFX.block(); toast('Still blocked. It will go by itself once its lane clears.', 'hint'); return; }
