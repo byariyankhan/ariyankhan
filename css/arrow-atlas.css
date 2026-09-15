@@ -242,6 +242,19 @@ button{ font-family:inherit; }
 .aa-credit{ font-size:13px; color:var(--muted); text-align:center; margin:14px 0 0; }
 /* the About / how-to / FAQ copy sits under the app, visible to readers and crawlers */
 .aa-seo{ max-width:640px; margin:0 auto; padding:28px 16px 48px; border-top:1px solid var(--bg2); }
+.aa-row--danger .aa-row-label{ color:var(--bad); }
+/* legal pages (privacy, terms) in the game's own dress */
+.aa-legal{ max-width:640px; margin:0 auto; padding:calc(18px + env(safe-area-inset-top, 0px)) 16px 48px; font-weight:600; }
+.aa-legal h1{ font-size:clamp(28px,7vw,38px); font-weight:900; margin:6px 0 4px; color:var(--line); }
+.aa-legal h2{ font-size:18px; font-weight:900; margin:26px 0 8px; }
+.aa-legal p, .aa-legal li{ font-size:15px; line-height:1.7; color:var(--muted); }
+.aa-legal p strong, .aa-legal li strong{ color:var(--ink); }
+.aa-legal ul{ padding-left:20px; margin:0 0 12px; }
+.aa-legal a{ color:var(--accent); font-weight:800; }
+.aa-legal .tag-pill{ display:inline-block; font-size:11px; font-weight:900; letter-spacing:1.5px; text-transform:uppercase; color:var(--accent); margin:0; }
+.aa-legal-back{ display:block; font-size:14px; margin-bottom:18px; text-decoration:none; }
+.aa-legal-date{ font-size:13px; }
+.aa-legal-foot{ margin-top:34px; padding-top:16px; border-top:1px solid var(--bg2); font-size:13px; }
 .aa-seo-cta{ text-align:center; margin:18px 0 0; }
 .aa-seo .aa-btn{ text-decoration:none; }
 

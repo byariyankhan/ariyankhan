@@ -532,6 +532,10 @@ unlock (skip allowed after two fails), stars, best times and progress in
   `#aaAbout` section under the app (the settings "How to play" and "About"
   rows scroll to it); the homepage has a "Games" section linking both games
   with keyword anchor text; sitemap priority 1.0 with an image entry.
+- **Legal**: the game has its own `arrow-atlas-privacy.html` and
+  `arrow-atlas-terms.html` (what is stored on the device, Google Analytics, fonts,
+  permissions, children, no account), linked from the welcome gate and Settings;
+  Settings → Reset progress wipes every `aa:v1:*` key.
 - **First open / launch**: `#aaGate` (welcome, Terms + Privacy links, Accept,
   stored in `aa:v1:welcomed`), then `#aaSplash` (logo + one line from `QUOTES`,
   rotating per launch in `aa:v1:launches`, tap or 2.4 s to dismiss, skipped for
