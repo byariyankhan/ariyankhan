@@ -14,7 +14,7 @@
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
   const SVG_NS = 'http://www.w3.org/2000/svg';
-  const DATA_VERSION = '1';
+  const DATA_VERSION = '2';
   const STORE = 'aa:v1:';
   const LIVES = 4;
   const RUSH_SECONDS = 90;
