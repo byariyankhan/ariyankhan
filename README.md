@@ -109,7 +109,9 @@ directories unreachable over the web.
 | `piece-the-world.html` | Geography jigsaw game page — see "Piece the World" section below |
 | `js/piece-the-world.js`, `css/piece-the-world.css` | Game engine (drag/snap, modes, timer, stars, bests) + page styles |
 | `games/data/*.json`, `games/build-data.mjs` | Level data (piece paths per continent) and the script that builds it from Natural Earth |
-| `games/piece-the-world.webmanifest`, `piece-the-world-sw.js` | PWA manifest + service worker for the game (offline levels, installable) |
+| `games/piece-the-world.webmanifest`, `piece-the-world-sw.js` | PWA manifest + service worker for both games (offline levels, installable) |
+| `arrow-atlas.html`, `js/arrow-atlas.js`, `css/arrow-atlas.css` | Tap-away arrow puzzle game on country maps — see "Arrow Atlas" section below |
+| `games/data/arrow-atlas.json`, `games/build-arrow-atlas.mjs`, `games/arrow-atlas.webmanifest` | Its level data (grid masks + outlines for 70 countries), build script and PWA manifest |
 | `js/vendor/` | Local copies of d3-array, d3-geo, d3-geo-projection, topojson-client and Natural Earth country data (`countries-110m.json`, `countries-50m.json`); the site CSP forbids CDNs |
 
 ---
@@ -449,6 +451,37 @@ text, `#level-mode` deep links (`#africa-hard`). English only, continuous play
 - **Tests**: `node tests/piece-the-world.test.mjs` validates the data against the
   level cards and page copy. Browser drag/tap/finish flow was checked with
   Playwright on desktop and a Pixel 5 profile.
+
+## Arrow Atlas (tap-away arrow puzzle on country maps)
+
+`arrow-atlas.html` is the second game: the casual, addictive one. Each level is a
+country's outline filled with arrows; tap an arrow to shoot it off the board if its
+run to the edge is clear, a blocked tap costs one of 4 hearts, Classic (count-up) or
+Rush (90 s countdown) timer, and clearing the board reveals the country for a
+3-option quiz plus capital/population/region. 70-level World Tour with sequential
+unlock (skip allowed after two fails), stars, best times and progress in
+`localStorage` (`aa:v1:*`), share text, `#level-N` deep links.
+
+- **Engine**: `js/arrow-atlas.js` (no libraries), styles in `css/arrow-atlas.css`
+  (`.aa-` prefix). Puzzles are generated in the browser from a fixed seed per level
+  (`mulberry32`), so every player gets the same board. `generate()` works backwards
+  from an empty board — each new piece must have a clear run to the edge past the
+  pieces placed before it — so the reverse order is always a solution and no move
+  order can get stuck. Dead cells are absorbed into a neighbouring piece's tail;
+  if that fails the seed is bumped and it retries (max 2 attempts needed in tests).
+- **Data**: `games/data/arrow-atlas.json` built by `games/build-arrow-atlas.mjs`
+  from world-atlas 110m + Natural Earth 50m properties: per country the outline
+  (`d`, in a 100×100 box) and five `tiers` of grid masks sized by land-cell count
+  (36/64/100/150/210 cells, ≤28 cells across). `TOUR` and `CAPITALS` in the build
+  script define the level order and quiz facts. Versioned with `?v=` +
+  `DATA_VERSION`; served immutable by `games/data/.htaccess`.
+- **Adding countries**: append to `TOUR` and `CAPITALS`, rebuild, bump
+  `DATA_VERSION`. Tiers by level index are in `TIER_OF` in the JS.
+- **PWA**: `games/arrow-atlas.webmanifest`; the shared worker
+  `piece-the-world-sw.js` also caches this game's files.
+- **Tests**: `node tests/arrow-atlas.test.mjs` runs the production `generate()` on
+  every level (and 100 random seeds on the hardest tier), checks solvability, full
+  coverage, determinism and data shape.
 
 ## Do Not
 

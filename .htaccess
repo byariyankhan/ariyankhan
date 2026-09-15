@@ -25,7 +25,7 @@ RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 
 # ── Never serve deploy/test tooling ──────────────
 RedirectMatch 404 ^/(deploy|tests)(/|$)
-RedirectMatch 404 ^/games/build-data\.mjs$
+RedirectMatch 404 ^/games/build-[a-z-]+\.mjs$
 
 ## Missing paths: keep a real 404 status and hand off to /404.html
 RewriteCond %{REQUEST_URI} !^/404\.html$ [NC]

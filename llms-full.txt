@@ -152,6 +152,7 @@ Fill out the contact form at https://ariyankhan.com/#contact with your project d
   territories). Built by Ariyan Khan, who does map animation for YouTube channels professionally.
 - AI Metadata Remover: https://ariyankhan.com/ai-metadata-remover.html
 - Piece the World (geography jigsaw game): https://ariyankhan.com/piece-the-world.html
+- Arrow Atlas (tap-away arrow puzzle on country maps): https://ariyankhan.com/arrow-atlas.html
   Free, browser-only tool that removes C2PA / JUMBF Content Credentials, XMP, IPTC, EXIF (camera, GPS,
   software), JPEG comments, PNG text chunks (Stable Diffusion "parameters", ComfyUI "prompt"/"workflow"),
   WebP EXIF/XMP/C2PA chunks and hidden trailing data from JPG, PNG and WebP images. The file container is
@@ -184,6 +185,7 @@ Practical articles on hiring, cost, and working with a video editor.
 - About: https://ariyankhan.com/about.html
 - AI Metadata Remover (free tool): https://ariyankhan.com/ai-metadata-remover.html
 - Piece the World (free geography game): https://ariyankhan.com/piece-the-world.html
+- Arrow Atlas (free geography puzzle game): https://ariyankhan.com/arrow-atlas.html
 - Map Maker (free tool): https://ariyankhan.com/map-maker.html
 - Talking Head Video Editing: https://ariyankhan.com/talking-head-video-editing.html
 - Documentary Video Editing: https://ariyankhan.com/documentary-video-editing.html
