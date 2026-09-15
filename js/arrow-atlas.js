@@ -177,15 +177,87 @@
       let ord = 0;
       const empty = new Set();
       for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) if (land[r][c]) empty.add(r * W + c);
+      // Border pieces ignore nothing; interior pieces may look "through" border pieces because those are newer
+      // (removed first). A cell blocks a line only if its piece is older than the piece being placed.
+      const blocksLine = (y, x) => occ[y][x] >= 0 && !pieces[occ[y][x]].border;
       const clearDirs = (r, c) => {
         const out = [];
         for (const [d, [dr, dc]] of Object.entries(DIRS)) {
           let y = r + dr, x = c + dc, ok = true;
-          while (y >= 0 && y < H && x >= 0 && x < W) { if (occ[y][x] >= 0) { ok = false; break; } y += dr; x += dc; }
+          while (y >= 0 && y < H && x >= 0 && x < W) { if (blocksLine(y, x)) { ok = false; break; } y += dr; x += dc; }
           if (ok) out.push(d);
         }
         return out;
       };
+      // ── Phase 1: the border is made of arrows. Trace the boundary cells into snakes that hug the outline;
+      // each gets a head whose run to the edge crosses no land at all, and the newest order, so peeling the
+      // border first is always possible and the reveal keeps the country's silhouette until the end.
+      const isLand = (y, x) => y >= 0 && y < H && x >= 0 && x < W && land[y][x];
+      const outsideLine = (r, c, [dr, dc]) => { let y = r + dr, x = c + dc; while (y >= 0 && y < H && x >= 0 && x < W) { if (land[y][x]) return false; y += dr; x += dc; } return true; };
+      const unassigned = new Set();
+      for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) if (land[r][c] && (!isLand(r - 1, c) || !isLand(r + 1, c) || !isLand(r, c - 1) || !isLand(r, c + 1))) unassigned.add(r * W + c);
+      const BORDER_ORD = 1000000;
+      if (attempt >= 120) unassigned.clear();   // last resort: a plain interior-style board always generates
+      while (unassigned.size) {
+        const pool = Array.from(unassigned); const start = pool[Math.floor(rnd() * pool.length)];
+        const path = [[Math.floor(start / W), start % W]]; unassigned.delete(start);
+        const target = 6 + Math.floor(rnd() * 9); let pdir = null;   // long runs so the outline reads as one line
+        while (path.length < target) {
+          const [y0, x0] = path[path.length - 1]; const opts = [];
+          for (const [dr, dc] of Object.values(DIRS)) { const y = y0 + dr, x = x0 + dc; if (unassigned.has(y * W + x) && isLand(y, x)) opts.push([dr, dc]); }
+          if (!opts.length) break;
+          const straight = pdir && opts.find(([a, b]) => a === pdir[0] && b === pdir[1]);
+          const step = straight && rnd() < 0.75 ? straight : opts[Math.floor(rnd() * opts.length)];
+          pdir = step; const ny = y0 + step[0], nx = x0 + step[1]; path.push([ny, nx]); unassigned.delete(ny * W + nx);
+        }
+        let placedLen = 0;
+        for (let len = path.length; len >= 2 && !placedLen; len--) {   // single stubs are left to the interior pass
+          const seg = path.slice(0, len);
+          for (const cells of [seg.slice().reverse(), seg]) {   // head = cells[0]
+            const [hy, hx] = cells[0];
+            const inBody = (y, x) => cells.some(([cy, cx]) => cy === y && cx === x);
+            // Best: a run that crosses no land at all → the piece can be the newest (peeled first).
+            // Otherwise: any run clear of what is placed so far and of its own body → an ordinary piece.
+            let dirs = Object.entries(DIRS).filter(([, v]) => outsideLine(hy, hx, v)), newest = true;
+            if (!dirs.length) {
+              newest = false;
+              dirs = Object.entries(DIRS).filter(([, [dr, dc]]) => { let y = hy + dr, x = hx + dc; while (y >= 0 && y < H && x >= 0 && x < W) { if (occ[y][x] >= 0 || inBody(y, x)) return false; y += dr; x += dc; } return true; });
+            }
+            if (!dirs.length) continue;
+            const prevCell = cells[1]; const away = prevCell ? dirs.filter(([, [dr, dc]]) => !(hy + dr === prevCell[0] && hx + dc === prevCell[1])) : dirs;
+            const [d] = (away.length ? away : dirs)[Math.floor(rnd() * (away.length ? away : dirs).length)];
+            const idx = pieces.length;
+            for (const [y, x] of cells) { occ[y][x] = idx; empty.delete(y * W + x); }
+            pieces.push({ idx, ord: newest ? BORDER_ORD + idx : ++ord, cells, dir: d, border: newest, color: PALETTE[idx % PALETTE.length] });
+            placedLen = len; break;
+          }
+        }
+        for (let k = placedLen; k < path.length; k++) if (placedLen) unassigned.add(path[k][0] * W + path[k][1]); // leftovers get another go; unplaceable singles fall to the interior pass
+      }
+      // Absorb cell (r,c) into a neighbouring piece: onto a head that points straight at it (the head moves
+      // forward; its run is the rest of the old run) or onto a tail that touches it (the head's run is unchanged).
+      // Solvability invariant: a piece's exit line must be clear of every piece with a smaller `ord` (placed
+      // earlier = removed later), so the cell must not lie on the exit line of the piece itself or of any newer
+      // piece — unless the piece can simply become the newest one, which is allowed when its own run is clear.
+      const onExitOf = (P, r, c) => { const [pr, pc] = DIRS[P.dir], [hy, hx] = P.cells[0]; return pr ? c === hx && Math.sign(r - hy) === pr : r === hy && Math.sign(c - hx) === pc; };
+      const lineClear = P => { const [pr, pc] = DIRS[P.dir]; let [y, x] = P.cells[0]; y += pr; x += pc; while (y >= 0 && y < H && x >= 0 && x < W) { if (blocksLine(y, x) && occ[y][x] !== P.idx) return false; y += pr; x += pc; } return true; };
+      const absorb = (r, c) => {
+        for (const [dr, dc] of Object.values(DIRS)) {
+          const y = r + dr, x = c + dc; if (y < 0 || y >= H || x < 0 || x >= W || occ[y][x] < 0) continue;
+          const q = pieces[occ[y][x]]; const tail = q.cells[q.cells.length - 1], head = q.cells[0];
+          if (q.border || q.cells.length >= maxLen + 6) continue;
+          const [qr, qc] = DIRS[q.dir];
+          if (head[0] === y && head[1] === x && head[0] + qr === r && head[1] + qc === c) {
+            if (pieces.some(P => P.ord > q.ord && !P.border && onExitOf(P, r, c))) { if (!lineClear(q)) continue; q.ord = ++ord; }
+            q.cells.unshift([r, c]); occ[r][c] = q.idx; empty.delete(r * W + c); return true;
+          }
+          if (tail[0] !== y || tail[1] !== x || onExitOf(q, r, c)) continue;
+          if (pieces.some(P => P.ord > q.ord && !P.border && onExitOf(P, r, c))) { if (!lineClear(q)) continue; q.ord = ++ord; }
+          q.cells.push([r, c]); occ[r][c] = q.idx; empty.delete(r * W + c); return true;
+        }
+        return false;
+      };
+      // ── Phase 2: interior snakes, most-constrained cell first ──
       let failed = false;
       while (empty.size) {
         // most constrained empty cell first, ties broken randomly
@@ -193,34 +265,10 @@
         for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
         for (const cell of pool) { const r = Math.floor(cell / W), c = cell % W; const ds = clearDirs(r, c); if (ds.length && ds.length < bestN) { best = [r, c]; bestN = ds.length; bestDirs = ds; if (bestN === 1) break; } }
         if (!best) {
-          // Dead cell: every run to the edge is blocked. Absorb it into a neighbouring piece whose tail
-          // touches it and which points away from it — the head's run is unchanged, so it stays solvable.
-          // Solvability invariant: a piece's exit line must be clear of every piece with a smaller `ord`
-          // (placed earlier = removed later). Appending the cell to q's tail is safe when the cell is not on
-          // the exit line of q or of any piece newer than q. If a newer piece is in the way but q's own exit
-          // line is clear right now, q can simply become the newest piece (be removed first) instead.
+          // Dead cell: every run to the edge is blocked. Absorb it into a neighbouring piece; if no cell can
+          // be absorbed this attempt fails and the next seed is tried.
           let merged = false;
-          const onExitOf = (P, r, c) => { const [pr, pc] = DIRS[P.dir], [hy, hx] = P.cells[0]; return pr ? c === hx && Math.sign(r - hy) === pr : r === hy && Math.sign(c - hx) === pc; };
-          const lineClear = P => { const [pr, pc] = DIRS[P.dir]; let [y, x] = P.cells[0]; y += pr; x += pc; while (y >= 0 && y < H && x >= 0 && x < W) { if (occ[y][x] >= 0 && occ[y][x] !== P.idx) return false; y += pr; x += pc; } return true; };
-          for (const cell of pool) {
-            const r = Math.floor(cell / W), c = cell % W;
-            for (const [dr, dc] of Object.values(DIRS)) {
-              const y = r + dr, x = c + dc; if (y < 0 || y >= H || x < 0 || x >= W || occ[y][x] < 0) continue;
-              const q = pieces[occ[y][x]]; const tail = q.cells[q.cells.length - 1], head = q.cells[0];
-              if (q.cells.length >= maxLen + 6) continue;
-              // Cell directly in front of q's head: q's head simply moves forward onto it. Its exit line is the
-              // rest of q's old line, which was already clear of every older piece, so nothing changes.
-              const [qr, qc] = DIRS[q.dir];
-              if (head[0] === y && head[1] === x && head[0] + qr === r && head[1] + qc === c) {
-                if (pieces.some(P => P.ord > q.ord && onExitOf(P, r, c))) { if (!lineClear(q)) continue; q.ord = ++ord; }
-                q.cells.unshift([r, c]); occ[r][c] = q.idx; empty.delete(cell); merged = true; break;
-              }
-              if (tail[0] !== y || tail[1] !== x || onExitOf(q, r, c)) continue;
-              if (pieces.some(P => P.ord > q.ord && onExitOf(P, r, c))) { if (!lineClear(q)) continue; q.ord = ++ord; }
-              q.cells.push([r, c]); occ[r][c] = q.idx; empty.delete(cell); merged = true; break;
-            }
-            if (merged) break;
-          }
+          for (const cell of pool) { if (absorb(Math.floor(cell / W), cell % W)) { merged = true; break; } }
           if (merged) continue;
           failed = true; break;
         }
@@ -245,6 +293,7 @@
           const step = straight && rnd() < 0.62 ? straight : opts[Math.floor(rnd() * opts.length)];
           py += step[0]; px += step[1]; pdir = step; cells.push([py, px]);
         }
+        if (cells.length === 1 && absorb(r, c)) continue;
         const idx = pieces.length;
         for (const [y, x] of cells) { occ[y][x] = idx; empty.delete(y * W + x); }
         pieces.push({ idx, ord: ++ord, cells, dir, color: PALETTE[idx % PALETTE.length] });
@@ -270,17 +319,9 @@
     const outline = svgEl('path', { d: state.level.d, class: 'aa-outline', transform: `translate(${-t.x} ${-t.y}) scale(${t.k})` });
     svg.appendChild(outline);
     state.outlineEl = outline;
-    // Grid-aligned frame around the land cells + guide dots (Settings → Guideline)
-    const land = state.land; let frame = ''; const dots = svgEl('g', { class: 'aa-guides' });
-    for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) {
-      if (!land[r][c]) continue;
-      dots.appendChild(svgEl('circle', { cx: c + 0.5, cy: r + 0.5, r: 0.09 }));
-      if (r === 0 || !land[r - 1][c]) frame += `M${c} ${r}h1`;
-      if (r === H - 1 || !land[r + 1][c]) frame += `M${c} ${r + 1}h1`;
-      if (c === 0 || !land[r][c - 1]) frame += `M${c} ${r}v1`;
-      if (c === W - 1 || !land[r][c + 1]) frame += `M${c + 1} ${r}v1`;
-    }
-    svg.appendChild(svgEl('path', { d: frame, class: 'aa-frame' }));
+    // Guide dots (Settings → Guideline). The outline itself is made of arrows: see generate() phase 1.
+    const land = state.land; const dots = svgEl('g', { class: 'aa-guides' });
+    for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) if (land[r][c]) dots.appendChild(svgEl('circle', { cx: c + 0.5, cy: r + 0.5, r: 0.09 }));
     svg.appendChild(dots);
     const piecesG = svgEl('g', { class: 'aa-pieces' });
     for (const p of pieces) {
