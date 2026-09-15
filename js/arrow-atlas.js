@@ -23,7 +23,10 @@
   };
   const LIVES = 4;                 // Classic and Rush; One Life has 1, Deep Focus none
   const DIFF_OF = tier => ['Normal', 'Normal', 'Hard', 'Expert', 'Master'][tier];
-  const COMBO_WINDOW_MS = 1500;
+  const COMBO_WINDOW_MS = 1800;   // shots closer together than this chain into a combo; a wrong tap breaks it
+  const COMBO_WORDS = ['Good!', 'Great!', 'Amazing!', 'Unstoppable!'];
+  const comboLevel = n => n >= 12 ? 3 : n >= 8 ? 2 : n >= 5 ? 1 : 0;
+  const LONG_SHOT = 10;           // an arrow that travels this many cells earns a cheer on its own
   const MILESTONES = [25, 50, 75, 90];
   const RUSH_SECONDS = 90;
   const HINT_PENALTY_MS = 5000;
@@ -154,7 +157,7 @@
     music.on = false; clearTimeout(music.timer);
     try { const t = music.ctx.currentTime; music.master.gain.setValueAtTime(music.master.gain.value, t); music.master.gain.exponentialRampToValueAtTime(0.0001, t + 1.5); setTimeout(() => { try { music.master.disconnect(); music.lfo.stop(); } catch { /* ignore */ } }, 1700); } catch { /* ignore */ }
   }
-  const SFX = { shoot: () => beep([[880, 0, 0.07], [1320, 0.04, 0.08]]), block: () => beep([[220, 0, 0.06, 'square', 0.05], [110, 0.05, 0.22, 'triangle', 0.06]]), win: () => beep([[523, 0, 0.12], [659, 0.1, 0.12], [784, 0.2, 0.12], [1047, 0.3, 0.35]]), lose: () => beep([[300, 0, 0.2, 'triangle'], [220, 0.2, 0.35, 'triangle']]) };
+  const SFX = { shoot: () => beep([[880, 0, 0.07], [1320, 0.04, 0.08]]), cheer: lv => { const f = 587 * Math.pow(2, lv * 3 / 12); beep([[f, 0, 0.09], [f * 1.26, 0.07, 0.1], [f * 1.5, 0.14, 0.14], [f * 2, 0.21, 0.22, 'sine', 0.06]]); }, block: () => beep([[220, 0, 0.06, 'square', 0.05], [110, 0.05, 0.22, 'triangle', 0.06]]), win: () => beep([[523, 0, 0.12], [659, 0.1, 0.12], [784, 0.2, 0.12], [1047, 0.3, 0.35]]), lose: () => beep([[300, 0, 0.2, 'triangle'], [220, 0.2, 0.35, 'triangle']]) };
   function vibe(ms) { if (state.vibe && navigator.vibrate) { try { navigator.vibrate(ms); } catch { /* ignore */ } } }
   function renderToggles() {
     el.btnMusic?.setAttribute('aria-checked', String(state.music));
@@ -716,13 +719,17 @@
     if (auto) { if (state.left === 0) winLevel(); return; }   // no combo or milestone chatter for arrows that went on their own
     const pct = Math.round(((state.pieces.length - state.left) / state.pieces.length) * 100);
     const m = MILESTONES.find(x => pct >= x && !state.shown.has(x));
+    // a cheer (confetti from both sides, rising jingle) for a combo of three or more, or for one long shot
+    const cheer = state.combo >= 3 ? comboLevel(state.combo) : travel >= LONG_SHOT ? 0 : -1;
+    if (cheer >= 0 && state.left > 0) { sideBurst(cheer); SFX.cheer(cheer); }
     if (state.left === 0) winLevel();
     else if (m) { state.shown.add(m); toast(({ 25: 'Nice start. 25% cleared.', 50: 'Halfway. The shape is showing.', 75: '75% cleared. Keep the rhythm.', 90: 'Almost there!' })[m]); }
-    else if (state.combo >= 3) toast(`Combo x${state.combo}!`, 'combo');
+    else if (state.combo >= 3) toast(`${COMBO_WORDS[cheer]} Combo x${state.combo}`, 'combo');
+    else if (cheer === 0) toast('Long shot!', 'combo');
   }
   function blocked(p, blocker) {
     if (state.armed.has(p)) { bounce(p); SFX.block(); toast('Still blocked. It will go by itself once its lane clears.', 'hint'); return; }
-    state.lives--; state.wrong++;
+    state.lives--; state.wrong++; state.combo = 0;
     arm(p);
     SFX.block(); vibe(60);
     bounce(p);
@@ -873,18 +880,42 @@
     } catch { if (flash) { flash.textContent = text; flash.hidden = false; } }
   }
 
-  function confetti() {
-    const c = el.confetti; if (!c || !c.getContext) return;
-    const r = el.boardWrap.getBoundingClientRect();
-    c.width = Math.round(r.width); c.height = Math.round(r.height); c.hidden = false;
-    const ctx = c.getContext('2d');
-    const parts = Array.from({ length: 120 }, () => ({ x: c.width / 2 + (Math.random() - 0.5) * c.width * 0.4, y: c.height * 0.45, vx: (Math.random() - 0.5) * 14, vy: -Math.random() * 12 - 4, g: 0.35 + Math.random() * 0.2, w: 6 + Math.random() * 6, h: 3 + Math.random() * 4, rot: Math.random() * Math.PI, vr: (Math.random() - 0.5) * 0.3, color: PALETTE[Math.floor(Math.random() * PALETTE.length)] }));
-    const t0 = performance.now();
+  // ── Particles: one canvas over the board, one animation loop, several emitters ──
+  const fx = { parts: [], running: false };
+  const particle = (x, y, vx, vy) => ({ x, y, vx, vy, g: 0.3 + Math.random() * 0.2, w: 5 + Math.random() * 7, h: 3 + Math.random() * 4, rot: Math.random() * Math.PI, vr: (Math.random() - 0.5) * 0.3, round: Math.random() < 0.3, color: PALETTE[Math.floor(Math.random() * PALETTE.length)], life: 1, ttl: 70 + Math.random() * 40 });
+  function fxEmit(list) {
+    const c = el.confetti; if (!c || !c.getContext || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    if (!fx.running) { const r = el.boardWrap.getBoundingClientRect(); c.width = Math.round(r.width); c.height = Math.round(r.height); }
+    c.hidden = false; fx.parts.push(...list);
+    if (fx.running) return;
+    fx.running = true;
+    const ctx = c.getContext('2d'); let last = performance.now();
     (function frame(now) {
-      const k = (now - t0) / 1600; ctx.clearRect(0, 0, c.width, c.height); ctx.globalAlpha = Math.max(0, 1 - k * k);
-      for (const p of parts) { p.vy += p.g; p.x += p.vx; p.y += p.vy; p.rot += p.vr; p.vx *= 0.99; ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot); ctx.fillStyle = p.color; ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h); ctx.restore(); }
-      if (k < 1) requestAnimationFrame(frame); else { ctx.clearRect(0, 0, c.width, c.height); c.hidden = true; }
-    })(t0);
+      const dt = Math.min(2, (now - last) / 16.7); last = now;
+      ctx.clearRect(0, 0, c.width, c.height);
+      fx.parts = fx.parts.filter(p => {
+        p.life -= dt / p.ttl; if (p.life <= 0 || p.y > c.height + 20) return false;
+        p.vy += p.g * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= Math.pow(0.985, dt); p.rot += p.vr * dt;
+        ctx.globalAlpha = Math.min(1, p.life * 2); ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot); ctx.fillStyle = p.color;
+        if (p.round) { ctx.beginPath(); ctx.arc(0, 0, p.w / 2, 0, Math.PI * 2); ctx.fill(); } else ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+        ctx.restore(); return true;
+      });
+      if (fx.parts.length) requestAnimationFrame(frame); else { ctx.clearRect(0, 0, c.width, c.height); c.hidden = true; fx.running = false; }
+    })(last);
+  }
+  // Level won: a fountain from the middle of the board.
+  function confetti() {
+    const W = el.boardWrap.clientWidth, H = el.boardWrap.clientHeight;
+    fxEmit(Array.from({ length: 120 }, () => particle(W / 2 + (Math.random() - 0.5) * W * 0.4, H * 0.45, (Math.random() - 0.5) * 14, -Math.random() * 12 - 4)));
+  }
+  // Combo or long shot: streamers fly in from both edges of the screen, more and faster the higher the level (0-3).
+  function sideBurst(level) {
+    const W = el.boardWrap.clientWidth, H = el.boardWrap.clientHeight, n = 14 + level * 8, list = [];
+    for (const side of [0, 1]) for (let k = 0; k < n; k++) {
+      const y = H * (0.2 + Math.random() * 0.6), speed = 7 + Math.random() * 7 + level * 1.5, ang = (Math.random() - 0.5) * 0.9, dir = side ? -1 : 1;
+      list.push(particle(side ? W + 6 : -6, y, dir * speed * Math.cos(ang), -Math.abs(speed * Math.sin(ang)) - 2));
+    }
+    fxEmit(list);
   }
 
   // ── Wiring ──

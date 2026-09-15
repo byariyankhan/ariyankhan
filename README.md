@@ -542,6 +542,14 @@ unlock (skip allowed after two fails), stars, best times and progress in
   diagonal period, repeated, slid by SMIL `animateTransform`; static under reduced
   motion); the head rides the body's exact curve so the two never part. Hard boards: ~55-65 arrows, ~3.4 free at any moment, freed arrow
   within two cells of the tap 24%, five or more cells away 44%.
+- **Cheers** (as in the reference apps): shots closer than `COMBO_WINDOW_MS`
+  (1.8 s) chain into a combo and a wrong tap breaks it; from x3 every shot fires
+  `sideBurst(level)` (streamers from both screen edges on the shared particle
+  canvas, level 0-3 from `comboLevel`: Good / Great / Amazing / Unstoppable)
+  with `SFX.cheer(level)`, a jingle that rises three semitones per level. One
+  arrow travelling `LONG_SHOT` (10) cells or more earns a level-0 cheer on its
+  own. `fxEmit()` runs one animation loop for every emitter, including the win
+  fountain `confetti()`; nothing is drawn under reduced motion.
 - **Armed arrows and lane preview** (as in the reference apps): a blocked tap
   costs a heart once and leaves the arrow *armed* (it just turns red);
   after every shot `releaseArmed()` fires any armed arrow whose lane is now clear
