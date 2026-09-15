@@ -115,7 +115,7 @@ $page_description = $page_count > 0
       href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700;800;900&family=Inter:wght@400;500;600;700;800&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="../css/style.css?v=16" />
+    <link rel="stylesheet" href="../css/style.css?v=17" />
     <link rel="stylesheet" href="css/service-index.css?v=2" />
   </head>
   <body>
