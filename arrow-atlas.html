@@ -18,7 +18,7 @@
     <title>Arrow Atlas — Tap-Away Arrow Puzzle on Country Maps</title>
     <meta
       name="description"
-      content="Free tap-away arrow puzzle on real country maps. Shoot arrows off the board, keep your 4 hearts, reveal and name the country. 70 levels, harder as you go, no sign-up."
+      content="Free tap-away arrow puzzle on real country maps. Shoot arrows off the board, keep your 4 hearts, reveal and name the country. 168 countries, harder as you play, no sign-up."
     />
     <meta name="author" content="Ariyan Khan" />
     <meta name="robots" content="index, follow, max-image-preview:large" />
@@ -33,7 +33,7 @@
     <meta property="og:title" content="Arrow Atlas — Tap-Away Arrow Puzzle on Country Maps" />
     <meta
       property="og:description"
-      content="Tap arrows to clear the board, keep your hearts, beat the clock, then guess which country you just cleared. 70 levels, free, in your browser."
+      content="Tap arrows to clear the board, keep your hearts, then guess which country you just cleared. 168 countries, free, in your browser."
     />
     <meta property="og:image" content="https://ariyankhan.com/images/history-geopolitics-video-editor.webp" />
     <meta property="og:site_name" content="Ariyan Khan | Video Editor" />
@@ -41,7 +41,7 @@
     <meta name="twitter:title" content="Arrow Atlas — Tap-Away Arrow Puzzle on Country Maps" />
     <meta
       name="twitter:description"
-      content="Tap arrows to clear the board, keep your hearts, beat the clock, then guess the country. 70 levels, free."
+      content="Tap arrows to clear the board, keep your hearts, then guess the country. 168 countries, free."
     />
     <meta name="twitter:image" content="https://ariyankhan.com/images/history-geopolitics-video-editor.webp" />
 
@@ -57,8 +57,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="css/arrow-atlas.css?v=14" />
-    <link rel="preload" href="games/data/arrow-atlas.json?v=4" as="fetch" crossorigin="anonymous" />
+    <link rel="stylesheet" href="css/arrow-atlas.css?v=15" />
+    <link rel="preload" href="games/data/arrow-atlas.json?v=5" as="fetch" crossorigin="anonymous" />
 
     <!-- SCHEMA -->
     <script type="application/ld+json">
@@ -70,7 +70,7 @@
           "@id": "https://ariyankhan.com/arrow-atlas.html#webpage",
           "url": "https://ariyankhan.com/arrow-atlas.html",
           "name": "Arrow Atlas — Tap-Away Arrow Puzzle on Country Maps",
-          "description": "Free arrow puzzle game played on real country maps. Tap arrows to shoot them off the board, keep your four hearts, beat the clock, then guess which country you cleared. 70 levels on a world tour.",
+          "description": "Free arrow puzzle game played on real country maps. Tap arrows to shoot them off the board, keep your four hearts, then guess which country you cleared. 168 countries on a world tour.",
           "inLanguage": "en-US",
           "datePublished": "2026-09-15",
           "dateModified": "2026-09-15",
@@ -84,7 +84,7 @@
           "name": "Arrow Atlas",
           "alternateName": ["Atlas Arrow Puzzle", "Tap Away Arrow Puzzle", "Country Map Arrow Game"],
           "url": "https://ariyankhan.com/arrow-atlas.html",
-          "description": "A tap-away arrow puzzle where every board is a real country. Tap an arrow to shoot it off the board if its path is clear; a blocked tap costs one of four hearts. Clear the board to reveal the country, name it in a three-option quiz, and collect it on a 70-level world tour. Difficulty ramps automatically as the tour goes on.",
+          "description": "A tap-away arrow puzzle where every board is a real country. Tap an arrow to shoot it off the board if its path is clear; a blocked tap costs one of four hearts. Clear the board to reveal the country, name it in a three-option quiz, and collect it on a 168-country world tour. Difficulty ramps automatically as the tour goes on.",
           "genre": ["Puzzle", "Casual", "Educational", "Geography", "Relaxation"],
           "gamePlatform": "Web browser",
           "playMode": "SinglePlayer",
@@ -96,7 +96,7 @@
           "isAccessibleForFree": true,
           "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
           "featureList": [
-            "70 country boards on a world tour, from Italy and Bangladesh to Iceland",
+            "168 country boards on a world tour: every country in the world, from Italy and Bangladesh to Luxembourg and Vanuatu",
             "Tap-away mechanic: shoot arrows off the board when their path is clear",
             "4 hearts per level; a blocked arrow costs one",
                         "Adaptive difficulty: Normal, Hard, Expert and Master boards of 40 to 250 arrows; the next board steps up or eases off based on your own hearts lost, hints, retries and speed; milestones every 10 levels; win streaks; combo counter; daily bonus board",
@@ -189,7 +189,7 @@
         </div>
 
         <div class="aa-world" id="aaWorld">
-          <svg class="aa-world-map" id="aaWorldMap" viewBox="0 36 1000 448" role="img" aria-label="World map of the tour: cleared countries are numbered"><g class="aa-world-land"></g><g class="aa-world-labels"></g></svg>
+          <div class="aa-world-scroll" id="aaWorldScroll"><svg class="aa-world-map" id="aaWorldMap" viewBox="0 36 1000 448" preserveAspectRatio="xMidYMid meet" role="img" aria-label="World map of the tour: cleared countries are numbered"><g class="aa-world-land"></g><g class="aa-world-labels"></g></svg></div>
           <p class="aa-world-cap" id="aaWorldCap"></p>
         </div>
 
@@ -198,7 +198,7 @@
           <div class="aa-mini-slot" id="aaDaily"></div>
           <button type="button" class="aa-mini aa-mini--tour" id="aaLevelsBtn">
             <span class="aa-mini-kicker">World Tour</span>
-            <span class="aa-mini-big" id="aaProgress">0/70</span>
+            <span class="aa-mini-big" id="aaProgress">0/168</span>
             <span class="aa-mini-sub">All levels</span>
           </button>
         </div>
@@ -280,7 +280,7 @@
       <!-- ── THE TOUR ── -->
       <section class="aa-section" id="tour">
         <div class="tag-pill">The World Tour</div>
-        <h2 class="section-title">70 countries, <span class="yl">five tiers</span></h2>
+        <h2 class="section-title">168 countries, <span class="yl">five tiers</span></h2>
         <p>
           The tour starts with shapes almost everyone knows, Italy, India, Australia, Brazil, Bangladesh, Japan, and
           works through the world's largest countries before finishing with Iceland. Early boards have about 90 cells
@@ -399,6 +399,6 @@
       </div>
     </div>
 
-    <script src="js/arrow-atlas.js?v=14"></script>
+    <script src="js/arrow-atlas.js?v=15"></script>
   </body>
 </html>

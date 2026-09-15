@@ -14,7 +14,7 @@
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
   const SVG_NS = 'http://www.w3.org/2000/svg';
-  const DATA_VERSION = '4';
+  const DATA_VERSION = '5';
   const MAP_VERSION = '1';
   const STORE = 'aa:v1:';
   const store = {
@@ -35,7 +35,7 @@
   // play (hearts lost, wrong taps, hints, retries, seconds per arrow), shifts that base one tier up or down, so a
   // player on a roll meets Hard boards early and a player who keeps losing hearts gets a breather. Never generic:
   // two players on level 12 can get different boards. Levels 1 and 2 always stay Normal.
-  const BASE_TIER = i => i < 5 ? 0 : i < 15 ? 1 : i < 30 ? 2 : i < 50 ? 3 : 4;
+  const BASE_TIER = i => i < 5 ? 0 : i < 15 ? 1 : i < 40 ? 2 : i < 80 ? 3 : 4;
   const SKILL_UP = 1.2, SKILL_DOWN = -1.2, SKILL_KEEP = 0.6, SKILL_GAIN = 0.8;
   const skillShift = skill => skill >= SKILL_UP ? 1 : skill <= SKILL_DOWN ? -1 : 0;
   const tierFor = (i, skill) => i < 2 ? 0 : Math.max(0, Math.min(4, BASE_TIER(i) + skillShift(skill)));
@@ -68,7 +68,7 @@
     overlay: $('#aaOverlay'), card: $('#aaCard'),
     loading: $('#aaLoading'), error: $('#aaError'),
     gate: $('#aaGate'), accept: $('#aaAccept'), splash: $('#aaSplash'), splashQuote: $('#aaSplashQuote'),
-    worldMap: $('#aaWorldMap'), worldCap: $('#aaWorldCap'),
+    worldMap: $('#aaWorldMap'), worldCap: $('#aaWorldCap'), worldScroll: $('#aaWorldScroll'),
   };
   if (!el.board) return;
 
@@ -89,7 +89,7 @@
   const unlocked = i => i === 0 || !!cleared(i - 1) || !!store.get(`skip:${i}`);
   const dayKey = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
   const hashStr = str => { let h = 2166136261; for (const ch of str) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; };
-  const dailyPick = () => { const h = hashStr('aa-daily-' + dayKey()); return { key: dayKey(), idx: h % 70, tier: 1 + (h >> 8) % 4, seed: 900000 + (h % 100000) }; };
+  const dailyPick = () => { const h = hashStr('aa-daily-' + dayKey()); return { key: dayKey(), idx: h % DATA.levels.length, tier: 1 + (h >> 8) % 4, seed: 900000 + (h % 100000) }; };
   function mulberry32(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
   function scrollToGame() { window.scrollTo({ top: 0, behavior: 'smooth' }); }
   function setHash(i) { if (history.replaceState) history.replaceState(null, '', location.pathname + location.search + (i >= 0 ? `#level-${i + 1}` : '')); }
@@ -175,7 +175,7 @@
   }
 
   // ── Lobby world map ──
-  // Every country faint; the 70 tour countries outlined; cleared ones filled and numbered with their level;
+  // Every country faint; the tour countries outlined; cleared ones filled and numbered with their level;
   // the next level pulsing. Tap a country to play its level. Built by games/build-world-map.mjs.
   let MAP = null, mapPromise = null, mapDrawn = false;
   function loadMap() {
@@ -213,6 +213,19 @@
       }
     }
     el.worldCap.textContent = done ? `${done} of ${n} countries collected · tap a country to play it` : 'Your world tour starts here · tap the highlighted country';
+    // The map takes the height left over in the lobby; on tall phones that makes it wider than the screen, so it
+    // scrolls sideways, opened on the next level. (Percent heights do not resolve inside an indefinite flex column,
+    // so the height is set here from the scroll box and kept in step on resize.)
+    const next = nextIdx >= 0 ? MAP.countries.find(c => c.id === DATA.levels[nextIdx].id) : null;
+    const fit = () => {
+      if (!el.worldScroll) return;
+      const h = el.worldScroll.clientHeight; if (h > 0) el.worldMap.style.height = `${h}px`;
+      const sw = el.worldMap.getBoundingClientRect().width, cw = el.worldScroll.clientWidth;
+      el.worldCap.classList.toggle('is-wide', sw > cw + 2);
+      if (next && sw > cw + 2) el.worldScroll.scrollLeft = Math.max(0, (next.cx / MAP.w) * sw - cw / 2);
+    };
+    requestAnimationFrame(fit);
+    if (!state.worldFit && 'ResizeObserver' in window) { state.worldFit = new ResizeObserver(() => requestAnimationFrame(fit)); state.worldFit.observe(el.worldScroll); }
   }
 
   // ── Level select ──
@@ -228,7 +241,7 @@
     el.streak.textContent = streak >= 2 ? `🔥 ${streak} in a row` : dStreak.count >= 2 ? `🔥 ${dStreak.count}-day daily streak` : '';
     renderDaily();
     const nextIdx = DATA.levels.findIndex((_, j) => !cleared(j) && unlocked(j));
-    el.playSub.textContent = nextIdx < 0 ? 'All 70 cleared · replay any level' : `Level ${nextIdx + 1} · ${LEVEL_DIFF(nextIdx)}`;
+    el.playSub.textContent = nextIdx < 0 ? `All ${DATA.levels.length} cleared · replay any level` : `Level ${nextIdx + 1} · ${LEVEL_DIFF(nextIdx)}`;
     el.play.dataset.level = nextIdx < 0 ? 0 : nextIdx;
     el.play.querySelector('.aa-play-label').textContent = done ? 'Continue' : 'Play';
     if (el.path) { el.path.innerHTML = '';
@@ -270,6 +283,50 @@
       </button>`;
     $('[data-daily]', el.daily).addEventListener('click', () => startLevel(d.idx, false, d));
   }
+
+  // ── Board masks ──
+  // A level stores only its outline (`d`, absolute M/L/Z in a REF×REF box) and one scale per tier (`k`, cells per
+  // unit). The grid mask is rasterised here with the very same code the build script used to choose k, so every
+  // player gets the same board. Even-odd point-in-polygon at cell centres; specks under 4 cells are dropped.
+  const REF = 100;
+  function parsePath(d) {
+    const rings = []; let ring = null; const re = /[MLZ]|-?\d+(?:\.\d+)?/g; let m, pending = [];
+    while ((m = re.exec(d))) {
+      const t = m[0];
+      if (t === 'M') { ring = []; rings.push(ring); pending = []; }
+      else if (t === 'L') pending = [];
+      else if (t === 'Z') { ring = null; }
+      else { pending.push(+t); if (pending.length === 2) { ring.push(pending); pending = []; } }
+    }
+    return rings.filter(r => r.length >= 3);
+  }
+  function insidePath(rings, x, y) {
+    let c = false;
+    for (const ring of rings) for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      const xi = ring[i][0], yi = ring[i][1], xj = ring[j][0], yj = ring[j][1];
+      if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) c = !c;
+    }
+    return c;
+  }
+  function rasterise(d, k, rings = parsePath(d)) {
+    const S = Math.ceil(REF * k) + 1;
+    const cells = [];
+    for (let r = 0; r < S; r++) { const row = new Array(S); for (let c = 0; c < S; c++) row[c] = insidePath(rings, (c + 0.5) / k, (r + 0.5) / k) ? 1 : 0; cells.push(row); }
+    const seen = cells.map(row => row.map(() => false));
+    for (let r = 0; r < S; r++) for (let c = 0; c < S; c++) {
+      if (!cells[r][c] || seen[r][c]) continue;
+      const comp = []; const stack = [[r, c]]; seen[r][c] = true;
+      while (stack.length) { const [y, x] = stack.pop(); comp.push([y, x]); for (const [dy, dx] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const ny = y + dy, nx = x + dx; if (ny >= 0 && nx >= 0 && ny < S && nx < S && cells[ny][nx] && !seen[ny][nx]) { seen[ny][nx] = true; stack.push([ny, nx]); } } }
+      if (comp.length < 4) for (const [y, x] of comp) cells[y][x] = 0;
+    }
+    let r0 = S, r1 = -1, c0 = S, c1 = -1;
+    for (let r = 0; r < S; r++) for (let c = 0; c < S; c++) if (cells[r][c]) { r0 = Math.min(r0, r); r1 = Math.max(r1, r); c0 = Math.min(c0, c); c1 = Math.max(c1, c); }
+    if (r1 < 0) return { k, x: 0, y: 0, rows: [], count: 0, w: 0, h: 0 };
+    const rows = cells.slice(r0, r1 + 1).map(row => row.slice(c0, c1 + 1).join(''));
+    return { k, x: c0, y: r0, rows, count: rows.join('').split('1').length - 1, w: rows[0].length, h: rows.length };
+  }
+  const maskCache = new Map();
+  const maskFor = (L, tier) => { const key = L.id + ':' + tier; if (!maskCache.has(key)) maskCache.set(key, rasterise(L.d, L.k[tier])); return maskCache.get(key); };
 
   // ── Puzzle generation ──
   // Every piece gets an order number `ord`; the solution removes pieces newest-first. Two pairwise rules keep
@@ -468,6 +525,19 @@
     throw new Error('could not generate a solvable board');
   }
 
+  // Generate a few candidate boards from the seed and keep the narrowest (fewest arrows free at the start), so the
+  // difficulty a tier promises does not depend on the luck of one seed. Candidates per tier: CANDIDATES_OF.
+  const CANDIDATES_OF = [1, 2, 3, 3, 2];
+  function freeAtStart(b) { const { W, H, occ } = b; return b.pieces.filter(p => { const [dr, dc] = DIRS[p.dir]; let [y, x] = p.cells[0]; y += dr; x += dc; while (y >= 0 && y < H && x >= 0 && x < W) { if (occ[y][x] >= 0) return false; y += dr; x += dc; } return true; }).length; }
+  function bestBoard(mask, tier, seed) {
+    let best = null, bestFree = Infinity;
+    for (let k = 0; k < CANDIDATES_OF[tier]; k++) {
+      const b = generate(mask, MAXLEN_OF[tier], seed + k * 97, GEN_OPTS(tier)); const f = freeAtStart(b);
+      if (f < bestFree) { best = b; bestFree = f; }
+    }
+    return best;
+  }
+
   // ── Board rendering ──
   const ARROW = { r: 0, d: 90, l: 180, u: 270 };
   function exitDistance(p) {
@@ -533,11 +603,14 @@
     if (bumpSeed) state.seedBump++; else if (state.idx !== i || !!daily !== !!state.daily) { state.seedBump = 0; state.fails = 0; }
     state.daily = daily;
     state.idx = i; state.level = DATA.levels[i]; state.tier = daily ? daily.tier : keepTier >= 0 ? keepTier : TIER_OF(i);
-    state.maskInfo = state.level.tiers[state.tier];
-    const gen = generate(state.maskInfo, MAXLEN_OF[state.tier], (daily ? daily.seed : (i + 1) * 1000) + state.seedBump, GEN_OPTS(state.tier));
+    state.busy = true; el.select.hidden = true; el.game.hidden = false; el.overlay.hidden = true; el.board.innerHTML = '';
+    el.hudLevel.textContent = daily ? 'Daily' : `Level ${i + 1}`; el.hudLeft.textContent = 'Drawing the board…';
+    await new Promise(r => setTimeout(r, 20));   // let the game screen paint before the (up to ~1 s on phones) generation
+    state.maskInfo = maskFor(state.level, state.tier);
+    const gen = bestBoard(state.maskInfo, state.tier, (daily ? daily.seed : (i + 1) * 1000) + state.seedBump);
     const livesMax = livesFor(state.mode);
     Object.assign(state, { W: gen.W, H: gen.H, pieces: gen.pieces, occ: gen.occ, land: gen.land, left: gen.pieces.length, lives: livesMax, livesMax, elapsed: 0, startedAt: 0, finished: false, hintsUsed: 0, wrong: 0, busy: false, combo: 0, bestCombo: 0, lastShot: 0, shown: new Set() });
-    el.select.hidden = true; el.game.hidden = false; el.overlay.hidden = true; el.error.hidden = true; el.loading.hidden = true;
+    el.error.hidden = true; el.loading.hidden = true;
     if (daily) { if (history.replaceState) history.replaceState(null, '', location.pathname + location.search + '#daily'); } else setHash(i);
     scrollToGame();
     const diff = daily ? DIFF_OF(state.tier) : LEVEL_DIFF(i, state.tier);
