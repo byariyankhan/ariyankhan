@@ -9,7 +9,7 @@ const data = JSON.parse(fs.readFileSync(path.join(root, 'games/data/arrow-atlas.
 const html = fs.readFileSync(path.join(root, 'arrow-atlas.html'), 'utf8');
 // Pull the pure pieces of the engine out of the IIFE so the exact production code is tested.
 const grab = re => { const m = js.match(re); if (!m) throw new Error('could not find ' + re); return m[0]; };
-const src = [grab(/const REF = \d+;/), grab(/function parsePath\(d\) \{[\s\S]*?\n  \}\n/), grab(/function insidePath\([\s\S]*?\n  \}\n/), grab(/function rasterise\([\s\S]*?\n  \}\n/), grab(/const DIRS = [^\n]+/), grab(/const PALETTE = [^\n]+/), grab(/const BASE_TIER = [^\n]+/), grab(/const SKILL_UP = [^\n]+/), grab(/const skillShift = [^\n]+/), grab(/const tierFor = [^\n]+/), grab(/const rateRun = [\s\S]*?\n  \};\n/), grab(/const nextSkill = [^\n]+/), grab(/const MAXLEN_OF = [^\n]+/), grab(/const NARROW_OF = [^\n]+/), grab(/const CHAIN_OF = [^\n]+/), grab(/const FAR_OF = [^\n]+/), grab(/const GEN_OPTS = [^\n]+/), grab(/function mulberry32[^\n]+/), grab(/function generate\(mask, maxLen, seed[^)]*\) \{[\s\S]*?\n  \}\n/)].join('\n');
+const src = [grab(/const REF = \d+;/), grab(/function parsePath\(d\) \{[\s\S]*?\n  \}\n/), grab(/function insidePath\([\s\S]*?\n  \}\n/), grab(/function rasterise\([\s\S]*?\n  \}\n/), grab(/const DIRS = [^\n]+/), grab(/const PALETTE = [^\n]+/), grab(/const BASE_TIER = [^\n]+/), grab(/const SKILL_UP = [^\n]+/), grab(/const skillShift = [^\n]+/), grab(/const tierFor = [^\n]+/), grab(/const rateRun = [\s\S]*?\n  \};\n/), grab(/const nextSkill = [^\n]+/), grab(/const MAXLEN_OF = [^\n]+/), grab(/const NARROW_OF = [^\n]+/), grab(/const CHAIN_OF = [^\n]+/), grab(/const FAR_OF = [^\n]+/), grab(/const BUNDLE_OF = [^\n]+/), grab(/const RAIL_OF = [^\n]+/), grab(/const HOLE_OF = [^\n]+/), grab(/const GEN_OPTS = [^\n]+/), grab(/function mulberry32[^\n]+/), grab(/function generate\(mask, maxLen, seed[^)]*\) \{[\s\S]*?\n  \}\n/)].join('\n');
 const { generate, rasterise, BASE_TIER, tierFor, rateRun, nextSkill, MAXLEN_OF, GEN_OPTS, DIRS } = new Function(src + '\nreturn { generate, rasterise, BASE_TIER, tierFor, rateRun, nextSkill, MAXLEN_OF, GEN_OPTS, DIRS };')();
 const maskCache = new Map(); const maskFor = (L, t) => { const key = L.id + ':' + t; if (!maskCache.has(key)) maskCache.set(key, rasterise(L.d, L.k[t])); return maskCache.get(key); };
 const TIER_OF = i => tierFor(i, 0);
@@ -39,13 +39,15 @@ test('rasterised tiers grow in cell count and stay within 46 cells (64 tall / 56
     for (let t = 1; t < 5; t++) assert.ok(maskFor(L, t).count >= maskFor(L, t - 1).count, `${L.name} tier ${t} smaller than tier ${t - 1}`);
   }
 });
-test('every level generates a solvable board at its tour tier (fixed seed) and covers every land cell', () => {
+test('every level generates a solvable board at its tour tier (fixed seed), covers every land cell, and gaps are sparse and never adjacent', () => {
   data.levels.forEach((L, i) => {
     const tier = TIER_OF(i); const mask = maskFor(L, tier);
     const b = generate(mask, MAXLEN_OF[tier], (i + 1) * 1000, GEN_OPTS(tier));
     assert.ok(solvable(b), `${L.name} unsolvable`);
-    const land = mask.rows.join('').split('1').length - 1;
-    assert.equal(b.pieces.reduce((n, p) => n + p.cells.length, 0), land, `${L.name} pieces do not cover the mask`);
+    const shapeCells = mask.rows.join('').split('1').length - 1, landCells = b.land.flat().filter(Boolean).length;
+    assert.equal(b.pieces.reduce((n, p) => n + p.cells.length, 0), landCells, `${L.name} pieces do not cover the land`);
+    assert.ok(landCells >= shapeCells * 0.8 && landCells <= shapeCells, `${L.name} has too many gaps (${shapeCells - landCells} of ${shapeCells})`);
+    for (let r = 0; r < b.H; r++) for (let c = 0; c < b.W; c++) if (b.shape[r][c] && !b.land[r][c]) assert.ok(b.occ[r][c] < 0 && ![[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dy, dx]) => b.shape[r + dy]?.[c + dx] && !b.land[r + dy][c + dx]), `${L.name} has adjacent gaps`);
     assert.ok(b.pieces.every(p => p.cells.length <= MAXLEN_OF[tier] + 6), 'piece too long');
   });
 });
