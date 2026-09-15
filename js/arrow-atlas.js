@@ -36,7 +36,7 @@
   };
 
   const el = {
-    select: $('#aaSelect'), levels: $('#aaLevels'), progress: $('#aaProgress'), progressBar: $('#aaProgressBar'), modes: $('#aaModes'), streak: $('#aaStreak'), daily: $('#aaDaily'), hudDiff: $('#aaHudDiff'),
+    select: $('#aaSelect'), levels: $('#aaLevels'), progress: $('#aaProgress'), progressBar: $('#aaProgressBar'), modes: $('#aaModes'), modeDesc: $('#aaModeDesc'), streak: $('#aaStreak'), daily: $('#aaDaily'), hudDiff: $('#aaHudDiff'), play: $('#aaPlay'), playSub: $('#aaPlaySub'), about: $('#aaAbout'), aboutPanel: $('#aaAboutPanel'),
     game: $('#aaGame'), boardWrap: $('#aaBoardWrap'), board: $('#aaBoard'), toast: $('#aaToast'), confetti: $('#aaConfetti'),
     hudLevel: $('#aaHudLevel'), hudMode: $('#aaHudMode'), hudTime: $('#aaHudTime'), hudLeft: $('#aaHudLeft'), hudLives: $('#aaHudLives'), hudLivesWrap: $('#aaHudLivesWrap'), hudPct: $('#aaHudPct'), boardBar: $('#aaBoardBar'),
     btnHint: $('#aaHint'), btnRestart: $('#aaRestart'), btnLevels: $('#aaBackToLevels'), btnSound: $('#aaSound'),
@@ -64,7 +64,7 @@
   const hashStr = str => { let h = 2166136261; for (const ch of str) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; };
   const dailyPick = () => { const h = hashStr('aa-daily-' + dayKey()); return { key: dayKey(), idx: h % 70, tier: 1 + (h >> 8) % 4, seed: 900000 + (h % 100000) }; };
   function mulberry32(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
-  function scrollToGame() { const top = el.game.getBoundingClientRect().top + window.scrollY - 84; window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' }); }
+  function scrollToGame() { window.scrollTo({ top: 0, behavior: 'smooth' }); }
   function setHash(i) { if (history.replaceState) history.replaceState(null, '', location.pathname + location.search + (i >= 0 ? `#level-${i + 1}` : '')); }
 
   // ── Sound ──
@@ -84,7 +84,7 @@
     } catch { /* silent */ }
   }
   const SFX = { shoot: () => beep([[880, 0, 0.07], [1320, 0.04, 0.08]]), block: () => beep([[150, 0, 0.18, 'square', 0.04]]), win: () => beep([[523, 0, 0.12], [659, 0.1, 0.12], [784, 0.2, 0.12], [1047, 0.3, 0.35]]), lose: () => beep([[300, 0, 0.2, 'triangle'], [220, 0.2, 0.35, 'triangle']]) };
-  function renderSound() { el.btnSound.setAttribute('aria-pressed', String(!state.muted)); el.btnSound.textContent = state.muted ? 'Sound: off' : 'Sound: on'; }
+  function renderSound() { el.btnSound.setAttribute('aria-pressed', String(!state.muted)); el.btnSound.setAttribute('aria-label', state.muted ? 'Sound off' : 'Sound on'); el.btnSound.textContent = state.muted ? '🔇' : '🔊'; }
 
   let toastTimer = 0;
   function toast(msg, kind = '') { el.toast.textContent = msg; el.toast.className = 'aa-toast' + (kind ? ' aa-toast--' + kind : ''); el.toast.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => { el.toast.hidden = true; }, 2800); }
@@ -110,13 +110,18 @@
     renderDaily();
     el.progressBar.style.width = `${(done / n) * 100}%`;
     el.modes.innerHTML = '';
-    for (const m of [['classic', 'Classic', 'Timer counts up, 4 hearts, 3 hints'], ['rush', 'Rush', `${RUSH_SECONDS}s countdown, 4 hearts, 3 hints`], ['onelife', 'One Life', 'One heart. One blocked tap and it is over.'], ['focus', 'Deep Focus', 'No clock, no hearts. Just clear the map.']]) {
+    const modeList = [['classic', 'Classic', 'Timer counts up · 4 hearts · 3 hints'], ['rush', 'Rush', `${RUSH_SECONDS} second countdown · 4 hearts · 3 hints`], ['onelife', 'One Life', 'One heart. One blocked tap and it is over.'], ['focus', 'Deep Focus', 'No clock, no hearts, unlimited hints. Just clear the map.']];
+    for (const m of modeList) {
       const b = document.createElement('button');
       b.type = 'button'; b.className = 'aa-mode' + (m[0] === state.mode ? ' is-active' : ''); b.dataset.mode = m[0]; b.setAttribute('aria-pressed', String(m[0] === state.mode));
-      b.innerHTML = `<strong>${m[1]}</strong><span>${m[2]}</span>`;
+      b.textContent = m[1];
       b.addEventListener('click', () => { state.mode = m[0]; store.set('mode', m[0]); renderSelect(); });
       el.modes.appendChild(b);
     }
+    el.modeDesc.textContent = modeList.find(m => m[0] === state.mode)[2];
+    const nextIdx = DATA.levels.findIndex((_, j) => !cleared(j) && unlocked(j));
+    el.playSub.textContent = nextIdx < 0 ? 'All 70 cleared · replay any level' : `Level ${nextIdx + 1} · ${DIFF_OF(TIER_OF(nextIdx))}`;
+    el.play.dataset.level = nextIdx < 0 ? 0 : nextIdx;
     el.levels.innerHTML = '';
     DATA.levels.forEach((L, i) => {
       const rec = cleared(i), open = unlocked(i);
@@ -529,6 +534,8 @@
   // ── Wiring ──
   el.btnHint.addEventListener('click', hint);
   el.btnRestart.addEventListener('click', () => startLevel(state.idx, false, state.daily));
+  el.play.addEventListener('click', () => startLevel(+el.play.dataset.level || 0));
+  el.about.addEventListener('click', () => { el.aboutPanel.open = true; el.aboutPanel.scrollIntoView({ behavior: 'smooth', block: 'start' }); });
   el.btnLevels.addEventListener('click', () => { if (state.left < state.pieces.length && !state.finished && !confirm('Leave this level? Progress on it will be lost.')) return; goToLevels(); });
   el.btnSound.addEventListener('click', () => { state.muted = !state.muted; store.set('muted', state.muted); renderSound(); if (!state.muted) SFX.shoot(); });
   document.addEventListener('keydown', e => { if (!el.game.hidden && !state.finished && (e.key === 'h' || e.key === 'H') && !/input|textarea/i.test(document.activeElement?.tagName || '')) hint(); });

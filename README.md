@@ -454,7 +454,11 @@ text, `#level-mode` deep links (`#africa-hard`). English only, continuous play
 
 ## Arrow Atlas (tap-away arrow puzzle on country maps)
 
-`arrow-atlas.html` is the second game: the casual, addictive one. Each level is a
+`arrow-atlas.html` is the second game: the casual, addictive one. The page is an
+app shell: no site nav, the game fills the first screen (home = Play button, mode
+chips, daily card, level grid; game = one HUD row, board, one bottom row); the SEO
+content, FAQ and site footer sit in a collapsed `<details>` below, opened by the
+`i` button. Each level is a
 country's outline filled with arrows; tap an arrow to shoot it off the board if its
 run to the edge is clear, a blocked tap costs one of 4 hearts, Classic (count-up) or
 Rush (90 s countdown) timer, One Life (1 heart), Deep Focus (no clock, no hearts, unlimited hints; 3 hints
