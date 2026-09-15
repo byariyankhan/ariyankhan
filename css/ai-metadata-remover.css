@@ -25,6 +25,9 @@
 }
 .amr-trust svg{ width:15px; height:15px; color:var(--yellow); fill:none; stroke:currentColor; stroke-width:2.2; stroke-linecap:round; stroke-linejoin:round; }
 
+/* Screen-reader-only heading (the site CSP forbids inline style attributes) */
+.amr-visually-hidden{ position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
+
 /* ── Tool card ── */
 .amr-tool{
   background:var(--panel); border:1px solid #1c1c1c; border-radius:22px;
