@@ -164,13 +164,15 @@
     return world.features.filter(f => ids.has(f.id));
   }
   function bboxPolygon([w, s, e, n]) {
-    // Sampled edges so curved projections frame the box properly.
+    // Sampled edges so curved projections frame the box properly. d3 treats
+    // rings as spherical: the exterior must wind CLOCKWISE (west edge going
+    // north first), otherwise the polygon means "the whole world except this box".
     const pts = [];
     const step = 2;
-    for (let x = w; x < e; x += step) pts.push([x, s]);
-    for (let y = s; y < n; y += step) pts.push([e, y]);
-    for (let x = e; x > w; x -= step) pts.push([x, n]);
-    for (let y = n; y > s; y -= step) pts.push([w, y]);
+    for (let y = s; y < n; y += step) pts.push([w, y]);
+    for (let x = w; x < e; x += step) pts.push([x, n]);
+    for (let y = n; y > s; y -= step) pts.push([e, y]);
+    for (let x = e; x > w; x -= step) pts.push([x, s]);
     pts.push([w, s]);
     return { type: 'Polygon', coordinates: [pts] };
   }
@@ -267,6 +269,11 @@
         if (!c || !isFinite(c[0]) || !isFinite(c[1])) continue;
         if (c[0] < 0 || c[1] < 0 || c[0] > W || c[1] > H) continue;
         if (!labelFits(f, f.properties.name, state.labelSize)) continue;
+        if (def.globe) {
+          // Skip countries on the far side of the globe (their clipped centroid can still land on-canvas).
+          const r = projection.rotate();
+          if (d3.geoDistance(d3.geoCentroid(largestPolygon(f)), [-r[0], -r[1]]) > Math.PI / 2 - 0.3) continue;
+        }
         const t = el('text', { x: c[0].toFixed(1), y: (c[1] + state.labelSize / 3).toFixed(1) });
         t.textContent = f.properties.name;
         gT.appendChild(t);
