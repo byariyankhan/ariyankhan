@@ -461,7 +461,7 @@ plus “night” and “mint” via `data-theme` on `<html>`, picked in Settings
 the palette button). Home = streak chip, settings, a card carousel (Today's
 Country, World Tour progress, Mode), title, a level path and a Continue button;
 game = back / Level + difficulty / palette + settings, hearts + arrows left + hint,
-the board (grid-aligned frame around the land cells, optional guideline dots),
+the board (its outline is made of arrow pieces, see below; optional guideline dots),
 Restart. The level grid is a bottom sheet; Settings is a full page like the
 reference apps: Sound / Vibration / Guideline switches, Colours, How to play,
 Feedback, Privacy Policy, Terms, and an About fold with the FAQ. This is the
@@ -481,8 +481,13 @@ unlock (skip allowed after two fails), stars, best times and progress in
   (`mulberry32`), so every player gets the same board. `generate()` works backwards
   from an empty board — each new piece must have a clear run to the edge past the
   pieces placed before it — so the reverse order is always a solution and no move
-  order can get stuck. Bodies snake backwards through empty cells (random walk, never onto the
-  head's exit line) so boards read like a maze; a piece is drawn as one track path and
+  order can get stuck. `generate()` runs in two phases: first the boundary cells are traced into snakes
+  that hug the outline (heads point straight out over non-land only, and they get
+  the newest removal order so peeling the border is always possible — this is what
+  makes the country's outline out of arrows, as in the reference apps); then the
+  interior is filled most-constrained-cell-first, looking "through" border pieces
+  because they are newer. Bodies snake backwards through empty cells (random walk,
+  never onto the head's exit line) so boards read like a maze; a piece is drawn as one track path and
   shot with a stroke-dashoffset transition so it flows out along its own track. Dead
   cells are absorbed into a neighbouring piece (head moves forward, or tail extends,
   with the removal-order invariant re-checked, re-ordering the piece to newest when

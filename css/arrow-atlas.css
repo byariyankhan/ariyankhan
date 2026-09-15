@@ -109,7 +109,6 @@ button{ font-family:inherit; }
 .aa-board{ display:block; width:100%; height:auto; max-height:calc(100dvh - 210px); touch-action:manipulation; user-select:none; -webkit-user-select:none; }
 .aa-board--tall{ max-height:calc(100dvh - 190px); }
 .aa-outline{ fill:var(--accent); fill-opacity:0; stroke:none; transition:fill-opacity .35s; pointer-events:none; }
-.aa-frame{ fill:none; stroke:var(--line); stroke-width:.14; stroke-linecap:round; stroke-linejoin:round; pointer-events:none; }
 .aa-guides{ display:none; }
 .aa-board--guides .aa-guides{ display:block; }
 .aa-guides circle{ fill:var(--line); fill-opacity:.32; }
