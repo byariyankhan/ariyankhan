@@ -512,6 +512,9 @@ unlock (skip allowed after two fails), stars, best times and progress in
   and numbered with their level, the next level pulsing purple. Versioned with
   `MAP_VERSION`. There is no Restart button in the game any more (back out or
   fail and retry).
+- **Lobby layout**: title, the world map (fills the space), Continue, then two
+  compact buttons (Today's Country, World Tour n/70 · All levels). The old cards
+  carousel and the level-path dots are gone.
 - **First open / launch**: `#aaGate` (welcome, Terms + Privacy links, Accept,
   stored in `aa:v1:welcomed`), then `#aaSplash` (logo + one line from `QUOTES`,
   rotating per launch in `aa:v1:launches`, tap or 2.4 s to dismiss, skipped for

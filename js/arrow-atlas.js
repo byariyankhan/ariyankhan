@@ -60,7 +60,7 @@
   const PALETTE = ['#FFED54', '#5CD6FF', '#8CFF7A', '#FF9AD5', '#C79BFF', '#FFB347', '#6EE7B7', '#FDBA74', '#F97373', '#38BDF8'];
 
   const el = {
-    select: $('#aaSelect'), levels: $('#aaLevels'), progress: $('#aaProgress'), progressBar: $('#aaProgressBar'), streak: $('#aaStreak'), daily: $('#aaDaily'), hudDiff: $('#aaHudDiff'), play: $('#aaPlay'), playSub: $('#aaPlaySub'), path: $('#aaPath'), btnVibe: $('#aaVibe'), btnGuides: $('#aaGuides'), btnMusic: $('#aaMusic'), howTo: $('#aaHowTo'), aboutPanel: $('#aaAboutPanel'),
+    select: $('#aaSelect'), levels: $('#aaLevels'), progress: $('#aaProgress'), streak: $('#aaStreak'), daily: $('#aaDaily'), hudDiff: $('#aaHudDiff'), play: $('#aaPlay'), playSub: $('#aaPlaySub'), path: $('#aaPath'), btnVibe: $('#aaVibe'), btnGuides: $('#aaGuides'), btnMusic: $('#aaMusic'), howTo: $('#aaHowTo'), aboutPanel: $('#aaAboutPanel'),
     sheet: $('#aaSheet'), levelsSheet: $('#aaLevelsSheet'), levelsBtn: $('#aaLevelsBtn'), settingsBtns: $$('#aaSettings, #aaSettingsG'), themeBtn: $('#aaTheme'), themes: $('#aaThemes'),
     game: $('#aaGame'), boardWrap: $('#aaBoardWrap'), board: $('#aaBoard'), toast: $('#aaToast'), confetti: $('#aaConfetti'),
     hudLevel: $('#aaHudLevel'), hudMode: $('#aaHudMode'), hudTime: $('#aaHudTime'), hudLeft: $('#aaHudLeft'), hudLives: $('#aaHudLives'), hudLivesWrap: $('#aaHudLivesWrap'), hudPct: $('#aaHudPct'), boardBar: $('#aaBoardBar'),
@@ -227,13 +227,11 @@
     const streak = store.get('streak', 0), dStreak = store.get('dailyStreak', { count: 0, last: '' });
     el.streak.textContent = streak >= 2 ? `🔥 ${streak} in a row` : dStreak.count >= 2 ? `🔥 ${dStreak.count}-day daily streak` : '';
     renderDaily();
-    el.progressBar.style.width = `${(done / n) * 100}%`;
     const nextIdx = DATA.levels.findIndex((_, j) => !cleared(j) && unlocked(j));
     el.playSub.textContent = nextIdx < 0 ? 'All 70 cleared · replay any level' : `Level ${nextIdx + 1} · ${LEVEL_DIFF(nextIdx)}`;
     el.play.dataset.level = nextIdx < 0 ? 0 : nextIdx;
     el.play.querySelector('.aa-play-label').textContent = done ? 'Continue' : 'Play';
-    // level path: current level plus the next four
-    el.path.innerHTML = '';
+    if (el.path) { el.path.innerHTML = '';
     const start = Math.max(0, (nextIdx < 0 ? n - 1 : nextIdx) - 1);
     for (let i = start; i < Math.min(n, start + 5); i++) {
       const d = document.createElement('button'); d.type = 'button';
@@ -241,7 +239,7 @@
       d.textContent = String(i + 1); d.disabled = !unlocked(i); d.setAttribute('aria-label', `Level ${i + 1}`);
       d.addEventListener('click', () => startLevel(i));
       el.path.appendChild(d);
-    }
+    } }
     renderThemes();
     el.levels.innerHTML = '';
     DATA.levels.forEach((L, i) => {
@@ -265,12 +263,11 @@
     const d = dailyPick(), L = DATA.levels[d.idx], rec = store.get(`daily:${d.key}`);
     const date = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     el.daily.innerHTML = `
-      <div class="aa-daily-text">
-        <span class="aa-daily-kicker">Today's Country · ${date}</span>
-        <strong>${rec ? L.name : 'A mystery country'} · ${DIFF_OF(d.tier)}</strong>
-        <span class="aa-daily-sub">${rec ? `Cleared in ${fmtTime(rec.t, true)} ${'★'.repeat(rec.stars)} · play again for a better time` : 'One bonus board a day, any level of the tour. Same board for everyone today.'}</span>
-      </div>
-      <button type="button" class="aa-btn aa-btn--primary" data-daily>${rec ? 'Replay' : 'Play'}</button>`;
+      <button type="button" class="aa-mini aa-mini--daily" data-daily aria-label="Today's Country, ${rec ? 'cleared, replay' : 'play'}">
+        <span class="aa-mini-kicker">Today's Country</span>
+        <span class="aa-mini-big">${rec ? L.name : 'Mystery'} · ${DIFF_OF(d.tier)}</span>
+        <span class="aa-mini-sub">${rec ? `Cleared ${'★'.repeat(rec.stars)} · replay` : `${date} · play`}</span>
+      </button>`;
     $('[data-daily]', el.daily).addEventListener('click', () => startLevel(d.idx, false, d));
   }
 

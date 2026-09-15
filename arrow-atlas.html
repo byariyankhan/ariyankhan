@@ -57,7 +57,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="css/arrow-atlas.css?v=12" />
+    <link rel="stylesheet" href="css/arrow-atlas.css?v=13" />
     <link rel="preload" href="games/data/arrow-atlas.json?v=4" as="fetch" crossorigin="anonymous" />
 
     <!-- SCHEMA -->
@@ -183,27 +183,25 @@
           <button type="button" class="aa-icon" id="aaSettings" aria-label="Settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5 19.4 7.7v8.6L12 20.5 4.6 16.3V7.7z"/><circle cx="12" cy="12" r="3"/></svg></button>
         </header>
 
-        <div class="aa-cards" id="aaCards">
-          <div class="aa-tile aa-tile--daily" id="aaDaily"></div>
-          <button type="button" class="aa-tile aa-tile--tour" id="aaLevelsBtn">
-            <span class="aa-tile-kicker">World Tour</span>
-            <span class="aa-tile-big" id="aaProgress">0/70</span>
-            <span class="aa-tile-track"><span class="aa-tile-bar" id="aaProgressBar"></span></span>
-            <span class="aa-tile-cta">All levels</span>
-          </button>
+        <div class="aa-hero">
+          <h1 class="aa-title">Arrow Atlas</h1>
+          <p class="aa-tagline">Clear the arrows. Reveal the country.</p>
         </div>
 
         <div class="aa-world" id="aaWorld">
           <svg class="aa-world-map" id="aaWorldMap" viewBox="0 0 1000 520" role="img" aria-label="World map of the tour: cleared countries are numbered"><g class="aa-world-land"></g><g class="aa-world-labels"></g></svg>
           <p class="aa-world-cap" id="aaWorldCap"></p>
         </div>
-        <div class="aa-hero">
-          <h1 class="aa-title">Arrow Atlas</h1>
-          <p class="aa-tagline">Clear the arrows. Reveal the country.</p>
-        </div>
 
-        <div class="aa-path" id="aaPath" aria-label="Upcoming levels"></div>
         <button type="button" class="aa-play" id="aaPlay"><span class="aa-play-label">Continue</span><span class="aa-play-sub" id="aaPlaySub">Level 1</span></button>
+        <div class="aa-minis">
+          <div class="aa-mini-slot" id="aaDaily"></div>
+          <button type="button" class="aa-mini aa-mini--tour" id="aaLevelsBtn">
+            <span class="aa-mini-kicker">World Tour</span>
+            <span class="aa-mini-big" id="aaProgress">0/70</span>
+            <span class="aa-mini-sub">All levels</span>
+          </button>
+        </div>
         <p class="aa-loading" id="aaLoading" hidden>Loading…</p>
         <p class="aa-error" id="aaError" hidden></p>
       </section>
@@ -401,6 +399,6 @@
       </div>
     </div>
 
-    <script src="js/arrow-atlas.js?v=13"></script>
+    <script src="js/arrow-atlas.js?v=14"></script>
   </body>
 </html>
