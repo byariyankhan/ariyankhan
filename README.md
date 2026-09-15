@@ -51,12 +51,12 @@ Hostinger KVM VPS, next to the other sites already there. It binds **no public
 port**: `ariyankhan-web` listens on `127.0.0.1:${WEB_PORT:-8081}` and the VPS's
 existing reverse proxy routes `ariyankhan.com` to it (Traefik labels are on the
 container for proxies that read them). All state is in this project's own named
-volumes (`site`, `site_data`), so moving the site to its own VPS later is: run
+volume (`site_data`), so moving the site to its own VPS later is: run
 the same compose there, copy the `site_data` volume, flip DNS.
 
 | File | Purpose |
 |------|---------|
-| `deploy/docker-compose.yml` | Shared-VPS project: `fetch` (clones this repo into the `site` volume) + `web` (php:8.4-apache) |
+| `deploy/docker-compose.yml` | Shared-VPS project: one `web` container (php:8.4-apache) that downloads the branch tarball from GitHub on start |
 | `deploy/docker-compose.standalone.yml` | Same, plus Caddy on :80/:443 with automatic TLS — only for a VPS where nothing else uses those ports |
 | `deploy/nginx-ariyankhan.conf` | Host nginx server block that proxies the domain to the container (the VPS's other sites are plain nginx vhosts too) |
 | `deploy/web-entrypoint.sh` | Enables Apache modules, `AllowOverride All`, and writes `mail-config.local.php` / `admin-config.local.php` from env vars |
@@ -66,8 +66,8 @@ project `ariyankhan`, container `ariyankhan-web` on `127.0.0.1:8747`.
 
 **Deploy / redeploy:** push to `main`, then re-run the project in hPanel → VPS →
 Docker Manager (or the Hostinger API `VPS_createNewProject` with
-`deploy/docker-compose.yml`). `fetch` re-clones `main`; `data/` (SQLite: tracker,
-inbox, reviews) is untouched because it lives on `site_data`.
+`deploy/docker-compose.yml`). the container restarts and re-downloads `main`; `data/` (SQLite: tracker,
+inbox, reviews) is untouched because it lives on the `site_data` volume.
 
 **Secrets** are never in git: set them as the project's environment in Docker
 Manager. `deploy/web-entrypoint.sh` turns them into the two gitignored PHP files
