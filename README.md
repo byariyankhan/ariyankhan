@@ -467,12 +467,17 @@ unlock (skip allowed after two fails), stars, best times and progress in
   (`mulberry32`), so every player gets the same board. `generate()` works backwards
   from an empty board — each new piece must have a clear run to the edge past the
   pieces placed before it — so the reverse order is always a solution and no move
-  order can get stuck. Dead cells are absorbed into a neighbouring piece's tail;
-  if that fails the seed is bumped and it retries (max 2 attempts needed in tests).
+  order can get stuck. Bodies snake backwards through empty cells (random walk, never onto the
+  head's exit line) so boards read like a maze; a piece is drawn as one track path and
+  shot with a stroke-dashoffset transition so it flows out along its own track. Dead
+  cells are absorbed into a neighbouring piece (head moves forward, or tail extends,
+  with the removal-order invariant re-checked, re-ordering the piece to newest when
+  its line is clear); if that fails the seed is bumped and it retries. 1,400 boards
+  in tests: 0 failures, 0 unsolvable, ~12 ms each.
 - **Data**: `games/data/arrow-atlas.json` built by `games/build-arrow-atlas.mjs`
   from world-atlas 110m + Natural Earth 50m properties: per country the outline
   (`d`, in a 100×100 box) and five `tiers` of grid masks sized by land-cell count
-  (36/64/100/150/210 cells, ≤28 cells across). `TOUR` and `CAPITALS` in the build
+  (90/170/280/420/600 cells, ≤34 cells across). `TOUR` and `CAPITALS` in the build
   script define the level order and quiz facts. Versioned with `?v=` +
   `DATA_VERSION`; served immutable by `games/data/.htaccess`.
 - **Adding countries**: append to `TOUR` and `CAPITALS`, rebuild, bump

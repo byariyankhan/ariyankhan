@@ -14,8 +14,8 @@ const atlas = require('world-atlas/countries-110m.json');
 const ne = JSON.parse(fs.readFileSync(process.argv[2] || 'ne_50m_admin_0_countries.geojson', 'utf8'));
 const OUT = new URL('./data/arrow-atlas.json', import.meta.url).pathname;
 
-const TARGETS = [36, 64, 100, 150, 210]; // land cells per difficulty tier
-const MAX_DIM = 28;                    // widest/tallest board in cells
+const TARGETS = [90, 170, 280, 420, 600]; // land cells per difficulty tier (dense, maze-like boards)
+const MAX_DIM = 34;                       // widest/tallest board in cells
 const REF = 100;                       // outline paths are stored in a REF×REF box; each tier stores k = cells per unit
 
 // World Tour order: recognisable shapes first, then the rest by area.
@@ -76,7 +76,7 @@ function rasteriseAt(feature, proj, k) {
 }
 // Find the scale whose land-cell count is closest to the target, keeping the board at most MAX_DIM cells across.
 function rasteriseTarget(feature, proj, target) {
-  let lo = 0.04, hi = MAX_DIM / REF, best = null; // hi keeps the long side within MAX_DIM
+  let lo = 0.06, hi = MAX_DIM / REF, best = null; // hi keeps the long side within MAX_DIM
   for (let i = 0; i < 18; i++) {
     const k = (lo + hi) / 2; const m = rasteriseAt(feature, proj, k);
     if (m.count < target) lo = k; else hi = k;

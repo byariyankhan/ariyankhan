@@ -20,7 +20,7 @@
   const RUSH_SECONDS = 90;
   const HINT_PENALTY_MS = 5000;
   const TIER_OF = i => i < 5 ? 0 : i < 15 ? 1 : i < 30 ? 2 : i < 50 ? 3 : 4;
-  const MAXLEN_OF = [2, 3, 3, 4, 4];
+  const MAXLEN_OF = [4, 5, 6, 7, 8];
   const DIRS = { r: [0, 1], l: [0, -1], d: [1, 0], u: [-1, 0] };
   const PALETTE = ['#FFED54', '#5CD6FF', '#8CFF7A', '#FF9AD5', '#C79BFF', '#FFB347', '#6EE7B7', '#FDBA74', '#F97373', '#38BDF8'];
 
@@ -130,6 +130,7 @@
       const rnd = mulberry32(seed * 7919 + attempt * 104729 + 17);
       const occ = Array.from({ length: H }, () => new Array(W).fill(-1));
       const pieces = [];
+      let ord = 0;
       const empty = new Set();
       for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) if (land[r][c]) empty.add(r * W + c);
       const clearDirs = (r, c) => {
@@ -150,13 +151,29 @@
         if (!best) {
           // Dead cell: every run to the edge is blocked. Absorb it into a neighbouring piece whose tail
           // touches it and which points away from it — the head's run is unchanged, so it stays solvable.
+          // Solvability invariant: a piece's exit line must be clear of every piece with a smaller `ord`
+          // (placed earlier = removed later). Appending the cell to q's tail is safe when the cell is not on
+          // the exit line of q or of any piece newer than q. If a newer piece is in the way but q's own exit
+          // line is clear right now, q can simply become the newest piece (be removed first) instead.
           let merged = false;
+          const onExitOf = (P, r, c) => { const [pr, pc] = DIRS[P.dir], [hy, hx] = P.cells[0]; return pr ? c === hx && Math.sign(r - hy) === pr : r === hy && Math.sign(c - hx) === pc; };
+          const lineClear = P => { const [pr, pc] = DIRS[P.dir]; let [y, x] = P.cells[0]; y += pr; x += pc; while (y >= 0 && y < H && x >= 0 && x < W) { if (occ[y][x] >= 0 && occ[y][x] !== P.idx) return false; y += pr; x += pc; } return true; };
           for (const cell of pool) {
             const r = Math.floor(cell / W), c = cell % W;
-            for (const [d, [dr, dc]] of Object.entries(DIRS)) {
+            for (const [dr, dc] of Object.values(DIRS)) {
               const y = r + dr, x = c + dc; if (y < 0 || y >= H || x < 0 || x >= W || occ[y][x] < 0) continue;
-              const q = pieces[occ[y][x]]; const tail = q.cells[q.cells.length - 1];
-              if (q.dir === d && tail[0] === y && tail[1] === x && q.cells.length < maxLen + 2) { q.cells.push([r, c]); occ[r][c] = q.idx; empty.delete(cell); merged = true; break; }
+              const q = pieces[occ[y][x]]; const tail = q.cells[q.cells.length - 1], head = q.cells[0];
+              if (q.cells.length >= maxLen + 6) continue;
+              // Cell directly in front of q's head: q's head simply moves forward onto it. Its exit line is the
+              // rest of q's old line, which was already clear of every older piece, so nothing changes.
+              const [qr, qc] = DIRS[q.dir];
+              if (head[0] === y && head[1] === x && head[0] + qr === r && head[1] + qc === c) {
+                if (pieces.some(P => P.ord > q.ord && onExitOf(P, r, c))) { if (!lineClear(q)) continue; q.ord = ++ord; }
+                q.cells.unshift([r, c]); occ[r][c] = q.idx; empty.delete(cell); merged = true; break;
+              }
+              if (tail[0] !== y || tail[1] !== x || onExitOf(q, r, c)) continue;
+              if (pieces.some(P => P.ord > q.ord && onExitOf(P, r, c))) { if (!lineClear(q)) continue; q.ord = ++ord; }
+              q.cells.push([r, c]); occ[r][c] = q.idx; empty.delete(cell); merged = true; break;
             }
             if (merged) break;
           }
@@ -166,12 +183,27 @@
         const [r, c] = best;
         const dir = bestDirs[Math.floor(rnd() * bestDirs.length)];
         const [dr, dc] = DIRS[dir];
-        const len = 1 + Math.floor(rnd() * maxLen);
+        const len = 3 + Math.floor(rnd() * (maxLen - 2));
         const cells = [[r, c]];
-        for (let k = 1; k < len; k++) { const y = r - dr * k, x = c - dc * k; if (y < 0 || y >= H || x < 0 || x >= W || !land[y][x] || occ[y][x] >= 0) break; cells.push([y, x]); }
+        // The body snakes backwards through empty land cells (random walk, no revisits), never onto the head's
+        // own exit line — that would block itself. Turns are what make the board look like a maze.
+        const onExit = (y, x) => (dr ? x === c && Math.sign(y - r) === dr : y === r && Math.sign(x - c) === dc);
+        let py = r, px = c, pdir = [-dr, -dc];
+        for (let k = 1; k < len; k++) {
+          const opts = [];
+          for (const [ddr, ddc] of Object.values(DIRS)) {
+            const y = py + ddr, x = px + ddc;
+            if (y < 0 || y >= H || x < 0 || x >= W || !land[y][x] || occ[y][x] >= 0 || onExit(y, x) || cells.some(([cy, cx]) => cy === y && cx === x)) continue;
+            opts.push([ddr, ddc]);
+          }
+          if (!opts.length) break;
+          const straight = opts.find(([a, b]) => a === pdir[0] && b === pdir[1]);
+          const step = straight && rnd() < 0.62 ? straight : opts[Math.floor(rnd() * opts.length)];
+          py += step[0]; px += step[1]; pdir = step; cells.push([py, px]);
+        }
         const idx = pieces.length;
         for (const [y, x] of cells) { occ[y][x] = idx; empty.delete(y * W + x); }
-        pieces.push({ idx, cells, dir, color: PALETTE[idx % PALETTE.length] });
+        pieces.push({ idx, ord: ++ord, cells, dir, color: PALETTE[idx % PALETTE.length] });
       }
       if (!failed) return { W, H, pieces, occ, land };
     }
@@ -180,30 +212,40 @@
 
   // ── Board rendering ──
   const ARROW = { r: 0, d: 90, l: 180, u: 270 };
+  function exitDistance(p) {
+    const [dr, dc] = DIRS[p.dir]; const head = p.cells[0];
+    return dr ? (dr > 0 ? state.H - head[0] : head[0] + 1) : (dc > 0 ? state.W - head[1] : head[1] + 1);
+  }
   function renderBoard() {
-    const { W, H, pieces, land } = state;
+    const { W, H, pieces } = state;
     const svg = el.board;
     svg.innerHTML = '';
-    svg.setAttribute('viewBox', `-0.35 -0.35 ${W + 0.7} ${H + 0.7}`);
+    svg.setAttribute('viewBox', `-0.5 -0.5 ${W + 1} ${H + 1}`);
     svg.classList.toggle('aa-board--tall', H > W * 1.25);
-    // outline (revealed as the board clears): stored at REF units, scaled to cells and shifted by the mask trim
     const t = state.maskInfo;
     const outline = svgEl('path', { d: state.level.d, class: 'aa-outline', transform: `translate(${-t.x} ${-t.y}) scale(${t.k})` });
     svg.appendChild(outline);
     state.outlineEl = outline;
-    const cellsG = svgEl('g', { class: 'aa-cells' });
-    for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) if (land[r][c]) cellsG.appendChild(svgEl('rect', { x: c + 0.06, y: r + 0.06, width: 0.88, height: 0.88, rx: 0.16 }));
-    svg.appendChild(cellsG);
     const piecesG = svgEl('g', { class: 'aa-pieces' });
     for (const p of pieces) {
       const g = svgEl('g', { class: 'aa-piece', 'data-i': p.idx, tabindex: '0', role: 'button', 'aria-label': `Arrow pointing ${({ r: 'right', l: 'left', u: 'up', d: 'down' })[p.dir]}` });
       for (const [y, x] of p.cells) g.appendChild(svgEl('rect', { x, y, width: 1, height: 1, class: 'aa-hit' }));
-      const head = p.cells[0], tail = p.cells[p.cells.length - 1];
       const [dr, dc] = DIRS[p.dir];
-      const hx = head[1] + 0.5 + dc * 0.12, hy = head[0] + 0.5 + dr * 0.12;
-      const tx = tail[1] + 0.5 - dc * 0.18, ty = tail[0] + 0.5 - dr * 0.18;
-      g.appendChild(svgEl('line', { x1: tx, y1: ty, x2: hx, y2: hy, class: 'aa-shaft', stroke: p.color }));
-      g.appendChild(svgEl('path', { d: 'M-0.3 -0.3 L0.08 0 L-0.3 0.3', class: 'aa-head', stroke: p.color, transform: `translate(${hx} ${hy}) rotate(${ARROW[p.dir]})` }));
+      const head = p.cells[0];
+      const hx = head[1] + 0.5, hy = head[0] + 0.5;
+      // track: tail → … → head centre → head tip, then straight on to just past the edge (hidden until shot)
+      const pts = p.cells.slice().reverse().map(([y, x]) => `${x + 0.5} ${y + 0.5}`);
+      const tipX = hx + dc * 0.32, tipY = hy + dr * 0.32;
+      const exit = exitDistance(p) + 1;
+      const d = `M${pts.join('L')}L${tipX} ${tipY}L${hx + dc * exit} ${hy + dr * exit}`;
+      const bodyLen = (p.cells.length - 1) + 0.32, exitLen = exit - 0.32;
+      const track = svgEl('path', { d, class: 'aa-track', 'stroke-dasharray': `${bodyLen} ${bodyLen + exitLen + 2}` });
+      track.style.strokeDashoffset = '0';
+      g.appendChild(track);
+      const headG = svgEl('g', { class: 'aa-head-g', transform: `translate(${tipX} ${tipY}) rotate(${ARROW[p.dir]})` });
+      headG.appendChild(svgEl('path', { d: 'M-0.34 -0.3 L0.08 0 L-0.34 0.3', class: 'aa-head' }));
+      g.appendChild(headG);
+      p.bodyLen = bodyLen; p.exitLen = exitLen;
       g.addEventListener('click', () => tapPiece(p));
       g.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); tapPiece(p); } });
       p.el = g;
@@ -277,15 +319,16 @@
   function shoot(p) {
     p.gone = true; state.left--;
     for (const [y, x] of p.cells) state.occ[y][x] = -1;
-    const [dr, dc] = DIRS[p.dir];
-    const head = p.cells[0];
-    const dist = dr ? (dr > 0 ? state.H - head[0] : head[0] + 1) : (dc > 0 ? state.W - head[1] : head[1] + 1);
-    const travel = dist + p.cells.length + 1;
+    const travel = p.bodyLen + p.exitLen;
+    const dur = Math.min(0.7, 0.15 + travel * 0.03);
+    const track = p.el.querySelector('.aa-track'), head = p.el.querySelector('.aa-head');
     p.el.classList.add('is-going');
-    p.el.style.transition = `transform ${Math.min(0.5, 0.12 + travel * 0.02)}s cubic-bezier(.4,0,1,1), opacity .3s`;
-    p.el.style.transform = `translate(${dc * travel}px, ${dr * travel}px)`;
-    p.el.style.opacity = '0';
-    setTimeout(() => p.el.remove(), 600);
+    track.style.transition = `stroke-dashoffset ${dur}s cubic-bezier(.45,0,1,1)`;
+    track.style.strokeDashoffset = String(-travel);
+    head.style.transition = `transform ${dur * (p.exitLen / travel)}s cubic-bezier(.45,0,1,1), opacity .15s ${dur * (p.exitLen / travel)}s`;
+    head.style.transform = `translate(${p.exitLen}px, 0)`; // local frame: the head group is already rotated to point forward
+    head.style.opacity = '0';
+    setTimeout(() => p.el.remove(), dur * 1000 + 80);
     SFX.shoot();
     updateReveal(); renderHud();
     if (state.left === 0) winLevel();
