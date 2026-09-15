@@ -858,6 +858,12 @@
   el.btnGuides?.addEventListener('click', () => { state.guides = !state.guides; store.set('guides', state.guides); renderToggles(); });
   const goAbout = () => { closeSheets(); if (!el.game.hidden) goToLevels(); document.getElementById('aaAbout')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); };
   el.howTo?.addEventListener('click', goAbout);
+  // Reset progress: wipes everything the game stored on this device (progress, streaks, skill, settings, launches)
+  document.getElementById('aaReset')?.addEventListener('click', () => {
+    if (!confirm('Delete all Arrow Atlas progress and settings on this device? This cannot be undone.')) return;
+    try { Object.keys(localStorage).filter(k => k.startsWith(STORE)).forEach(k => localStorage.removeItem(k)); } catch { /* ignore */ }
+    location.replace(location.pathname);
+  });
   $$('a[href="#aaAbout"]').forEach(a => a.addEventListener('click', e => { e.preventDefault(); goAbout(); }));
   renderToggles();
   document.addEventListener('keydown', e => { if (!el.game.hidden && !state.finished && (e.key === 'h' || e.key === 'H') && !/input|textarea/i.test(document.activeElement?.tagName || '')) hint(); });
