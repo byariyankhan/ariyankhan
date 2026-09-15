@@ -45,13 +45,14 @@ button{ font-family:inherit; }
 .aa-error{ color:var(--bad); }
 
 /* ── Home ── */
-.aa-home{ gap:14px; }
-.aa-home-top{ display:flex; align-items:center; justify-content:space-between; min-height:42px; }
+.aa-home{ gap:10px; }
+.aa-home-top{ display:flex; align-items:center; justify-content:flex-end; min-height:42px; }
+.aa-home-top .aa-chip{ margin-right:auto; }
 .aa-chip{ font-size:13px; color:var(--muted); background:var(--bg2); border-radius:30px; padding:6px 12px; }
 .aa-chip:empty{ display:none; }
 /* lobby world map: every country faint, tour countries outlined, cleared ones filled and numbered */
-.aa-world{ flex:1; display:flex; flex-direction:column; justify-content:center; margin:0; min-height:0; }
-.aa-world-map{ display:block; width:100%; height:auto; overflow:visible; }
+.aa-world{ flex:1; display:flex; flex-direction:column; justify-content:flex-start; margin:0; min-height:0; }
+.aa-world-map{ display:block; width:calc(100% + 32px); margin:0 -16px; height:auto; overflow:visible; }
 .aa-world-land path{ fill:color-mix(in srgb, var(--line) 9%, var(--bg)); stroke:var(--bg); stroke-width:.7; stroke-linejoin:round; }
 .aa-world-land path.is-tour{ fill:color-mix(in srgb, var(--line) 18%, var(--bg)); stroke:color-mix(in srgb, var(--line) 45%, var(--bg)); stroke-width:1; cursor:pointer; }
 .aa-world-land path.is-done{ fill:var(--good); stroke:var(--bg); }
