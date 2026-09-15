@@ -1,7 +1,7 @@
 // Shared service-page profile data + renderer.
 const SITE = {
   name:         'Ariyan Khan',
-  avatar:       'images/ariyan-khan-profile.webp?v=2',
+  avatar:       'images/ariyan-khan-profile.webp?v=3',
   rating:       '4.9',
   heroReviews:  '400+',
   orderLabel:   'Order Now',

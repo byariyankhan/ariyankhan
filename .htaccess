@@ -11,6 +11,10 @@ RewriteEngine On
 RewriteCond %{HTTP_HOST} ^www\.(.+)$ [NC]
 RewriteRule ^ https://%1%{REQUEST_URI} [L,R=301]
 
+# ── /index.html → / (one canonical URL per page) ──
+RewriteCond %{THE_REQUEST} \s/+(.*/)?index\.html[?\s] [NC]
+RewriteRule ^(.*/)?index\.html$ https://%{HTTP_HOST}/%1 [R=301,L,NE]
+
 # ── Force HTTPS ──────────────────────────────────
 #    Behind a TLS-terminating proxy (Caddy on the VPS, Cloudflare) Apache
 #    itself only ever sees plain HTTP, so also trust X-Forwarded-Proto or
@@ -36,7 +40,7 @@ RewriteRule ^ - [R=404,L]
   Header always set Referrer-Policy "strict-origin-when-cross-origin"
   Header always set Permissions-Policy "camera=(), microphone=(), geolocation=()"
   Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
-  Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://www.google-analytics.com; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://img.youtube.com https://i.ytimg.com; frame-src https://www.youtube.com https://drive.google.com https://www.facebook.com; connect-src 'self' https://www.google-analytics.com https://region1.google-analytics.com https://analytics.google.com https://www.youtube.com; object-src 'none'; base-uri 'self'; form-action 'self'"
+  Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://*.googletagmanager.com https://*.google-analytics.com https://static.cloudflareinsights.com; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://img.youtube.com https://i.ytimg.com https://*.google-analytics.com https://*.googletagmanager.com; frame-src https://www.youtube.com https://drive.google.com https://www.facebook.com; connect-src 'self' https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com https://*.g.doubleclick.net https://www.google.com https://cloudflareinsights.com https://www.youtube.com; object-src 'none'; base-uri 'self'; form-action 'self'"
 </IfModule>
 
 # ── Gzip compression ─────────────────────────────
@@ -75,21 +79,15 @@ RewriteRule ^ - [R=404,L]
   <FilesMatch "\.(html|htm)$">
     Header set Cache-Control "no-cache, must-revalidate"
   </FilesMatch>
+
+  # Map Maker country data - big, versioned by filename, never changes
+  <FilesMatch "^countries-(110m|50m)\.json$">
+    Header set Cache-Control "public, max-age=31536000, immutable"
+  </FilesMatch>
 </IfModule>
 
 # ── Protect local mail config ─────────────────────
 <Files "mail-config.local.php">
-  <IfModule mod_authz_core.c>
-    Require all denied
-  </IfModule>
-  <IfModule !mod_authz_core.c>
-    Order allow,deny
-    Deny from all
-  </IfModule>
-</Files>
-
-# ── Protect local admin config (Project Tracker) ──
-<Files "admin-config.local.php">
   <IfModule mod_authz_core.c>
     Require all denied
   </IfModule>

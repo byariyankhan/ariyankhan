@@ -115,13 +115,13 @@ $page_description = $page_count > 0
       href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700;800;900&family=Inter:wght@400;500;600;700;800&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="../css/style.css?v=14" />
+    <link rel="stylesheet" href="../css/style.css?v=18" />
     <link rel="stylesheet" href="css/service-index.css?v=2" />
   </head>
   <body>
     <div id="stars"></div>
 
-    <site-nav data-page="subpage" data-home-path="../index.html"></site-nav>
+    <site-nav data-page="subpage" data-home-path="/"></site-nav>
 
     <main class="si-page">
       <section class="si-hero si-width">
@@ -164,8 +164,8 @@ $page_description = $page_count > 0
 
     <site-footer data-base-path="../"></site-footer>
 
-    <script src="../js/site-nav.js?v=9"></script>
-    <script src="../js/site-footer.js?v=9"></script>
-    <script src="../js/main.js?v=23"></script>
+    <script src="../js/site-nav.js?v=11"></script>
+    <script src="../js/site-footer.js?v=11"></script>
+    <script src="../js/main.js?v=24"></script>
   </body>
 </html>

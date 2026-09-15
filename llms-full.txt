@@ -142,6 +142,14 @@ Fill out the contact form at https://ariyankhan.com/#contact with your project d
 - Upwork: https://www.upwork.com/freelancers/ariyankhan
 
 ## Free Tools
+- Map Maker: https://ariyankhan.com/map-maker.html
+  Free, browser-only map generator for creators and teachers. Highlight countries by clicking or
+  searching (aliases like UK/USA/Burma work), up to six colour groups with labels, eight projections
+  including an orthographic globe, region presets (Europe, South Asia, Middle East…), "zoom to selection",
+  16:9 / 9:16 / 1:1 / 4:3 / 21:9 canvases, style presets, transparent background, graticule, labels.
+  Exports PNG at 1×/2×/4× (up to 8K on 16:9) or SVG; a share link encodes the whole map. Borders are
+  Natural Earth (public domain, de facto boundaries; 1:110m by default, optional 1:50m with 241
+  territories). Built by Ariyan Khan, who does map animation for YouTube channels professionally.
 - AI Metadata Remover: https://ariyankhan.com/ai-metadata-remover.html
   Free, browser-only tool that removes C2PA / JUMBF Content Credentials, XMP, IPTC, EXIF (camera, GPS,
   software), JPEG comments, PNG text chunks (Stable Diffusion "parameters", ComfyUI "prompt"/"workflow"),
@@ -174,6 +182,7 @@ Practical articles on hiring, cost, and working with a video editor.
 - Home: https://ariyankhan.com/
 - About: https://ariyankhan.com/about.html
 - AI Metadata Remover (free tool): https://ariyankhan.com/ai-metadata-remover.html
+- Map Maker (free tool): https://ariyankhan.com/map-maker.html
 - Talking Head Video Editing: https://ariyankhan.com/talking-head-video-editing.html
 - Documentary Video Editing: https://ariyankhan.com/documentary-video-editing.html
 - Short Form Video Editing: https://ariyankhan.com/short-form-video-editing.html

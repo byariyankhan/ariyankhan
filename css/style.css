@@ -76,26 +76,8 @@ body.menu-open{ overflow:hidden; }
   62%  { opacity:0; }
   100% { top:100%; opacity:0; }
 }
-/* REC pulse dot — sits just outside the clipped shape so it isn't cut off */
-.nav-logo::after{
-    content:'';
-    position:absolute;
-    bottom:-2px; left:25px;
-    width:8px; height:8px;
-    border-radius:50%;
-    background:var(--red);
-    box-shadow:0 0 0 2px #000, 0 0 8px rgba(232,56,58,.75);
-    animation:logo-rec-pulse 1.8s ease-in-out infinite;
-    pointer-events:none;
-    z-index:3;
-  }
-@keyframes logo-rec-pulse{
-  0%,100% { opacity:1; transform:scale(1); }
-  50%     { opacity:.35; transform:scale(.82); }
-}
 @media (prefers-reduced-motion: reduce){
   .logo-mark::after{ animation:none; opacity:0; }
-  .nav-logo::after{ animation:none; }
 }
 .logo-text{
   font-family:'Barlow Condensed',sans-serif;
@@ -909,7 +891,7 @@ section{ position:relative; z-index:1; padding:80px 22px; }
 .cdd{ position:relative; user-select:none; }
 .cdd-trigger{
   width:100%; display:flex; align-items:center; justify-content:space-between;
-  padding:14px 16px;
+  padding:14px 12px;
   background:rgba(255,255,255,.02);
   border:1px solid #1f1f1f; border-radius:8px;
   cursor:pointer; transition:border-color .2s, background .2s;
@@ -949,7 +931,10 @@ section{ position:relative; z-index:1; padding:80px 22px; }
 
 /* ── CONTACT FORM ── */
 .cf-group{ margin-bottom:0; padding:18px 0; border-bottom:1px solid #1a1a1a; }
-.cf-label{ display:block; font-size:11px; font-weight:700; letter-spacing:3px; color:var(--muted); margin-bottom:8px; font-family:'Barlow Condensed',sans-serif; }
+/* Label starts exactly at the box's left edge (no indent) */
+/* Honeypot: invisible to people, tempting to bots. Never display:none (some bots skip those). */
+.cf-hp{ position:absolute; left:-9999px; top:auto; width:1px; height:1px; overflow:hidden; opacity:0; pointer-events:none; }
+.cf-label{ display:block; font-size:11px; font-weight:700; letter-spacing:3px; color:var(--muted); margin-bottom:8px; padding-left:0; font-family:'Barlow Condensed',sans-serif; }
 .cf-input{
   width:100%;
   color:var(--text); font-family:'Inter',sans-serif; font-size:15px; font-weight:500;
@@ -971,7 +956,7 @@ section{ position:relative; z-index:1; padding:80px 22px; }
 .cf-phone-country{ min-width:0; }
 .cf-phone-country .cdd-trigger{
   min-height:62px;
-  padding:14px 16px;
+  padding:14px 12px;
   border-radius:12px;
 }
 .cf-phone-country .cdd-val{

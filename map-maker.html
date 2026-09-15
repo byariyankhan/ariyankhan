@@ -1,0 +1,436 @@
+<!doctype html>
+<html lang="en-US">
+  <head>
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-8ZPSNG5X37"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag() {
+        dataLayer.push(arguments);
+      }
+      gtag("js", new Date());
+      gtag("config", "G-8ZPSNG5X37");
+    </script>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- SEO -->
+    <title>Free Map Maker — Highlight Countries, Export 4K PNG &amp; SVG</title>
+    <meta
+      name="description"
+      content="Free map maker for YouTube videos, thumbnails and slides. Highlight countries in colour groups, choose a projection, zoom to a region, export 4K PNG or SVG."
+    />
+    <meta name="author" content="Ariyan Khan" />
+    <meta name="robots" content="index, follow, max-image-preview:large" />
+    <meta name="theme-color" content="#0d0d0d" />
+    <link rel="canonical" href="https://ariyankhan.com/map-maker.html" />
+    <link rel="alternate" hreflang="en-US" href="https://ariyankhan.com/map-maker.html" />
+    <link rel="alternate" hreflang="x-default" href="https://ariyankhan.com/map-maker.html" />
+
+    <!-- OPEN GRAPH -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://ariyankhan.com/map-maker.html" />
+    <meta property="og:title" content="Free Map Maker — Highlight Countries, Export 4K PNG" />
+    <meta
+      property="og:description"
+      content="Click countries to highlight them, choose a projection, zoom to a region, add labels and export a 4K PNG or SVG for your video, thumbnail or slide. Free, no sign-up."
+    />
+    <meta property="og:image" content="https://ariyankhan.com/images/history-geopolitics-video-editor.webp" />
+    <meta property="og:site_name" content="Ariyan Khan | Video Editor" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Free Map Maker — Highlight Countries, Export 4K PNG" />
+    <meta
+      name="twitter:description"
+      content="Click countries to highlight them, choose a projection, zoom to a region, add labels and export a 4K PNG or SVG. Free, no sign-up."
+    />
+    <meta name="twitter:image" content="https://ariyankhan.com/images/history-geopolitics-video-editor.webp" />
+
+    <!-- FAVICON -->
+    <link rel="icon" type="image/x-icon" href="favicon/favicon.ico" />
+    <link rel="icon" type="image/png" sizes="96x96" href="favicon/favicon-96x96.png" />
+    <link rel="apple-touch-icon" href="favicon/apple-touch-icon.png" />
+    <link rel="manifest" href="favicon/site.webmanifest" />
+
+    <!-- FONTS -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700;800;900&family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="css/style.css?v=18" />
+    <link rel="stylesheet" href="css/map-maker.css?v=1" />
+    <link rel="preload" href="js/vendor/countries-110m.json" as="fetch" crossorigin="anonymous" />
+
+    <!-- SCHEMA -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "WebPage",
+          "@id": "https://ariyankhan.com/map-maker.html#webpage",
+          "url": "https://ariyankhan.com/map-maker.html",
+          "name": "Free Map Maker — Highlight Countries on a World Map, Export PNG & SVG",
+          "description": "Free online map maker for YouTube videos, presentations and lessons. Click to highlight countries in colour groups, pick a projection, zoom to a region, add labels and export a 4K PNG or SVG.",
+          "inLanguage": "en-US",
+          "datePublished": "2026-09-15",
+          "dateModified": "2026-09-15",
+          "author": { "@id": "https://ariyankhan.com/about.html#person" },
+          "mainEntity": { "@id": "https://ariyankhan.com/map-maker.html#app" },
+          "breadcrumb": { "@id": "https://ariyankhan.com/map-maker.html#breadcrumb" }
+        },
+        {
+          "@type": "WebApplication",
+          "@id": "https://ariyankhan.com/map-maker.html#app",
+          "name": "Map Maker",
+          "alternateName": ["Country Highlight Map Generator", "World Map Highlighter", "Custom Map Maker for YouTube"],
+          "url": "https://ariyankhan.com/map-maker.html",
+          "description": "Highlight any countries on a world map in up to six colour groups, choose from eight projections including a globe, zoom to a region or to your selection, add labels and a graticule, and export a PNG up to 4K or an SVG. Runs entirely in the browser.",
+          "applicationCategory": "DesignApplication",
+          "applicationSubCategory": "Map generator",
+          "operatingSystem": "Any — runs in a modern web browser",
+          "browserRequirements": "Requires JavaScript",
+          "isAccessibleForFree": true,
+          "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+          "featureList": [
+            "Click or search to highlight countries in colour groups",
+            "8 projections: Natural Earth, Equal Earth, Robinson, Winkel Tripel, Mercator, Miller, Equirectangular, Globe",
+            "Zoom to a region preset or to the selected countries",
+            "16:9, 9:16, 1:1, 4:3 and 21:9 canvases for video, Shorts and slides",
+            "Labels, graticule, transparent background, style presets",
+            "Export PNG at 1×, 2× or 4× (up to 4K and beyond) or SVG",
+            "Shareable link that restores the exact map",
+            "Free, no account, nothing uploaded"
+          ],
+          "author": {
+            "@id": "https://ariyankhan.com/about.html#person",
+            "@type": "Person",
+            "name": "Ariyan Khan",
+            "jobTitle": "Freelance Video Editor",
+            "url": "https://ariyankhan.com/about.html"
+          }
+        },
+        {
+          "@type": "BreadcrumbList",
+          "@id": "https://ariyankhan.com/map-maker.html#breadcrumb",
+          "itemListElement": [
+            { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://ariyankhan.com/" },
+            { "@type": "ListItem", "position": 2, "name": "Map Maker", "item": "https://ariyankhan.com/map-maker.html" }
+          ]
+        },
+        {
+          "@type": "FAQPage",
+          "@id": "https://ariyankhan.com/map-maker.html#faq",
+          "mainEntity": [
+            { "@type": "Question", "name": "Is the map maker free, and can I use the maps commercially?", "acceptedAnswer": { "@type": "Answer", "text": "Yes on both counts. The tool is free with no account, and the boundary data comes from Natural Earth, which is public domain. Maps you export are yours to use in YouTube videos, monetised or not, in presentations, courses, print and social posts. No credit is required, though a mention is appreciated." } },
+            { "@type": "Question", "name": "What resolution can I export?", "acceptedAnswer": { "@type": "Answer", "text": "PNG exports come in 1×, 2× and 4× of the canvas. On a 16:9 canvas that is 1920×1080, 3840×2160 (4K) and 7680×4320 (8K). The 9:16 canvas gives 1080×1920 and up for Shorts, Reels and TikTok. SVG export is vector, so it scales to any size in After Effects, Illustrator, Figma or DaVinci Resolve." } },
+            { "@type": "Question", "name": "Can I make the background transparent?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. Tick “Transparent ocean/background” and the PNG keeps only land and borders (plus the globe outline if you leave it on), so you can drop the map over your own footage or a gradient in your editor." } },
+            { "@type": "Question", "name": "Which projection should I use for a YouTube video?", "acceptedAnswer": { "@type": "Answer", "text": "Natural Earth or Equal Earth for a whole-world view: they keep country sizes honest and look modern. Mercator makes Greenland look bigger than Africa, so avoid it for world maps, but it is fine when you zoom into a single region. The Globe projection is the most cinematic for a single country or continent reveal." } },
+            { "@type": "Question", "name": "Why is a small country missing from the map?", "acceptedAnswer": { "@type": "Answer", "text": "The default dataset is Natural Earth 1:110m, which leaves out micro-states such as Singapore, Malta, Bahrain and most island territories to keep the page fast. Tick “High-detail borders” to load the 1:50m dataset with 241 countries and territories, including all of those." } },
+            { "@type": "Question", "name": "How are disputed borders handled?", "acceptedAnswer": { "@type": "Answer", "text": "Borders follow Natural Earth's de facto policy: the map shows who controls an area today, not who claims it. That means Kashmir, Western Sahara, Taiwan, Kosovo, Somaliland, Northern Cyprus, Crimea and similar areas are drawn one particular way that some viewers will disagree with. The map is not a political statement, and you should add your own caption or disclaimer where it matters for your audience." } },
+            { "@type": "Question", "name": "Can I share a map I made with someone else?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. Click “Copy share link”. The whole map, including colours, projection and selected countries, is encoded in the link itself, so nothing is stored on a server and anyone who opens the link sees exactly what you built and can keep editing it." } },
+            { "@type": "Question", "name": "Do you need animated maps rather than still images?", "acceptedAnswer": { "@type": "Answer", "text": "That is my day job. This tool makes stills; for animated country reveals, route lines, zooms and geopolitical explainers in After Effects, see the map animation service on this site." } }
+          ]
+        }
+      ]
+    }
+    </script>
+  </head>
+  <body>
+    <div id="stars"></div>
+
+    <site-nav data-page="subpage"></site-nav>
+
+    <main class="mm-page">
+      <nav class="mm-crumb" aria-label="Breadcrumb">
+        <a href="/">Home</a><span aria-hidden="true">/</span><span aria-current="page">Map Maker</span>
+      </nav>
+
+      <header class="mm-hero">
+        <div class="tag-pill">Free Tool · No Sign-up</div>
+        <h1 class="section-title">Map <span class="yl">Maker</span></h1>
+        <p class="section-desc">
+          Click countries to highlight them, choose a projection, zoom to a region, add labels and export a
+          4K PNG or an SVG for your YouTube video, thumbnail, Short or slide. Built by a map-animation
+          editor, runs entirely in your browser.
+        </p>
+        <ul class="mm-trust">
+          <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z"/><path d="m9 12 2 2 4-4"/></svg>Free for commercial use</li>
+          <li><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18"/></svg>Up to 8K PNG · SVG</li>
+          <li><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>8 projections incl. globe</li>
+          <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h16"/><path d="m14 6 6 6-6 6"/></svg>Share by link</li>
+        </ul>
+      </header>
+
+      <!-- ── TOOL ── -->
+      <section class="mm-tool" id="mmTool" aria-labelledby="mmToolTitle">
+        <h2 id="mmToolTitle" class="mm-visually-hidden">Map editor</h2>
+        <div class="mm-stage">
+          <div class="mm-canvas">
+            <svg id="mmMap" viewBox="0 0 1920 1080" role="img" aria-label="World map. Click a country to highlight it."></svg>
+            <div class="mm-tip" id="mmTip" hidden></div>
+          </div>
+          <div class="mm-stage-bar">
+            <button type="button" class="mm-btn mm-btn--small" id="mmFitSelection">Zoom to selection</button>
+            <button type="button" class="mm-btn mm-btn--small" id="mmFitWorld">Whole world</button>
+            <button type="button" class="mm-btn mm-btn--small" id="mmClear">Clear all</button>
+            <button type="button" class="mm-btn mm-btn--small" id="mmShare">Copy share link</button>
+            <p class="mm-status" id="mmStatus" hidden></p>
+            <p class="mm-flash" id="mmFlash" hidden></p>
+            <p class="mm-error" id="mmError" hidden></p>
+          </div>
+        </div>
+
+        <aside class="mm-panel" aria-label="Map controls">
+          <div class="mm-block">
+            <h3>Countries</h3>
+            <div class="mm-search">
+              <input type="text" id="mmSearch" placeholder="Search a country… (Enter adds it)" autocomplete="off" aria-label="Search countries" />
+              <div class="mm-results" id="mmResults" hidden></div>
+            </div>
+            <p class="mm-hint">Click the map or search. Countries go into the <strong>active</strong> group (yellow ring). Click a highlighted country again to remove it.</p>
+            <div id="mmGroups"></div>
+            <button type="button" class="mm-btn mm-btn--small" id="mmAddGroup">+ Add colour group</button>
+          </div>
+
+          <div class="mm-block">
+            <h3>View</h3>
+            <div class="mm-row"><label for="mmProjection">Projection</label><select id="mmProjection"></select></div>
+            <div class="mm-row"><label for="mmRegion">Region</label>
+              <select id="mmRegion">
+                <option value="world">Whole world</option>
+                <option value="europe">Europe</option>
+                <option value="asia">Asia</option>
+                <option value="south-asia">South Asia</option>
+                <option value="southeast-asia">Southeast Asia</option>
+                <option value="east-asia">East Asia</option>
+                <option value="central-asia">Central Asia</option>
+                <option value="middle-east">Middle East</option>
+                <option value="africa">Africa</option>
+                <option value="north-america">North America</option>
+                <option value="caribbean">Caribbean &amp; Central America</option>
+                <option value="south-america">South America</option>
+                <option value="oceania">Oceania</option>
+              </select>
+            </div>
+            <div class="mm-row"><label for="mmAspect">Canvas</label>
+              <select id="mmAspect">
+                <option value="16:9">16:9 · YouTube (1920×1080)</option>
+                <option value="9:16">9:16 · Shorts / Reels (1080×1920)</option>
+                <option value="1:1">1:1 · Square (1080×1080)</option>
+                <option value="4:3">4:3 · Slides (1600×1200)</option>
+                <option value="21:9">21:9 · Ultrawide (2560×1080)</option>
+              </select>
+            </div>
+            <div class="mm-row"><label for="mmZoom">Zoom</label><input type="range" id="mmZoom" min="0.5" max="6" step="0.1" value="1" /><span class="mm-val" id="mmZoomVal">1.0×</span></div>
+            <div class="mm-row"><label for="mmPadding">Margin</label><input type="range" id="mmPadding" min="0" max="20" step="1" value="6" /></div>
+            <div class="mm-row"><label class="mm-check"><input type="checkbox" id="mmDetail" /> High-detail borders (241 countries &amp; territories, ~700 KB)</label></div>
+          </div>
+
+          <div class="mm-block">
+            <h3>Style</h3>
+            <div class="mm-presets">
+              <button type="button" class="mm-preset" data-preset="dark">Dark</button>
+              <button type="button" class="mm-preset" data-preset="light">Light</button>
+              <button type="button" class="mm-preset" data-preset="ocean">Atlas</button>
+              <button type="button" class="mm-preset" data-preset="slate">Slate</button>
+              <button type="button" class="mm-preset" data-preset="paper">Paper</button>
+            </div>
+            <div class="mm-row"><label for="mmLand">Land</label><input type="color" id="mmLand" value="#2a2a2a" /><label for="mmOcean">Ocean</label><input type="color" id="mmOcean" value="#0d0d0d" /></div>
+            <div class="mm-row"><label class="mm-check"><input type="checkbox" id="mmOceanTransparent" /> Transparent ocean/background</label></div>
+            <div class="mm-row"><label for="mmBorder">Borders</label><input type="color" id="mmBorder" value="#000000" /><input type="range" id="mmBorderWidth" min="0" max="3" step="0.1" value="0.6" aria-label="Border width" /></div>
+            <div class="mm-row"><label class="mm-check"><input type="checkbox" id="mmSphere" checked /> Globe/sphere outline</label></div>
+            <div class="mm-row"><label class="mm-check"><input type="checkbox" id="mmGrat" /> Grid lines (graticule)</label><input type="color" id="mmGratColor" value="#333333" aria-label="Grid colour" /></div>
+            <div class="mm-row"><label class="mm-check"><input type="checkbox" id="mmLabels" checked /> Labels on highlighted countries</label></div>
+            <div class="mm-row"><label for="mmLabelColor">Label</label><input type="color" id="mmLabelColor" value="#ffffff" /><input type="range" id="mmLabelSize" min="10" max="72" step="1" value="22" aria-label="Label size" /></div>
+          </div>
+
+          <div class="mm-block">
+            <h3>Export</h3>
+            <div class="mm-row"><label for="mmExportScale">PNG size</label>
+              <select id="mmExportScale">
+                <option value="1">1× (HD)</option>
+                <option value="2" selected>2× (4K on 16:9)</option>
+                <option value="4">4× (8K on 16:9)</option>
+              </select>
+            </div>
+            <div class="mm-export">
+              <button type="button" class="mm-btn mm-btn--primary mm-btn--wide" id="mmDownloadPng">Download PNG</button>
+              <button type="button" class="mm-btn mm-btn--wide" id="mmDownloadSvg">Download SVG</button>
+              <button type="button" class="mm-btn mm-btn--wide" id="mmCopyPng">Copy PNG to clipboard</button>
+              <p class="mm-export-dims"><span id="mmExportDims">3840 × 2160</span> px · nothing is uploaded</p>
+            </div>
+          </div>
+        </aside>
+      </section>
+
+      <!-- ── HOW TO ── -->
+      <section class="mm-section" id="how-to">
+        <div class="tag-pill">How It Works</div>
+        <h2 class="section-title">A custom map in <span class="yl">under a minute</span></h2>
+        <ol class="mm-steps">
+          <li><strong>Pick your countries</strong>Click them on the map or type a name (aliases like “UK”, “USA” or “Burma” work). Add more colour groups to compare, say, NATO members against partners, or the countries a trade route passes through.</li>
+          <li><strong>Frame the shot</strong>Choose a projection, a region preset or “Zoom to selection”, then set the canvas to 16:9 for a video, 9:16 for a Short, or 1:1 for a post. Use the zoom and margin sliders to leave room for your titles.</li>
+          <li><strong>Export</strong>Download a PNG at 2× (4K) or 4× (8K), or an SVG you can recolour and animate in After Effects, Illustrator or Figma. Tick “transparent” to drop the map straight over your footage.</li>
+        </ol>
+        <div class="mm-callout">
+          <p><strong>Thumbnail tip:</strong> highlight one country in yellow on a dark map, zoom in until it fills a third of the frame, and put your text in the empty ocean side. High contrast, one focal point, readable at 200 pixels wide. That is the thumbnail formula that keeps working for geography and history channels.</p>
+        </div>
+      </section>
+
+      <!-- ── USE CASES ── -->
+      <section class="mm-section" id="uses">
+        <div class="tag-pill">Who It's For</div>
+        <h2 class="section-title">Made for people who <span class="yl">explain the world</span></h2>
+        <div class="mm-grid">
+          <div class="mm-card"><h3>Geography &amp; history YouTubers</h3><p>Reveal which countries border a river, fought in a war, joined an alliance or share a language. Export the base PNG, then animate the highlight in your editor, or send me the project and I will.</p></div>
+          <div class="mm-card"><h3>Economics &amp; trade explainers</h3><p>Colour-group exporters, importers and transit states. Six groups and custom labels are enough for most trade, sanction or membership maps.</p></div>
+          <div class="mm-card"><h3>Teachers &amp; students</h3><p>Blank or highlighted maps for slides, quizzes and handouts. The Light and Paper presets print cleanly; SVG scales to a projector or an A3 sheet without blur.</p></div>
+          <div class="mm-card"><h3>Travel creators &amp; bloggers</h3><p>“Countries I've visited” maps for a channel banner or a Reel, with a transparent background so it sits on your own photo.</p></div>
+          <div class="mm-card"><h3>News &amp; newsletter writers</h3><p>A clean locator map in seconds when a story breaks. Share the link with a colleague and they can recolour it without redoing the work.</p></div>
+          <div class="mm-card"><h3>Presentations &amp; reports</h3><p>Market coverage, office locations, expansion plans. Export at 4:3 or 16:9 to match the deck, keep the SVG so the designer can restyle it.</p></div>
+        </div>
+      </section>
+
+      <!-- ── PROJECTIONS ── -->
+      <section class="mm-section" id="projections">
+        <div class="tag-pill">Projections</div>
+        <h2 class="section-title">Which projection <span class="yl">should you use?</span></h2>
+        <p class="section-desc">Every flat map lies about something. Pick the lie that matters least for your story.</p>
+        <div class="mm-table-wrap">
+          <table class="mm-table">
+            <thead><tr><th>Projection</th><th>Best for</th><th>Watch out</th></tr></thead>
+            <tbody>
+              <tr><td>Natural Earth</td><td>Whole-world videos and thumbnails. Modern, balanced, the default here.</td><td>Slight shape distortion near the poles.</td></tr>
+              <tr><td>Equal Earth</td><td>When relative country size is the point (population, emissions, land area).</td><td>Looks a little stretched at the edges.</td></tr>
+              <tr><td>Robinson</td><td>The classic “atlas” look; familiar to older audiences and textbooks.</td><td>Neither equal-area nor conformal, a compromise on both.</td></tr>
+              <tr><td>Winkel Tripel</td><td>National Geographic's choice; very low overall distortion.</td><td>Curved edges leave odd corners on a 16:9 canvas.</td></tr>
+              <tr><td>Mercator</td><td>Zoomed-in regions, navigation, matching Google Maps screenshots.</td><td>Greenland looks as big as Africa. Never use it for a world map about size.</td></tr>
+              <tr><td>Miller</td><td>A Mercator that tolerates the poles; fills a rectangle neatly.</td><td>Same size lies, only slightly smaller.</td></tr>
+              <tr><td>Equirectangular</td><td>Overlaying data grids, or when you need lat/long to be straight lines.</td><td>Flat and plain; countries near the equator look squashed.</td></tr>
+              <tr><td>Globe (Orthographic)</td><td>A single country or continent reveal; cinematic, works great on 9:16.</td><td>Only half the world is visible at once, by design.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ── WHY / AUTHOR ── -->
+      <section class="mm-section" id="why">
+        <div class="tag-pill">Why This Exists</div>
+        <h2 class="section-title">I make <span class="yl">map animations</span> for a living</h2>
+        <p>
+          Most of my editing work is for geography, history, economics and geopolitics channels, and almost
+          every project starts the same way: a still map with the right countries highlighted, in the
+          right projection, at the right aspect ratio. Clients would send me screenshots of Google Maps,
+          Wikipedia SVGs with the wrong colours, or a paint-bucket job in PowerPoint. Getting a clean base
+          map used to cost twenty minutes per shot.
+        </p>
+        <p>
+          So I built the tool I wanted: public-domain Natural Earth borders, proper projections, a globe,
+          colour groups, and an export that lands directly in the timeline. It runs entirely in your browser,
+          nothing is uploaded, and it is free because a good base map is the least interesting part of a
+          great map video.
+        </p>
+        <h3>What the tool does not do</h3>
+        <ul>
+          <li><strong>No animation.</strong> It makes stills. Reveals, zooms, route lines and camera moves are done in After Effects, which is the <a href="map-animation-video-editing.html">service</a> this page sits next to.</li>
+          <li><strong>No city points or custom shapes yet.</strong> Countries and territories only, from Natural Earth. If you need provinces or cities, export the SVG and add them in Illustrator or Figma.</li>
+          <li><strong>No political judgement.</strong> Borders follow Natural Earth's de facto policy. Add your own caption where your audience expects one.</li>
+        </ul>
+        <div class="mm-author">
+          <img src="images/ariyan-khan-profile.webp?v=3" alt="Ariyan Khan, freelance video editor" width="72" height="72" loading="lazy" decoding="async" />
+          <div>
+            <p class="mm-author-name">Ariyan Khan</p>
+            <p>Freelance video editor specialising in map animation and documentary edits for YouTube geography, history and economics channels. <a href="about.html">More about me →</a> · Also free: <a href="ai-metadata-remover.html">AI Metadata Remover</a>.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── FAQ ── -->
+      <section class="mm-section mm-faq" id="faq">
+        <div class="tag-pill">FAQ</div>
+        <h2 class="section-title">Questions before you <span class="yl">export</span></h2>
+
+        <div class="faq-item">
+          <button class="faq-q" id="mm-faq-q-1" type="button" aria-expanded="false" aria-controls="mm-faq-a-1">
+            <span class="faq-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z"/></svg></span><span class="faq-q-text">Is the map maker free, and can I use the maps commercially?</span><span class="faq-chevron" aria-hidden="true"></span>
+          </button>
+          <div class="faq-a" id="mm-faq-a-1" role="region" aria-labelledby="mm-faq-q-1" aria-hidden="true"><p>Yes on both counts. The tool is free with no account, and the boundary data comes from Natural Earth, which is public domain. Maps you export are yours to use in YouTube videos, monetised or not, in presentations, courses, print and social posts. No credit is required, though a mention is appreciated.</p></div>
+        </div>
+        <div class="faq-item">
+          <button class="faq-q" id="mm-faq-q-2" type="button" aria-expanded="false" aria-controls="mm-faq-a-2">
+            <span class="faq-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m3 16 5-5 4 4 3-3 6 6"/></svg></span><span class="faq-q-text">What resolution can I export?</span><span class="faq-chevron" aria-hidden="true"></span>
+          </button>
+          <div class="faq-a" id="mm-faq-a-2" role="region" aria-labelledby="mm-faq-q-2" aria-hidden="true"><p>PNG exports come in 1×, 2× and 4× of the canvas. On a 16:9 canvas that is 1920×1080, 3840×2160 (4K) and 7680×4320 (8K). The 9:16 canvas gives 1080×1920 and up for Shorts, Reels and TikTok. SVG export is vector, so it scales to any size in After Effects, Illustrator, Figma or DaVinci Resolve.</p></div>
+        </div>
+        <div class="faq-item">
+          <button class="faq-q" id="mm-faq-q-3" type="button" aria-expanded="false" aria-controls="mm-faq-a-3">
+            <span class="faq-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M4 12h16M12 4v16"/></svg></span><span class="faq-q-text">Can I make the background transparent?</span><span class="faq-chevron" aria-hidden="true"></span>
+          </button>
+          <div class="faq-a" id="mm-faq-a-3" role="region" aria-labelledby="mm-faq-q-3" aria-hidden="true"><p>Yes. Tick “Transparent ocean/background” and the PNG keeps only land and borders (plus the globe outline if you leave it on), so you can drop the map over your own footage or a gradient in your editor.</p></div>
+        </div>
+        <div class="faq-item">
+          <button class="faq-q" id="mm-faq-q-4" type="button" aria-expanded="false" aria-controls="mm-faq-a-4">
+            <span class="faq-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg></span><span class="faq-q-text">Which projection should I use for a YouTube video?</span><span class="faq-chevron" aria-hidden="true"></span>
+          </button>
+          <div class="faq-a" id="mm-faq-a-4" role="region" aria-labelledby="mm-faq-q-4" aria-hidden="true"><p>Natural Earth or Equal Earth for a whole-world view: they keep country sizes honest and look modern. Mercator makes Greenland look bigger than Africa, so avoid it for world maps, but it is fine when you zoom into a single region. The Globe projection is the most cinematic for a single country or continent reveal.</p></div>
+        </div>
+        <div class="faq-item">
+          <button class="faq-q" id="mm-faq-q-5" type="button" aria-expanded="false" aria-controls="mm-faq-a-5">
+            <span class="faq-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg></span><span class="faq-q-text">Why is a small country missing from the map?</span><span class="faq-chevron" aria-hidden="true"></span>
+          </button>
+          <div class="faq-a" id="mm-faq-a-5" role="region" aria-labelledby="mm-faq-q-5" aria-hidden="true"><p>The default dataset is Natural Earth 1:110m, which leaves out micro-states such as Singapore, Malta, Bahrain and most island territories to keep the page fast. Tick “High-detail borders” to load the 1:50m dataset with 241 countries and territories, including all of those.</p></div>
+        </div>
+        <div class="faq-item">
+          <button class="faq-q" id="mm-faq-q-6" type="button" aria-expanded="false" aria-controls="mm-faq-a-6">
+            <span class="faq-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M12 3v18"/><path d="M5 7h14"/><path d="m5 7-3 6a3 3 0 0 0 6 0zM19 7l-3 6a3 3 0 0 0 6 0z"/></svg></span><span class="faq-q-text">How are disputed borders handled?</span><span class="faq-chevron" aria-hidden="true"></span>
+          </button>
+          <div class="faq-a" id="mm-faq-a-6" role="region" aria-labelledby="mm-faq-q-6" aria-hidden="true"><p>Borders follow Natural Earth's de facto policy: the map shows who controls an area today, not who claims it. That means Kashmir, Western Sahara, Taiwan, Kosovo, Somaliland, Northern Cyprus, Crimea and similar areas are drawn one particular way that some viewers will disagree with. The map is not a political statement, and you should add your own caption or disclaimer where it matters for your audience.</p></div>
+        </div>
+        <div class="faq-item">
+          <button class="faq-q" id="mm-faq-q-7" type="button" aria-expanded="false" aria-controls="mm-faq-a-7">
+            <span class="faq-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg></span><span class="faq-q-text">Can I share a map I made with someone else?</span><span class="faq-chevron" aria-hidden="true"></span>
+          </button>
+          <div class="faq-a" id="mm-faq-a-7" role="region" aria-labelledby="mm-faq-q-7" aria-hidden="true"><p>Yes. Click “Copy share link”. The whole map, including colours, projection and selected countries, is encoded in the link itself, so nothing is stored on a server and anyone who opens the link sees exactly what you built and can keep editing it.</p></div>
+        </div>
+        <div class="faq-item">
+          <button class="faq-q" id="mm-faq-q-8" type="button" aria-expanded="false" aria-controls="mm-faq-a-8">
+            <span class="faq-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><rect x="4" y="6" width="14" height="12" rx="2"/><path d="m18 10 4-2v8l-4-2"/></svg></span><span class="faq-q-text">Do you need animated maps rather than still images?</span><span class="faq-chevron" aria-hidden="true"></span>
+          </button>
+          <div class="faq-a" id="mm-faq-a-8" role="region" aria-labelledby="mm-faq-q-8" aria-hidden="true"><p>That is my day job. This tool makes stills; for animated country reveals, route lines, zooms and geopolitical explainers in After Effects, see the map animation service on this site.</p></div>
+        </div>
+      </section>
+
+      <section class="mm-cta">
+        <div class="tag-pill">Need It Animated?</div>
+        <h2 class="section-title">Country reveals, routes and <span class="yl">geopolitical explainers</span></h2>
+        <p class="section-desc">
+          Cinematic animated maps for documentary and explainer channels, cut to your voiceover, delivered in 4K
+          with four rounds of revisions.
+        </p>
+        <a href="map-animation-video-editing.html" class="mm-btn mm-btn--primary">See Map Animation Work</a>
+      </section>
+
+      <div class="mm-explore">
+        <p class="mm-explore-label">Explore Video Editing Services</p>
+        <div class="mm-explore-links">
+          <a href="map-animation-video-editing.html" class="mm-explore-link"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m4 6 5-2 6 2 5-2v14l-5 2-6-2-5 2Z"/><path d="M9 4v14"/><path d="M15 6v14"/></svg>Map Animation</a>
+          <a href="documentary-video-editing.html" class="mm-explore-link"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="4" y="5" width="16" height="14" rx="2"/><path d="M8 5l2 4"/><path d="M14 5l2 4"/><path d="M4 9h16"/></svg>Documentary Editing</a>
+          <a href="service/video-editor-for-geography-and-country-explainer-channels.html" class="mm-explore-link"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/></svg>Geography Channels</a>
+          <a href="service/video-editor-for-history-and-geopolitics-channels.html" class="mm-explore-link"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 19V5a2 2 0 0 1 2-2h12v16H6a2 2 0 0 0-2 2z"/><path d="M8 7h6"/></svg>History &amp; Geopolitics</a>
+        </div>
+      </div>
+    </main>
+
+    <site-footer></site-footer>
+
+    <script src="js/site-nav.js?v=11"></script>
+    <script src="js/site-footer.js?v=11"></script>
+    <script src="js/vendor/d3-array.min.js"></script>
+    <script src="js/vendor/d3-geo.min.js"></script>
+    <script src="js/vendor/d3-geo-projection.min.js"></script>
+    <script src="js/vendor/topojson-client.min.js"></script>
+    <script src="js/map-maker.js?v=4"></script>
+  </body>
+</html>

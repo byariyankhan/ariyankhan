@@ -7,7 +7,6 @@
     { id: 'faq', label: 'FAQ', number: '05', type: 'anchor' },
     { id: 'reviews', label: 'Reviews', number: '06', type: 'anchor' },
     { id: 'contact', label: 'Contact', number: '07', type: 'anchor' },
-    { label: 'Track Order', number: '08', type: 'page', path: 'track.html' },
   ];
 
   function escapeAttr(value) {
@@ -15,8 +14,8 @@
   }
 
   // Owns the mobile menu button/overlay this component just rendered — kept
-  // here (not in main.js) so pages that skip main.js (review.html, track.html)
-  // still get a working menu button.
+  // here (not in main.js) so pages that skip main.js still get a working
+  // menu button.
   function initMenu(root) {
     const menuBtn = root.querySelector('#menuBtn');
     const menuOverlay = root.querySelector('#menuOverlay');
@@ -81,7 +80,7 @@
   }
 
   function buildNavComponent(isHomePage, homePath) {
-    const basePath = homePath.replace(/index\.html$/, '');
+    const basePath = homePath === '/' ? '/' : homePath.replace(/index\.html$/, '');
     const logoHref = isHomePage ? '#home' : homePath;
     const contactItem = NAV_ITEMS.find(item => item.id === 'contact');
     const contactHref = buildHref(contactItem, isHomePage, homePath, basePath);
@@ -97,7 +96,7 @@
     return `
 <nav class="site-nav">
   <a href="${escapeAttr(logoHref)}" class="nav-logo">
-    <div class="logo-mark"><img src="${escapeAttr(basePath)}images/logo-avatar.webp" alt="" width="34" height="34" decoding="async"></div>
+    <div class="logo-mark"><img src="${escapeAttr(basePath)}images/logo-avatar.webp?v=3" alt="" width="34" height="34" decoding="async"></div>
     <span class="logo-text">ARIYAN <span>KHAN</span></span>
   </a>
 
@@ -130,7 +129,7 @@
       if (this.dataset.rendered === 'true') return;
 
       const isHomePage = this.dataset.page === 'home';
-      const homePath = this.dataset.homePath || 'index.html';
+      const homePath = this.dataset.homePath || '/';
 
       this.style.display = 'contents';
       this.innerHTML = buildNavComponent(isHomePage, homePath);

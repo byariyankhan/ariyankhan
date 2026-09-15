@@ -4,12 +4,16 @@
 ══════════════════════════════ */
 
 // Mobile menu button/overlay behavior now lives in site-nav.js, next to the
-// markup it controls — that way pages that skip main.js (review.html,
-// track.html) still get a working menu button.
+// markup it controls — that way pages that skip main.js still get a working
+// menu button.
 
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') closeAllDropdowns();
 });
+
+// Page-load timestamp: send-mail.php rejects submissions that arrive
+// suspiciously fast (bots fill forms in milliseconds).
+const CF_LOADED_AT = Date.now();
 
 /* ── Stars ── */
 (function () {
@@ -763,6 +767,8 @@ async function handleSubmit(btn) {
         'Accept': 'application/json',
       },
       body: JSON.stringify({
+        website: document.getElementById('cf-website')?.value || '',
+        t: CF_LOADED_AT,
         name,
         email,
         whatsapp,

@@ -1,10 +1,6 @@
 # Credentials — never commit
 .env
 mail-config.local.php
-admin-config.local.php
-
-# Project tracker database (server-only, never commit client data)
-data/
 
 # Deploy utilities (local only)
 ftp_download.ps1

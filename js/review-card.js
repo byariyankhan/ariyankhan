@@ -5,10 +5,8 @@
    and is skipped entirely for prefers-reduced-motion. Combines
    curated quotes (data-curated="key1,key2,..." into the shared
    window.CURATED_REVIEWS map from js/reviews-data.js — one key per
-   service page, or several on index.html for a mixed feed) with
-   self-submitted reviews fetched live from reviews.php. Built with
-   createElement/textContent throughout — never innerHTML — since
-   review text is user-submitted. */
+   service page, or several on index.html for a mixed feed). Built with
+   createElement/textContent throughout — never innerHTML. */
 (() => {
   const root = document.getElementById('reviewCard');
   if (!root) return;
@@ -129,37 +127,13 @@
     reviews = shouldShuffle ? shuffle(list) : list;
     if (!reviews.length) return;
 
-    // Arriving fresh from review.html?justReviewed=Name — jump straight to
-    // that review so the client sees their own feedback live on the page.
-    const justReviewed = new URLSearchParams(window.location.search).get('justReviewed');
-    if (justReviewed) {
-      const matchIndex = reviews.findIndex((r) => r.name === justReviewed);
-      if (matchIndex !== -1) index = matchIndex;
-      root.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
-
     renderFace(reviews[index]);
     renderDots();
     root.setAttribute('aria-busy', 'false');
     startTimer();
   }
 
-  const api = root.dataset.api || 'reviews.php';
-  fetch(api)
-    .then((res) => (res.ok ? res.json() : null))
-    .then((json) => {
-      const allSubmitted = json && json.ok && Array.isArray(json.reviews) ? json.reviews : [];
-      // Only show a submitted review on the page(s) its project was tagged
-      // for. A review with no service on file (shouldn't happen for new
-      // projects, but covers old data) falls back to showing everywhere
-      // rather than silently vanishing.
-      const submitted = allSubmitted.filter(
-        (r) => !r.service || curatedKeys.includes(r.service)
-      );
-      // Real, self-submitted reviews lead (newest first, per reviews.php's
-      // own ordering) so a fresh review is the first thing shown when the
-      // section comes into view, with curated quotes filling in after.
-      init([...submitted, ...curated]);
-    })
-    .catch(() => init(curated));
+  // Curated quotes only — the self-service review submission flow
+  // (review.html / reviews.php / tracker) was removed.
+  init(curated);
 })();

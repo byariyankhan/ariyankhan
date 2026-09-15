@@ -57,13 +57,15 @@
     <span class="footer-divider" aria-hidden="true">|</span>
     <a href="${basePath}ai-metadata-remover.html">AI Metadata Remover</a>
     <span class="footer-divider" aria-hidden="true">|</span>
+    <a href="${basePath}map-maker.html">Map Maker</a>
+    <span class="footer-divider" aria-hidden="true">|</span>
     <a href="${basePath}about.html">About</a>
     <span class="footer-divider" aria-hidden="true">|</span>
     <a href="${basePath}privacy-policy.html">Privacy Policy</a>
     <span class="footer-divider" aria-hidden="true">|</span>
     <a href="${basePath}terms-and-conditions.html">Terms &amp; Conditions</a>
   </p>
-  <p class="footer-copy">&copy; ${new Date().getFullYear()} <a href="${basePath}index.html" class="footer-copy-link">Ariyan Khan</a>. All Rights Reserved.</p>
+  <p class="footer-copy">&copy; ${new Date().getFullYear()} <a href="/" class="footer-copy-link">Ariyan Khan</a>. All Rights Reserved.</p>
 </footer>`.trim();
   }
 

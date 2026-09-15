@@ -41,6 +41,8 @@ across the niches and formats listed below.
 
 ## Free Tools
 
+- [Map Maker](https://ariyankhan.com/map-maker.html): Free browser-based map generator. Click or search to highlight countries in up to six colour groups, choose from eight projections (Natural Earth, Equal Earth, Robinson, Winkel Tripel, Mercator, Miller, Equirectangular, Globe), zoom to a region or selection, add labels and grid lines, and export PNG up to 8K or SVG for YouTube videos, thumbnails, Shorts and slides. Natural Earth public-domain borders, shareable links, nothing uploaded.
+
 - [AI Metadata Remover](https://ariyankhan.com/ai-metadata-remover.html): Free browser-based tool that strips C2PA Content Credentials, XMP, IPTC, EXIF/GPS and Stable Diffusion prompt data from JPG, PNG and WebP images. No upload, no account, pixels never re-encoded. Also detects which AI generator (ChatGPT, Gemini, Firefly, Midjourney, Stable Diffusion) tagged the file. Cannot remove pixel watermarks such as SynthID.
 
 ## Blog
