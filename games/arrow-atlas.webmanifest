@@ -1,17 +1,30 @@
 {
   "id": "/arrow-atlas.html",
-  "name": "Arrow Atlas — Map Arrow Puzzle",
+  "name": "Arrow Atlas \u2014 Map Arrow Puzzle",
   "short_name": "Arrow Atlas",
-  "description": "Tap-away arrow puzzle and deep-focus game on real country maps. Clear the maze, reveal the country, name it. By Ariyan Khan.",
+  "description": "Arrow Atlas: a free arrow puzzle game on real country maps. Tap arrows to clear the board, keep your hearts, name the country. 168 countries, adaptive difficulty, works offline.",
   "start_url": "/arrow-atlas.html?utm_source=pwa",
   "scope": "/",
   "display": "standalone",
   "orientation": "any",
   "background_color": "#F4EDE0",
   "theme_color": "#F4EDE0",
-  "categories": ["games", "education"],
+  "categories": [
+    "games",
+    "education"
+  ],
   "icons": [
-    { "src": "/favicon/web-app-manifest-192x192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
-    { "src": "/favicon/web-app-manifest-512x512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+    {
+      "src": "/favicon/web-app-manifest-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/favicon/web-app-manifest-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
   ]
 }

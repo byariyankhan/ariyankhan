@@ -524,6 +524,14 @@ unlock (skip allowed after two fails), stars, best times and progress in
 - **Lobby layout**: title, the world map (fills the space), Continue, then two
   compact buttons (Today's Country, World Tour n/168 · All levels). The old cards
   carousel and the level-path dots are gone.
+- **SEO**: title/description/keywords around "Arrow Atlas", "arrow puzzle" and
+  "arrow game"; Open Graph/Twitter card `images/arrow-atlas-og.jpg` (1200×630,
+  rendered from `scratchpad/og/arrow-atlas-og.html`); schema.org WebPage +
+  VideoGame/WebApplication (alternateNames, keywords, image, PlayAction) +
+  BreadcrumbList + FAQPage; the About / how-to / FAQ copy is a visible
+  `#aaAbout` section under the app (the settings "How to play" and "About"
+  rows scroll to it); the homepage has a "Games" section linking both games
+  with keyword anchor text; sitemap priority 1.0 with an image entry.
 - **First open / launch**: `#aaGate` (welcome, Terms + Privacy links, Accept,
   stored in `aa:v1:welcomed`), then `#aaSplash` (logo + one line from `QUOTES`,
   rotating per launch in `aa:v1:launches`, tap or 2.4 s to dismiss, skipped for
