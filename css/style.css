@@ -1621,3 +1621,14 @@ section{ position:relative; z-index:1; padding:80px 22px; }
     animation: none;
   }
 }
+
+/* ── Games section (homepage) ── */
+.games-grid{ display:grid; gap:18px; grid-template-columns:1fr; }
+@media(min-width:720px){ .games-grid{ grid-template-columns:1fr 1fr; } }
+.game-card{ display:flex; flex-direction:column; background:var(--card, #151515); border:1px solid rgba(255,255,255,.08); border-radius:18px; overflow:hidden; text-decoration:none; color:inherit; transition:transform .15s, border-color .15s; }
+.game-card:hover{ transform:translateY(-3px); border-color:rgba(255,255,255,.22); }
+.game-card img{ display:block; width:100%; height:auto; aspect-ratio:1200/630; object-fit:cover; }
+.game-card-body{ display:flex; flex-direction:column; gap:8px; padding:18px 18px 20px; }
+.game-card-body strong{ font-size:18px; line-height:1.2; }
+.game-card-body span{ font-size:14px; line-height:1.6; color:var(--muted, #b5b5b5); }
+.game-card-body em{ font-style:normal; font-weight:700; color:var(--yl, #f5c542); }

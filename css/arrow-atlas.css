@@ -240,6 +240,10 @@ button{ font-family:inherit; }
 .aa-about-summary{ cursor:pointer; list-style:none; font-weight:900; font-size:15px; }
 .aa-about-summary::-webkit-details-marker{ display:none; }
 .aa-credit{ font-size:13px; color:var(--muted); text-align:center; margin:14px 0 0; }
+/* the About / how-to / FAQ copy sits under the app, visible to readers and crawlers */
+.aa-seo{ max-width:640px; margin:0 auto; padding:28px 16px 48px; border-top:1px solid var(--bg2); }
+.aa-seo-cta{ text-align:center; margin:18px 0 0; }
+.aa-seo .aa-btn{ text-decoration:none; }
 
 /* ── About content (reused sections) ── */
 .aa-page{ padding:8px 0 0; font-weight:600; }

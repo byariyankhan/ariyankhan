@@ -62,7 +62,7 @@
   const PALETTE = ['#FFED54', '#5CD6FF', '#8CFF7A', '#FF9AD5', '#C79BFF', '#FFB347', '#6EE7B7', '#FDBA74', '#F97373', '#38BDF8'];
 
   const el = {
-    select: $('#aaSelect'), levels: $('#aaLevels'), progress: $('#aaProgress'), streak: $('#aaStreak'), daily: $('#aaDaily'), hudDiff: $('#aaHudDiff'), play: $('#aaPlay'), playSub: $('#aaPlaySub'), path: $('#aaPath'), btnVibe: $('#aaVibe'), btnGuides: $('#aaGuides'), btnMusic: $('#aaMusic'), howTo: $('#aaHowTo'), aboutPanel: $('#aaAboutPanel'),
+    select: $('#aaSelect'), levels: $('#aaLevels'), progress: $('#aaProgress'), streak: $('#aaStreak'), daily: $('#aaDaily'), hudDiff: $('#aaHudDiff'), play: $('#aaPlay'), playSub: $('#aaPlaySub'), path: $('#aaPath'), btnVibe: $('#aaVibe'), btnGuides: $('#aaGuides'), btnMusic: $('#aaMusic'), howTo: $('#aaHowTo'),
     sheet: $('#aaSheet'), levelsSheet: $('#aaLevelsSheet'), levelsBtn: $('#aaLevelsBtn'), settingsBtns: $$('#aaSettings, #aaSettingsG'), themeBtn: $('#aaTheme'), themes: $('#aaThemes'),
     game: $('#aaGame'), boardWrap: $('#aaBoardWrap'), board: $('#aaBoard'), toast: $('#aaToast'), confetti: $('#aaConfetti'),
     hudLevel: $('#aaHudLevel'), hudMode: $('#aaHudMode'), hudTime: $('#aaHudTime'), hudLeft: $('#aaHudLeft'), hudLives: $('#aaHudLives'), hudLivesWrap: $('#aaHudLivesWrap'), hudPct: $('#aaHudPct'), boardBar: $('#aaBoardBar'),
@@ -856,7 +856,9 @@
   document.addEventListener('pointerdown', () => { if (state.music && !music.on) musicStart(); }, { passive: true });
   document.addEventListener('visibilitychange', () => { if (document.hidden) musicStop(); });
   el.btnGuides?.addEventListener('click', () => { state.guides = !state.guides; store.set('guides', state.guides); renderToggles(); });
-  el.howTo?.addEventListener('click', () => { el.aboutPanel.open = true; el.aboutPanel.scrollIntoView({ behavior: 'smooth', block: 'start' }); });
+  const goAbout = () => { closeSheets(); if (!el.game.hidden) goToLevels(); document.getElementById('aaAbout')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); };
+  el.howTo?.addEventListener('click', goAbout);
+  $$('a[href="#aaAbout"]').forEach(a => a.addEventListener('click', e => { e.preventDefault(); goAbout(); }));
   renderToggles();
   document.addEventListener('keydown', e => { if (!el.game.hidden && !state.finished && (e.key === 'h' || e.key === 'H') && !/input|textarea/i.test(document.activeElement?.tagName || '')) hint(); });
   document.addEventListener('visibilitychange', () => { if (document.hidden && state.startedAt && !state.finished) { stopTimer(); } });
