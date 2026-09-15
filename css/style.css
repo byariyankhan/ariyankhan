@@ -76,26 +76,8 @@ body.menu-open{ overflow:hidden; }
   62%  { opacity:0; }
   100% { top:100%; opacity:0; }
 }
-/* REC pulse dot — sits just outside the clipped shape so it isn't cut off */
-.nav-logo::after{
-    content:'';
-    position:absolute;
-    bottom:-2px; left:25px;
-    width:8px; height:8px;
-    border-radius:50%;
-    background:var(--red);
-    box-shadow:0 0 0 2px #000, 0 0 8px rgba(232,56,58,.75);
-    animation:logo-rec-pulse 1.8s ease-in-out infinite;
-    pointer-events:none;
-    z-index:3;
-  }
-@keyframes logo-rec-pulse{
-  0%,100% { opacity:1; transform:scale(1); }
-  50%     { opacity:.35; transform:scale(.82); }
-}
 @media (prefers-reduced-motion: reduce){
   .logo-mark::after{ animation:none; opacity:0; }
-  .nav-logo::after{ animation:none; }
 }
 .logo-text{
   font-family:'Barlow Condensed',sans-serif;
