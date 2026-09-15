@@ -61,7 +61,7 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="css/style.css?v=18" />
-    <link rel="stylesheet" href="css/arrow-atlas.css?v=4" />
+    <link rel="stylesheet" href="css/arrow-atlas.css?v=5" />
     <link rel="preload" href="games/data/arrow-atlas.json?v=3" as="fetch" crossorigin="anonymous" />
 
     <!-- SCHEMA -->
@@ -144,83 +144,76 @@
     }
     </script>
   </head>
-  <body>
+  <body class="aa-body">
     <div id="stars"></div>
 
-    <site-nav data-page="subpage"></site-nav>
-
-    <main class="aa-page">
-      <nav class="aa-crumb" aria-label="Breadcrumb">
-        <a href="/">Home</a><span aria-hidden="true">/</span><span aria-current="page">Arrow Atlas</span>
-      </nav>
-
-      <header class="aa-hero">
-        <div class="tag-pill">Free Puzzle Game · No Sign-up</div>
-        <h1 class="section-title">Arrow <span class="yl">Atlas</span></h1>
-        <p class="section-desc">
-          Tap arrows to shoot them off the board. A blocked arrow costs a heart, you have four, and the clock is
-          running. Or switch to Deep Focus: no clock, no hearts, just you and the maze. Clear the board and a
-          country appears underneath. Can you name it? 70 countries, one world tour.
-        </p>
-        <ul class="aa-trust">
-          <li><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>70 countries</li>
-          <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20s-7-4.5-7-10a4 4 0 0 1 7-2.5A4 4 0 0 1 19 10c0 5.5-7 10-7 10z"/></svg>4 hearts per level</li>
-          <li><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2M9 3h6"/></svg>Classic, Rush &amp; Deep Focus</li>
-          <li><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M11 18h2"/></svg>Phone &amp; desktop</li>
-        </ul>
+    <main class="aa-app" id="aaApp">
+      <header class="aa-top">
+        <a href="/" class="aa-brand" aria-label="Ariyan Khan — home"><img src="images/logo-avatar.webp?v=3" alt="" width="30" height="30" decoding="async" /></a>
+        <h1 class="aa-logo">Arrow <span class="yl">Atlas</span></h1>
+        <div class="aa-top-actions">
+          <button type="button" class="aa-icon" id="aaSound" aria-pressed="true" aria-label="Sound on">Sound: on</button>
+          <button type="button" class="aa-icon" id="aaAbout" aria-label="About this game">i</button>
+        </div>
       </header>
 
-      <!-- ── GAME ── -->
-      <section class="aa-shell" id="aaShell" aria-labelledby="aaShellTitle">
-        <h2 id="aaShellTitle" class="aa-visually-hidden">Play</h2>
-        <p class="aa-loading" id="aaLoading" hidden>Loading the world tour…</p>
-        <p class="aa-error" id="aaError" hidden></p>
+      <p class="aa-loading" id="aaLoading" hidden>Loading…</p>
+      <p class="aa-error" id="aaError" hidden></p>
 
-        <div id="aaSelect">
-          <div class="aa-select-head">
-            <div>
-              <h2>World Tour</h2>
-              <p>Levels unlock in order: Normal, then Hard, Super Hard and Expert boards. Every 10th level is a milestone.</p>
-            </div>
-            <div class="aa-modes" id="aaModes" role="group" aria-label="Mode"></div>
-          </div>
-          <div class="aa-progress-wrap">
-            <p class="aa-progress" id="aaProgress">0/70 countries cleared</p>
-            <div class="aa-progress-track"><div class="aa-progress-bar" id="aaProgressBar"></div></div>
-            <p class="aa-streak" id="aaStreak"></p>
-          </div>
-          <div class="aa-daily" id="aaDaily"></div>
-          <div class="aa-levels" id="aaLevels"></div>
+      <!-- ── HOME / WORLD TOUR ── -->
+      <section class="aa-screen" id="aaSelect" aria-label="World Tour">
+        <div class="aa-progress-wrap">
+          <p class="aa-progress" id="aaProgress">0/70 countries cleared</p>
+          <div class="aa-progress-track"><div class="aa-progress-bar" id="aaProgressBar"></div></div>
+          <p class="aa-streak" id="aaStreak"></p>
         </div>
 
-        <div id="aaGame" hidden>
-          <div class="aa-hud">
-            <h3 class="aa-hud-title"><span id="aaHudLevel">Level 1</span><span class="aa-hud-mode" id="aaHudMode">Classic</span><span class="aa-hud-diff" id="aaHudDiff">Normal</span></h3>
-            <div class="aa-hud-stats">
-              <span><b id="aaHudTime">0:00</b>time</span>
-              <span><b id="aaHudLeft">0</b>arrows left</span>
-              <span><b id="aaHudPct">0%</b>cleared</span>
-              <span id="aaHudLivesWrap"><b class="aa-lives" id="aaHudLives" role="img" aria-label="4 of 4 hearts"></b>hearts</span>
-            </div>
-            <div class="aa-hud-actions">
-              <button type="button" class="aa-btn aa-btn--small" id="aaHint" title="Light up a free arrow (H). Adds 5 seconds; 3 per level outside Deep Focus.">Hint (3)</button>
-              <button type="button" class="aa-btn aa-btn--small" id="aaRestart">Restart</button>
-              <button type="button" class="aa-btn aa-btn--small" id="aaSound" aria-pressed="true">Sound: on</button>
-              <button type="button" class="aa-btn aa-btn--small" id="aaBackToLevels">World Tour</button>
-            </div>
+        <button type="button" class="aa-play" id="aaPlay"><span class="aa-play-label">Play</span><span class="aa-play-sub" id="aaPlaySub">Level 1</span></button>
+
+        <div class="aa-modes-wrap">
+          <div class="aa-modes" id="aaModes" role="group" aria-label="Mode"></div>
+          <p class="aa-mode-desc" id="aaModeDesc"></p>
+        </div>
+
+        <div class="aa-daily" id="aaDaily"></div>
+
+        <h2 class="aa-h2">World Tour</h2>
+        <div class="aa-levels" id="aaLevels"></div>
+      </section>
+
+      <!-- ── GAME ── -->
+      <section class="aa-screen aa-screen--game" id="aaGame" aria-label="Game" hidden>
+        <div class="aa-hud">
+          <button type="button" class="aa-icon" id="aaBackToLevels" aria-label="Back to World Tour">‹</button>
+          <div class="aa-hud-title"><span id="aaHudLevel">Level 1</span><span class="aa-hud-diff" id="aaHudDiff">Normal</span><span class="aa-hud-mode" id="aaHudMode">Classic</span></div>
+          <div class="aa-hud-stats">
+            <span id="aaHudLivesWrap"><b class="aa-lives" id="aaHudLives" role="img" aria-label="4 of 4 hearts"></b></span>
+            <span class="aa-hud-stat" title="Time"><b id="aaHudTime">0:00</b></span>
           </div>
-          <div class="aa-board-wrap" id="aaBoardWrap">
-            <div class="aa-board-track" aria-hidden="true"><div class="aa-board-bar" id="aaBoardBar"></div></div>
-            <svg id="aaBoard" class="aa-board" viewBox="0 0 10 10" role="group" aria-label="Puzzle board. Tap an arrow to shoot it off the board."></svg>
-            <canvas class="aa-confetti" id="aaConfetti" hidden></canvas>
-            <div class="aa-toast" id="aaToast" role="status" aria-live="polite" hidden></div>
-            <div class="aa-overlay" id="aaOverlay" hidden>
-              <div class="aa-card" id="aaCard" role="dialog" aria-live="polite"></div>
-            </div>
+        </div>
+        <div class="aa-board-wrap" id="aaBoardWrap">
+          <div class="aa-board-track" aria-hidden="true"><div class="aa-board-bar" id="aaBoardBar"></div></div>
+          <svg id="aaBoard" class="aa-board" viewBox="0 0 10 10" role="group" aria-label="Puzzle board. Tap an arrow to shoot it off the board."></svg>
+          <canvas class="aa-confetti" id="aaConfetti" hidden></canvas>
+          <div class="aa-toast" id="aaToast" role="status" aria-live="polite" hidden></div>
+          <div class="aa-overlay" id="aaOverlay" hidden>
+            <div class="aa-card" id="aaCard" role="dialog" aria-live="polite"></div>
+          </div>
+        </div>
+        <div class="aa-bottom">
+          <span class="aa-bottom-stat"><b id="aaHudLeft">0</b> arrows left · <b id="aaHudPct">0%</b></span>
+          <div class="aa-bottom-actions">
+            <button type="button" class="aa-btn aa-btn--small" id="aaHint" title="Light up a free arrow (H)">Hint (3)</button>
+            <button type="button" class="aa-btn aa-btn--small" id="aaRestart">Restart</button>
           </div>
         </div>
       </section>
+    </main>
 
+    <!-- ── ABOUT (collapsed; opened with the i button) ── -->
+    <details class="aa-about" id="aaAboutPanel">
+      <summary class="aa-about-summary">About Arrow Atlas: how to play, the World Tour, FAQ</summary>
+      <div class="aa-page">
       <!-- ── HOW TO PLAY ── -->
       <section class="aa-section" id="how">
         <div class="tag-pill">How To Play</div>
@@ -352,12 +345,12 @@
           <a href="ai-metadata-remover.html" class="aa-explore-link"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="m8 8 8 8M16 8l-8 8"/></svg>AI Metadata Remover</a>
         </div>
       </div>
-    </main>
+      </div>
+    </details>
 
     <site-footer></site-footer>
 
-    <script src="js/site-nav.js?v=11"></script>
     <script src="js/site-footer.js?v=13"></script>
-    <script src="js/arrow-atlas.js?v=4"></script>
+    <script src="js/arrow-atlas.js?v=5"></script>
   </body>
 </html>
