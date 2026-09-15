@@ -55,7 +55,10 @@
   const NARROW_OF = [0.5, 0.75, 0.9, 0.97, 1];
   const CHAIN_OF = [0.6, 0.75, 0.9, 0.95, 1];
   const FAR_OF = [0.2, 0.4, 0.6, 0.8, 0.9];
-  const GEN_OPTS = tier => ({ narrow: NARROW_OF[tier], chain: CHAIN_OF[tier], far: FAR_OF[tier] });
+  const BUNDLE_OF = [0.2, 0.3, 0.35, 0.4, 0.45];   // share of pieces that get a parallel twin (a ladder of arrows pointing the same way)
+  const RAIL_OF = [0.1, 0.15, 0.2, 0.25, 0.3];     // share of pieces that run long and straight across the board
+  const HOLE_OF = [0.04, 0.06, 0.08, 0.1, 0.12];   // share of inland cells left empty: gaps make lanes, traps and breathing room, as on the reference boards
+  const GEN_OPTS = tier => ({ narrow: NARROW_OF[tier], chain: CHAIN_OF[tier], far: FAR_OF[tier], bundle: BUNDLE_OF[tier], rail: RAIL_OF[tier], holes: HOLE_OF[tier] });
   const DIRS = { r: [0, 1], l: [0, -1], d: [1, 0], u: [-1, 0] };
   const PALETTE = ['#FFED54', '#5CD6FF', '#8CFF7A', '#FF9AD5', '#C79BFF', '#FFB347', '#6EE7B7', '#FDBA74', '#F97373', '#38BDF8'];
 
@@ -340,15 +343,25 @@
   // that can only point at the sea is free from the start; the last few pieces placed are the only ones that
   // need to be. Pieces whose head sits on the coast walk along the coast (`hug`), so the outline is drawn by
   // arrows. Cells with a single option are always handled first so pockets do not go dead.
-  function generate(mask, maxLen, seed, { chain = 0.8, far = 0.5, hug = 0.9, narrow = 0.8 } = {}) {
+  function generate(mask, maxLen, seed, { chain = 0.8, far = 0.5, hug = 0.9, narrow = 0.8, bundle = 0.35, rail = 0.2, holes = 0.08 } = {}) {
     const H = mask.rows.length, W = mask.rows[0].length;
     const land = mask.rows.map(r => r.split('').map(ch => ch === '1'));
+    const shape = land.map(r => r.slice());   // the country itself; `land` below loses the holes
     const inb = (y, x) => y >= 0 && y < H && x >= 0 && x < W;
     const isLand = (y, x) => inb(y, x) && land[y][x];
     const OPP = { r: 'l', l: 'r', u: 'd', d: 'u' };
     // coast cells: land with any non-land 8-neighbour (8-neighbour so the coast is 4-connected and can be walked)
     const coast = new Set();
     for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) if (land[r][c]) { let edge = false; for (let dy = -1; dy <= 1 && !edge; dy++) for (let dx = -1; dx <= 1; dx++) if ((dy || dx) && !isLand(r + dy, c + dx)) { edge = true; break; } if (edge) coast.add(r * W + c); }
+    // Holes: a share of inland cells stays empty (never two side by side, never on the coast). Runs pass through
+    // them, so an arrow's blocker can sit a few cells away and the board gets the gaps the reference boards have.
+    {
+      const rnd0 = mulberry32(seed * 31337 + 5);
+      const inland = []; for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) if (land[r][c] && !coast.has(r * W + c)) inland.push([r, c]);
+      for (let i = inland.length - 1; i > 0; i--) { const j = Math.floor(rnd0() * (i + 1)); [inland[i], inland[j]] = [inland[j], inland[i]]; }
+      let want = Math.round(inland.length * holes);
+      for (const [r, c] of inland) { if (want <= 0) break; if (Object.values(DIRS).some(([a, b]) => !isLand(r + a, c + b))) continue; land[r][c] = false; want--; }
+    }
     for (let attempt = 0; attempt < 200; attempt++) {
       const rnd = mulberry32(seed * 7919 + attempt * 104729 + 17);
       const occ = Array.from({ length: H }, () => new Array(W).fill(-1));
@@ -403,7 +416,7 @@
       const nook = (y, x, fy, fx) => freeCell(y, x) && !Object.values(DIRS).some(([a, b]) => (y + a !== fy || x + b !== fx) && freeCell(y + a, x + b));
       // Grow a body of up to `len` cells backwards from the head at (r,c): a random walk through empty land,
       // never onto the head's own run (that would block itself). Turns are what make the board a maze.
-      const buildBody = (r, c, dir, len, hugging) => {
+      const buildBody = (r, c, dir, len, hugging, straightP = hugging ? 0.75 : 0.62) => {
         const [dr, dc] = DIRS[dir];
         const onExit = (y, x) => (dr ? x === c && Math.sign(y - r) === dr : y === r && Math.sign(x - c) === dc);
         const cells = [[r, c]];
@@ -421,10 +434,55 @@
           const coastOpts = hugging ? opts.filter(([a, b]) => coast.has((py + a) * W + px + b)) : [];
           const from = nooks.length && rnd() < 0.9 ? nooks : coastOpts.length ? coastOpts : opts;
           const straight = from.find(([a, b]) => a === pdir[0] && b === pdir[1]);
-          const step = straight && rnd() < (hugging ? 0.75 : 0.62) ? straight : from[Math.floor(rnd() * from.length)];
+          const step = straight && rnd() < straightP ? straight : from[Math.floor(rnd() * from.length)];
           py += step[0]; px += step[1]; pdir = step; cells.push([py, px]);
         }
         return cells;
+      };
+      // Can this exact body, head first, be placed pointing d? Returns the ord to give it, or null.
+      const validate = (cells, d) => {
+        const [hy, hx] = cells[0]; const { hi } = rayInfo(hy, hx, d);
+        const lo = laneMax(cells); if (lo >= hi) return null;
+        const at = hi === Infinity ? ord + 1 : slotBetween(lo, hi);
+        return createsDead(cells, d, at) ? null : at;
+      };
+      // Tail-first: walk inland from a cell whose head could not continue its segment and put the head at the far
+      // end, so the piece is a real snake instead of a lone arrowhead. Returns { cells, at, dir } or null.
+      const buildFromTail = (r, c, len) => {
+        const path = [[r, c]]; let py = r, px = c, pdir = null;
+        for (let k = 1; k < len; k++) {
+          const opts = [];
+          for (const [ddr, ddc] of Object.values(DIRS)) { const y = py + ddr, x = px + ddc; if (freeCell(y, x) && !path.some(([cy, cx]) => cy === y && cx === x)) opts.push([ddr, ddc]); }
+          if (!opts.length) break;
+          const straight = pdir && opts.find(([a, b]) => a === pdir[0] && b === pdir[1]);
+          const step = straight && rnd() < 0.62 ? straight : opts[Math.floor(rnd() * opts.length)];
+          py += step[0]; px += step[1]; pdir = step; path.push([py, px]);
+        }
+        for (let n = path.length; n >= 2; n--) {
+          const cells = path.slice(0, n).reverse(); const [hy, hx] = cells[0], [by, bx] = cells[1];
+          const d = Object.keys(DIRS).find(k => by + DIRS[k][0] === hy && bx + DIRS[k][1] === hx);
+          if (cells.some(([y, x]) => (DIRS[d][0] ? x === hx && Math.sign(y - hy) === DIRS[d][0] : y === hy && Math.sign(x - hx) === DIRS[d][1]))) continue;   // own run
+          const { hi, room } = rayInfo(hy, hx, d); if (hi === Infinity && !room) continue;   // would be free from the start
+          const at = validate(cells, d); if (at != null) return { cells, at, dir: d };
+        }
+        return null;
+      };
+      // A parallel twin: the same body shifted one cell sideways, pointing the same way, trimmed from the tail until
+      // it fits. Ladders of arrows pointing the same way are what the reference boards are made of, and the eye
+      // cannot tell which rung is the free one.
+      const twinOf = (P) => {
+        const [dr, dc] = DIRS[P.dir];
+        for (const side of rnd() < 0.5 ? [1, -1] : [-1, 1]) {
+          const oy = dc * side, ox = -dr * side;   // perpendicular to the head direction
+          let cells = P.cells.map(([y, x]) => [y + oy, x + ox]);
+          while (cells.length >= 2 && !cells.every(([y, x]) => freeCell(y, x))) cells = cells.slice(0, cells.length - 1);
+          if (cells.length < 2 || !cells.every(([y, x]) => freeCell(y, x))) continue;
+          const [hy, hx] = cells[0];
+          if (cells.some(([y, x]) => (dr ? x === hx && Math.sign(y - hy) === dr : y === hy && Math.sign(x - hx) === dc))) continue;
+          const { hi, room } = rayInfo(hy, hx, P.dir); if (hi === Infinity && !room) continue;
+          const at = validate(cells, P.dir); if (at != null) return { cells, at, dir: P.dir };
+        }
+        return null;
       };
       // Would this piece leave some empty cell with no option at all? Only cells whose runs pass through the
       // new cells, or that lie on the new run, can be affected, so those are the ones checked.
@@ -444,7 +502,8 @@
       // until the pieces whose runs cross it are all older than the ones it points at. Returns { cells, ord } or null.
       const fit = (r, c, d, len, hugging) => {
         const { hi } = rayInfo(r, c, d);
-        let cells = buildBody(r, c, d, len, hugging);
+        const railing = !hugging && rnd() < rail;
+        let cells = buildBody(r, c, d, railing ? maxLen + 3 : len, hugging, railing ? 0.96 : undefined);
         for (; cells.length; cells = cells.slice(0, cells.length - 1)) {
           const lo = laneMax(cells); if (lo >= hi) continue;
           const at = hi === Infinity ? ord + 1 : slotBetween(lo, hi);
@@ -463,7 +522,12 @@
       const pickDir = (r, c, opts) => {
         const kinds = rnd() < narrow ? ['blocked', 'open', 'sea'] : ['open', 'blocked', 'sea'];
         for (const kind of kinds) {
-          const ds = opts.filter(o => o.kind === kind).map(o => o.d); if (!ds.length) continue;
+          let ds = opts.filter(o => o.kind === kind).map(o => o.d); if (!ds.length) continue;
+          if (kind === 'blocked' && ds.length > 1 && rnd() < far) {
+            // a trap: the blocker is far down the run, so the arrow looks free
+            const dist = d => { const [dr, dc] = DIRS[d]; let y = r + dr, x = c + dc, n = 0; while (inb(y, x) && occ[y][x] < 0) { y += dr; x += dc; n++; } return n; };
+            const best = Math.max(...ds.map(dist)); ds = ds.filter(d => dist(d) === best);
+          }
           const aligned = ds.filter(d => freeCell(r - DIRS[d][0], c - DIRS[d][1]));
           const tidy = (aligned.length ? aligned : ds).filter(d => kind === 'blocked' || !exitsAtCorner(r, c, d));
           const pool = tidy.length ? tidy : aligned.length ? aligned : ds;
@@ -512,15 +576,29 @@
           placed = placeAt(r, c, bestOpts);
         }
         if (!placed) { failed = true; break; }
-        const { cells, dir, at } = placed;
-        if (cells.length === 1 && absorb(cells[0][0], cells[0][1])) continue;
-        const idx = pieces.length;
-        for (const [y, x] of cells) { occ[y][x] = idx; empty.delete(y * W + x); }
-        if (at > ord) ord = at;
-        pieces.push({ idx, ord: at, cells, dir, color: PALETTE[idx % PALETTE.length] });
-        if (rayInfo(cells[0][0], cells[0][1], dir).room) open.push(idx);
+        if (placed.cells.length === 1) {
+          // a lone arrowhead: rather join a neighbour, or grow a snake inland with the head at the far end, or,
+          // inland, leave the cell as a gap
+          const [sy, sx] = placed.cells[0];
+          if (absorb(sy, sx)) continue;
+          const t = buildFromTail(sy, sx, 3 + Math.floor(rnd() * (maxLen - 2)));
+          if (t) placed = { r: t.cells[0][0], c: t.cells[0][1], ...t };
+          else if (!coast.has(sy * W + sx) && !Object.values(DIRS).some(([a, b]) => freeCell(sy + a, sx + b) || (isLand(sy + a, sx + b) === false && shape[sy + a]?.[sx + b]))) { land[sy][sx] = false; empty.delete(sy * W + sx); continue; }   // never next to another gap
+        }
+        const put = ({ cells, dir, at }) => {
+          const idx = pieces.length;
+          for (const [y, x] of cells) { occ[y][x] = idx; empty.delete(y * W + x); }
+          if (at > ord) ord = at;
+          const P = { idx, ord: at, cells, dir, color: PALETTE[idx % PALETTE.length] };
+          pieces.push(P);
+          if (rayInfo(cells[0][0], cells[0][1], dir).room) open.push(idx);
+          return P;
+        };
+        const P = put(placed);
+        // ladders: give the piece a parallel twin (and sometimes a third rung)
+        if (P.cells.length >= 3 && rnd() < bundle) { const t = twinOf(P); if (t) { const Q = put(t); if (rnd() < 0.4) { const u = twinOf(Q); if (u) put(u); } } }
       }
-      if (!failed) return { W, H, pieces, occ, land };
+      if (!failed) return { W, H, pieces, occ, land, shape };
     }
     throw new Error('could not generate a solvable board');
   }
@@ -529,11 +607,23 @@
   // difficulty a tier promises does not depend on the luck of one seed. Candidates per tier: CANDIDATES_OF.
   const CANDIDATES_OF = [1, 2, 3, 3, 2];
   function freeAtStart(b) { const { W, H, occ } = b; return b.pieces.filter(p => { const [dr, dc] = DIRS[p.dir]; let [y, x] = p.cells[0]; y += dr; x += dc; while (y >= 0 && y < H && x >= 0 && x < W) { if (occ[y][x] >= 0) return false; y += dr; x += dc; } return true; }).length; }
+  // Lower is better: every arrow free at the start counts three, every lone arrowhead one, and a trap (an arrow
+  // with a gap between its head and its blocker, so it looks free) earns a small credit.
+  function boardScore(b) {
+    const { W, H, occ } = b; let free = 0, singles = 0, traps = 0;
+    for (const p of b.pieces) {
+      if (p.cells.length === 1) singles++;
+      const [dr, dc] = DIRS[p.dir]; let [y, x] = p.cells[0]; y += dr; x += dc; let n = 0, hit = false;
+      while (y >= 0 && y < H && x >= 0 && x < W) { if (occ[y][x] >= 0) { hit = true; break; } y += dr; x += dc; n++; }
+      if (!hit) free++; else if (n >= 1) traps++;
+    }
+    return free * 3 + singles - traps * 0.3;
+  }
   function bestBoard(mask, tier, seed) {
-    let best = null, bestFree = Infinity;
+    let best = null, bestScore = Infinity;
     for (let k = 0; k < CANDIDATES_OF[tier]; k++) {
-      const b = generate(mask, MAXLEN_OF[tier], seed + k * 97, GEN_OPTS(tier)); const f = freeAtStart(b);
-      if (f < bestFree) { best = b; bestFree = f; }
+      const b = generate(mask, MAXLEN_OF[tier], seed + k * 97, GEN_OPTS(tier)); const sc = boardScore(b);
+      if (sc < bestScore) { best = b; bestScore = sc; }
     }
     return best;
   }

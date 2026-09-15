@@ -504,8 +504,19 @@ unlock (skip allowed after two fails), stars, best times and progress in
   (plain most-constrained generation) to ~5-7%, free at any moment from ~12% to
   ~4%; 1,050 boards: 0 failures, 0 unsolvable, ~7 ms (Normal) to ~250 ms (Master).
   `scratchpad/aa-free.mjs`-style profiling: count free pieces along a random solve.
+- **Smarter placement** (what the reference boards do that a plain fill does not):
+  `holes` leaves a share of inland cells empty (never two side by side, never on
+  the coast; leftover isolated inland cells become gaps too), so runs cross gaps
+  and an arrow's blocker can sit a cell or two away, a trap that looks free;
+  `bundle` gives a placed piece a parallel twin (and sometimes a third rung)
+  pointing the same way, the ladders the eye cannot sort; `rail` makes some
+  pieces run long and straight across the board; among blocked directions a
+  `far` roll picks the one whose blocker is furthest; and a cell that could only
+  hold a lone arrowhead first tries to join a neighbour, then grows a snake
+  inland tail-first (`buildFromTail`) with the head at the far end. Measured on
+  the tour: ladders ~31% of arrows, traps 12-25% by tier, gaps 4-12%.
 - **Board choice**: `bestBoard()` generates `CANDIDATES_OF[tier]` boards (1/2/3/3/2)
-  from the level seed and keeps the one with the fewest arrows free at the start,
+  from the level seed and keeps the best by `boardScore()` (free arrows ×3 + lone arrowheads − traps × 0.3),
   so a tier's difficulty does not hinge on one seed. `startLevel` shows the game
   screen with "Drawing the board…" and yields a frame first, because a Master board
   takes up to ~1 s on a phone. Measured on the 168-country tour: free at the start
