@@ -16,11 +16,15 @@
   const SVG_NS = 'http://www.w3.org/2000/svg';
   const DATA_VERSION = '3';
   const STORE = 'aa:v1:';
-  const LIVES = 4;
+  const LIVES = 4;                 // Classic and Rush; One Life has 1, Deep Focus none
+  const DIFF_OF = tier => ['Normal', 'Normal', 'Hard', 'Super Hard', 'Expert'][tier];
+  const COMBO_WINDOW_MS = 1500;
+  const MILESTONES = [25, 50, 75, 90];
   const RUSH_SECONDS = 90;
   const HINT_PENALTY_MS = 5000;
   const HINTS_PER_LEVEL = 3;       // Classic and Rush; Deep Focus is unlimited
-  const MODES = { classic: 'Classic', rush: 'Rush', focus: 'Deep Focus' };
+  const MODES = { classic: 'Classic', rush: 'Rush', onelife: 'One Life', focus: 'Deep Focus' };
+  const livesFor = mode => mode === 'onelife' ? 1 : mode === 'focus' ? Infinity : LIVES;
   const TIER_OF = i => i < 5 ? 0 : i < 15 ? 1 : i < 30 ? 2 : i < 50 ? 3 : 4;
   const MAXLEN_OF = [4, 5, 6, 7, 8];
   const DIRS = { r: [0, 1], l: [0, -1], d: [1, 0], u: [-1, 0] };
@@ -32,7 +36,7 @@
   };
 
   const el = {
-    select: $('#aaSelect'), levels: $('#aaLevels'), progress: $('#aaProgress'), progressBar: $('#aaProgressBar'), modes: $('#aaModes'),
+    select: $('#aaSelect'), levels: $('#aaLevels'), progress: $('#aaProgress'), progressBar: $('#aaProgressBar'), modes: $('#aaModes'), streak: $('#aaStreak'), daily: $('#aaDaily'), hudDiff: $('#aaHudDiff'),
     game: $('#aaGame'), boardWrap: $('#aaBoardWrap'), board: $('#aaBoard'), toast: $('#aaToast'), confetti: $('#aaConfetti'),
     hudLevel: $('#aaHudLevel'), hudMode: $('#aaHudMode'), hudTime: $('#aaHudTime'), hudLeft: $('#aaHudLeft'), hudLives: $('#aaHudLives'), hudLivesWrap: $('#aaHudLivesWrap'), hudPct: $('#aaHudPct'), boardBar: $('#aaBoardBar'),
     btnHint: $('#aaHint'), btnRestart: $('#aaRestart'), btnLevels: $('#aaBackToLevels'), btnSound: $('#aaSound'),
@@ -45,7 +49,8 @@
   const state = {
     mode: MODES[store.get('mode')] ? store.get('mode') : 'classic', muted: !!store.get('muted', false),
     idx: -1, level: null, tier: 0, mask: null, pieces: [], occ: null, W: 0, H: 0, left: 0,
-    lives: LIVES, startedAt: 0, elapsed: 0, timerId: 0, finished: false, hintsUsed: 0, fails: 0, seedBump: 0, busy: false,
+    lives: LIVES, livesMax: LIVES, startedAt: 0, elapsed: 0, timerId: 0, finished: false, hintsUsed: 0, fails: 0, seedBump: 0, busy: false,
+    combo: 0, bestCombo: 0, lastShot: 0, shown: new Set(), daily: null,
   };
 
   // ── Helpers ──
@@ -55,6 +60,9 @@
   const progressKey = i => `lv:${i}`;
   const cleared = i => store.get(progressKey(i));
   const unlocked = i => i === 0 || !!cleared(i - 1) || !!store.get(`skip:${i}`);
+  const dayKey = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+  const hashStr = str => { let h = 2166136261; for (const ch of str) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; };
+  const dailyPick = () => { const h = hashStr('aa-daily-' + dayKey()); return { key: dayKey(), idx: h % 70, tier: 1 + (h >> 8) % 4, seed: 900000 + (h % 100000) }; };
   function mulberry32(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
   function scrollToGame() { const top = el.game.getBoundingClientRect().top + window.scrollY - 84; window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' }); }
   function setHash(i) { if (history.replaceState) history.replaceState(null, '', location.pathname + location.search + (i >= 0 ? `#level-${i + 1}` : '')); }
@@ -97,9 +105,12 @@
     const done = DATA.levels.filter((_, i) => cleared(i)).length;
     const learned = DATA.levels.filter((_, i) => cleared(i)?.quiz).length;
     el.progress.textContent = `${done}/${n} countries cleared · ${learned} named correctly`;
+    const streak = store.get('streak', 0), dStreak = store.get('dailyStreak', { count: 0, last: '' });
+    el.streak.textContent = streak >= 2 ? `🔥 ${streak}-level win streak` : dStreak.count >= 2 ? `🔥 ${dStreak.count}-day daily streak` : 'Clear levels in a row to build a win streak.';
+    renderDaily();
     el.progressBar.style.width = `${(done / n) * 100}%`;
     el.modes.innerHTML = '';
-    for (const m of [['classic', 'Classic', 'Timer counts up, 4 hearts, 3 hints'], ['rush', 'Rush', `${RUSH_SECONDS}s countdown, 4 hearts, 3 hints`], ['focus', 'Deep Focus', 'No clock, no hearts. Just clear the map.']]) {
+    for (const m of [['classic', 'Classic', 'Timer counts up, 4 hearts, 3 hints'], ['rush', 'Rush', `${RUSH_SECONDS}s countdown, 4 hearts, 3 hints`], ['onelife', 'One Life', 'One heart. One blocked tap and it is over.'], ['focus', 'Deep Focus', 'No clock, no hearts. Just clear the map.']]) {
       const b = document.createElement('button');
       b.type = 'button'; b.className = 'aa-mode' + (m[0] === state.mode ? ' is-active' : ''); b.dataset.mode = m[0]; b.setAttribute('aria-pressed', String(m[0] === state.mode));
       b.innerHTML = `<strong>${m[1]}</strong><span>${m[2]}</span>`;
@@ -110,18 +121,31 @@
     DATA.levels.forEach((L, i) => {
       const rec = cleared(i), open = unlocked(i);
       const b = document.createElement('button');
-      b.type = 'button'; b.className = 'aa-level' + (rec ? ' is-done' : '') + (open ? '' : ' is-locked'); b.dataset.level = i; b.disabled = !open;
+      b.type = 'button'; b.className = 'aa-level' + (rec ? ' is-done' : '') + (open ? '' : ' is-locked') + ((i + 1) % 10 === 0 ? ' is-milestone' : ''); b.dataset.level = i; b.disabled = !open;
       b.setAttribute('aria-label', rec ? `Level ${i + 1}, ${L.name}, ${rec.stars} stars` : open ? `Level ${i + 1}` : `Level ${i + 1}, locked`);
       const svg = svgEl('svg', { viewBox: '-2 -2 104 104', 'aria-hidden': 'true', focusable: 'false' });
       svg.appendChild(svgEl('path', { d: L.d }));
       b.appendChild(svg);
       const t = document.createElement('span'); t.className = 'aa-level-num'; t.textContent = String(i + 1); b.appendChild(t);
       const s = document.createElement('span'); s.className = 'aa-level-sub';
-      s.textContent = rec ? `${L.name} ${'★'.repeat(rec.stars)}` : open ? `Tier ${TIER_OF(i) + 1}` : '🔒';
+      s.textContent = rec ? `${L.name} ${'★'.repeat(rec.stars)}` : open ? DIFF_OF(TIER_OF(i)) : '🔒';
       b.appendChild(s);
       b.addEventListener('click', () => startLevel(i));
       el.levels.appendChild(b);
     });
+  }
+
+  function renderDaily() {
+    const d = dailyPick(), L = DATA.levels[d.idx], rec = store.get(`daily:${d.key}`);
+    const date = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    el.daily.innerHTML = `
+      <div class="aa-daily-text">
+        <span class="aa-daily-kicker">Today's Country · ${date}</span>
+        <strong>${rec ? L.name : 'A mystery country'} · ${DIFF_OF(d.tier)}</strong>
+        <span class="aa-daily-sub">${rec ? `Cleared in ${fmtTime(rec.t, true)} ${'★'.repeat(rec.stars)} · play again for a better time` : 'One bonus board a day, any level of the tour. Same board for everyone today.'}</span>
+      </div>
+      <button type="button" class="aa-btn aa-btn--primary" data-daily>${rec ? 'Replay' : 'Play'}</button>`;
+    $('[data-daily]', el.daily).addEventListener('click', () => startLevel(d.idx, false, d));
   }
 
   // ── Puzzle generation ──
@@ -264,27 +288,34 @@
   }
 
   // ── Game lifecycle ──
-  async function startLevel(i, bumpSeed = false) {
+  async function startLevel(i, bumpSeed = false, daily = null) {
     try { await loadData(); } catch (err) { el.error.textContent = `Could not load the levels (${err.message}).`; el.error.hidden = false; return; }
     if (i < 0 || i >= DATA.levels.length) i = 0;
-    if (!unlocked(i)) i = DATA.levels.findIndex((_, j) => !cleared(j) && unlocked(j));
+    if (!daily && !unlocked(i)) i = DATA.levels.findIndex((_, j) => !cleared(j) && unlocked(j));
     if (i < 0) i = 0;
     stopTimer();
-    if (bumpSeed) state.seedBump++; else if (state.idx !== i) { state.seedBump = 0; state.fails = 0; }
-    state.idx = i; state.level = DATA.levels[i]; state.tier = TIER_OF(i);
+    if (bumpSeed) state.seedBump++; else if (state.idx !== i || !!daily !== !!state.daily) { state.seedBump = 0; state.fails = 0; }
+    state.daily = daily;
+    state.idx = i; state.level = DATA.levels[i]; state.tier = daily ? daily.tier : TIER_OF(i);
     state.maskInfo = state.level.tiers[state.tier];
-    const gen = generate(state.maskInfo, MAXLEN_OF[state.tier], (i + 1) * 1000 + state.seedBump);
-    Object.assign(state, { W: gen.W, H: gen.H, pieces: gen.pieces, occ: gen.occ, land: gen.land, left: gen.pieces.length, lives: LIVES, elapsed: 0, startedAt: 0, finished: false, hintsUsed: 0, busy: false });
+    const gen = generate(state.maskInfo, MAXLEN_OF[state.tier], (daily ? daily.seed : (i + 1) * 1000) + state.seedBump);
+    const livesMax = livesFor(state.mode);
+    Object.assign(state, { W: gen.W, H: gen.H, pieces: gen.pieces, occ: gen.occ, land: gen.land, left: gen.pieces.length, lives: livesMax, livesMax, elapsed: 0, startedAt: 0, finished: false, hintsUsed: 0, busy: false, combo: 0, bestCombo: 0, lastShot: 0, shown: new Set() });
     el.select.hidden = true; el.game.hidden = false; el.overlay.hidden = true; el.error.hidden = true; el.loading.hidden = true;
-    setHash(i); scrollToGame();
+    if (daily) { if (history.replaceState) history.replaceState(null, '', location.pathname + location.search + '#daily'); } else setHash(i);
+    scrollToGame();
     renderBoard(); renderHud();
-    if (i === 0 && !cleared(0)) toast('Tap an arrow to shoot it off the board. If another arrow is in its way, you lose a heart.', 'hint');
-    else toast(`Level ${i + 1} · ${state.pieces.length} arrows · which country is this?`);
+    const diff = DIFF_OF(state.tier);
+    if (i === 0 && !cleared(0) && !daily) toast('Tap an arrow to shoot it off the board. If another arrow is in its way, you lose a heart.', 'hint');
+    else if (diff !== 'Normal') toast(`${diff.toUpperCase()} LEVEL · ${state.pieces.length} arrows${state.mode === 'onelife' ? ' · one heart' : ''}`, 'hard');
+    else toast(`${daily ? 'Daily board' : 'Level ' + (i + 1)} · ${state.pieces.length} arrows · which country is this?`);
   }
 
   function renderHud() {
-    el.hudLevel.textContent = `Level ${state.idx + 1}`;
+    el.hudLevel.textContent = state.daily ? 'Daily' : `Level ${state.idx + 1}`;
     el.hudMode.textContent = MODES[state.mode];
+    el.hudDiff.textContent = DIFF_OF(state.tier);
+    el.hudDiff.className = 'aa-hud-diff aa-hud-diff--' + DIFF_OF(state.tier).toLowerCase().replace(' ', '-');
     const focus = state.mode === 'focus';
     el.hudLivesWrap.hidden = focus;
     const hintsLeft = HINTS_PER_LEVEL - state.hintsUsed;
@@ -294,8 +325,10 @@
     el.hudPct.textContent = `${pct}%`;
     el.boardBar.style.width = `${pct}%`;
     el.hudLeft.textContent = String(state.left);
-    el.hudLives.innerHTML = Array.from({ length: LIVES }, (_, k) => `<span class="${k < state.lives ? 'is-on' : 'is-off'}">♥</span>`).join('');
-    el.hudLives.setAttribute('aria-label', `${state.lives} of ${LIVES} hearts`);
+    const max = Number.isFinite(state.livesMax) ? state.livesMax : 0;
+    el.hudLives.innerHTML = Array.from({ length: max }, (_, k) => `<span class="${k < state.lives ? 'is-on' : 'is-off'}">♥</span>`).join('');
+    el.hudLives.setAttribute('aria-label', `${state.lives} of ${max} hearts`);
+    el.hudLives.classList.toggle('is-last', max > 1 && state.lives === 1 && !state.finished);
     renderTime();
   }
   const currentElapsed = () => state.startedAt ? state.elapsed + (performance.now() - state.startedAt) : state.elapsed;
@@ -339,11 +372,14 @@
     head.style.opacity = '0';
     setTimeout(() => p.el.remove(), dur * 1000 + 80);
     SFX.shoot();
+    const now = performance.now();
+    state.combo = now - state.lastShot < COMBO_WINDOW_MS ? state.combo + 1 : 1; state.lastShot = now; state.bestCombo = Math.max(state.bestCombo, state.combo);
     updateReveal(); renderHud();
-    const done = state.pieces.length - state.left, half = Math.ceil(state.pieces.length / 2);
+    const pct = Math.round(((state.pieces.length - state.left) / state.pieces.length) * 100);
+    const m = MILESTONES.find(x => pct >= x && !state.shown.has(x));
     if (state.left === 0) winLevel();
-    else if (done === half) toast('50% cleared. The shape is starting to show.');
-    else if (state.left === 5 && state.pieces.length > 20) toast('5 arrows left!');
+    else if (m) { state.shown.add(m); toast(({ 25: 'Nice start. 25% cleared.', 50: 'Halfway. The shape is showing.', 75: '75% cleared. Keep the rhythm.', 90: 'Almost there!' })[m]); }
+    else if (state.combo >= 3) toast(`Combo x${state.combo}!`, 'combo');
   }
   function blocked(p, blocker) {
     const focus = state.mode === 'focus';
@@ -374,7 +410,7 @@
   }
 
   // ── End of level ──
-  function stars() { if (state.mode === 'focus') return state.hintsUsed === 0 ? 3 : state.hintsUsed <= 2 ? 2 : 1; const lost = LIVES - state.lives; return lost === 0 ? 3 : lost === 1 ? 2 : 1; }
+  function stars() { if (state.mode === 'focus') return state.hintsUsed === 0 ? 3 : state.hintsUsed <= 2 ? 2 : 1; const lost = state.livesMax - state.lives; return lost === 0 ? 3 : lost === 1 ? 2 : 1; }
   function winLevel() {
     stopTimer(); state.finished = true; state.busy = true;
     state.outlineEl?.style.setProperty('fill-opacity', '0.9');
@@ -401,20 +437,27 @@
   function showResult(quizRight) {
     const L = state.level, i = state.idx;
     const t = Math.round(state.elapsed), s = stars();
-    const prev = cleared(i);
+    const prev = state.daily ? store.get(`daily:${state.daily.key}`) : cleared(i);
     const isBest = !prev || t < prev.t;
-    store.set(progressKey(i), { t: isBest ? t : prev.t, stars: Math.max(s, prev?.stars || 0), quiz: !!(quizRight || prev?.quiz), at: Date.now() });
+    const rec = { t: isBest ? t : prev.t, stars: Math.max(s, prev?.stars || 0), quiz: !!(quizRight || prev?.quiz), at: Date.now() };
+    if (state.daily) {
+      store.set(`daily:${state.daily.key}`, rec);
+      const ds = store.get('dailyStreak', { count: 0, last: '' });
+      if (ds.last !== state.daily.key) { const y = new Date(); y.setDate(y.getDate() - 1); const yk = `${y.getFullYear()}-${String(y.getMonth() + 1).padStart(2, '0')}-${String(y.getDate()).padStart(2, '0')}`; store.set('dailyStreak', { count: ds.last === yk ? ds.count + 1 : 1, last: state.daily.key }); }
+    } else store.set(progressKey(i), rec);
+    const streak = store.get('streak', 0) + 1; store.set('streak', streak);
+    const milestone = !state.daily && (i + 1) % 10 === 0;
     const facts = [L.cap ? `Capital: <b>${L.cap}</b>` : '', L.pop ? `Population: <b>${fmtPop(L.pop)}</b>` : '', L.sub ? `Region: <b>${L.sub}</b>` : ''].filter(Boolean).join(' · ');
     const last = i >= DATA.levels.length - 1;
     el.card.innerHTML = `
-      <p class="aa-card-kicker">${quizRight ? 'Correct!' : `It was`}</p>
+      <p class="aa-card-kicker">${milestone ? `Milestone · ${i + 1} countries` : streak >= 2 ? `${streak} in a row · ` : ''}${quizRight ? 'Correct!' : 'It was'}</p>
       <h3>${L.name}</h3>
       <p class="aa-stars" aria-label="${s} of 3 stars">${'★'.repeat(s)}${'☆'.repeat(3 - s)}</p>
-      <div class="aa-stats"><span><b>${fmtTime(t, true)}</b>time</span><span><b>${state.mode === 'focus' ? '∞' : LIVES - state.lives}</b>${state.mode === 'focus' ? 'hearts' : 'hearts lost'}</span><span><b>${state.hintsUsed}</b>hints</span><span><b>${state.pieces.length}</b>arrows</span></div>
+      <div class="aa-stats"><span><b>${fmtTime(t, true)}</b>time</span><span><b>${state.mode === 'focus' ? '∞' : LIVES - state.lives}</b>${state.mode === 'focus' ? 'hearts' : 'hearts lost'}</span><span><b>${state.hintsUsed}</b>hints</span><span><b>x${state.bestCombo}</b>best combo</span></div>
       <p class="aa-facts">${facts}</p>
       <p class="aa-best">${isBest ? (prev ? `New best time! Previous ${fmtTime(prev.t, true)}.` : 'First clear. That is your time to beat.') : `Your best: ${fmtTime(prev.t, true)}.`}</p>
       <div class="aa-actions">
-        ${last ? '' : `<button type="button" class="aa-btn aa-btn--primary" data-act="next">Next: Level ${i + 2}</button>`}
+        ${last || state.daily ? '' : `<button type="button" class="aa-btn aa-btn--primary" data-act="next">Next: Level ${i + 2}</button>`}
         <button type="button" class="aa-btn" data-act="again">Play again</button>
         <button type="button" class="aa-btn" data-act="share">Share</button>
         <button type="button" class="aa-btn" data-act="levels">World Tour</button>
@@ -428,10 +471,11 @@
   function failLevel(reason) {
     if (state.finished) return;
     stopTimer(); state.finished = true; state.busy = true; state.fails++;
-    SFX.lose();
-    const canSkip = state.fails >= 2 && state.idx < DATA.levels.length - 1;
+    store.set('streak', 0);
+    SFX.lose(); renderHud();
+    const canSkip = !state.daily && state.fails >= 2 && state.idx < DATA.levels.length - 1;
     el.card.innerHTML = `
-      <p class="aa-card-kicker">Level ${state.idx + 1}</p>
+      <p class="aa-card-kicker">${state.daily ? 'Daily board' : `Level ${state.idx + 1}`} · ${DIFF_OF(state.tier)}</p>
       <h3>${reason}</h3>
       <p class="aa-card-lead">${state.left} of ${state.pieces.length} arrows were still on the board.</p>
       <div class="aa-actions">
@@ -446,8 +490,8 @@
   el.card.addEventListener('click', e => {
     const act = e.target.closest('[data-act]')?.dataset.act; if (!act) return;
     if (act === 'next') startLevel(state.idx + 1);
-    else if (act === 'again' || act === 'retry') startLevel(state.idx);
-    else if (act === 'shuffle') startLevel(state.idx, true);
+    else if (act === 'again' || act === 'retry') startLevel(state.idx, false, state.daily);
+    else if (act === 'shuffle') startLevel(state.idx, true, state.daily);
     else if (act === 'skip') { store.set(`skip:${state.idx + 1}`, true); startLevel(state.idx + 1); }
     else if (act === 'levels') goToLevels();
     else if (act === 'share') share();
@@ -458,8 +502,8 @@
   }
   async function share() {
     const n = DATA.levels.length, done = DATA.levels.filter((_, i) => cleared(i)).length;
-    const rec = cleared(state.idx);
-    const text = `Arrow Atlas: I cleared ${state.level.name} (level ${state.idx + 1}, ${MODES[state.mode]}) in ${fmtTime(rec?.t ?? state.elapsed, true)} ${'★'.repeat(rec?.stars || stars())} and ${done}/${n} countries so far.\nYour turn: https://ariyankhan.com/arrow-atlas.html#level-${state.idx + 1}`;
+    const rec = state.daily ? store.get(`daily:${state.daily.key}`) : cleared(state.idx);
+    const text = `Arrow Atlas: I cleared ${state.level.name} (${state.daily ? 'daily board ' + state.daily.key : 'level ' + (state.idx + 1)}, ${MODES[state.mode]}) in ${fmtTime(rec?.t ?? state.elapsed, true)} ${'★'.repeat(rec?.stars || stars())} and ${done}/${n} countries so far.\nYour turn: https://ariyankhan.com/arrow-atlas.html${state.daily ? '#daily' : '#level-' + (state.idx + 1)}`;
     const flash = $('.aa-flash', el.card);
     try {
       if (navigator.share) { await navigator.share({ text }); return; }
@@ -484,7 +528,7 @@
 
   // ── Wiring ──
   el.btnHint.addEventListener('click', hint);
-  el.btnRestart.addEventListener('click', () => startLevel(state.idx));
+  el.btnRestart.addEventListener('click', () => startLevel(state.idx, false, state.daily));
   el.btnLevels.addEventListener('click', () => { if (state.left < state.pieces.length && !state.finished && !confirm('Leave this level? Progress on it will be lost.')) return; goToLevels(); });
   el.btnSound.addEventListener('click', () => { state.muted = !state.muted; store.set('muted', state.muted); renderSound(); if (!state.muted) SFX.shoot(); });
   document.addEventListener('keydown', e => { if (!el.game.hidden && !state.finished && (e.key === 'h' || e.key === 'H') && !/input|textarea/i.test(document.activeElement?.tagName || '')) hint(); });
@@ -498,6 +542,7 @@
     renderSelect();
     const m = /^#level-(\d+)$/.exec(location.hash);
     if (m) startLevel(+m[1] - 1);
+    else if (location.hash === '#daily') { const d = dailyPick(); startLevel(d.idx, false, d); }
   }).catch(err => { el.loading.hidden = true; el.error.textContent = `Could not load the levels (${err.message}). Check your connection and reload.`; el.error.hidden = false; });
 
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {

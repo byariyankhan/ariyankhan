@@ -61,7 +61,7 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="css/style.css?v=18" />
-    <link rel="stylesheet" href="css/arrow-atlas.css?v=3" />
+    <link rel="stylesheet" href="css/arrow-atlas.css?v=4" />
     <link rel="preload" href="games/data/arrow-atlas.json?v=3" as="fetch" crossorigin="anonymous" />
 
     <!-- SCHEMA -->
@@ -103,7 +103,8 @@
             "70 country boards on a world tour, from Italy and Bangladesh to Iceland",
             "Tap-away mechanic: shoot arrows off the board when their path is clear",
             "4 hearts per level; a blocked arrow costs one",
-            "Classic mode (timer counts up), Rush mode (90-second countdown) and Deep Focus mode (no clock, no hearts, unlimited hints)",
+            "Classic (timer counts up), Rush (90-second countdown), One Life (one heart) and Deep Focus (no clock, no hearts, unlimited hints) modes",
+            "Difficulty tiers Normal, Hard, Super Hard and Expert; milestones every 10 levels; win streaks; combo counter; daily bonus board",
             "Board clears reveal the country shape; a 3-option quiz asks which country it was",
             "Country facts on every clear: capital, population, region",
             "Stars, best times and tour progress saved in your browser",
@@ -134,7 +135,7 @@
             { "@type": "Question", "name": "Is it free and do I need an account?", "acceptedAnswer": { "@type": "Answer", "text": "Yes it is free and no account is needed. Progress, stars and best times are saved in your own browser. Nothing is uploaded." } },
             { "@type": "Question", "name": "What is the difference between Classic, Rush and Deep Focus?", "acceptedAnswer": { "@type": "Answer", "text": "Classic counts your time up so you can chase a best time. Rush gives you 90 seconds per board; when the clock hits zero the level is failed. Both give four hearts and three hints. Deep Focus has no clock and no hearts: a blocked tap simply bounces, hints are unlimited, and you clear the map at whatever pace clears your head." } },
             { "@type": "Question", "name": "Can a level become impossible?", "acceptedAnswer": { "@type": "Answer", "text": "No. Boards are generated so that a solution always exists, and removing an arrow can only free space for the others, so whatever order you tap in you can never get stuck. If you are out of ideas, use a hint: it lights up an arrow that is free right now and adds five seconds to your clock." } },
-            { "@type": "Question", "name": "Are the puzzles the same for everyone?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. Each level has a fixed layout, so when you share a time on level 12 your friend faces exactly the same board. Choosing “New layout” after a fail gives you a fresh arrangement of the same country." } },
+            { "@type": "Question", "name": "Are the puzzles the same for everyone?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. Each level has a fixed layout, so when you share a time on level 12 your friend faces exactly the same board. Choosing “New layout” after a fail gives you a fresh arrangement of the same country. Today's Country is likewise the same bonus board for everyone that day." } },
             { "@type": "Question", "name": "Why are the countries hidden until I finish?", "acceptedAnswer": { "@type": "Answer", "text": "That is the geography part. The board is the country's real outline and it fades in as you clear arrows, so you are quietly learning shapes while you play. The quiz at the end checks whether you spotted it, and the level card shows the capital, population and region." } },
             { "@type": "Question", "name": "Can I install it as an app?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. On Android and desktop Chrome use “Install” or “Add to Home Screen”; on iPhone use Share → Add to Home Screen. After the first visit the levels are cached so the game works offline." } }
           ]
@@ -179,20 +180,22 @@
           <div class="aa-select-head">
             <div>
               <h2>World Tour</h2>
-              <p>Levels unlock in order. Boards get bigger and arrows get longer as you go.</p>
+              <p>Levels unlock in order: Normal, then Hard, Super Hard and Expert boards. Every 10th level is a milestone.</p>
             </div>
             <div class="aa-modes" id="aaModes" role="group" aria-label="Mode"></div>
           </div>
           <div class="aa-progress-wrap">
             <p class="aa-progress" id="aaProgress">0/70 countries cleared</p>
             <div class="aa-progress-track"><div class="aa-progress-bar" id="aaProgressBar"></div></div>
+            <p class="aa-streak" id="aaStreak"></p>
           </div>
+          <div class="aa-daily" id="aaDaily"></div>
           <div class="aa-levels" id="aaLevels"></div>
         </div>
 
         <div id="aaGame" hidden>
           <div class="aa-hud">
-            <h3 class="aa-hud-title"><span id="aaHudLevel">Level 1</span><span class="aa-hud-mode" id="aaHudMode">Classic</span></h3>
+            <h3 class="aa-hud-title"><span id="aaHudLevel">Level 1</span><span class="aa-hud-mode" id="aaHudMode">Classic</span><span class="aa-hud-diff" id="aaHudDiff">Normal</span></h3>
             <div class="aa-hud-stats">
               <span><b id="aaHudTime">0:00</b>time</span>
               <span><b id="aaHudLeft">0</b>arrows left</span>
@@ -248,9 +251,15 @@
         </div>
         <p>
           Classic mode counts up, for chasing best times. Rush mode gives you 90 seconds a board, for when you want
-          your hands to shake. Both use the same four hearts and three hints. Deep Focus removes the clock and the
-          hearts entirely: a blocked tap just bounces, hints are unlimited, and the only goal is the slow satisfaction
-          of watching a country emerge from the maze. All three save stars and best times per level in your browser.
+          your hands to shake. One Life gives you a single heart. All three use three hints a level. Deep Focus removes
+          the clock and the hearts entirely: a blocked tap just bounces, hints are unlimited, and the only goal is the
+          slow satisfaction of watching a country emerge from the maze. Every mode saves stars and best times per level
+          in your browser.
+        </p>
+        <p>
+          Levels are labelled Normal, Hard, Super Hard and Expert as the boards grow. Quick consecutive taps build a
+          combo, clearing levels back to back builds a win streak, every tenth level is a milestone, and the Today's
+          Country board gives everyone the same bonus puzzle each day.
         </p>
       </section>
 
@@ -349,6 +358,6 @@
 
     <script src="js/site-nav.js?v=11"></script>
     <script src="js/site-footer.js?v=13"></script>
-    <script src="js/arrow-atlas.js?v=3"></script>
+    <script src="js/arrow-atlas.js?v=4"></script>
   </body>
 </html>
