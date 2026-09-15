@@ -88,26 +88,24 @@
 @media(max-width:480px){ .aa-hud-title{ font-size:20px; } .aa-hud-stats{ gap:10px; font-size:11px; } .aa-hud-stats b{ font-size:18px; } }
 
 /* Board */
-.aa-board-wrap{
-  position:relative; background:#0a0a0a; border:1px solid #222; border-radius:14px; overflow:hidden; touch-action:manipulation;
-  background-image:linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px);
-  background-size:24px 24px; max-width:720px; margin:0 auto;
-}
+.aa-board-wrap{ position:relative; background:#0a0a0a; border:1px solid #222; border-radius:14px; overflow:hidden; touch-action:manipulation; max-width:760px; margin:0 auto; }
 .aa-board{ display:block; width:100%; height:auto; max-height:74vh; touch-action:manipulation; user-select:none; -webkit-user-select:none; }
 .aa-board--tall{ max-height:82vh; }
-.aa-outline{ fill:var(--yellow); fill-opacity:.05; stroke:rgba(255,237,84,.25); stroke-width:.6; vector-effect:non-scaling-stroke; transition:fill-opacity .35s; pointer-events:none; }
-.aa-cells rect{ fill:rgba(255,255,255,.05); }
+.aa-outline{ fill:var(--yellow); fill-opacity:.06; stroke:rgba(255,237,84,.22); stroke-width:.6; vector-effect:non-scaling-stroke; transition:fill-opacity .35s; pointer-events:none; }
 .aa-piece{ cursor:pointer; outline:none; }
 .aa-piece .aa-hit{ fill:transparent; }
-.aa-piece .aa-shaft{ stroke-width:.2; stroke-linecap:round; pointer-events:none; }
-.aa-piece .aa-head{ fill:none; stroke-width:.2; stroke-linecap:round; stroke-linejoin:round; pointer-events:none; }
-.aa-piece:hover .aa-shaft, .aa-piece:hover .aa-head, .aa-piece:focus-visible .aa-shaft, .aa-piece:focus-visible .aa-head{ stroke-width:.28; filter:brightness(1.25); }
+.aa-piece .aa-track{ fill:none; stroke:rgba(255,255,255,.88); stroke-width:.11; stroke-linecap:round; stroke-linejoin:round; pointer-events:none; }
+.aa-piece .aa-head{ fill:rgba(255,255,255,.95); stroke:rgba(255,255,255,.95); stroke-width:.06; stroke-linejoin:round; pointer-events:none; transform-box:view-box; }
+.aa-piece:hover .aa-track, .aa-piece:focus-visible .aa-track{ stroke:var(--yellow); stroke-width:.16; }
+.aa-piece:hover .aa-head, .aa-piece:focus-visible .aa-head{ fill:var(--yellow); stroke:var(--yellow); }
 .aa-piece.is-going{ pointer-events:none; }
-.aa-piece.is-blocker .aa-shaft, .aa-piece.is-blocker .aa-head{ stroke:#E8383A !important; stroke-width:.3; }
-.aa-piece.is-hint .aa-shaft, .aa-piece.is-hint .aa-head{ stroke:#fff !important; stroke-width:.32; animation:aa-glow .6s ease-in-out infinite alternate; }
-.aa-piece.is-shake{ animation:aa-shake .35s; }
-@keyframes aa-shake{ 0%,100%{ transform:translate(0,0); } 25%{ transform:translate(-.12px,0); } 75%{ transform:translate(.12px,0); } }
-@keyframes aa-glow{ from{ opacity:.55; } to{ opacity:1; } }
+.aa-piece.is-blocker .aa-track{ stroke:#E8383A !important; stroke-width:.2; }
+.aa-piece.is-blocker .aa-head{ fill:#E8383A !important; stroke:#E8383A !important; }
+.aa-piece.is-hint .aa-track{ stroke:var(--yellow) !important; stroke-width:.2; animation:aa-glow .5s ease-in-out infinite alternate; }
+.aa-piece.is-hint .aa-head{ fill:var(--yellow) !important; stroke:var(--yellow) !important; }
+.aa-piece.is-shake .aa-track, .aa-piece.is-shake .aa-head{ animation:aa-shake .3s; }
+@keyframes aa-shake{ 0%,100%{ opacity:1; } 30%,70%{ opacity:.25; } }
+@keyframes aa-glow{ from{ opacity:.5; } to{ opacity:1; } }
 .aa-confetti{ position:absolute; inset:0; width:100%; height:100%; pointer-events:none; z-index:3; }
 
 .aa-toast{ position:absolute; left:50%; bottom:12px; transform:translateX(-50%); z-index:4; max-width:min(92%,520px); background:rgba(0,0,0,.88); color:#fff; font-size:13px; font-weight:600; padding:8px 14px; border-radius:30px; border:1px solid rgba(255,255,255,.15); text-align:center; pointer-events:none; }
@@ -164,4 +162,4 @@
 .aa-page a.aa-explore-link{ color:rgba(255,255,255,.65); }
 .aa-page a.aa-explore-link:hover{ border-color:rgba(255,237,84,.4); color:var(--yellow); background:rgba(255,237,84,.05); text-decoration:none; }
 
-@media(prefers-reduced-motion:reduce){ .aa-piece.is-shake, .aa-piece.is-hint .aa-shaft, .aa-piece.is-hint .aa-head, .aa-level{ animation:none; transition:none; } }
+@media(prefers-reduced-motion:reduce){ .aa-piece.is-shake .aa-track, .aa-piece.is-shake .aa-head, .aa-piece.is-hint .aa-track, .aa-level{ animation:none; transition:none; } }
