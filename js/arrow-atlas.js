@@ -1,0 +1,460 @@
+/* ══════════════════════════════════════════════════
+   ARROW ATLAS — tap-away arrow puzzle on country maps
+   No dependencies. Data: games/data/arrow-atlas.json
+   Each level is a country: a grid mask (land cells) at one of five
+   difficulty tiers plus the outline for the reveal. The puzzle itself is
+   generated in the browser from a fixed seed, so level 12 is the same
+   for everyone. Generation works backwards from an empty board: every
+   piece placed has a clear run to the edge past the pieces placed before
+   it, so the reverse placement order is always a valid solution, and any
+   other valid move order stays solvable (removing pieces only frees cells).
+   ══════════════════════════════════════════════════ */
+(() => {
+  'use strict';
+  const $ = (s, r = document) => r.querySelector(s);
+  const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+  const DATA_VERSION = '1';
+  const STORE = 'aa:v1:';
+  const LIVES = 4;
+  const RUSH_SECONDS = 90;
+  const HINT_PENALTY_MS = 5000;
+  const TIER_OF = i => i < 5 ? 0 : i < 15 ? 1 : i < 30 ? 2 : i < 50 ? 3 : 4;
+  const MAXLEN_OF = [2, 3, 3, 4, 4];
+  const DIRS = { r: [0, 1], l: [0, -1], d: [1, 0], u: [-1, 0] };
+  const PALETTE = ['#FFED54', '#5CD6FF', '#8CFF7A', '#FF9AD5', '#C79BFF', '#FFB347', '#6EE7B7', '#FDBA74', '#F97373', '#38BDF8'];
+
+  const store = {
+    get(k, fb) { try { const v = localStorage.getItem(STORE + k); return v == null ? fb : JSON.parse(v); } catch { return fb; } },
+    set(k, v) { try { localStorage.setItem(STORE + k, JSON.stringify(v)); } catch { /* ignore */ } },
+  };
+
+  const el = {
+    select: $('#aaSelect'), levels: $('#aaLevels'), progress: $('#aaProgress'), progressBar: $('#aaProgressBar'), modes: $('#aaModes'),
+    game: $('#aaGame'), boardWrap: $('#aaBoardWrap'), board: $('#aaBoard'), toast: $('#aaToast'), confetti: $('#aaConfetti'),
+    hudLevel: $('#aaHudLevel'), hudMode: $('#aaHudMode'), hudTime: $('#aaHudTime'), hudLeft: $('#aaHudLeft'), hudLives: $('#aaHudLives'),
+    btnHint: $('#aaHint'), btnRestart: $('#aaRestart'), btnLevels: $('#aaBackToLevels'), btnSound: $('#aaSound'),
+    overlay: $('#aaOverlay'), card: $('#aaCard'),
+    loading: $('#aaLoading'), error: $('#aaError'),
+  };
+  if (!el.board) return;
+
+  let DATA = null;
+  const state = {
+    mode: store.get('mode') === 'rush' ? 'rush' : 'classic', muted: !!store.get('muted', false),
+    idx: -1, level: null, tier: 0, mask: null, pieces: [], occ: null, W: 0, H: 0, left: 0,
+    lives: LIVES, startedAt: 0, elapsed: 0, timerId: 0, finished: false, hintsUsed: 0, fails: 0, seedBump: 0, busy: false,
+  };
+
+  // ── Helpers ──
+  const fmtTime = (ms, tenths) => { const s = Math.max(0, ms) / 1000, m = Math.floor(s / 60), r = s - m * 60; return tenths ? `${m}:${r.toFixed(1).padStart(4, '0')}` : `${m}:${String(Math.floor(r)).padStart(2, '0')}`; };
+  const fmtPop = n => !n ? '' : n >= 1e9 ? `${(n / 1e9).toFixed(2)} billion` : n >= 1e6 ? `${Math.round(n / 1e6)} million` : `${Math.round(n / 1e3)}K`;
+  const svgEl = (tag, attrs = {}) => { const n = document.createElementNS(SVG_NS, tag); for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v); return n; };
+  const progressKey = i => `lv:${i}`;
+  const cleared = i => store.get(progressKey(i));
+  const unlocked = i => i === 0 || !!cleared(i - 1) || !!store.get(`skip:${i}`);
+  function mulberry32(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+  function scrollToGame() { const top = el.game.getBoundingClientRect().top + window.scrollY - 84; window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' }); }
+  function setHash(i) { if (history.replaceState) history.replaceState(null, '', location.pathname + location.search + (i >= 0 ? `#level-${i + 1}` : '')); }
+
+  // ── Sound ──
+  let audio = null;
+  function beep(notes) {
+    if (state.muted) return;
+    try {
+      audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+      if (audio.state === 'suspended') audio.resume();
+      const t0 = audio.currentTime;
+      notes.forEach(([freq, start, dur, type = 'sine', gain = 0.07]) => {
+        const o = audio.createOscillator(), g = audio.createGain();
+        o.type = type; o.frequency.value = freq;
+        g.gain.setValueAtTime(0.0001, t0 + start); g.gain.exponentialRampToValueAtTime(gain, t0 + start + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t0 + start + dur);
+        o.connect(g).connect(audio.destination); o.start(t0 + start); o.stop(t0 + start + dur + 0.02);
+      });
+    } catch { /* silent */ }
+  }
+  const SFX = { shoot: () => beep([[880, 0, 0.07], [1320, 0.04, 0.08]]), block: () => beep([[150, 0, 0.18, 'square', 0.04]]), win: () => beep([[523, 0, 0.12], [659, 0.1, 0.12], [784, 0.2, 0.12], [1047, 0.3, 0.35]]), lose: () => beep([[300, 0, 0.2, 'triangle'], [220, 0.2, 0.35, 'triangle']]) };
+  function renderSound() { el.btnSound.setAttribute('aria-pressed', String(!state.muted)); el.btnSound.textContent = state.muted ? 'Sound: off' : 'Sound: on'; }
+
+  let toastTimer = 0;
+  function toast(msg, kind = '') { el.toast.textContent = msg; el.toast.className = 'aa-toast' + (kind ? ' aa-toast--' + kind : ''); el.toast.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => { el.toast.hidden = true; }, 2800); }
+
+  // ── Data ──
+  async function loadData() {
+    if (DATA) return DATA;
+    const r = await fetch(`games/data/arrow-atlas.json?v=${DATA_VERSION}`, { cache: 'force-cache' });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    DATA = await r.json();
+    return DATA;
+  }
+
+  // ── Level select ──
+  function renderSelect() {
+    if (!DATA) return;
+    const n = DATA.levels.length;
+    const done = DATA.levels.filter((_, i) => cleared(i)).length;
+    const learned = DATA.levels.filter((_, i) => cleared(i)?.quiz).length;
+    el.progress.textContent = `${done}/${n} countries cleared · ${learned} named correctly`;
+    el.progressBar.style.width = `${(done / n) * 100}%`;
+    el.modes.innerHTML = '';
+    for (const m of [['classic', 'Classic', 'Timer counts up, 4 hearts'], ['rush', 'Rush', `${RUSH_SECONDS}s countdown, 4 hearts`]]) {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'aa-mode' + (m[0] === state.mode ? ' is-active' : ''); b.dataset.mode = m[0]; b.setAttribute('aria-pressed', String(m[0] === state.mode));
+      b.innerHTML = `<strong>${m[1]}</strong><span>${m[2]}</span>`;
+      b.addEventListener('click', () => { state.mode = m[0]; store.set('mode', m[0]); renderSelect(); });
+      el.modes.appendChild(b);
+    }
+    el.levels.innerHTML = '';
+    DATA.levels.forEach((L, i) => {
+      const rec = cleared(i), open = unlocked(i);
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'aa-level' + (rec ? ' is-done' : '') + (open ? '' : ' is-locked'); b.dataset.level = i; b.disabled = !open;
+      b.setAttribute('aria-label', rec ? `Level ${i + 1}, ${L.name}, ${rec.stars} stars` : open ? `Level ${i + 1}` : `Level ${i + 1}, locked`);
+      const svg = svgEl('svg', { viewBox: '-2 -2 104 104', 'aria-hidden': 'true', focusable: 'false' });
+      svg.appendChild(svgEl('path', { d: L.d }));
+      b.appendChild(svg);
+      const t = document.createElement('span'); t.className = 'aa-level-num'; t.textContent = String(i + 1); b.appendChild(t);
+      const s = document.createElement('span'); s.className = 'aa-level-sub';
+      s.textContent = rec ? `${L.name} ${'★'.repeat(rec.stars)}` : open ? `Tier ${TIER_OF(i) + 1}` : '🔒';
+      b.appendChild(s);
+      b.addEventListener('click', () => startLevel(i));
+      el.levels.appendChild(b);
+    });
+  }
+
+  // ── Puzzle generation ──
+  function generate(mask, maxLen, seed) {
+    const H = mask.rows.length, W = mask.rows[0].length;
+    const land = mask.rows.map(r => r.split('').map(ch => ch === '1'));
+    for (let attempt = 0; attempt < 200; attempt++) {
+      const rnd = mulberry32(seed * 7919 + attempt * 104729 + 17);
+      const occ = Array.from({ length: H }, () => new Array(W).fill(-1));
+      const pieces = [];
+      const empty = new Set();
+      for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) if (land[r][c]) empty.add(r * W + c);
+      const clearDirs = (r, c) => {
+        const out = [];
+        for (const [d, [dr, dc]] of Object.entries(DIRS)) {
+          let y = r + dr, x = c + dc, ok = true;
+          while (y >= 0 && y < H && x >= 0 && x < W) { if (occ[y][x] >= 0) { ok = false; break; } y += dr; x += dc; }
+          if (ok) out.push(d);
+        }
+        return out;
+      };
+      let failed = false;
+      while (empty.size) {
+        // most constrained empty cell first, ties broken randomly
+        let best = null, bestN = 9, bestDirs = null; const pool = Array.from(empty);
+        for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
+        for (const cell of pool) { const r = Math.floor(cell / W), c = cell % W; const ds = clearDirs(r, c); if (ds.length && ds.length < bestN) { best = [r, c]; bestN = ds.length; bestDirs = ds; if (bestN === 1) break; } }
+        if (!best) {
+          // Dead cell: every run to the edge is blocked. Absorb it into a neighbouring piece whose tail
+          // touches it and which points away from it — the head's run is unchanged, so it stays solvable.
+          let merged = false;
+          for (const cell of pool) {
+            const r = Math.floor(cell / W), c = cell % W;
+            for (const [d, [dr, dc]] of Object.entries(DIRS)) {
+              const y = r + dr, x = c + dc; if (y < 0 || y >= H || x < 0 || x >= W || occ[y][x] < 0) continue;
+              const q = pieces[occ[y][x]]; const tail = q.cells[q.cells.length - 1];
+              if (q.dir === d && tail[0] === y && tail[1] === x && q.cells.length < maxLen + 2) { q.cells.push([r, c]); occ[r][c] = q.idx; empty.delete(cell); merged = true; break; }
+            }
+            if (merged) break;
+          }
+          if (merged) continue;
+          failed = true; break;
+        }
+        const [r, c] = best;
+        const dir = bestDirs[Math.floor(rnd() * bestDirs.length)];
+        const [dr, dc] = DIRS[dir];
+        const len = 1 + Math.floor(rnd() * maxLen);
+        const cells = [[r, c]];
+        for (let k = 1; k < len; k++) { const y = r - dr * k, x = c - dc * k; if (y < 0 || y >= H || x < 0 || x >= W || !land[y][x] || occ[y][x] >= 0) break; cells.push([y, x]); }
+        const idx = pieces.length;
+        for (const [y, x] of cells) { occ[y][x] = idx; empty.delete(y * W + x); }
+        pieces.push({ idx, cells, dir, color: PALETTE[idx % PALETTE.length] });
+      }
+      if (!failed) return { W, H, pieces, occ, land };
+    }
+    throw new Error('could not generate a solvable board');
+  }
+
+  // ── Board rendering ──
+  const ARROW = { r: 0, d: 90, l: 180, u: 270 };
+  function renderBoard() {
+    const { W, H, pieces, land } = state;
+    const svg = el.board;
+    svg.innerHTML = '';
+    svg.setAttribute('viewBox', `-0.35 -0.35 ${W + 0.7} ${H + 0.7}`);
+    svg.classList.toggle('aa-board--tall', H > W * 1.25);
+    // outline (revealed as the board clears): stored at REF units, scaled to cells and shifted by the mask trim
+    const t = state.maskInfo;
+    const outline = svgEl('path', { d: state.level.d, class: 'aa-outline', transform: `translate(${-t.x} ${-t.y}) scale(${t.k})` });
+    svg.appendChild(outline);
+    state.outlineEl = outline;
+    const cellsG = svgEl('g', { class: 'aa-cells' });
+    for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) if (land[r][c]) cellsG.appendChild(svgEl('rect', { x: c + 0.06, y: r + 0.06, width: 0.88, height: 0.88, rx: 0.16 }));
+    svg.appendChild(cellsG);
+    const piecesG = svgEl('g', { class: 'aa-pieces' });
+    for (const p of pieces) {
+      const g = svgEl('g', { class: 'aa-piece', 'data-i': p.idx, tabindex: '0', role: 'button', 'aria-label': `Arrow pointing ${({ r: 'right', l: 'left', u: 'up', d: 'down' })[p.dir]}` });
+      for (const [y, x] of p.cells) g.appendChild(svgEl('rect', { x, y, width: 1, height: 1, class: 'aa-hit' }));
+      const head = p.cells[0], tail = p.cells[p.cells.length - 1];
+      const [dr, dc] = DIRS[p.dir];
+      const hx = head[1] + 0.5 + dc * 0.12, hy = head[0] + 0.5 + dr * 0.12;
+      const tx = tail[1] + 0.5 - dc * 0.18, ty = tail[0] + 0.5 - dr * 0.18;
+      g.appendChild(svgEl('line', { x1: tx, y1: ty, x2: hx, y2: hy, class: 'aa-shaft', stroke: p.color }));
+      g.appendChild(svgEl('path', { d: 'M-0.3 -0.3 L0.08 0 L-0.3 0.3', class: 'aa-head', stroke: p.color, transform: `translate(${hx} ${hy}) rotate(${ARROW[p.dir]})` }));
+      g.addEventListener('click', () => tapPiece(p));
+      g.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); tapPiece(p); } });
+      p.el = g;
+      piecesG.appendChild(g);
+    }
+    svg.appendChild(piecesG);
+    updateReveal();
+  }
+  function updateReveal() {
+    const total = state.pieces.length;
+    const done = total - state.left;
+    const k = total ? done / total : 0;
+    state.outlineEl?.style.setProperty('fill-opacity', String(0.05 + 0.75 * k * k));
+  }
+
+  // ── Game lifecycle ──
+  async function startLevel(i, bumpSeed = false) {
+    try { await loadData(); } catch (err) { el.error.textContent = `Could not load the levels (${err.message}).`; el.error.hidden = false; return; }
+    if (i < 0 || i >= DATA.levels.length) i = 0;
+    if (!unlocked(i)) i = DATA.levels.findIndex((_, j) => !cleared(j) && unlocked(j));
+    if (i < 0) i = 0;
+    stopTimer();
+    if (bumpSeed) state.seedBump++; else if (state.idx !== i) { state.seedBump = 0; state.fails = 0; }
+    state.idx = i; state.level = DATA.levels[i]; state.tier = TIER_OF(i);
+    state.maskInfo = state.level.tiers[state.tier];
+    const gen = generate(state.maskInfo, MAXLEN_OF[state.tier], (i + 1) * 1000 + state.seedBump);
+    Object.assign(state, { W: gen.W, H: gen.H, pieces: gen.pieces, occ: gen.occ, land: gen.land, left: gen.pieces.length, lives: LIVES, elapsed: 0, startedAt: 0, finished: false, hintsUsed: 0, busy: false });
+    el.select.hidden = true; el.game.hidden = false; el.overlay.hidden = true; el.error.hidden = true; el.loading.hidden = true;
+    setHash(i); scrollToGame();
+    renderBoard(); renderHud();
+    if (i === 0 && !cleared(0)) toast('Tap an arrow to shoot it off the board. If another arrow is in its way, you lose a heart.', 'hint');
+    else toast(`Level ${i + 1} · ${state.pieces.length} arrows · which country is this?`);
+  }
+
+  function renderHud() {
+    el.hudLevel.textContent = `Level ${state.idx + 1}`;
+    el.hudMode.textContent = state.mode === 'rush' ? 'Rush' : 'Classic';
+    el.hudLeft.textContent = String(state.left);
+    el.hudLives.innerHTML = Array.from({ length: LIVES }, (_, k) => `<span class="${k < state.lives ? 'is-on' : 'is-off'}">♥</span>`).join('');
+    el.hudLives.setAttribute('aria-label', `${state.lives} of ${LIVES} hearts`);
+    el.btnHint.disabled = state.finished;
+    renderTime();
+  }
+  const currentElapsed = () => state.startedAt ? state.elapsed + (performance.now() - state.startedAt) : state.elapsed;
+  function renderTime() {
+    const e = currentElapsed();
+    el.hudTime.textContent = state.mode === 'rush' ? fmtTime(RUSH_SECONDS * 1000 - e) : fmtTime(e);
+    el.hudTime.classList.toggle('is-low', state.mode === 'rush' && RUSH_SECONDS * 1000 - e < 15000);
+  }
+  function startTimer() {
+    if (state.startedAt || state.finished) return;
+    state.startedAt = performance.now();
+    state.timerId = setInterval(() => { renderTime(); if (state.mode === 'rush' && currentElapsed() >= RUSH_SECONDS * 1000) failLevel('Time is up!'); }, 200);
+  }
+  function stopTimer() { if (state.startedAt) { state.elapsed += performance.now() - state.startedAt; state.startedAt = 0; } clearInterval(state.timerId); state.timerId = 0; }
+
+  // ── Moves ──
+  function blockerOf(p) {
+    const [dr, dc] = DIRS[p.dir];
+    let [y, x] = p.cells[0]; y += dr; x += dc;
+    while (y >= 0 && y < state.H && x >= 0 && x < state.W) { const o = state.occ[y][x]; if (o >= 0 && o !== p.idx) return state.pieces[o]; y += dr; x += dc; }
+    return null;
+  }
+  function tapPiece(p) {
+    if (state.finished || p.gone || state.busy) return;
+    startTimer();
+    const blocker = blockerOf(p);
+    if (blocker) { blocked(p, blocker); return; }
+    shoot(p);
+  }
+  function shoot(p) {
+    p.gone = true; state.left--;
+    for (const [y, x] of p.cells) state.occ[y][x] = -1;
+    const [dr, dc] = DIRS[p.dir];
+    const head = p.cells[0];
+    const dist = dr ? (dr > 0 ? state.H - head[0] : head[0] + 1) : (dc > 0 ? state.W - head[1] : head[1] + 1);
+    const travel = dist + p.cells.length + 1;
+    p.el.classList.add('is-going');
+    p.el.style.transition = `transform ${Math.min(0.5, 0.12 + travel * 0.02)}s cubic-bezier(.4,0,1,1), opacity .3s`;
+    p.el.style.transform = `translate(${dc * travel}px, ${dr * travel}px)`;
+    p.el.style.opacity = '0';
+    setTimeout(() => p.el.remove(), 600);
+    SFX.shoot();
+    updateReveal(); renderHud();
+    if (state.left === 0) winLevel();
+  }
+  function blocked(p, blocker) {
+    state.lives--;
+    SFX.block();
+    p.el.classList.remove('is-shake'); void p.el.getBBox(); p.el.classList.add('is-shake');
+    blocker.el.classList.add('is-blocker');
+    setTimeout(() => blocker.el.classList.remove('is-blocker'), 600);
+    setTimeout(() => p.el.classList.remove('is-shake'), 400);
+    renderHud();
+    if (state.lives <= 0) failLevel('Out of hearts.');
+    else toast(state.lives === 1 ? 'Blocked! Last heart, look before you tap.' : 'Blocked! The red arrow is in the way.', 'bad');
+  }
+  function hint() {
+    if (state.finished) return;
+    const p = state.pieces.find(q => !q.gone && !blockerOf(q));
+    if (!p) return;
+    startTimer();
+    state.hintsUsed++; state.elapsed += HINT_PENALTY_MS;
+    $$('.aa-piece.is-hint', el.board).forEach(g => g.classList.remove('is-hint'));
+    p.el.classList.add('is-hint');
+    setTimeout(() => p.el.classList.remove('is-hint'), 2500);
+    toast(`Hint: the glowing arrow is free. +${HINT_PENALTY_MS / 1000}s on the clock.`, 'hint');
+    renderTime();
+  }
+
+  // ── End of level ──
+  function stars() { const lost = LIVES - state.lives; return lost === 0 ? 3 : lost === 1 ? 2 : 1; }
+  function winLevel() {
+    stopTimer(); state.finished = true; state.busy = true;
+    state.outlineEl?.style.setProperty('fill-opacity', '0.9');
+    SFX.win(); confetti();
+    setTimeout(showQuiz, 700);
+  }
+  function showQuiz() {
+    const L = state.level;
+    const pool = DATA.levels.filter(x => x !== L && x.cont === L.cont);
+    const others = (pool.length >= 2 ? pool : DATA.levels.filter(x => x !== L)).slice();
+    const rnd = mulberry32(state.idx * 31 + 7);
+    for (let i = others.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [others[i], others[j]] = [others[j], others[i]]; }
+    const options = [L, others[0], others[1]]; for (let i = options.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [options[i], options[j]] = [options[j], options[i]]; }
+    el.card.innerHTML = `<h3>Board cleared!</h3><p class="aa-card-lead">Which country did you just clear?</p><div class="aa-quiz"></div>`;
+    const box = $('.aa-quiz', el.card);
+    for (const o of options) {
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'aa-btn aa-quiz-opt'; b.textContent = o.name;
+      b.addEventListener('click', () => { $$('.aa-quiz-opt', box).forEach(x => { x.disabled = true; x.classList.toggle('is-right', x.textContent === L.name); x.classList.toggle('is-wrong', x === b && o !== L); }); setTimeout(() => showResult(o === L), 650); });
+      box.appendChild(b);
+    }
+    el.overlay.hidden = false;
+    $('.aa-quiz-opt', box)?.focus({ preventScroll: true });
+  }
+  function showResult(quizRight) {
+    const L = state.level, i = state.idx;
+    const t = Math.round(state.elapsed), s = stars();
+    const prev = cleared(i);
+    const isBest = !prev || t < prev.t;
+    store.set(progressKey(i), { t: isBest ? t : prev.t, stars: Math.max(s, prev?.stars || 0), quiz: !!(quizRight || prev?.quiz), at: Date.now() });
+    const facts = [L.cap ? `Capital: <b>${L.cap}</b>` : '', L.pop ? `Population: <b>${fmtPop(L.pop)}</b>` : '', L.sub ? `Region: <b>${L.sub}</b>` : ''].filter(Boolean).join(' · ');
+    const last = i >= DATA.levels.length - 1;
+    el.card.innerHTML = `
+      <p class="aa-card-kicker">${quizRight ? 'Correct!' : `It was`}</p>
+      <h3>${L.name}</h3>
+      <p class="aa-stars" aria-label="${s} of 3 stars">${'★'.repeat(s)}${'☆'.repeat(3 - s)}</p>
+      <div class="aa-stats"><span><b>${fmtTime(t, true)}</b>time</span><span><b>${LIVES - state.lives}</b>hearts lost</span><span><b>${state.hintsUsed}</b>hints</span><span><b>${state.pieces.length}</b>arrows</span></div>
+      <p class="aa-facts">${facts}</p>
+      <p class="aa-best">${isBest ? (prev ? `New best time! Previous ${fmtTime(prev.t, true)}.` : 'First clear. That is your time to beat.') : `Your best: ${fmtTime(prev.t, true)}.`}</p>
+      <div class="aa-actions">
+        ${last ? '' : `<button type="button" class="aa-btn aa-btn--primary" data-act="next">Next: Level ${i + 2}</button>`}
+        <button type="button" class="aa-btn" data-act="again">Play again</button>
+        <button type="button" class="aa-btn" data-act="share">Share</button>
+        <button type="button" class="aa-btn" data-act="levels">World Tour</button>
+      </div>
+      <p class="aa-flash" hidden></p>
+      <p class="aa-yt">Curious about ${L.name}? I make geography, history and economy videos: <a href="https://www.youtube.com/@ariyankhan" target="_blank" rel="noopener">youtube.com/@ariyankhan</a></p>`;
+    el.overlay.hidden = false;
+    $('[data-act]', el.card)?.focus({ preventScroll: true });
+    if (typeof gtag === 'function') gtag('event', 'level_complete', { game: 'arrow_atlas', level: i + 1, mode: state.mode, time_ms: t, stars: s, quiz: quizRight ? 1 : 0 });
+  }
+  function failLevel(reason) {
+    if (state.finished) return;
+    stopTimer(); state.finished = true; state.busy = true; state.fails++;
+    SFX.lose();
+    const canSkip = state.fails >= 2 && state.idx < DATA.levels.length - 1;
+    el.card.innerHTML = `
+      <p class="aa-card-kicker">Level ${state.idx + 1}</p>
+      <h3>${reason}</h3>
+      <p class="aa-card-lead">${state.left} of ${state.pieces.length} arrows were still on the board.</p>
+      <div class="aa-actions">
+        <button type="button" class="aa-btn aa-btn--primary" data-act="retry">Try again</button>
+        <button type="button" class="aa-btn" data-act="shuffle">New layout</button>
+        ${canSkip ? '<button type="button" class="aa-btn" data-act="skip">Skip level</button>' : ''}
+        <button type="button" class="aa-btn" data-act="levels">World Tour</button>
+      </div>`;
+    el.overlay.hidden = false;
+    $('[data-act]', el.card)?.focus({ preventScroll: true });
+  }
+  el.card.addEventListener('click', e => {
+    const act = e.target.closest('[data-act]')?.dataset.act; if (!act) return;
+    if (act === 'next') startLevel(state.idx + 1);
+    else if (act === 'again' || act === 'retry') startLevel(state.idx);
+    else if (act === 'shuffle') startLevel(state.idx, true);
+    else if (act === 'skip') { store.set(`skip:${state.idx + 1}`, true); startLevel(state.idx + 1); }
+    else if (act === 'levels') goToLevels();
+    else if (act === 'share') share();
+  });
+
+  function goToLevels() {
+    stopTimer(); el.game.hidden = true; el.overlay.hidden = true; el.select.hidden = false; setHash(-1); renderSelect();
+  }
+  async function share() {
+    const n = DATA.levels.length, done = DATA.levels.filter((_, i) => cleared(i)).length;
+    const rec = cleared(state.idx);
+    const text = `Arrow Atlas: I cleared ${state.level.name} (level ${state.idx + 1}) in ${fmtTime(rec?.t ?? state.elapsed, true)} ${'★'.repeat(rec?.stars || stars())} and ${done}/${n} countries so far.\nYour turn: https://ariyankhan.com/arrow-atlas.html#level-${state.idx + 1}`;
+    const flash = $('.aa-flash', el.card);
+    try {
+      if (navigator.share) { await navigator.share({ text }); return; }
+      await navigator.clipboard.writeText(text);
+      if (flash) { flash.textContent = 'Copied. Paste it anywhere.'; flash.hidden = false; }
+    } catch { if (flash) { flash.textContent = text; flash.hidden = false; } }
+  }
+
+  function confetti() {
+    const c = el.confetti; if (!c || !c.getContext) return;
+    const r = el.boardWrap.getBoundingClientRect();
+    c.width = Math.round(r.width); c.height = Math.round(r.height); c.hidden = false;
+    const ctx = c.getContext('2d');
+    const parts = Array.from({ length: 120 }, () => ({ x: c.width / 2 + (Math.random() - 0.5) * c.width * 0.4, y: c.height * 0.45, vx: (Math.random() - 0.5) * 14, vy: -Math.random() * 12 - 4, g: 0.35 + Math.random() * 0.2, w: 6 + Math.random() * 6, h: 3 + Math.random() * 4, rot: Math.random() * Math.PI, vr: (Math.random() - 0.5) * 0.3, color: PALETTE[Math.floor(Math.random() * PALETTE.length)] }));
+    const t0 = performance.now();
+    (function frame(now) {
+      const k = (now - t0) / 1600; ctx.clearRect(0, 0, c.width, c.height); ctx.globalAlpha = Math.max(0, 1 - k * k);
+      for (const p of parts) { p.vy += p.g; p.x += p.vx; p.y += p.vy; p.rot += p.vr; p.vx *= 0.99; ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot); ctx.fillStyle = p.color; ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h); ctx.restore(); }
+      if (k < 1) requestAnimationFrame(frame); else { ctx.clearRect(0, 0, c.width, c.height); c.hidden = true; }
+    })(t0);
+  }
+
+  // ── Wiring ──
+  el.btnHint.addEventListener('click', hint);
+  el.btnRestart.addEventListener('click', () => startLevel(state.idx));
+  el.btnLevels.addEventListener('click', () => { if (state.left < state.pieces.length && !state.finished && !confirm('Leave this level? Progress on it will be lost.')) return; goToLevels(); });
+  el.btnSound.addEventListener('click', () => { state.muted = !state.muted; store.set('muted', state.muted); renderSound(); if (!state.muted) SFX.shoot(); });
+  document.addEventListener('keydown', e => { if (!el.game.hidden && !state.finished && (e.key === 'h' || e.key === 'H') && !/input|textarea/i.test(document.activeElement?.tagName || '')) hint(); });
+  document.addEventListener('visibilitychange', () => { if (document.hidden && state.startedAt && !state.finished) { stopTimer(); } });
+  el.board.addEventListener('pointerdown', () => { if (!state.startedAt && !state.finished && state.elapsed) startTimer(); });
+
+  renderSound();
+  el.loading.hidden = false;
+  loadData().then(() => {
+    el.loading.hidden = true;
+    renderSelect();
+    const m = /^#level-(\d+)$/.exec(location.hash);
+    if (m) startLevel(+m[1] - 1);
+  }).catch(err => { el.loading.hidden = true; el.error.textContent = `Could not load the levels (${err.message}). Check your connection and reload.`; el.error.hidden = false; });
+
+  if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+    window.addEventListener('load', () => { navigator.serviceWorker.register('/piece-the-world-sw.js').catch(() => {}); });
+  }
+
+  $$('.faq-item').forEach(item => {
+    const q = item.querySelector('.faq-q'), a = item.querySelector('.faq-a');
+    q?.addEventListener('click', () => { const open = !item.classList.contains('open'); item.classList.toggle('open', open); q.setAttribute('aria-expanded', String(open)); a?.setAttribute('aria-hidden', String(!open)); });
+  });
+  const root = document.getElementById('stars');
+  if (root && !root.childElementCount) {
+    for (let i = 0; i < 90; i++) {
+      const s = document.createElement('div'); const size = Math.random() < 0.25 ? 2.5 : 1.5; s.className = 'star';
+      s.style.cssText = `left:${Math.random() * 100}%;top:${Math.random() * 100}%;width:${size}px;height:${size}px;animation-duration:${2 + Math.random() * 5}s;animation-delay:${Math.random() * 5}s;background:${Math.random() < 0.1 ? '#F5C518' : '#fff'}`;
+      root.appendChild(s);
+    }
+  }
+})();

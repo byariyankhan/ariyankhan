@@ -1,12 +1,13 @@
-/* Piece the World — service worker.
+/* Piece the World + Arrow Atlas — service worker.
    Scope is the whole origin (it has to be, to control the game page), but the fetch
    handler only ever answers for the game's own files; every other request on the
    site is left to the network exactly as if no worker were installed. */
-const VERSION = 'ptw-cache-v1';
+const VERSION = 'ptw-cache-v2';
 const GAME_FILES = new Set([
   '/piece-the-world.html', '/css/style.css', '/css/piece-the-world.css',
   '/js/piece-the-world.js', '/js/site-nav.js', '/js/site-footer.js',
   '/games/piece-the-world.webmanifest', '/images/ariyan-khan-profile.webp',
+  '/arrow-atlas.html', '/css/arrow-atlas.css', '/js/arrow-atlas.js', '/games/arrow-atlas.webmanifest',
   '/favicon/favicon.ico', '/favicon/favicon-96x96.png', '/favicon/apple-touch-icon.png',
 ]);
 const isLevelData = p => p.startsWith('/games/data/') && p.endsWith('.json');

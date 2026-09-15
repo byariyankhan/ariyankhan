@@ -1,0 +1,17 @@
+{
+  "id": "/arrow-atlas.html",
+  "name": "Arrow Atlas — Map Arrow Puzzle",
+  "short_name": "Arrow Atlas",
+  "description": "Tap arrows to clear real country maps, keep your hearts, beat the clock and name the country. Free geography puzzle by Ariyan Khan.",
+  "start_url": "/arrow-atlas.html?utm_source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0a0a0a",
+  "theme_color": "#0d0d0d",
+  "categories": ["games", "education"],
+  "icons": [
+    { "src": "/favicon/web-app-manifest-192x192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/favicon/web-app-manifest-512x512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

@@ -59,6 +59,7 @@
     <span class="footer-divider" aria-hidden="true">|</span>
     <a href="${basePath}map-maker.html">Map Maker</a>
     <a href="${basePath}piece-the-world.html">Piece the World</a>
+    <a href="${basePath}arrow-atlas.html">Arrow Atlas</a>
     <span class="footer-divider" aria-hidden="true">|</span>
     <a href="${basePath}about.html">About</a>
     <span class="footer-divider" aria-hidden="true">|</span>
