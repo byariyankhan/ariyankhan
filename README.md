@@ -464,7 +464,10 @@ game = back / Level + difficulty / palette + settings, hearts + arrows left + hi
 the board (its outline is made of arrow pieces, see below; optional guideline dots),
 Restart. The level grid is a bottom sheet; Settings is a full page like the
 reference apps: Sound / Vibration / Guideline switches, Colours, How to play,
-Feedback, Privacy Policy, Terms, and an About fold with the FAQ. This is the
+Feedback, Privacy Policy, Terms, and an About fold with the FAQ. Music is a
+slow ambient pad synthesised with WebAudio on the device (Am9 · Fmaj7 · Cmaj7 ·
+G6, low-passed, delayed, ~0.11 gain) — no audio file, no licence, works
+offline; it starts on the first tap and stops when the tab is hidden. This is the
 same shell we will wrap for Android/iOS (TWA / Capacitor). Each level is a
 country's outline filled with arrows; tap an arrow to shoot it off the board if its
 run to the edge is clear, a blocked tap costs one of 4 hearts, no clock (time is still recorded for the result card), 4 hearts and 3 hints per
@@ -482,11 +485,13 @@ unlock (skip allowed after two fails), stars, best times and progress in
   from an empty board — each new piece must have a clear run to the edge past the
   pieces placed before it — so the reverse order is always a solution and no move
   order can get stuck. `generate()` runs in two phases: first the boundary cells are traced into snakes
-  that hug the outline (heads point straight out over non-land only, and they get
-  the newest removal order so peeling the border is always possible — this is what
-  makes the country's outline out of arrows, as in the reference apps); then the
-  interior is filled most-constrained-cell-first, looking "through" border pieces
-  because they are newer. Bodies snake backwards through empty cells (random walk,
+  that hug the outline (every head continues its own last segment; a run may cross
+  non-land and other border cells, and border pieces are ordered so whoever is
+  pointed at is removed first — pieces that cannot be ordered are dropped back to
+  the interior pass — which is what makes the country's outline out of arrows, as
+  in the reference apps); then the interior is filled most-constrained-cell-first,
+  looking "through" border pieces because they are newer, with the body's first
+  step straight behind the head so arrowheads are always in line. Bodies snake backwards through empty cells (random walk,
   never onto the head's exit line) so boards read like a maze; a piece is drawn as one track path and
   shot with a stroke-dashoffset transition so it flows out along its own track. Dead
   cells are absorbed into a neighbouring piece (head moves forward, or tail extends,

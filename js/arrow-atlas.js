@@ -39,7 +39,7 @@
   };
 
   const el = {
-    select: $('#aaSelect'), levels: $('#aaLevels'), progress: $('#aaProgress'), progressBar: $('#aaProgressBar'), streak: $('#aaStreak'), daily: $('#aaDaily'), hudDiff: $('#aaHudDiff'), play: $('#aaPlay'), playSub: $('#aaPlaySub'), path: $('#aaPath'), btnVibe: $('#aaVibe'), btnGuides: $('#aaGuides'), howTo: $('#aaHowTo'), aboutPanel: $('#aaAboutPanel'),
+    select: $('#aaSelect'), levels: $('#aaLevels'), progress: $('#aaProgress'), progressBar: $('#aaProgressBar'), streak: $('#aaStreak'), daily: $('#aaDaily'), hudDiff: $('#aaHudDiff'), play: $('#aaPlay'), playSub: $('#aaPlaySub'), path: $('#aaPath'), btnVibe: $('#aaVibe'), btnGuides: $('#aaGuides'), btnMusic: $('#aaMusic'), howTo: $('#aaHowTo'), aboutPanel: $('#aaAboutPanel'),
     sheet: $('#aaSheet'), levelsSheet: $('#aaLevelsSheet'), levelsBtn: $('#aaLevelsBtn'), settingsBtns: $$('#aaSettings, #aaSettingsG'), themeBtn: $('#aaTheme'), themes: $('#aaThemes'),
     game: $('#aaGame'), boardWrap: $('#aaBoardWrap'), board: $('#aaBoard'), toast: $('#aaToast'), confetti: $('#aaConfetti'),
     hudLevel: $('#aaHudLevel'), hudMode: $('#aaHudMode'), hudTime: $('#aaHudTime'), hudLeft: $('#aaHudLeft'), hudLives: $('#aaHudLives'), hudLivesWrap: $('#aaHudLivesWrap'), hudPct: $('#aaHudPct'), boardBar: $('#aaBoardBar'),
@@ -51,7 +51,7 @@
 
   let DATA = null;
   const state = {
-    mode: 'classic', muted: !!store.get('muted', false), vibe: store.get('vibe', true) !== false, guides: !!store.get('guides', false),
+    mode: 'classic', muted: !!store.get('muted', false), music: store.get('music', true) !== false, vibe: store.get('vibe', true) !== false, guides: !!store.get('guides', false),
     idx: -1, level: null, tier: 0, mask: null, pieces: [], occ: null, W: 0, H: 0, left: 0,
     lives: LIVES, livesMax: LIVES, startedAt: 0, elapsed: 0, timerId: 0, finished: false, hintsUsed: 0, fails: 0, seedBump: 0, busy: false,
     combo: 0, bestCombo: 0, lastShot: 0, shown: new Set(), daily: null,
@@ -87,9 +87,52 @@
       });
     } catch { /* silent */ }
   }
+  // ── Music: a slow ambient pad synthesised on the device (no audio file, no licence, works offline) ──
+  const music = { ctx: null, master: null, timer: 0, step: 0, on: false };
+  const CHORDS = [[57, 64, 67, 71, 76], [53, 60, 64, 69, 72], [48, 55, 60, 64, 71], [55, 59, 62, 67, 74]]; // Am9 · Fmaj7 · Cmaj7 · G6 (MIDI)
+  const mtof = m => 440 * Math.pow(2, (m - 69) / 12);
+  function musicStart() {
+    if (music.on || !state.music) return;
+    try {
+      audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+      if (audio.state === 'suspended') audio.resume();
+      const ctx = audio; music.ctx = ctx;
+      const master = ctx.createGain(); master.gain.value = 0.0001; master.connect(ctx.destination);
+      const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 520; lp.Q.value = 0.6; lp.connect(master);
+      const delay = ctx.createDelay(1.2); delay.delayTime.value = 0.52; const fb = ctx.createGain(); fb.gain.value = 0.32;
+      const dlp = ctx.createBiquadFilter(); dlp.type = 'lowpass'; dlp.frequency.value = 900;
+      lp.connect(delay); delay.connect(dlp); dlp.connect(fb); fb.connect(delay); dlp.connect(master);
+      const lfo = ctx.createOscillator(); lfo.frequency.value = 0.05; const lfoG = ctx.createGain(); lfoG.gain.value = 180; lfo.connect(lfoG).connect(lp.frequency); lfo.start();
+      music.master = master; music.lp = lp; music.lfo = lfo; music.on = true;
+      master.gain.exponentialRampToValueAtTime(0.11, ctx.currentTime + 4);
+      const playChord = () => {
+        if (!music.on) return;
+        const notes = CHORDS[music.step % CHORDS.length]; music.step++;
+        const t = ctx.currentTime, dur = 14;
+        notes.forEach((m, i) => {
+          for (const det of [-6, 5]) {
+            const o = ctx.createOscillator(); o.type = i === 0 ? 'triangle' : 'sine'; o.frequency.value = mtof(m - (i === 0 ? 12 : 0)); o.detune.value = det;
+            const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t);
+            g.gain.exponentialRampToValueAtTime(i === 0 ? 0.5 : 0.28, t + 4 + i * 0.6);
+            g.gain.setValueAtTime(i === 0 ? 0.5 : 0.28, t + dur - 5);
+            g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+            o.connect(g).connect(lp); o.start(t); o.stop(t + dur + 0.1);
+          }
+        });
+        music.timer = setTimeout(playChord, (dur - 4) * 1000);
+      };
+      playChord();
+    } catch { /* no audio, no problem */ }
+  }
+  function musicStop() {
+    if (!music.on) return;
+    music.on = false; clearTimeout(music.timer);
+    try { const t = music.ctx.currentTime; music.master.gain.setValueAtTime(music.master.gain.value, t); music.master.gain.exponentialRampToValueAtTime(0.0001, t + 1.5); setTimeout(() => { try { music.master.disconnect(); music.lfo.stop(); } catch { /* ignore */ } }, 1700); } catch { /* ignore */ }
+  }
   const SFX = { shoot: () => beep([[880, 0, 0.07], [1320, 0.04, 0.08]]), block: () => beep([[150, 0, 0.18, 'square', 0.04]]), win: () => beep([[523, 0, 0.12], [659, 0.1, 0.12], [784, 0.2, 0.12], [1047, 0.3, 0.35]]), lose: () => beep([[300, 0, 0.2, 'triangle'], [220, 0.2, 0.35, 'triangle']]) };
   function vibe(ms) { if (state.vibe && navigator.vibrate) { try { navigator.vibrate(ms); } catch { /* ignore */ } } }
   function renderToggles() {
+    el.btnMusic?.setAttribute('aria-checked', String(state.music));
     el.btnVibe?.setAttribute('aria-checked', String(state.vibe));
     el.btnGuides?.setAttribute('aria-checked', String(state.guides));
     el.board.classList.toggle('aa-board--guides', state.guides);
@@ -196,6 +239,10 @@
       const outsideLine = (r, c, [dr, dc]) => { let y = r + dr, x = c + dc; while (y >= 0 && y < H && x >= 0 && x < W) { if (land[y][x]) return false; y += dr; x += dc; } return true; };
       const unassigned = new Set();
       for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) if (land[r][c] && (!isLand(r - 1, c) || !isLand(r + 1, c) || !isLand(r, c - 1) || !isLand(r, c + 1))) unassigned.add(r * W + c);
+      const boundarySet = new Set(unassigned);
+      // A border run may cross non-land and other boundary cells only: border pieces are ordered among
+      // themselves below (whoever is pointed at goes first), and the interior sees through all of them.
+      const borderLine = (r, c, [dr, dc]) => { let y = r + dr, x = c + dc; while (y >= 0 && y < H && x >= 0 && x < W) { if (land[y][x] && !boundarySet.has(y * W + x)) return false; y += dr; x += dc; } return true; };
       const BORDER_ORD = 1000000;
       if (attempt >= 120) unassigned.clear();   // last resort: a plain interior-style board always generates
       while (unassigned.size) {
@@ -211,28 +258,59 @@
           pdir = step; const ny = y0 + step[0], nx = x0 + step[1]; path.push([ny, nx]); unassigned.delete(ny * W + nx);
         }
         let placedLen = 0;
-        for (let len = path.length; len >= 2 && !placedLen; len--) {   // single stubs are left to the interior pass
-          const seg = path.slice(0, len);
-          for (const cells of [seg.slice().reverse(), seg]) {   // head = cells[0]
-            const [hy, hx] = cells[0];
-            const inBody = (y, x) => cells.some(([cy, cx]) => cy === y && cx === x);
-            // Best: a run that crosses no land at all → the piece can be the newest (peeled first).
-            // Otherwise: any run clear of what is placed so far and of its own body → an ordinary piece.
-            let dirs = Object.entries(DIRS).filter(([, v]) => outsideLine(hy, hx, v)), newest = true;
-            if (!dirs.length) {
-              newest = false;
-              dirs = Object.entries(DIRS).filter(([, [dr, dc]]) => { let y = hy + dr, x = hx + dc; while (y >= 0 && y < H && x >= 0 && x < W) { if (occ[y][x] >= 0 || inBody(y, x)) return false; y += dr; x += dc; } return true; });
+        // The arrowhead continues the last segment (head = direction of travel), like the reference apps.
+        // Only heads in line with their last segment are accepted; the run may cross non-land and other border
+        // cells (ordered below). Whatever cannot be placed that way is left to the interior pass.
+        for (const pass of ['travel']) {
+          for (let len = path.length; len >= 2 && !placedLen; len--) {
+            const seg = path.slice(0, len);
+            for (const cells of [seg.slice().reverse(), seg]) {   // head = cells[0]
+              const [hy, hx] = cells[0];
+              const inBody = (y, x) => cells.some(([cy, cx]) => cy === y && cx === x);
+              let d = null, newest = false;
+              if (pass === 'travel') {
+                const travel = Object.entries(DIRS).find(([, [dr, dc]]) => cells[1][0] + dr === hy && cells[1][1] + dc === hx);
+                if (travel && !inBody(hy + travel[1][0], hx + travel[1][1]) && borderLine(hy, hx, travel[1])) { d = travel[0]; newest = true; }
+              } else {
+                const out = Object.entries(DIRS).filter(([, v]) => outsideLine(hy, hx, v));
+                if (out.length) { d = out[Math.floor(rnd() * out.length)][0]; newest = true; }
+              }
+              if (!d) continue;
+              const idx = pieces.length;
+              for (const [y, x] of cells) { occ[y][x] = idx; empty.delete(y * W + x); }
+              pieces.push({ idx, ord: newest ? BORDER_ORD + idx : ++ord, cells, dir: d, border: newest, color: PALETTE[idx % PALETTE.length] });
+              placedLen = len; break;
             }
-            if (!dirs.length) continue;
-            const prevCell = cells[1]; const away = prevCell ? dirs.filter(([, [dr, dc]]) => !(hy + dr === prevCell[0] && hx + dc === prevCell[1])) : dirs;
-            const [d] = (away.length ? away : dirs)[Math.floor(rnd() * (away.length ? away : dirs).length)];
-            const idx = pieces.length;
-            for (const [y, x] of cells) { occ[y][x] = idx; empty.delete(y * W + x); }
-            pieces.push({ idx, ord: newest ? BORDER_ORD + idx : ++ord, cells, dir: d, border: newest, color: PALETTE[idx % PALETTE.length] });
-            placedLen = len; break;
           }
+          if (placedLen) break;
         }
         for (let k = placedLen; k < path.length; k++) if (placedLen) unassigned.add(path[k][0] * W + path[k][1]); // leftovers get another go; unplaceable singles fall to the interior pass
+      }
+      // Border order. A border run may cross other border pieces: if A's run crosses B, B must be removed
+      // before A, so ord(A) < ord(B). Score each piece by the longest chain of pieces it points at (0 = points at
+      // nothing on land) and give higher scores lower ords. A run that crosses land not covered by a border piece
+      // (leftover boundary stubs the interior pass fills) demotes that piece to an ordinary one, and so does any
+      // cycle. Interior pieces are placed next with smaller ords and see through every remaining border piece.
+      {
+        const cellsOn = P => { const [dr, dc] = DIRS[P.dir]; const out = []; let [y, x] = P.cells[0]; y += dr; x += dc; while (y >= 0 && y < H && x >= 0 && x < W) { if (land[y][x]) out.push([y, x]); y += dr; x += dc; } return out; };
+        // A border piece that cannot keep the border order is dropped altogether (its cells go back to the
+        // interior pass), never kept as an ordinary piece — two such leftovers could block each other.
+        const drop = P => { P.dead = true; P.border = false; for (const [y, x] of P.cells) { occ[y][x] = -1; empty.add(y * W + x); } };
+        const targetsOf = P => Array.from(new Set(cellsOn(P).map(([y, x]) => occ[y][x]))).filter(i => i >= 0 && i !== P.idx);
+        for (let changed = true; changed;) {
+          changed = false;
+          for (const P of pieces) if (P.border && cellsOn(P).some(([y, x]) => occ[y][x] < 0 || !pieces[occ[y][x]].border)) { drop(P); changed = true; }
+          if (changed) continue;
+          const score = new Map();
+          let pending = pieces.filter(p => p.border);
+          while (pending.length) {
+            const ready = pending.filter(P => targetsOf(P).every(i => score.has(i)));
+            if (!ready.length) { drop(pending[0]); changed = true; break; }   // cycle: break it and re-validate
+            for (const P of ready) { const t = targetsOf(P); score.set(P.idx, t.length ? 1 + Math.max(...t.map(i => score.get(i))) : 0); }
+            pending = pending.filter(P => !score.has(P.idx));
+          }
+          if (!changed) for (const P of pieces) if (P.border) P.ord = BORDER_ORD + 100000 - score.get(P.idx);
+        }
       }
       // Absorb cell (r,c) into a neighbouring piece: onto a head that points straight at it (the head moves
       // forward; its run is the rest of the old run) or onto a tail that touches it (the head's run is unchanged).
@@ -248,11 +326,12 @@
           if (q.border || q.cells.length >= maxLen + 6) continue;
           const [qr, qc] = DIRS[q.dir];
           if (head[0] === y && head[1] === x && head[0] + qr === r && head[1] + qc === c) {
-            if (pieces.some(P => P.ord > q.ord && !P.border && onExitOf(P, r, c))) { if (!lineClear(q)) continue; q.ord = ++ord; }
+            if (pieces.some(P => !P.dead && P.ord > q.ord && !P.border && onExitOf(P, r, c))) { if (!lineClear(q)) continue; q.ord = ++ord; }
             q.cells.unshift([r, c]); occ[r][c] = q.idx; empty.delete(r * W + c); return true;
           }
           if (tail[0] !== y || tail[1] !== x || onExitOf(q, r, c)) continue;
-          if (pieces.some(P => P.ord > q.ord && !P.border && onExitOf(P, r, c))) { if (!lineClear(q)) continue; q.ord = ++ord; }
+          if (q.cells.length === 1 && !(head[0] - qr === r && head[1] - qc === c)) continue;   // keep the head in line with its first segment
+          if (pieces.some(P => !P.dead && P.ord > q.ord && !P.border && onExitOf(P, r, c))) { if (!lineClear(q)) continue; q.ord = ++ord; }
           q.cells.push([r, c]); occ[r][c] = q.idx; empty.delete(r * W + c); return true;
         }
         return false;
@@ -273,15 +352,22 @@
           failed = true; break;
         }
         const [r, c] = best;
-        const dir = bestDirs[Math.floor(rnd() * bestDirs.length)];
+        // The arrowhead must continue the last segment, so the body's first step is straight behind the head:
+        // prefer a direction whose "behind" cell is free land.
+        // Attempts 0–39 insist on it; later attempts relax it (a slightly bent head beats no border at all).
+        const strictAlign = attempt < 40;
+        const freeCell = (y, x) => y >= 0 && y < H && x >= 0 && x < W && land[y][x] && occ[y][x] < 0;
+        const withBehind = bestDirs.filter(d => freeCell(r - DIRS[d][0], c - DIRS[d][1]));
+        const dir = (withBehind.length ? withBehind : bestDirs)[Math.floor(rnd() * (withBehind.length ? withBehind : bestDirs).length)];
         const [dr, dc] = DIRS[dir];
-        const len = 3 + Math.floor(rnd() * (maxLen - 2));
+        const len = withBehind.length || !strictAlign ? 3 + Math.floor(rnd() * (maxLen - 2)) : 1;
         const cells = [[r, c]];
         // The body snakes backwards through empty land cells (random walk, no revisits), never onto the head's
         // own exit line — that would block itself. Turns are what make the board look like a maze.
         const onExit = (y, x) => (dr ? x === c && Math.sign(y - r) === dr : y === r && Math.sign(x - c) === dc);
         let py = r, px = c, pdir = [-dr, -dc];
-        for (let k = 1; k < len; k++) {
+        if (len > 1 && withBehind.length) { py -= dr; px -= dc; cells.push([py, px]); }
+        for (let k = cells.length; k < len; k++) {
           const opts = [];
           for (const [ddr, ddc] of Object.values(DIRS)) {
             const y = py + ddr, x = px + ddc;
@@ -298,7 +384,11 @@
         for (const [y, x] of cells) { occ[y][x] = idx; empty.delete(y * W + x); }
         pieces.push({ idx, ord: ++ord, cells, dir, color: PALETTE[idx % PALETTE.length] });
       }
-      if (!failed) return { W, H, pieces, occ, land };
+      if (!failed) {
+        const alive = pieces.filter(p => !p.dead);
+        alive.forEach((p, i) => { p.idx = i; for (const [y, x] of p.cells) occ[y][x] = i; });
+        return { W, H, pieces: alive, occ, land };
+      }
     }
     throw new Error('could not generate a solvable board');
   }
@@ -619,6 +709,10 @@
   el.btnLevels.addEventListener('click', () => { if (state.left < state.pieces.length && !state.finished && !confirm('Leave this level? Progress on it will be lost.')) return; goToLevels(); });
   el.btnSound.addEventListener('click', () => { state.muted = !state.muted; store.set('muted', state.muted); renderSound(); if (!state.muted) SFX.shoot(); });
   el.btnVibe?.addEventListener('click', () => { state.vibe = !state.vibe; store.set('vibe', state.vibe); renderToggles(); vibe(20); });
+  el.btnMusic?.addEventListener('click', () => { state.music = !state.music; store.set('music', state.music); renderToggles(); if (state.music) musicStart(); else musicStop(); });
+  // Browsers only allow sound after a gesture: the first tap anywhere starts the pad (if Music is on).
+  document.addEventListener('pointerdown', () => { if (state.music && !music.on) musicStart(); }, { passive: true });
+  document.addEventListener('visibilitychange', () => { if (document.hidden) musicStop(); });
   el.btnGuides?.addEventListener('click', () => { state.guides = !state.guides; store.set('guides', state.guides); renderToggles(); });
   el.howTo?.addEventListener('click', () => { el.aboutPanel.open = true; el.aboutPanel.scrollIntoView({ behavior: 'smooth', block: 'start' }); });
   renderToggles();
