@@ -57,6 +57,8 @@
     <span class="footer-divider" aria-hidden="true">|</span>
     <a href="${basePath}ai-metadata-remover.html">AI Metadata Remover</a>
     <span class="footer-divider" aria-hidden="true">|</span>
+    <a href="${basePath}map-maker.html">Map Maker</a>
+    <span class="footer-divider" aria-hidden="true">|</span>
     <a href="${basePath}about.html">About</a>
     <span class="footer-divider" aria-hidden="true">|</span>
     <a href="${basePath}privacy-policy.html">Privacy Policy</a>

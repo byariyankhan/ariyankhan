@@ -104,6 +104,9 @@ directories unreachable over the web.
 | `ai-metadata-remover.html` | Free SEO tool page: strips C2PA/XMP/IPTC/EXIF/PNG-text metadata from images in the browser — see "AI Metadata Remover" section below |
 | `js/ai-metadata-remover.js` | The byte-level JPEG/PNG/WebP metadata stripper + page UI (no server, no upload) |
 | `css/ai-metadata-remover.css` | Tool page layout, drop zone, result cards, content sections |
+| `map-maker.html` | Free SEO tool page: highlight countries on a world map, export PNG/SVG — see "Map Maker" section below |
+| `js/map-maker.js`, `css/map-maker.css` | Map Maker engine (d3-geo projections, export, share links) + page styles |
+| `js/vendor/` | Local copies of d3-array, d3-geo, d3-geo-projection, topojson-client and Natural Earth country data (`countries-110m.json`, `countries-50m.json`); the site CSP forbids CDNs |
 
 ---
 
@@ -382,10 +385,35 @@ output parses clean. Needs Node only (no browser).
 (SynthID etc.), cannot beat pixel-based detectors, and does nothing for video.
 Don't market it as "make AI images undetectable".
 
+## Map Maker (free tool page)
+
+`map-maker.html` is the second organic-traffic tool: highlight countries in colour
+groups, pick a projection, zoom to a region/selection, export PNG (1×/2×/4×) or
+SVG, share by link. All client-side.
+
+- **Libraries** live in `js/vendor/` (UMD builds; they attach to `window.d3` /
+  `window.topojson`). Load order in the page: d3-array → d3-geo →
+  d3-geo-projection → topojson-client → `js/map-maker.js`. No CDN: the CSP is
+  `script-src 'self'`.
+- **Data**: `countries-110m.json` (default, ~40 KB gzipped, 177 countries) and
+  `countries-50m.json` ("High-detail borders" toggle, ~240 KB gzipped, 241
+  territories) from the `world-atlas` npm package (Natural Earth, public domain).
+  Abbreviated Natural Earth names are expanded in `NAME_FIX`; search aliases
+  (UK, USA, Burma…) in `ALIASES`; region presets are lon/lat boxes in `REGIONS`.
+- **Share links** put the whole state in `#m=<base64url JSON>`; nothing is
+  stored server-side. `loadHash()` validates every field, so a malformed link
+  just falls back to defaults.
+- **Export** serialises a fresh non-interactive SVG (`render(target, {interactive:false})`)
+  and rasterises it through an `<img>` + canvas. Labels use `Inter, Segoe UI,
+  Arial` so the PNG matches what the browser has.
+- **Rule**: keep the disputed-borders FAQ honest (Natural Earth de facto policy)
+  and never call the maps "official".
+
 ## Do Not
 
 - Do not commit `mail-config.local.php`
 - Do not add self-links in explore pills
 - Do not create duplicate content across SEO pages (Google penalty)
 - Do not add `site-config.js`
+- Do not load JS/CSS from a CDN — the CSP only allows `'self'`; vendor it under `js/vendor/`
 
