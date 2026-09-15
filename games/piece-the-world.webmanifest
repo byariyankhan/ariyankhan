@@ -1,0 +1,17 @@
+{
+  "id": "/piece-the-world.html",
+  "name": "Piece the World — Map Jigsaw",
+  "short_name": "Piece the World",
+  "description": "Drag continents and countries into place against the clock. Free geography jigsaw by Ariyan Khan.",
+  "start_url": "/piece-the-world.html?utm_source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0a0a0a",
+  "theme_color": "#0d0d0d",
+  "categories": ["games", "education"],
+  "icons": [
+    { "src": "/favicon/web-app-manifest-192x192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/favicon/web-app-manifest-512x512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

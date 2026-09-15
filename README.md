@@ -106,6 +106,10 @@ directories unreachable over the web.
 | `css/ai-metadata-remover.css` | Tool page layout, drop zone, result cards, content sections |
 | `map-maker.html` | Free SEO tool page: highlight countries on a world map, export PNG/SVG — see "Map Maker" section below |
 | `js/map-maker.js`, `css/map-maker.css` | Map Maker engine (d3-geo projections, export, share links) + page styles |
+| `piece-the-world.html` | Geography jigsaw game page — see "Piece the World" section below |
+| `js/piece-the-world.js`, `css/piece-the-world.css` | Game engine (drag/snap, modes, timer, stars, bests) + page styles |
+| `games/data/*.json`, `games/build-data.mjs` | Level data (piece paths per continent) and the script that builds it from Natural Earth |
+| `games/piece-the-world.webmanifest`, `piece-the-world-sw.js` | PWA manifest + service worker for the game (offline levels, installable) |
 | `js/vendor/` | Local copies of d3-array, d3-geo, d3-geo-projection, topojson-client and Natural Earth country data (`countries-110m.json`, `countries-50m.json`); the site CSP forbids CDNs |
 
 ---
@@ -408,6 +412,43 @@ SVG, share by link. All client-side.
   Arial` so the PNG matches what the browser has.
 - **Rule**: keep the disputed-borders FAQ honest (Natural Earth de facto policy)
   and never call the maps "official".
+
+## Piece the World (geography jigsaw game)
+
+`piece-the-world.html` is the first game: drag continents (World level) or
+countries (Europe, Asia, Africa, North America, South America, Oceania) onto an
+outline board against the clock. Easy / Normal / Hard, misses + hints → accuracy →
+1–3 stars, personal bests per level+mode in `localStorage` (`ptw:v1:*`), share
+text, `#level-mode` deep links (`#africa-hard`). English only, continuous play
+(no daily challenge), transcontinental countries filed by capital.
+
+- **Engine**: `js/piece-the-world.js` (no libraries), styles in
+  `css/piece-the-world.css` (`.ptw-` prefix). The board is one `<svg>` with the
+  level's `viewBox`; every piece path is already in board coordinates, so a
+  piece is "home" at translate(0,0). Dragging draws a ghost at true board scale
+  in a fixed full-viewport `<svg>` and converts the drop point through
+  `getScreenCTM()`; a drop within `tolerance(piece)` of the centroid snaps.
+  Mobile also supports tap-piece-then-tap-board.
+- **Data**: `games/data/<level>.json` (`{ board, pieces[], auto[], sphere? }`),
+  ~1.1 MB total, built by `games/build-data.mjs` from Natural Earth 1:50m on an
+  azimuthal equal-area projection (so piece sizes are honest). `auto` = countries
+  under 14 board units in either direction, drawn pre-placed. IDs are ISO numeric
+  codes, or a name slug where Natural Earth has `-99` (France, Norway, Kosovo…).
+  Files are requested with `?v=<DATA_VERSION>` and `games/data/.htaccess` marks
+  them immutable — bump `DATA_VERSION` in the JS (and the preload in the HTML)
+  whenever you rebuild.
+- **Adding a level** (e.g. states of a country): add an entry to `LEVELS` in
+  `games/build-data.mjs` (or write the JSON by hand in the same shape), rebuild,
+  then add `{ id, name, pieces, tag, blurb }` to `LEVELS` in the JS and a row to
+  the levels table in the HTML. No engine changes needed.
+- **PWA**: `games/piece-the-world.webmanifest` + `piece-the-world-sw.js` (root
+  scope, but its fetch handler only answers for the game's own files; everything
+  else passes through untouched). `.htaccess` serves the worker with `no-cache`
+  so edges never pin an old version. Wrap it as an Android app later with
+  Bubblewrap/PWABuilder (Trusted Web Activity) — no code changes.
+- **Tests**: `node tests/piece-the-world.test.mjs` validates the data against the
+  level cards and page copy. Browser drag/tap/finish flow was checked with
+  Playwright on desktop and a Pixel 5 profile.
 
 ## Do Not
 

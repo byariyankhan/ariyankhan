@@ -25,6 +25,7 @@ RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 
 # ── Never serve deploy/test tooling ──────────────
 RedirectMatch 404 ^/(deploy|tests)(/|$)
+RedirectMatch 404 ^/games/build-data\.mjs$
 
 ## Missing paths: keep a real 404 status and hand off to /404.html
 RewriteCond %{REQUEST_URI} !^/404\.html$ [NC]
@@ -84,6 +85,11 @@ RewriteRule ^ - [R=404,L]
   <FilesMatch "^countries-(110m|50m)\.json$">
     Header set Cache-Control "public, max-age=31536000, immutable"
   </FilesMatch>
+
+  # Service worker: browsers re-check it on every page load, so the edge must not pin it for a year
+  <Files "piece-the-world-sw.js">
+    Header set Cache-Control "no-cache, must-revalidate"
+  </Files>
 </IfModule>
 
 # ── Protect local mail config ─────────────────────
