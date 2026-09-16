@@ -111,7 +111,7 @@ directories unreachable over the web.
 | `games/data/*.json`, `games/build-data.mjs` | Level data (piece paths per continent) and the script that builds it from Natural Earth |
 | `games/piece-the-world.webmanifest`, `piece-the-world-sw.js` | PWA manifest + service worker for both games (offline levels, installable) |
 | `arrow-atlas.html`, `js/arrow-atlas.js`, `css/arrow-atlas.css` | Tap-away arrow puzzle game on country maps — see "Arrow Atlas" section below |
-| `games/data/arrow-atlas.json`, `games/build-arrow-atlas.mjs`, `games/arrow-atlas.webmanifest` | Its level data (outlines + tier scales for 168 countries; masks are rasterised in the browser), build script and PWA manifest |
+| `games/data/arrow-atlas.json`, `games/build-arrow-atlas.mjs`, `games/arrow-atlas.webmanifest` | Its level data (outlines + tier scales for 197 countries; masks are rasterised in the browser), build script and PWA manifest |
 | `js/vendor/` | Local copies of d3-array, d3-geo, d3-geo-projection, topojson-client and Natural Earth country data (`countries-110m.json`, `countries-50m.json`); the site CSP forbids CDNs |
 
 ---
@@ -482,7 +482,7 @@ in a row step it down;
 `TIER_OF()`; Try again keeps the same board, New layout takes the new tier; the
 result card says what the form did), combo counter (taps within 1.8 s), win streak, milestones every 10 levels, a Today's Country
 bonus board (date-seeded, same for everyone, `#daily`), and clearing the board reveals the country for a
-3-option quiz plus capital/population/region. 168-country World Tour (every country in world-atlas 110m minus dependencies and disputed areas) with sequential
+3-option quiz plus capital/population/region. 197-country World Tour (every UN member state, plus Palestine, the Vatican, Kosovo and Taiwan: world-atlas 110m plus the 29 small states from the 10m file, minus dependencies and disputed areas) with sequential
 unlock (skip allowed after two fails), stars, best times and progress in
 `localStorage` (`aa:v1:*`), share text, `#level-N` deep links.
 
@@ -525,7 +525,7 @@ unlock (skip allowed after two fails), stars, best times and progress in
   data files. Versioned with `MAP_VERSION`. There is no Restart button in the game any more (back out or
   fail and retry).
 - **Lobby layout**: title, the world map (fills the space), Continue, then two
-  compact buttons (Today's Country, World Tour n/168 · All levels). The old cards
+  compact buttons (Today's Country, World Tour n/197 · All levels). The old cards
   carousel and the level-path dots are gone.
 - **SEO**: title/description/keywords around "Arrow Atlas", "arrow puzzle" and
   "arrow game"; Open Graph/Twitter card `images/arrow-atlas-og.jpg` (1200×630,

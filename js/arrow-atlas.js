@@ -14,8 +14,8 @@
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
   const SVG_NS = 'http://www.w3.org/2000/svg';
-  const DATA_VERSION = '9';
-  const MAP_VERSION = '1';
+  const DATA_VERSION = '10';
+  const MAP_VERSION = '2';
   const STORE = 'aa:v1:';
   const store = {
     get(k, fb) { try { const v = localStorage.getItem(STORE + k); return v == null ? fb : JSON.parse(v); } catch { return fb; } },
