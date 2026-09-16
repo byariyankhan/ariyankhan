@@ -480,7 +480,8 @@ up after a single level, 1 for any other first-try clear so two in a row step up
 whatever hearts and hints were spent, 0 after a retry (resets); two lost boards
 in a row step it down;
 `TIER_OF()`; Try again keeps the same board, New layout takes the new tier; the
-result card says what the form did), combo counter (taps within 1.8 s), win streak, milestones every 10 levels, a Today's Country
+tier is never explained on the win card, only shown on the Next button and in
+the start toast), combo counter (taps within 1.8 s), win streak, milestones every 10 levels, a Today's Country
 bonus board (date-seeded, same for everyone, `#daily`), and clearing the board reveals the country for a
 3-option quiz plus capital/population/region. 197-country World Tour (every UN member state, plus Palestine, the Vatican, Kosovo and Taiwan: world-atlas 110m plus the 29 small states from the 10m file, minus dependencies and disputed areas) with sequential
 unlock (skip allowed after two fails), stars, best times and progress in
@@ -597,7 +598,12 @@ unlock (skip allowed after two fails), stars, best times and progress in
   63 countries before the discovery boards existed is on level 65, not back on
   level 4 because Bhutan's animal sits fourth in their list. Milestones (every
   10th) and the share text use that number; `#level-n` (position in the list)
-  is still read for old links. The result card's Next button and Skip go to the
+  is still read for old links. The win card is deliberately short: kicker, name,
+  stars, the four stats, what the find is (discovery boards) or capital,
+  population and region (countries), then the buttons. The best-time line and
+  the paragraph explaining what the player's form did to the next tier were both
+  dropped as noise; the record is still kept and the tier still shows on the
+  Next button. The result card's Next button and Skip go to the
   next *open* board (`nextOpen`: first uncleared, unlocked level further down
   the list, else from the top), never to a replay of a cleared one. The boards file is loaded with the level
   data, not in the background. The HUD says only `Level n`; the start toast
