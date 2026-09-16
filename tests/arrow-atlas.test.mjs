@@ -30,8 +30,8 @@ function solvable(board) {
   return gone.size === pieces.length;
 }
 
-test('168 levels with name, capital, outline and 5 tier scales', () => {
-  assert.equal(data.levels.length, 168);
+test('197 levels with name, capital, outline and 5 tier scales', () => {
+  assert.equal(data.levels.length, 197);
   for (const L of data.levels) { assert.ok(L.name && L.cap && L.d.startsWith('M'), L.name); assert.equal(L.k.length, 5); assert.ok(L.k.every(k => k > 0), L.name); assert.ok(L.cont, `${L.name} has no continent`); }
 });
 test('every level id is unique', () => assert.equal(new Set(data.levels.map(l => l.id)).size, data.levels.length));
