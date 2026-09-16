@@ -16,7 +16,7 @@
   const SVG_NS = 'http://www.w3.org/2000/svg';
   const DATA_VERSION = '11';
   const MAP_VERSION = '3';
-  const DISCB_VERSION = '1';  // games/data/discover-boards.json: the board shaped like each country's animal, bird or landmark
+  const DISCB_VERSION = '2';  // games/data/discover-boards.json: the board shaped like each country's animal, bird or landmark
   const STORE = 'aa:v1:';
   const store = {
     get(k, fb) { try { const v = localStorage.getItem(STORE + k); return v == null ? fb : JSON.parse(v); } catch { return fb; } },
@@ -371,7 +371,7 @@
   // the discovery level of country C: a level of its own that borrows the shape's outline and scales
   function discLevelFor(C) {
     const b = DISCB?.boards?.[C.a2], sh = b && DISCB.shapes[b.hex]; if (!sh) return null;
-    if (!discCache.has(C.id)) discCache.set(C.id, { id: 'd:' + C.id, name: b.name, kind: b.kind, hex: b.hex, d: sh.d, k: sh.k, country: C, disc: true });
+    if (!discCache.has(C.id)) discCache.set(C.id, { id: 'd:' + C.id, name: b.name, kind: b.kind, hex: b.hex, rel: b.rel, fact: b.fact, d: sh.d, k: sh.k, country: C, disc: true });
     return discCache.get(C.id);
   }
   // the next board to play after i: the first open one further down the list (cleared boards are skipped, so Next
@@ -933,7 +933,7 @@
     } else { store.set(progressKey(i), rec); forgetNums(); }
     const streak = store.get('streak', 0) + 1; store.set('streak', streak);
     const n = levelNo(i), milestone = !state.daily && n % 10 === 0;
-    const facts = D ? `${escapeHtml(C.name)}'s ${KIND_WORD[D.kind]} · <b>${escapeHtml(L.name)}</b>` : [L.cap ? `Capital: <b>${L.cap}</b>` : '', L.pop ? `Population: <b>${fmtPop(L.pop)}</b>` : '', L.sub ? `Region: <b>${L.sub}</b>` : ''].filter(Boolean).join(' · ');
+    const facts = D ? `<b>${escapeHtml(L.name)}</b> · ${escapeHtml(D.rel)}` : [L.cap ? `Capital: <b>${L.cap}</b>` : '', L.pop ? `Population: <b>${fmtPop(L.pop)}</b>` : '', L.sub ? `Region: <b>${L.sub}</b>` : ''].filter(Boolean).join(' · ');
     const nj = nextOpen(i), last = nj < 0;
     el.card.innerHTML = `
       <p class="aa-card-kicker">${milestone ? `Milestone · level ${n}` : streak >= 2 ? `${streak} in a row · ` : ''}${D ? 'You cleared' : quizRight ? 'Correct!' : 'It was'}</p>
@@ -941,6 +941,7 @@
       <p class="aa-stars" aria-label="${s} of 3 stars">${'★'.repeat(s)}${'☆'.repeat(3 - s)}</p>
       <div class="aa-stats"><span><b>${fmtTime(t, true)}</b>time</span><span><b>${state.livesMax - state.lives}</b>hearts lost</span><span><b>${state.hintsUsed}</b>hints</span><span><b>x${state.bestCombo}</b>best combo</span></div>
       <p class="aa-facts">${facts}</p>
+      ${D && D.fact ? `<p class="aa-disc-fact">${escapeHtml(D.fact)}</p>` : ''}
       <p class="aa-best">${isBest ? (prev ? `New best time! Previous ${fmtTime(prev.t, true)}.` : 'First clear. That is your time to beat.') : `Your best: ${fmtTime(prev.t, true)}.`}</p>
       ${last ? '' : adaptNote(learn, `Level ${levelNo(nj)}`)}
       <div class="aa-actions">
