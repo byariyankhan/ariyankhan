@@ -30,6 +30,7 @@ services:
         condition: service_completed_successfully
     volumes:
       - site:/var/www/html
+      - aa-data:/var/lib/arrow-atlas
     environment:
       SITE_URL: ${SITE_URL:-https://ariyankhan.com}
       TO_EMAIL: ${TO_EMAIL:-}
@@ -38,6 +39,10 @@ services:
       SMTP_PASS: ${SMTP_PASS:-}
       SMTP_PORT: ${SMTP_PORT:-587}
       ALLOW_SELF_SIGNED: ${ALLOW_SELF_SIGNED:-}
+      # Arrow Atlas accounts (games/api/): the SQLite file lives in the aa-data volume, never in the web root,
+      # which every deploy replaces. GOOGLE_CLIENT_ID switches Google sign-in on; empty means no sign-in offered.
+      AA_DATA_DIR: /var/lib/arrow-atlas
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
     command: ["bash", "/var/www/html/deploy/web-entrypoint.sh"]
 
   caddy:
@@ -76,3 +81,4 @@ services:
 volumes:
   caddy_data:
   caddy_config:
+  aa-data:

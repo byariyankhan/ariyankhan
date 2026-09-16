@@ -75,7 +75,7 @@
 
   const el = {
     select: $('#aaSelect'), tagline: $('#aaTagline'), dailyRow: $('#aaDailyRow'), homeSel: $('#aaHome'), streak: $('#aaStreak'), daily: $('#aaDaily'), hudDiff: $('#aaHudDiff'), play: $('#aaPlay'), path: $('#aaPath'), btnVibe: $('#aaVibe'), btnGuides: $('#aaGuides'), btnMusic: $('#aaMusic'), howTo: $('#aaHowTo'),
-    sheet: $('#aaSheet'), friends: $('#aaFriends'), friendsSheet: $('#aaFriendsSheet'), challengeBtn: $('#aaChallenge'), nameInput: $('#aaName'), settingsBtns: $$('#aaSettings, #aaSettingsG'), themeBtn: $('#aaTheme'), themes: $('#aaThemes'),
+    sheet: $('#aaSheet'), friends: $('#aaFriends'), signInSheet: $('#aaSignInSheet'), googleBtn: $('#aaGoogleBtn'), signInNote: $('#aaSignInNote'), dashSheet: $('#aaDashSheet'), dash: $('#aaDash'), settingsBtns: $$('#aaSettings, #aaSettingsG'), themeBtn: $('#aaTheme'), themes: $('#aaThemes'),
     game: $('#aaGame'), boardWrap: $('#aaBoardWrap'), board: $('#aaBoard'), toast: $('#aaToast'), confetti: $('#aaConfetti'),
     hudLevel: $('#aaHudLevel'), hudMode: $('#aaHudMode'), hudTime: $('#aaHudTime'), hudLeft: $('#aaHudLeft'), hudLives: $('#aaHudLives'), hudLivesWrap: $('#aaHudLivesWrap'), hudPct: $('#aaHudPct'), boardBar: $('#aaBoardBar'),
     btnHint: $('#aaHint'), btnLevels: $('#aaBackToLevels'), btnSound: $('#aaSound'),
@@ -1017,6 +1017,96 @@
     } catch { if (flash) { flash.textContent = text; flash.hidden = false; } }
   }
 
+  // ── Accounts ──
+  // Only for playing with other people: the single-player game never asks. The server (games/api/auth.php) keeps
+  // the provider's opaque user id and the display name, nothing else, and the account can be deleted from the
+  // dashboard. Signed out, the button opens the sign-in sheet; signed in, it opens the dashboard.
+  const auth = { user: null, providers: {}, ready: false };
+  function authApi(a, body) {
+    return fetch(`games/api/auth.php?a=${a}`, { method: body ? 'POST' : 'GET', credentials: 'same-origin', cache: 'no-store', headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined })
+      .then(async r => { const d = await r.json().catch(() => ({})); if (!r.ok) throw Object.assign(new Error(d.error || `HTTP ${r.status}`), { code: d.error }); return d; });
+  }
+  async function authLoad(force) {
+    if (auth.ready && !force) return auth;
+    try { const d = await authApi('me'); auth.user = d.user || null; auth.providers = d.providers || {}; }
+    catch { auth.user = null; auth.providers = {}; }
+    auth.ready = true;
+    return auth;
+  }
+  async function openFriends() {
+    closeSheets();
+    await authLoad();
+    if (auth.user) openDash(); else openSignIn();
+  }
+  let gisAsked = false;
+  function openSignIn() {
+    if (el.googleBtn) el.googleBtn.innerHTML = '';
+    if (el.signInNote) { el.signInNote.hidden = true; el.signInNote.textContent = ''; }
+    openSheet(el.signInSheet);
+    if (auth.providers.google) loadGis();
+    else signInNote('Sign-in is being switched on. Until then, a challenge link you were sent still works without an account.');
+  }
+  const signInNote = msg => { if (!el.signInNote) return; el.signInNote.textContent = msg; el.signInNote.hidden = false; };
+  function loadGis() {
+    if (window.google?.accounts?.id) { renderGoogleButton(); return; }
+    if (gisAsked) return;
+    gisAsked = true;
+    const sc = document.createElement('script');
+    sc.src = 'https://accounts.google.com/gsi/client'; sc.async = true; sc.defer = true;
+    sc.onload = renderGoogleButton;
+    sc.onerror = () => { gisAsked = false; signInNote('Google sign-in could not load. Check your connection and try again.'); };
+    document.head.appendChild(sc);
+  }
+  function renderGoogleButton() {
+    const box = el.googleBtn;
+    if (!box || !window.google?.accounts?.id) return;
+    box.innerHTML = '';
+    try {
+      google.accounts.id.initialize({ client_id: auth.providers.google, callback: onGoogleCredential, ux_mode: 'popup', auto_select: false });
+      google.accounts.id.renderButton(box, { theme: 'outline', size: 'large', shape: 'pill', text: 'continue_with', width: 260 });
+    } catch { signInNote('Google sign-in could not start. Please try again.'); }
+  }
+  async function onGoogleCredential(res) {
+    try {
+      const d = await authApi('google', { credential: res?.credential || '' });
+      auth.user = d.user || null;
+      closeSheets();
+      if (auth.user) { openDash(); toast(`Signed in as ${auth.user.name}`, 'good'); if (typeof gtag === 'function') gtag('event', 'login', { method: 'google', game: 'arrow_atlas' }); }
+    } catch (e) {
+      signInNote(e.code === 'google_not_configured' ? 'Google sign-in is not switched on yet.' : 'That sign-in did not go through. Please try again.');
+    }
+  }
+  function openDash() { renderDash(); openSheet(el.dashSheet); }
+  function renderDash() {
+    const u = auth.user;
+    if (!u || !el.dash) return;
+    const boards = DATA ? DATA.levels.filter((_, i) => cleared(i)).length : 0;
+    const countries = DATA ? DATA.levels.filter((L, i) => !L.disc && cleared(i)).length : 0;
+    el.dash.innerHTML = `
+      <div class="aa-me"><span class="aa-me-face" aria-hidden="true">${escapeHtml((u.name || '?').trim().charAt(0).toUpperCase() || '?')}</span><span><span class="aa-me-name">${escapeHtml(u.name || 'Player')}</span><br><span class="aa-me-sub">Signed in with ${escapeHtml(u.provider || 'Google')}</span></span></div>
+      <div class="aa-stats"><span><b>${countries}</b>countries</span><span><b>${boards}</b>boards cleared</span><span><b>${DIFF_OF(TIER_OF())}</b>difficulty</span></div>
+      <div class="aa-group">
+        <button type="button" class="aa-row aa-row--link" data-dash="challenge"><span class="aa-row-ico">🏁</span><span class="aa-row-label">Challenge a friend<small>Play a board, then send it. Whoever clears it faster wins.</small></span><span class="aa-row-chev">›</span></button>
+        <div class="aa-row aa-row--soon"><span class="aa-row-ico">⚡</span><span class="aa-row-label">Live race, up to 7 players<small>Everyone starts together, first to clear wins</small></span><span class="aa-soon">Soon</span></div>
+        <div class="aa-row aa-row--soon"><span class="aa-row-ico">🌍</span><span class="aa-row-label">Race people online<small>We find you players at your level</small></span><span class="aa-soon">Soon</span></div>
+      </div>
+      <div class="aa-group">
+        <button type="button" class="aa-row aa-row--link" data-dash="signout"><span class="aa-row-ico">🚪</span><span class="aa-row-label">Sign out</span><span class="aa-row-chev">›</span></button>
+        <button type="button" class="aa-row aa-row--link aa-row--danger" data-dash="delete"><span class="aa-row-ico">🗑️</span><span class="aa-row-label">Delete account<small>Removes the account from our server for good</small></span><span class="aa-row-chev">›</span></button>
+      </div>`;
+  }
+  el.dash?.addEventListener('click', async e => {
+    const act = e.target.closest('[data-dash]')?.dataset.dash;
+    if (!act) return;
+    if (act === 'challenge') { closeSheets(); startChallenge(); return; }
+    if (act === 'signout') { try { await authApi('logout', {}); } catch { /* the cookie may already be gone */ } auth.user = null; closeSheets(); toast('Signed out.'); return; }
+    if (act === 'delete') {
+      if (!confirm('Delete your account? Your friends list and anything stored on our server goes with it. The progress on this device stays.')) return;
+      try { await authApi('delete', {}); auth.user = null; closeSheets(); toast('Account deleted.'); }
+      catch { toast('Could not delete the account. Please try again.', 'bad'); }
+    }
+  });
+
   // ── Play with friends: challenge links ──
   // A board is built from a seed, so two phones can play the very same board with no server at all: the link
   // carries the board, the tier, the seed and the sender's time. Nothing is stored anywhere and no account is
@@ -1026,7 +1116,7 @@
   const b64uEnc = str => { let bin = ''; for (const b of new TextEncoder().encode(str)) bin += String.fromCharCode(b); return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); };
   const b64uDec = code => { const bin = atob(code.replace(/-/g, '+').replace(/_/g, '/')); return new TextDecoder().decode(Uint8Array.from(bin, c => c.charCodeAt(0))); };
   const cleanName = v => String(v || '').replace(/[~\u0000-\u001f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 14);
-  const myName = () => cleanName(store.get('name', '')) || 'A friend';
+  const myName = () => cleanName(auth.user?.name || store.get('name', '')) || 'A friend';
   const raceCode = r => b64uEnc(['1', GEN_VERSION, r.board, r.tier, r.seed, r.t, r.stars, r.name].join('~'));
   function raceParse(code) {
     try {
@@ -1195,11 +1285,9 @@
   el.play.addEventListener('click', () => startLevel(+el.play.dataset.level || 0));
   // Sheets
   const openSheet = sh => { sh.hidden = false; document.body.style.overflow = 'hidden'; };
-  const closeSheets = () => { el.sheet.hidden = true; if (el.friendsSheet) el.friendsSheet.hidden = true; document.body.style.overflow = ''; };
+  const closeSheets = () => { el.sheet.hidden = true; if (el.signInSheet) el.signInSheet.hidden = true; if (el.dashSheet) el.dashSheet.hidden = true; document.body.style.overflow = ''; };
   el.settingsBtns.forEach(b => b.addEventListener('click', () => openSheet(el.sheet)));
-  el.friends?.addEventListener('click', () => { if (el.nameInput) el.nameInput.value = cleanName(store.get('name', '')); openSheet(el.friendsSheet); });
-  el.nameInput?.addEventListener('input', () => store.set('name', cleanName(el.nameInput.value)));
-  el.challengeBtn?.addEventListener('click', () => { closeSheets(); startChallenge(); });
+  el.friends?.addEventListener('click', openFriends);
   $$('[data-close-sheet]').forEach(b => b.addEventListener('click', closeSheets));
   $$('.aa-sheet').forEach(sh => sh.addEventListener('click', e => { if (e.target === sh) closeSheets(); }));
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSheets(); });

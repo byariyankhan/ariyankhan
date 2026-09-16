@@ -3,15 +3,17 @@
 # One container, no public port. `web` (php:8.4-apache) downloads the site
 # from GitHub as a tarball on every start (SITE_BRANCH, default main), runs
 # deploy/web-entrypoint.sh, and listens on 127.0.0.1:${WEB_PORT} (default
-# 8747). The VPS's host nginx routes ariyankhan.com to that port. The site is
-# stateless (static pages + a PHP contact form), so moving it to another VPS
-# is: run this compose there, flip DNS. Nothing is shared with other sites.
+# 8747). The VPS's host nginx routes ariyankhan.com to that port. Almost everything is
+# stateless (static pages + a PHP contact form); the one exception is the Arrow
+# Atlas account database, a SQLite file in the aa-data volume. Moving to another
+# VPS is: copy that volume, run this compose there, flip DNS. Nothing is shared with other sites.
 #
 # Redeploy = re-run the project (container restarts → fetches latest code).
 #
 # Environment (Docker Manager → project env / .env):
 #   WEB_PORT, SITE_BRANCH,
 #   SITE_URL, TO_EMAIL, SMTP_HOST, SMTP_USER, SMTP_PASS, SMTP_PORT,
+#   GOOGLE_CLIENT_ID (Arrow Atlas sign-in; leave empty to offer no sign-in),
 #
 # Dedicated VPS with nothing else on :80/:443 → deploy/docker-compose.standalone.yml
 
@@ -31,6 +33,12 @@ services:
       SMTP_PASS: ${SMTP_PASS:-}
       SMTP_PORT: ${SMTP_PORT:-587}
       ALLOW_SELF_SIGNED: ${ALLOW_SELF_SIGNED:-}
+      # Arrow Atlas accounts (games/api/): the SQLite file lives in the volume below, never in the web root,
+      # which every deploy wipes. GOOGLE_CLIENT_ID switches Google sign-in on; empty means no sign-in offered.
+      AA_DATA_DIR: /var/lib/arrow-atlas
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+    volumes:
+      - aa-data:/var/lib/arrow-atlas
     command:
       - bash
       - -c
@@ -49,3 +57,5 @@ services:
       retries: 3
       start_period: 40s
 
+volumes:
+  aa-data:
