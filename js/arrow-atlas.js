@@ -37,14 +37,18 @@
   const livesFor = () => LIVES;
   // ── Adaptive difficulty ──
   // Difficulty follows the player, never the level number. One tier (0 Easy … 4 Master) lives on the device and
-  // moves on form alone: two levels in a row cleared at the first try (hearts and hints spent or not) step it up;
-  // two lost boards in a row step it down. Nobody stays bored on an easy board or stuck on a hard one.
-  const STEP_UP_WINS = 2, STEP_DOWN_LOSSES = 2;
+  // moves on form alone. A cleared board earns points towards the next step: a flawless, fast first-try clear (no
+  // heart lost, no hint, quick per arrow) earns the whole step at once, so a strong player leaves Easy after level 1;
+  // any other first-try clear earns half (two in a row step up, hearts and hints spent or not); a clear after a
+  // retry earns nothing and resets. Two lost boards in a row step down. Nobody stays bored or stuck.
+  const STEP_POINTS = 2, STEP_DOWN_LOSSES = 2;
+  const FAST_SEC_PER_ARROW = 1.2;   // level 1 (~22 arrows) in under ~26 s counts as fast
   const clampTier = t => Math.max(0, Math.min(4, t));
-  // form = { tier, wins: first-try clears in a row, losses: lost boards in a row }
+  const clearPoints = ({ firstTry, heartsLost, hints, secPerArrow }) => !firstTry ? 0 : heartsLost === 0 && hints === 0 && secPerArrow <= FAST_SEC_PER_ARROW ? STEP_POINTS : 1;
+  // form = { tier, wins: points towards the next step, losses: lost boards in a row }
   const FORM0 = { tier: 0, wins: 0, losses: 0 };
-  const nextForm = (f, won, firstTry) => {
-    if (won) { const wins = firstTry ? f.wins + 1 : 0; return wins >= STEP_UP_WINS ? { tier: clampTier(f.tier + 1), wins: 0, losses: 0 } : { tier: f.tier, wins, losses: 0 }; }
+  const nextForm = (f, won, run) => {
+    if (won) { const pts = clearPoints(run), wins = pts ? f.wins + pts : 0; return wins >= STEP_POINTS ? { tier: clampTier(f.tier + 1), wins: 0, losses: 0 } : { tier: f.tier, wins, losses: 0 }; }
     const losses = f.losses + 1; return losses >= STEP_DOWN_LOSSES ? { tier: clampTier(f.tier - 1), wins: 0, losses: 0 } : { tier: f.tier, wins: 0, losses };
   };
   const formNow = () => ({ ...FORM0, ...(store.get('form', null) || {}) });
@@ -756,19 +760,20 @@
   // Move the player's form on the finished board (tour levels only; the daily board has a fixed tier).
   function learnFrom(won) {
     if (state.daily) return null;
-    const before = formNow(), firstTry = won && state.fails === 0, after = nextForm(before, won, firstTry);
+    const run = { firstTry: won && state.fails === 0, heartsLost: state.livesMax - state.lives, hints: state.hintsUsed, secPerArrow: state.elapsed / 1000 / Math.max(1, state.pieces.length) };
+    const before = formNow(), after = nextForm(before, won, run), points = won ? clearPoints(run) : 0;
     store.set('form', after);
-    store.set('lastRun', { level: state.idx + 1, tier: state.tier, won, firstTry, wrong: state.wrong, hints: state.hintsUsed, at: Date.now() });
-    return { before, after, firstTry };
+    store.set('lastRun', { level: state.idx + 1, tier: state.tier, won, ...run, points, at: Date.now() });
+    return { before, after, points };
   }
   // One line for the result card explaining what the player's form did to the next board.
   function adaptNote(learn, nextIdx) {
     if (!learn || nextIdx == null || nextIdx >= DATA.levels.length) return '';
-    const { before, after } = learn;
-    if (after.tier > before.tier) return `<p class="aa-adapt aa-adapt--up">Two in a row at the first try. Level ${nextIdx + 1} steps up to ${DIFF_OF(after.tier)}.</p>`;
+    const { before, after, points } = learn;
+    if (after.tier > before.tier) return `<p class="aa-adapt aa-adapt--up">${points >= STEP_POINTS ? 'Flawless and fast.' : 'Two in a row at the first try.'} Level ${nextIdx + 1} steps up to ${DIFF_OF(after.tier)}.</p>`;
     if (after.tier >= 4) return `<p class="aa-adapt aa-adapt--up">Master boards. As hard as it gets.</p>`;
-    if (after.wins === 1) return `<p class="aa-adapt">First try. One more like that and the boards step up to ${DIFF_OF(after.tier + 1)}.</p>`;
-    return `<p class="aa-adapt">Level ${nextIdx + 1} stays ${DIFF_OF(after.tier)}. Two first-try clears in a row step it up.</p>`;
+    if (after.wins > 0) return `<p class="aa-adapt">First try. One more like that and the boards step up to ${DIFF_OF(after.tier + 1)}; a flawless, fast clear steps up at once.</p>`;
+    return `<p class="aa-adapt">Level ${nextIdx + 1} stays ${DIFF_OF(after.tier)}. Two first-try clears in a row step it up, a flawless fast clear at once.</p>`;
   }
   function stars() { const lost = state.livesMax - state.lives; return lost === 0 ? 3 : lost === 1 ? 2 : 1; }
   function winLevel() {
