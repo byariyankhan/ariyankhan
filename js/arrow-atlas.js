@@ -236,12 +236,9 @@
     return flagsPromise;
   }
   const flagColour = (a2, x, y, W, H) => { const f = FLAGS?.flags[a2]; if (!f) return null; const fx = Math.min(FLAGS.w - 1, Math.floor((x + 0.5) / W * FLAGS.w)), fy = Math.min(FLAGS.h - 1, Math.floor((y + 0.5) / H * FLAGS.h)); return f.p[+f.r[fy][fx]] || f.p[0]; };
-  // a small inline SVG of the flag for the result card (runs of equal cells merged into one rect per run)
-  function flagSvg(a2) {
-    const f = FLAGS?.flags[a2]; if (!f) return '';
-    let out = ''; for (let y = 0; y < FLAGS.h; y++) { let x = 0; while (x < FLAGS.w) { const c = f.r[y][x]; let x2 = x; while (x2 + 1 < FLAGS.w && f.r[y][x2 + 1] === c) x2++; out += `<rect x="${x}" y="${y}" width="${x2 - x + 1}" height="1" fill="${f.p[+c]}"/>`; x = x2 + 1; } }
-    return `<svg class="aa-flag-thumb" viewBox="0 0 ${FLAGS.w} ${FLAGS.h}" role="img" aria-label="Flag"><g shape-rendering="crispEdges">${out}</g></svg>`;
-  }
+  // the real flag (flag-icons SVG, MIT, games/flags/) for the quiz and result cards: the board underlay is a cell grid
+  // by nature, but the card should show the flag as it is
+  const flagImg = a2 => `<img class="aa-flag-thumb" src="games/flags/${a2.toLowerCase()}.svg" alt="Flag" width="640" height="480" decoding="async">`;
 
   // ── Lobby world map ──
   // Every country faint; the tour countries outlined; cleared ones filled and numbered with their level;
@@ -903,7 +900,7 @@
     const rnd = mulberry32(state.idx * 31 + 7);
     for (let i = others.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [others[i], others[j]] = [others[j], others[i]]; }
     const options = [L, others[0], others[1]]; for (let i = options.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [options[i], options[j]] = [options[j], options[i]]; }
-    el.card.innerHTML = `<h3>Board cleared!</h3><p class="aa-card-lead">${state.board === 'flags' ? 'Whose flag is this?' : 'Which country did you just clear?'}</p>${state.board === 'flags' ? flagSvg(L.a2) : ''}<div class="aa-quiz"></div>`;
+    el.card.innerHTML = `<h3>Board cleared!</h3><p class="aa-card-lead">${state.board === 'flags' ? 'Whose flag is this?' : 'Which country did you just clear?'}</p>${state.board === 'flags' ? flagImg(L.a2) : ''}<div class="aa-quiz"></div>`;
     const box = $('.aa-quiz', el.card);
     for (const o of options) {
       const b = document.createElement('button'); b.type = 'button'; b.className = 'aa-btn aa-quiz-opt'; b.textContent = o.name;
@@ -931,6 +928,7 @@
     const last = i >= DATA.levels.length - 1;
     el.card.innerHTML = `
       <p class="aa-card-kicker">${milestone ? `Milestone · ${i + 1} countries` : streak >= 2 ? `${streak} in a row · ` : ''}${quizRight ? 'Correct!' : 'It was'}</p>
+      ${state.board === 'flags' ? flagImg(L.a2) : ''}
       <h3>${L.name}</h3>
       <p class="aa-stars" aria-label="${s} of 3 stars">${'★'.repeat(s)}${'☆'.repeat(3 - s)}</p>
       <div class="aa-stats"><span><b>${fmtTime(t, true)}</b>time</span><span><b>${state.livesMax - state.lives}</b>hearts lost</span><span><b>${state.hintsUsed}</b>hints</span><span><b>x${state.bestCombo}</b>best combo</span></div>

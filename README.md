@@ -590,7 +590,8 @@ unlock (skip allowed after two fails), stars, best times and progress in
   the start, Master 4.5 vs 11). `games/build-flags.mjs` renders every flag
   (flag-icons, MIT) to a 32x24 palette grid in `games/data/flags.json`; the
   board lays it under the arrows at 22% and lights each cell as its arrow
-  leaves; the quiz asks whose flag it is and shows the flag.
+  leaves; the quiz and result cards show the real flag (`games/flags/*.svg`,
+  flag-icons, MIT; the grid is only for the board).
 - **Tightening** (generate stage 3, Hard and up, `TIGHTEN_OF` iterations): a local
   search over head ends after signposting. Flip one arrow to its other end, or,
   when that closes a cycle, also one arrow on its new run, and keep the flip when

@@ -78,7 +78,7 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 /* flag boards: the flag lies under the arrows and lights up cell by cell */
 .aa-flagcell{ opacity:.22; transition:opacity .35s ease; }
 .aa-flagcell.is-open{ opacity:1; }
-.aa-flag-thumb{ display:block; width:min(60%,180px); margin:6px auto 10px; border-radius:6px; box-shadow:var(--shadow); }
+.aa-flag-thumb{ display:block; width:min(60%,180px); height:auto; aspect-ratio:4/3; object-fit:cover; margin:6px auto 10px; border-radius:6px; box-shadow:var(--shadow); }
 .aa-row--select{ cursor:default; }
 .aa-row-label small{ display:block; font-size:12px; font-weight:600; color:var(--muted); }
 .aa-select{ font:inherit; font-weight:700; font-size:14px; color:var(--ink); background:var(--bg2); border:none; border-radius:12px; padding:8px 10px; max-width:46%; }
