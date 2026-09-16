@@ -986,6 +986,7 @@
     else if (act === 'giveup') { el.card.innerHTML = '<h3>Sending…</h3>'; finishMatch(false, 0); }
     else if (act === 'minvite') sendInvite(state.pendingMatch);
     else if (act === 'mcancel') cancelMatch();
+    else if (act === 'mstart') startMatch();
     else if (act === 'levels') goToLevels();
     else if (act === 'share') share();
     else if (act === 'gorace') el.overlay.hidden = true;
@@ -1097,7 +1098,7 @@
     el.matchTitle.textContent = 'Dashboard';
     el.matchBody.innerHTML = `
       ${meStrip()}
-      <p class="aa-sheet-note">Pick what you both put in. You each play the same board, and whoever clears it faster takes the lot.</p>
+      <p class="aa-sheet-note">Pick what everyone puts in. You all play the same board, and the first to clear it takes the lot.</p>
       <div class="aa-stakes">
         ${STAKES.map((v, i) => `<button type="button" class="aa-stake" data-stake="${v}"${gold < v ? ' disabled' : ''}><span class="aa-stake-amt"><span aria-hidden="true">🪙</span>${gfmt(v)}</span><span class="aa-stake-sub">${['Normal', 'Hard', 'Expert'][i]} board<br>${gold < v ? 'not enough gold' : `winner takes ${gfmt(v * 2)}`}</span></button>`).join('')}
       </div>
@@ -1105,10 +1106,10 @@
     openSheet(el.matchSheet);
   }
 
-  // The host waits on the game screen: the board only arrives once the friend is in, so nobody can study it
-  // while the other side decides.
-  function waitForFriend(m) {
-    stopMatchPoll();
+  // The room, on the game screen: who is in, an Invite button, and Start for the host. The board is not dealt
+  // until the host starts, so nobody can study it while the room fills up.
+  const faces = players => (players || []).map(p => `<span class="aa-rank${p.you ? ' is-you' : ''}" title="${escapeHtml(p.name)}"><span aria-hidden="true">${escapeHtml((p.name || '?').trim().charAt(0).toUpperCase() || '?')}</span></span>`).join('');
+  function showRoom(m) {
     state.pendingMatch = m;
     closeSheets();
     el.select.hidden = true; el.game.hidden = false; el.board.innerHTML = '';
@@ -1117,44 +1118,63 @@
     el.boardBar.style.width = '0%'; el.ranks.hidden = true;
     scrollToGame();
     if (history.replaceState) history.replaceState(null, '', location.pathname + location.search + '#m=' + m.code);
+    renderRoom(m);
+    el.overlay.hidden = false;
+    startRoomPoll(m.code);
+  }
+  function renderRoom(m) {
+    const host = m.you === 'host';
+    state.pendingMatch = m;
     el.card.innerHTML = `
       <p class="aa-card-kicker">Gold match · ${gfmt(m.stake)}</p>
-      <h3>Waiting for your friend</h3>
-      <p class="aa-wait">The board opens the moment they accept.</p>
+      <h3>${m.count} of ${m.seats} joined</h3>
+      <div class="aa-ranks aa-ranks--card">${faces(m.players)}</div>
+      <p class="aa-wait">${host ? (m.count > 1 ? 'Start when everyone is in.' : 'Waiting for your friends to join.') : `Waiting for ${escapeHtml(m.host)} to start.`}</p>
       <p class="aa-link-box">${escapeHtml(matchLink(m.code))}</p>
       <div class="aa-actions">
-        <button type="button" class="aa-btn aa-btn--primary" data-act="minvite">Invite a friend</button>
-        <button type="button" class="aa-btn" data-act="mcancel">Cancel</button>
+        <button type="button" class="aa-btn${host ? '' : ' aa-btn--primary'}" data-act="minvite">Invite</button>
+        ${host ? `<button type="button" class="aa-btn aa-btn--primary" data-act="mstart"${m.count > 1 ? '' : ' disabled'}>Start</button>` : ''}
+        ${host ? '<button type="button" class="aa-btn" data-act="mcancel">Cancel</button>' : ''}
       </div>
       <p class="aa-flash" hidden></p>`;
-    el.overlay.hidden = false;
+  }
+  function startRoomPoll(code) {
+    stopMatchPoll();
     state.matchPoll = setInterval(async () => {
       try {
-        const d = await matchApi('get', null, '&code=' + encodeURIComponent(m.code));
+        const d = await matchApi('get', null, '&code=' + encodeURIComponent(code));
         if (typeof d.gold === 'number') setGold(d.gold);
-        if (d.match.state === 'playing') { stopMatchPoll(); playMatch(d.match); }
-        else if (d.match.state !== 'open') { stopMatchPoll(); toast('That match is over.', 'hint'); goToLevels(); }
+        const m = d.match;
+        if (m.state === 'playing') { stopMatchPoll(); playMatch(m); }
+        else if (m.state === 'open') { const was = state.pendingMatch?.count; state.pendingMatch = m; if (!el.overlay.hidden && m.count !== was) renderRoom(m); }
+        else { stopMatchPoll(); toast(m.state === 'void' ? 'That match was called off.' : 'That match is over.', 'hint'); goToLevels(); }
       } catch { /* a dropped poll is nothing: the next one will do */ }
-    }, 2500);
+    }, 2000);
   }
   function stopMatchPoll() { clearInterval(state.matchPoll); state.matchPoll = 0; }
+  async function startMatch() {
+    const m = state.pendingMatch;
+    if (!m) return;
+    const btn = $('[data-act="mstart"]', el.card); if (btn) btn.disabled = true;
+    try { const d = await matchApi('start', { code: m.code }); stopMatchPoll(); playMatch(d.match); }
+    catch (err) { if (btn) btn.disabled = false; toast(err.code === 'need_two' ? 'Nobody has joined yet.' : 'Could not start the match.', 'bad'); }
+  }
   async function cancelMatch() {
     const m = state.pendingMatch;
     if (!m) return;
     stopMatchPoll();
-    try { const d = await matchApi('cancel', { code: m.code }); setGold(d.gold); toast(`Invitation cancelled. ${gfmt(m.stake)} gold back.`, 'good'); }
-    catch (err) { toast(err.code === 'taken' ? 'Too late, your friend already accepted.' : 'Could not cancel that invitation.', 'bad'); }
+    try { const d = await matchApi('cancel', { code: m.code }); setGold(d.gold); toast(`Match called off. ${gfmt(m.stake)} gold back.`, 'good'); }
+    catch (err) { toast(err.code === 'taken' ? 'Too late, the match has started.' : 'Could not call that match off.', 'bad'); }
     state.pendingMatch = null;
     goToLevels();
   }
-
   function showConfirm(m) {
     el.matchTitle.textContent = 'A challenge';
     const gold = auth.user?.gold ?? 0, short = gold < m.stake;
     el.matchBody.innerHTML = `
       <p class="aa-sheet-note"><b>${escapeHtml(m.host)}</b> challenges you.</p>
       <p class="aa-purse"><span>Stake</span><span class="aa-gold"><span aria-hidden="true">🪙</span>${gfmt(m.stake)}</span></p>
-      <p class="aa-sheet-note">You both put in ${gfmt(m.stake)} gold and play the very same board. Clear it faster and you take ${gfmt(m.stake * 2)}.${short ? ` <b>You have only ${gfmt(gold)}.</b>` : ''}</p>
+      <p class="aa-sheet-note">Everyone puts in ${gfmt(m.stake)} gold and plays the very same board. Clear it first and you take the lot.${short ? ` <b>You have only ${gfmt(gold)}.</b>` : ''}</p>
       <div class="aa-actions">
         <button type="button" class="aa-btn aa-btn--primary" data-mact="join"${short ? ' disabled' : ''}>Confirm game</button>
         <button type="button" class="aa-btn" data-mact="close">Not now</button>
@@ -1166,12 +1186,11 @@
 
   function showMatchState(m) {
     el.matchTitle.textContent = m.state === 'done' ? (m.draw ? 'Nobody cleared it' : m.you_won ? 'You win!' : `${escapeHtml(m.winner)} wins`) : 'Waiting';
-    const them = m.you === 'host' ? m.guest : m.host;
-    const row = (who, ms) => `<div class="aa-vs-row"><span>${escapeHtml(who)}</span><b>${ms == null ? 'still playing' : ms < 0 ? 'ran out of hearts' : fmtTime(ms, true)}</b></div>`;
+    const row = p => `<div class="aa-vs-row${m.state === 'done' && p.place === 1 && p.ms > 0 ? ' is-win' : ''}"><span>${p.ms > 0 ? `${p.place}. ` : ''}${escapeHtml(p.you ? 'You' : p.name)}</span><b>${p.ms == null ? 'still playing' : p.ms < 0 ? 'ran out of hearts' : fmtTime(p.ms, true)}</b></div>`;
     el.matchBody.innerHTML = `
-      <div class="aa-vs">${row('You', m.your_ms)}${row(them || 'Your friend', m.their_ms)}</div>
-      <p class="aa-purse"><span>${m.state === 'done' ? (m.draw ? 'Both stakes came back' : m.you_won ? `You won ${gfmt(m.stake * 2)}` : `You lost ${gfmt(m.stake)}`) : 'Your stake is held'}</span><span class="aa-gold"><span aria-hidden="true">🪙</span>${gfmt(auth.user?.gold ?? 0)}</span></p>
-      ${m.state === 'done' ? '' : '<p class="aa-sheet-note">Your friend has not finished yet. Open this again later to see how it ended.</p>'}
+      <div class="aa-vs">${(m.players || []).map(row).join('')}</div>
+      <p class="aa-purse"><span>${m.state === 'done' ? (m.draw ? 'Every stake came back' : m.you_won ? `You won ${gfmt(m.pot)}` : `You lost ${gfmt(m.stake)}`) : 'Your stake is held'}</span><span class="aa-gold"><span aria-hidden="true">🪙</span>${gfmt(auth.user?.gold ?? 0)}</span></p>
+      <p class="aa-sheet-note">${m.state === 'done' ? 'The first player to clear the board takes the pot.' : 'The others have not finished yet. Open this again later to see how it ended.'}</p>
       <div class="aa-actions"><button type="button" class="aa-btn aa-btn--primary" data-mact="stakes">Play another</button><button type="button" class="aa-btn" data-mact="close">Close</button></div>`;
     openSheet(el.matchSheet);
   }
@@ -1214,7 +1233,7 @@
   async function sendInvite(m) {
     if (!m) return;
     const link = matchLink(m.code);
-    const text = `Arrow Atlas: I put ${gfmt(m.stake)} gold on this board. Match it, clear it faster than me and take ${gfmt(m.stake * 2)}.\n${link}`;
+    const text = `Arrow Atlas: I put ${gfmt(m.stake)} gold on a board. Match it, clear it before me and take the lot.\n${link}`;
     const flash = $('.aa-flash', el.overlay.hidden ? el.matchBody : el.card);
     try {
       if (navigator.share) { await navigator.share({ text }); return; }
@@ -1230,7 +1249,7 @@
     const act = e.target.closest('[data-mact]')?.dataset.mact;
     if (stake) {
       const btn = e.target.closest('[data-stake]'); btn.disabled = true;
-      try { const d = await matchApi('create', { stake: +stake }); setGold(d.gold); waitForFriend(d.match); }
+      try { const d = await matchApi('create', { stake: +stake }); setGold(d.gold); showRoom(d.match); }
       catch (err) { btn.disabled = false; toast(goldError(err), 'bad'); if (typeof err.gold === 'number') setGold(err.gold); }
       return;
     }
@@ -1240,7 +1259,7 @@
     else if (act === 'close') closeSheets();
     else if (act === 'join' && m) {
       const btn = e.target.closest('[data-mact]'); btn.disabled = true;
-      try { const d = await matchApi('join', { code: m.code }); setGold(d.gold); playMatch(d.match); }
+      try { const d = await matchApi('join', { code: m.code }); setGold(d.gold); showRoom(d.match); }
       catch (err) { btn.disabled = false; toast(goldError(err), 'bad'); if (typeof err.gold === 'number') setGold(err.gold); }
     }
   });
@@ -1261,10 +1280,11 @@
       const m = d.match;
       if (typeof d.gold === 'number') setGold(d.gold);
       if (!auth.user) { state.pendingCode = code; openSignIn(`${m.host} put ${gfmt(m.stake)} gold on a board for you. Sign in to take the challenge.`); return; }
-      if (m.you && m.state !== 'open') { if (m.your_ms == null && m.board) playMatch(m); else showMatchState(m); return; }
+      if (m.you && m.state === 'playing') { if (m.your_ms == null && m.board) playMatch(m); else showMatchState(m); return; }
+      if (m.you && m.state === 'done') { showMatchState(m); return; }
       if (m.state === 'void') { toast('That invitation was called off.', 'hint', 4000); return; }
       if (m.state !== 'open') { toast('That match is over.', 'hint'); return; }
-      if (m.you === 'host') { waitForFriend(m); return; }
+      if (m.you) { showRoom(m); return; }
       showConfirm(m);
     } catch (err) {
       toast(err.code === 'no_match' ? 'That invitation link is not valid any more.' : 'Could not open that invitation.', 'bad', 4500);
