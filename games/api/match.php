@@ -63,8 +63,8 @@ if ($action === 'create') {
     if (!aa_take_gold($db, $me['id'], $stake)) { $db->rollBack(); aa_json(['error' => 'not_enough_gold', 'gold' => aa_gold($db, $me['id'])], 400); }
     $code = aa_match_code($db);
     $db->prepare('INSERT INTO matches (code, host_id, stake, board, tier, seed, state, created) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
-       ->execute([$code, $me['id'], $stake, $board, AA_STAKE_TIER[$stake], random_int(100000, 999999), 'open', time()]);
-    aa_seat($db, $code, $me['id']);
+       ->execute([$code, $me['id'], $stake, $board, 2, random_int(100000, 999999), 'open', time()]);
+    aa_seat($db, $code, $me['id'], (int)(aa_body()['tier'] ?? 2));
     $db->commit();
     aa_reply($db, $code, $me);
 }
@@ -87,7 +87,7 @@ if ($action === 'join') {
     $stake = (int)$m['stake'];
     $db->beginTransaction();
     if (!aa_take_gold($db, $me['id'], $stake)) { $db->rollBack(); aa_json(['error' => 'not_enough_gold', 'gold' => aa_gold($db, $me['id'])], 400); }
-    aa_seat($db, $m['code'], $me['id']);
+    aa_seat($db, $m['code'], $me['id'], (int)(aa_body()['tier'] ?? 2));
     $db->commit();
     aa_reply($db, $m['code'], $me);
 }
@@ -100,7 +100,9 @@ if ($action === 'start') {
     if ((int)$m['host_id'] !== $me['id']) aa_json(['error' => 'not_host'], 403);
     if ($m['state'] !== 'open') aa_json(['error' => 'taken'], 409);
     if (count(aa_room($db, $m['code'])) < 2) aa_json(['error' => 'need_two'], 400);
-    $db->prepare("UPDATE matches SET state = 'playing', started = ? WHERE code = ? AND state = 'open'")->execute([time(), $m['code']]);
+    // the board is set now, from the players who actually turned up
+    $db->prepare("UPDATE matches SET state = 'playing', started = ?, tier = ? WHERE code = ? AND state = 'open'")
+       ->execute([time(), aa_room_tier($db, $m['code']), $m['code']]);
     aa_reply($db, $m['code'], $me);
 }
 
