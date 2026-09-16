@@ -90,6 +90,13 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-play--ghost{ background:var(--card); color:var(--ink); box-shadow:0 3px 0 var(--line-soft); margin-top:10px; font-size:18px; padding:14px 22px; }
 .aa-play--ghost:active{ box-shadow:0 1px 0 var(--line-soft); }
 .aa-row--soon{ opacity:.55; }
+.aa-signin{ display:flex; justify-content:center; min-height:44px; margin:4px 0 12px; }
+.aa-signin:empty{ display:none; margin:0; min-height:0; }   /* no empty gap when Google's button could not load */
+.aa-signin-list{ margin:0 0 14px; padding:0 0 0 18px; color:var(--muted); font-size:14px; line-height:1.7; }
+.aa-me{ display:flex; align-items:center; gap:12px; margin:0 0 14px; }
+.aa-me-face{ width:48px; height:48px; border-radius:50%; background:var(--accent); color:#fff; font-size:22px; font-weight:900; display:flex; align-items:center; justify-content:center; flex:0 0 auto; }
+.aa-me-name{ font-size:20px; font-weight:900; color:var(--ink); line-height:1.1; }
+.aa-me-sub{ font-size:12px; color:var(--muted); }
 .aa-soon{ font-size:11px; font-weight:900; letter-spacing:1px; text-transform:uppercase; color:var(--muted); background:var(--bg2); border-radius:999px; padding:4px 10px; flex:0 0 auto; }
 .aa-input{ text-align:right; }
 .aa-vs{ display:grid; gap:6px; margin:0 0 14px; }

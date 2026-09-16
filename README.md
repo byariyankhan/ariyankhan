@@ -620,6 +620,27 @@ unlock (skip allowed after two fails), stars, best times and progress in
   discovery) is next and is the only level picker: the All levels sheet, the
   Discoveries collection and the "You discovered" facts list are all gone. The
   tour unlocks itself from the player's play and location.
+- **Accounts** (`games/api/auth.php`, `games/api/lib.php`, `auth` in the engine):
+  the lobby's second button gates on sign-in. Signed out it opens the sign-in
+  sheet, signed in it opens the dashboard (name, stats, Challenge a friend, the
+  two live modes marked Soon, sign out, delete account). The server keeps only
+  the provider's opaque user id and the display name, in SQLite under
+  `AA_DATA_DIR` (a Docker volume, since every deploy wipes the web root);
+  sessions are random tokens stored hashed behind an HttpOnly, SameSite=Lax
+  cookie. `GET ?a=me` also reports which providers the server can actually use:
+  Google sign-in is live only when `GOOGLE_CLIENT_ID` is set in the container's
+  environment, otherwise the sheet says so. The OAuth client's **Authorized
+  JavaScript origins** must list `https://ariyankhan.com`, or Google's library
+  refuses to show the button on the live site. `arrow-atlas.html` gets its own
+  slightly wider CSP in `.htaccess` for Google's sign-in library. Deleting the
+  account is in the dashboard because Google Play requires it.
+  `tests/auth.test.php` covers the security-critical half without the network:
+  which ID tokens are accepted (audience, issuer, expiry, unverified accounts,
+  junk answers), that one Google account makes exactly one player, that session
+  tokens are stored hashed and expire, and that deleting an account takes its
+  sessions with it. The browser side is `aa-friends.mjs` and `aa-auth-full.mjs`
+  in the scratchpad; the one step no test can do is Google actually signing a
+  token, so a real sign-in has to be tried by hand once.
 - **Play with friends** (`playRace`, `raceCode`/`raceParse`, `#vs=<code>`): a board
   comes from a seed, so two phones can play the identical board with no server at
   all. The lobby's second button opens a sheet with three rows: **Challenge a
