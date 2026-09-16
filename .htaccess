@@ -27,6 +27,42 @@ RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 RedirectMatch 404 ^/(deploy|tests)(/|$)
 RedirectMatch 404 ^/games/build-[a-z-]+\.mjs$
 
+# ── youtube.ariyankhan.com ───────────────────────
+#    One container, two sites. The subdomain's document root is /youtube (the
+#    channel smart link and a page per video); the main site never serves that
+#    folder, so the same pages are not indexed twice. [END] stops the rewrite
+#    engine outright, which is what keeps an internal rewrite from looping back
+#    through these rules.
+RewriteCond %{HTTP_HOST} ^youtube\. [NC]
+RewriteRule ^youtube(/|$) - [R=404,END]
+
+#    one canonical URL per page: no /index.php, no .php extension. Only pages that
+#    really are in the folder redirect, so a stray .php elsewhere stays a plain 404.
+RewriteCond %{HTTP_HOST} ^youtube\. [NC]
+RewriteRule ^index\.(?:php|html)$ https://%{HTTP_HOST}/ [R=301,L,NE]
+
+RewriteCond %{HTTP_HOST} ^youtube\. [NC]
+RewriteCond %{DOCUMENT_ROOT}/youtube/$1.php -f
+RewriteRule ^(.+)\.php$ https://%{HTTP_HOST}/$1 [R=301,L,NE]
+
+RewriteCond %{HTTP_HOST} ^youtube\. [NC]
+RewriteRule ^$ youtube/index.php [END]
+
+RewriteCond %{HTTP_HOST} ^youtube\. [NC]
+RewriteCond %{DOCUMENT_ROOT}/youtube/$1 -f
+RewriteRule ^(.+)$ youtube/$1 [END]
+
+#    /spain, not /spain.php: the pages' own canonical URLs carry no extension
+RewriteCond %{HTTP_HOST} ^youtube\. [NC]
+RewriteCond %{DOCUMENT_ROOT}/youtube/$1.php -f
+RewriteRule ^([^./]+)/?$ youtube/$1.php [END]
+
+RewriteCond %{HTTP_HOST} ^youtube\. [NC]
+RewriteRule ^ - [R=404,END]
+
+#    and on the main site that folder is not a page at all
+RewriteRule ^youtube(/|$) - [R=404,L]
+
 ## Missing paths: keep a real 404 status and hand off to /404.html
 RewriteCond %{REQUEST_URI} !^/404\.html$ [NC]
 RewriteCond %{REQUEST_FILENAME} !-f
@@ -47,6 +83,16 @@ RewriteRule ^ - [R=404,L]
   <Files "arrow-atlas.html">
     Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://accounts.google.com https://www.gstatic.com https://*.googletagmanager.com https://*.google-analytics.com https://static.cloudflareinsights.com https://*.googlesyndication.com; style-src 'self' 'unsafe-inline' https://accounts.google.com https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://accounts.google.com https://www.gstatic.com https://img.youtube.com https://i.ytimg.com https://*.google-analytics.com https://*.googletagmanager.com https://*.googlesyndication.com https://*.g.doubleclick.net; frame-src https://accounts.google.com https://www.youtube.com https://drive.google.com https://www.facebook.com https://*.googlesyndication.com https://*.adtrafficquality.google; connect-src 'self' https://accounts.google.com https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com https://*.g.doubleclick.net https://www.google.com https://cloudflareinsights.com https://www.youtube.com https://*.googlesyndication.com https://*.adtrafficquality.google; object-src 'none'; base-uri 'self'; form-action 'self'"
   </Files>
+  # The channel pages on youtube.ariyankhan.com send their own security headers, and a stricter policy than
+  # this one: nonces rather than 'unsafe-inline', frames denied outright. Two Content-Security-Policy headers
+  # are enforced as the intersection of both and the other four would simply contradict each other, so the
+  # subdomain drops these and lets the pages speak. Its static files keep nosniff and HSTS from above.
+  <If "%{HTTP_HOST} =~ /^youtube\./i">
+    Header always unset Content-Security-Policy
+    Header always unset X-Frame-Options
+    Header always unset Referrer-Policy
+    Header always unset Permissions-Policy
+  </If>
 </IfModule>
 
 # ── Gzip compression ─────────────────────────────

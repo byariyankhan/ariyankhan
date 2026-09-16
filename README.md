@@ -84,6 +84,46 @@ directories unreachable over the web.
 
 ---
 
+## youtube.ariyankhan.com (the channel's smart link)
+
+The subdomain is **the same container as the main site**, not a second server.
+`/youtube` in this repo is its document root: `index.php` is the smart opener
+that hands a visitor to the YouTube app, `spain.php` is a page per video, plus
+that subdomain's own `robots.txt`, `sitemap.xml` and `assets/`.
+
+Three pieces have to line up, and all three are here except the DNS record:
+
+| Piece | Where | State |
+|-------|-------|-------|
+| DNS record `youtube` | **Cloudflare** (`algin`/`meiling.ns.cloudflare.com` are the domain's nameservers — the Hostinger zone for ariyankhan.com is not authoritative and editing it does nothing) | **the one manual step**: add `CNAME youtube → ariyankhan.com`, proxied |
+| `server_name` on the VPS | `deploy/nginx-ariyankhan.conf` | in the repo; copy it to the VPS and reload nginx |
+| Routing and headers | root `.htaccess` | done |
+
+The `.htaccess` block does four things for any host starting `youtube.`:
+serves `/` from `/youtube/index.php`; serves a real file out of `/youtube` when
+one exists (so `/assets/spain-thumbnail.png`, `/robots.txt` and `/sitemap.xml`
+resolve); maps an extensionless path to the `.php` beside it, because the pages'
+own canonical URLs read `/spain`; and 404s everything else, so nothing from the
+main site is reachable through the subdomain. `/spain.php` and `/index.php`
+301 to their canonical forms, and **on the main site `/youtube` is a 404**, so
+the same pages are never indexed at two addresses. `[END]` (not `[L]`) is what
+stops an internal rewrite from looping back through the block.
+
+The pages send their own security headers, including a stricter nonce-based
+Content-Security-Policy than the main site's. Two `Content-Security-Policy`
+headers would be enforced as the intersection of both, and the other four would
+simply contradict each other, so the `<If "%{HTTP_HOST} =~ /^youtube\./i">`
+block unsets the main site's CSP, `X-Frame-Options`, `Referrer-Policy` and
+`Permissions-Policy` and lets the pages speak. Static files there keep `nosniff`
+and HSTS.
+
+Adding another video page: drop `whatever.php` in `/youtube` and it is live at
+`https://youtube.ariyankhan.com/whatever` on the next deploy. **Put it in
+`/youtube`** — the folder was once called `Youtube Ariyan Khan`, and a file
+uploaded to that old name is not served.
+
+---
+
 ## File Map
 
 | File | Purpose |
