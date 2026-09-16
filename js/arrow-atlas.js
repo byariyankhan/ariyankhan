@@ -374,6 +374,14 @@
     if (!discCache.has(C.id)) discCache.set(C.id, { id: 'd:' + C.id, name: b.name, kind: b.kind, hex: b.hex, d: sh.d, k: sh.k, country: C, disc: true });
     return discCache.get(C.id);
   }
+  // the next board to play after i: the first open one further down the list (cleared boards are skipped, so Next
+  // never lands on a replay), else the first open one anywhere, else nothing (-1)
+  function nextOpen(i) {
+    const open = j => !cleared(j) && unlocked(j);
+    for (let j = i + 1; j < DATA.levels.length; j++) if (open(j)) return j;
+    for (let j = 0; j <= i && j < DATA.levels.length; j++) if (open(j)) return j;
+    return -1;
+  }
   const hudLabel = () => state.daily ? 'Daily' : `Level ${levelNo(state.idx)}`;
   const maskFor = (L, tier) => { const key = L.id + ':' + tier; if (!maskCache.has(key)) maskCache.set(key, rasterise(L.d, L.k[tier])); return maskCache.get(key); };
 
@@ -884,7 +892,8 @@
     stopTimer(); state.finished = true; state.busy = true;
     state.outlineEl?.style.setProperty('fill-opacity', '0.9');
     SFX.win(); confetti();
-    setTimeout(showQuiz, 700);
+    // only a country gets the quiz; a discovery board simply tells what it was
+    setTimeout(state.disc ? () => showResult(null) : showQuiz, 700);
   }
   function showQuiz() {
     const L = state.level, D = state.disc;
@@ -916,7 +925,7 @@
     const learn = learnFrom(true);
     const prev = state.daily ? store.get(`daily:${state.daily.key}`) : cleared(i);
     const isBest = !prev || t < prev.t;
-    const rec = { t: isBest ? t : prev.t, stars: Math.max(s, prev?.stars || 0), quiz: !!(quizRight || prev?.quiz), tier: state.tier, arrows: state.pieces.length, at: Date.now() };
+    const rec = { t: isBest ? t : prev.t, stars: Math.max(s, prev?.stars || 0), quiz: !!D || !!(quizRight || prev?.quiz), tier: state.tier, arrows: state.pieces.length, at: Date.now() };
     if (state.daily) {
       store.set(`daily:${state.daily.key}`, rec);
       const ds = store.get('dailyStreak', { count: 0, last: '' });
@@ -925,17 +934,17 @@
     const streak = store.get('streak', 0) + 1; store.set('streak', streak);
     const n = levelNo(i), milestone = !state.daily && n % 10 === 0;
     const facts = D ? `${escapeHtml(C.name)}'s ${KIND_WORD[D.kind]} · <b>${escapeHtml(L.name)}</b>` : [L.cap ? `Capital: <b>${L.cap}</b>` : '', L.pop ? `Population: <b>${fmtPop(L.pop)}</b>` : '', L.sub ? `Region: <b>${L.sub}</b>` : ''].filter(Boolean).join(' · ');
-    const last = i >= DATA.levels.length - 1;
+    const nj = nextOpen(i), last = nj < 0;
     el.card.innerHTML = `
-      <p class="aa-card-kicker">${milestone ? `Milestone · level ${n}` : streak >= 2 ? `${streak} in a row · ` : ''}${quizRight ? 'Correct!' : 'It was'}</p>
+      <p class="aa-card-kicker">${milestone ? `Milestone · level ${n}` : streak >= 2 ? `${streak} in a row · ` : ''}${D ? 'You cleared' : quizRight ? 'Correct!' : 'It was'}</p>
       <h3>${escapeHtml(L.name)}</h3>
       <p class="aa-stars" aria-label="${s} of 3 stars">${'★'.repeat(s)}${'☆'.repeat(3 - s)}</p>
       <div class="aa-stats"><span><b>${fmtTime(t, true)}</b>time</span><span><b>${state.livesMax - state.lives}</b>hearts lost</span><span><b>${state.hintsUsed}</b>hints</span><span><b>x${state.bestCombo}</b>best combo</span></div>
       <p class="aa-facts">${facts}</p>
       <p class="aa-best">${isBest ? (prev ? `New best time! Previous ${fmtTime(prev.t, true)}.` : 'First clear. That is your time to beat.') : `Your best: ${fmtTime(prev.t, true)}.`}</p>
-      ${last ? '' : adaptNote(learn, `Level ${levelNo(i + 1)}`)}
+      ${last ? '' : adaptNote(learn, `Level ${levelNo(nj)}`)}
       <div class="aa-actions">
-        ${last || state.daily ? '' : `<button type="button" class="aa-btn aa-btn--primary" data-act="next">Next: Level ${levelNo(i + 1)} · ${DIFF_OF(TIER_OF())}</button>`}
+        ${last || state.daily ? '' : `<button type="button" class="aa-btn aa-btn--primary" data-act="next">Next: Level ${levelNo(nj)} · ${DIFF_OF(TIER_OF())}</button>`}
         <button type="button" class="aa-btn" data-act="again">Play again</button>
         <button type="button" class="aa-btn" data-act="share">Share</button>
         <button type="button" class="aa-btn" data-act="levels">World Tour</button>
@@ -970,10 +979,10 @@
   }
   el.card.addEventListener('click', e => {
     const act = e.target.closest('[data-act]')?.dataset.act; if (!act) return;
-    if (act === 'next') startLevel(state.idx + 1);
+    if (act === 'next') { const j = nextOpen(state.idx); if (j < 0) goToLevels(); else startLevel(j); }
     else if (act === 'again' || act === 'retry') startLevel(state.idx, false, state.daily, state.tier);
     else if (act === 'shuffle') startLevel(state.idx, true, state.daily);
-    else if (act === 'skip') { store.set(skipKey(state.idx + 1), true); startLevel(state.idx + 1); }
+    else if (act === 'skip') { store.set(skipKey(state.idx + 1), true); startLevel(nextOpen(state.idx)); }
     else if (act === 'levels') goToLevels();
     else if (act === 'share') share();
   });
