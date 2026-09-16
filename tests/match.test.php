@@ -21,26 +21,26 @@ $gold = fn(int $u) => aa_gold($db, $u);
 $row = fn(string $code) => aa_match_row_raw($db, $code);
 
 // the pieces the endpoint puts together, exercised here without HTTP
-$make = function (int $uid, int $stake) use ($db) {
+$make = function (int $uid, int $stake, int $tier = 2) use ($db) {
     if (!in_array($stake, AA_STAKES, true) || !aa_take_gold($db, $uid, $stake)) return null;
     $code = aa_match_code($db);
     $db->prepare('INSERT INTO matches (code, host_id, stake, board, tier, seed, state, created) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
-       ->execute([$code, $uid, $stake, aa_pick_board() ?? '380', AA_STAKE_TIER[$stake], 424242, 'open', time()]);
-    aa_seat($db, $code, $uid);
+       ->execute([$code, $uid, $stake, aa_pick_board() ?? '380', 2, 424242, 'open', time()]);
+    aa_seat($db, $code, $uid, $tier);
     return $code;
 };
-$join = function (string $code, int $uid) use ($db) {
+$join = function (string $code, int $uid, int $tier = 2) use ($db) {
     $m = aa_match_row_raw($db, $code);
     if (!$m || $m['state'] !== 'open' || count(aa_room($db, $code)) >= AA_MATCH_SEATS) return false;
     foreach (aa_room($db, $code) as $p) if ((int)$p['user_id'] === $uid) return false;
     if (!aa_take_gold($db, $uid, (int)$m['stake'])) return false;
-    aa_seat($db, $code, $uid);
+    aa_seat($db, $code, $uid, $tier);
     return true;
 };
 $start = function (string $code, int $uid) use ($db) {
     $m = aa_match_row_raw($db, $code);
     if (!$m || $m['state'] !== 'open' || (int)$m['host_id'] !== $uid || count(aa_room($db, $code)) < 2) return false;
-    $db->prepare("UPDATE matches SET state = 'playing', started = ? WHERE code = ?")->execute([time(), $code]);
+    $db->prepare("UPDATE matches SET state = 'playing', started = ?, tier = ? WHERE code = ?")->execute([time(), aa_room_tier($db, $code), $code]);
     return true;
 };
 // ms = their own clock, at = the moment their result reached the server
@@ -58,11 +58,30 @@ $code = $make($host, 1000);
 ok(is_string($code) && strlen($code) === 6 && !preg_match('/[IO01]/', $code), "the room has a six-letter code ($code)");
 ok($gold($host) === 9000, 'the stake leaves the host purse at once');
 ok(count(aa_room($db, $code)) === 1, 'the host is the only one in the room');
-ok((int)$row($code)['tier'] === 2 && $row($code)['board'] !== '', 'the server picked the board and the tier');
+ok($row($code)['board'] !== '', 'the server picked the board');
 ok($make($guest, 999) === null, 'a stake that is not on the list is refused');
 $broke = aa_upsert_user($db, 'google', 'broke', 'Karim');
 $db->prepare('UPDATE users SET gold = 100 WHERE id = ?')->execute([$broke]);
 ok($make($broke, 500) === null && $gold($broke) === 100, 'a player without the stake cannot open a room');
+
+echo "\nThe stake does not buy an easier board\n";
+{
+    $easy = aa_upsert_user($db, 'google', 'easy', 'Nabila');
+    $hard = aa_upsert_user($db, 'google', 'hard', 'Tanvir');
+    $cheap = $make($easy, 500, 0);          // the smallest stake, two beginners
+    $join($cheap, $hard, 2);
+    $db->prepare("UPDATE matches SET state = 'playing', tier = ? WHERE code = ?")->execute([aa_room_tier($db, $cheap), $cheap]);
+    ok((int)$row($cheap)['tier'] === 1, 'a 500 room of a beginner and a middling player gets an easy board');
+    $rich = $make($easy, 7000, 4);          // the biggest stake, two strong players
+    $join($rich, $hard, 4);
+    $db->prepare("UPDATE matches SET state = 'playing', tier = ? WHERE code = ?")->execute([aa_room_tier($db, $rich), $rich]);
+    ok((int)$row($rich)['tier'] === 4, 'a 7,000 room of two strong players gets a master board');
+    $mixed = $make($hard, 500, 4);
+    $join($mixed, $easy, 0);
+    $db->prepare("UPDATE matches SET state = 'playing', tier = ? WHERE code = ?")->execute([aa_room_tier($db, $mixed), $mixed]);
+    ok((int)$row($mixed)['tier'] === 2, 'a mixed room meets in the middle');
+    ok(!defined('AA_STAKE_TIER'), 'the stake no longer decides the board at all');
+}
 
 echo "\nThe host starts it\n";
 ok($start($code, $host) === false, 'one player alone cannot start');

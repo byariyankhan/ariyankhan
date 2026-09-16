@@ -1098,11 +1098,9 @@
     el.matchTitle.textContent = 'Dashboard';
     el.matchBody.innerHTML = `
       ${meStrip()}
-      <p class="aa-sheet-note">Pick what everyone puts in. You all play the same board, and the first to clear it takes the lot.</p>
       <div class="aa-stakes">
-        ${STAKES.map((v, i) => `<button type="button" class="aa-stake" data-stake="${v}"${gold < v ? ' disabled' : ''}><span class="aa-stake-amt"><span aria-hidden="true">🪙</span>${gfmt(v)}</span><span class="aa-stake-sub">${['Normal', 'Hard', 'Expert'][i]} board<br>${gold < v ? 'not enough gold' : `winner takes ${gfmt(v * 2)}`}</span></button>`).join('')}
-      </div>
-      <p class="aa-sheet-note">Your stake is held until the match is over. If nobody accepts within a day, it comes straight back.</p>`;
+        ${STAKES.map(v => `<button type="button" class="aa-stake" data-stake="${v}"${gold < v ? ' disabled' : ''}><span class="aa-stake-coin" aria-hidden="true">🪙</span><span class="aa-stake-amt">${gfmt(v)}</span></button>`).join('')}
+      </div>`;
     openSheet(el.matchSheet);
   }
 
@@ -1114,7 +1112,7 @@
     closeSheets();
     el.select.hidden = true; el.game.hidden = false; el.board.innerHTML = '';
     el.hudLevel.textContent = 'Gold match'; el.hudLevel.classList.remove('is-disc');
-    el.hudDiff.textContent = DIFF_OF(m.tier ?? 1); el.hudLeft.textContent = '0'; el.hudPct.textContent = '0%';
+    el.hudDiff.textContent = ''; el.hudLeft.textContent = '0'; el.hudPct.textContent = '0%';
     el.boardBar.style.width = '0%'; el.ranks.hidden = true;
     scrollToGame();
     if (history.replaceState) history.replaceState(null, '', location.pathname + location.search + '#m=' + m.code);
@@ -1184,15 +1182,20 @@
     state.pendingMatch = m;
   }
 
-  function showMatchState(m) {
+  function showMatchState(m, goldBefore) {
     el.matchTitle.textContent = m.state === 'done' ? (m.draw ? 'Nobody cleared it' : m.you_won ? 'You win!' : `${escapeHtml(m.winner)} wins`) : 'Waiting';
     const row = p => `<div class="aa-vs-row${m.state === 'done' && p.place === 1 && p.ms > 0 ? ' is-win' : ''}"><span>${p.ms > 0 ? `${p.place}. ` : ''}${escapeHtml(p.you ? 'You' : p.name)}</span><b>${p.ms == null ? 'still playing' : p.ms < 0 ? 'ran out of hearts' : fmtTime(p.ms, true)}</b></div>`;
     el.matchBody.innerHTML = `
       <div class="aa-vs">${(m.players || []).map(row).join('')}</div>
-      <p class="aa-purse"><span>${m.state === 'done' ? (m.draw ? 'Every stake came back' : m.you_won ? `You won ${gfmt(m.pot)}` : `You lost ${gfmt(m.stake)}`) : 'Your stake is held'}</span><span class="aa-gold"><span aria-hidden="true">🪙</span>${gfmt(auth.user?.gold ?? 0)}</span></p>
+      <p class="aa-purse"><span>${m.state === 'done' ? (m.draw ? 'Every stake came back' : m.you_won ? `You won ${gfmt(m.pot)}` : `You lost ${gfmt(m.stake)}`) : 'Your stake is held'}</span><span class="aa-gold${m.you_won ? ' is-won' : ''}"><span aria-hidden="true">🪙</span><span id="aaPurseCount">${gfmt(auth.user?.gold ?? 0)}</span></span></p>
       <p class="aa-sheet-note">${m.state === 'done' ? 'The first player to clear the board takes the pot.' : 'The others have not finished yet. Open this again later to see how it ended.'}</p>
       <div class="aa-actions"><button type="button" class="aa-btn aa-btn--primary" data-mact="stakes">Play another</button><button type="button" class="aa-btn" data-mact="close">Close</button></div>`;
     openSheet(el.matchSheet);
+    if (m.state === 'done' && m.you_won) {
+      SFX.win(); vibe([0, 40, 60, 120]); goldRain(100, true);
+      setTimeout(() => goldRain(60, true), 500);
+      if (typeof goldBefore === 'number') countTo($('#aaPurseCount', el.matchBody), goldBefore, auth.user?.gold ?? goldBefore);
+    }
   }
 
   // The line-up over the board: first place first, and the order moves as they play.
@@ -1249,7 +1252,7 @@
     const act = e.target.closest('[data-mact]')?.dataset.mact;
     if (stake) {
       const btn = e.target.closest('[data-stake]'); btn.disabled = true;
-      try { const d = await matchApi('create', { stake: +stake }); setGold(d.gold); showRoom(d.match); }
+      try { const d = await matchApi('create', { stake: +stake, tier: TIER_OF() }); setGold(d.gold); showRoom(d.match); }
       catch (err) { btn.disabled = false; toast(goldError(err), 'bad'); if (typeof err.gold === 'number') setGold(err.gold); }
       return;
     }
@@ -1259,7 +1262,7 @@
     else if (act === 'close') closeSheets();
     else if (act === 'join' && m) {
       const btn = e.target.closest('[data-mact]'); btn.disabled = true;
-      try { const d = await matchApi('join', { code: m.code }); setGold(d.gold); showRoom(d.match); }
+      try { const d = await matchApi('join', { code: m.code, tier: TIER_OF() }); setGold(d.gold); showRoom(d.match); }
       catch (err) { btn.disabled = false; toast(goldError(err), 'bad'); if (typeof err.gold === 'number') setGold(err.gold); }
     }
   });
@@ -1315,15 +1318,42 @@
     if (!R?.match) return;
     try {
       stopProgressPoll();
+      const before = auth.user?.gold ?? 0;
       const d = await matchApi('result', { code: R.match.code, ms: Math.round(ms), cleared: !!cleared });
       setGold(d.gold);
       renderRanks(d.match.players);
       el.overlay.hidden = true;
-      showMatchState(d.match);
+      showMatchState(d.match, before);
     } catch (err) {
       el.card.innerHTML = `<h3>${cleared ? 'Board cleared!' : 'Out of hearts'}</h3><p class="aa-card-lead">Your time could not reach the server. Open the invitation link again when you are back online.</p><div class="aa-actions"><button type="button" class="aa-btn aa-btn--primary" data-act="levels">World Tour</button></div>`;
       el.overlay.hidden = false;
     }
+  }
+
+  // Winning gold should land like winning gold: coins rain, the purse counts up, the badge pops.
+  const GOLD_COLORS = ['#FFD34D', '#FFB300', '#FFE9A3', '#E7A100'];
+  function goldRain(n = 90, overSheet = false) {
+    const c = el.confetti; if (!c) return;
+    if (overSheet) { c.classList.add('is-over'); c.width = innerWidth; c.height = innerHeight; }
+    const r = overSheet ? { width: innerWidth, height: innerHeight } : el.boardWrap.getBoundingClientRect();
+    const list = [];
+    for (let i = 0; i < n; i++) {
+      const p = particle(Math.random() * r.width, -20 - Math.random() * r.height * 0.4, (Math.random() - 0.5) * 2, 1 + Math.random() * 3);
+      p.color = GOLD_COLORS[Math.floor(Math.random() * GOLD_COLORS.length)];
+      p.round = true; p.w = 9 + Math.random() * 9; p.h = p.w; p.g = 0.16 + Math.random() * 0.12; p.ttl = 110 + Math.random() * 60;
+      list.push(p);
+    }
+    fxEmit(list);
+  }
+  function countTo(node, from, to, ms = 1100) {
+    if (!node) return;
+    const t0 = performance.now(), span = to - from;
+    const step = now => {
+      const k = Math.min(1, (now - t0) / ms), eased = 1 - Math.pow(1 - k, 3);
+      node.textContent = gfmt(Math.round(from + span * eased));
+      if (k < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
   }
 
   // ── Particles: one canvas over the board, one animation loop, several emitters ──
@@ -1331,7 +1361,7 @@
   const particle = (x, y, vx, vy) => ({ x, y, vx, vy, g: 0.3 + Math.random() * 0.2, w: 5 + Math.random() * 7, h: 3 + Math.random() * 4, rot: Math.random() * Math.PI, vr: (Math.random() - 0.5) * 0.3, round: Math.random() < 0.3, color: PALETTE[Math.floor(Math.random() * PALETTE.length)], life: 1, ttl: 70 + Math.random() * 40 });
   function fxEmit(list) {
     const c = el.confetti; if (!c || !c.getContext || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    if (!fx.running) { const r = el.boardWrap.getBoundingClientRect(); c.width = Math.round(r.width); c.height = Math.round(r.height); }
+    if (!fx.running && !c.classList.contains('is-over')) { const r = el.boardWrap.getBoundingClientRect(); c.width = Math.round(r.width); c.height = Math.round(r.height); }
     c.hidden = false; fx.parts.push(...list);
     if (fx.running) return;
     fx.running = true;
@@ -1346,7 +1376,7 @@
         if (p.round) { ctx.beginPath(); ctx.arc(0, 0, p.w / 2, 0, Math.PI * 2); ctx.fill(); } else ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
         ctx.restore(); return true;
       });
-      if (fx.parts.length) requestAnimationFrame(frame); else { ctx.clearRect(0, 0, c.width, c.height); c.hidden = true; fx.running = false; }
+      if (fx.parts.length) requestAnimationFrame(frame); else { ctx.clearRect(0, 0, c.width, c.height); c.hidden = true; c.classList.remove('is-over'); fx.running = false; }
     })(last);
   }
   // Level won: a fountain from the middle of the board.

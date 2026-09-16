@@ -647,8 +647,12 @@ unlock (skip allowed after two fails), stars, best times and progress in
   token, so a real sign-in has to be tried by hand once.
 - **Gold matches** (`games/api/match.php`, `openStakes`/`showRoom`/`showConfirm`,
   `#m=<code>`): the lobby's second button asks for a sign-in, then shows the
-  player's strip (name, provider, purse) and three stakes: 500, 1,000 and 7,000,
-  on a Normal, Hard and Expert board. Picking one holds the stake and opens a
+  player's strip (name, provider, purse) and three coins side by side: 500,
+  1,000 and 7,000, with nothing else on the screen. **The stake never touches the
+  board.** Each player sends their own difficulty when they open or join a room,
+  and `aa_room_tier` sets the board to the middle of everyone's, at the moment
+  the host starts, so gold buys a bigger pot and never an easier board.
+  Picking a coin holds the stake and opens a
   **room** on the game screen: how many of the seven seats are filled, the faces
   of who is in, the invitation link, **Invite**, **Start** (host only, dead until
   someone else is in) and **Cancel**. Friends open the link, confirm the stake
@@ -670,9 +674,13 @@ unlock (skip allowed after two fails), stars, best times and progress in
   upwards (`renderRanks`, polled every 2 s). `match_players` is a row per player,
   so three to seven in a room needs no new shape; `aa_migrate_matches` moved the
   first two-seat version over and refunded anything unfinished.
-  `tests/match.test.php` (46 checks) covers the stakes, the room rules, a room of
-  seven, the finish-order rule against a shorter clock, and that no gold is made
-  or lost. Signing out and deleting the account live in Settings.
+  Winning pays off properly: gold rains over the card, the purse badge pops and
+  counts up from the old balance (`goldRain`, `countTo`), with the canvas lifted
+  above the sheet for the duration (`.aa-confetti.is-over`).
+  `tests/match.test.php` (50 checks) covers the stakes, the room rules, a room of
+  seven, the finish-order rule against a shorter clock, that a 500 room of
+  beginners gets an easy board while a 7,000 room of strong players gets a master
+  one, and that no gold is made or lost. Signing out and deleting the account live in Settings.
 - **Home country first** (`homeCountry`, `orderFor`): `games/geo.php` passes on
   Cloudflare's `CF-IPCountry` (nothing stored); the browser language region is
   the fallback. The tour order is the player's country, then every other country

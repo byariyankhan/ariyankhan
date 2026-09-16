@@ -7,8 +7,7 @@ declare(strict_types=1);
 
 const AA_COOKIE = 'aa_session';
 const AA_SIGNUP_GOLD = 10000;   // what a new player starts with, once, when the account is created
-const AA_STAKES = [500, 1000, 7000];        // the three stakes a player can pick
-const AA_STAKE_TIER = [500 => 1, 1000 => 2, 7000 => 3];   // the bigger the stake, the harder the board
+const AA_STAKES = [500, 1000, 7000];        // the three stakes a player can pick; the stake never touches the board
 const AA_MATCH_HOURS = 24;      // an invitation nobody accepts is refunded after this
 const AA_MATCH_SEATS = 7;       // how many can be in one room
 const AA_SESSION_DAYS = 180;
@@ -46,7 +45,9 @@ function aa_db(): PDO {
     $db->exec('CREATE TABLE IF NOT EXISTS matches (code TEXT PRIMARY KEY, host_id INTEGER NOT NULL, stake INTEGER NOT NULL, board TEXT NOT NULL, tier INTEGER NOT NULL, seed INTEGER NOT NULL, state TEXT NOT NULL, winner_id INTEGER, created INTEGER NOT NULL, started INTEGER, settled INTEGER)');
     // one row per player: pct is how far along they are, ms their own clock (-1 = out of hearts), done the moment
     // their result reached the server, which is what decides who finished first.
-    $db->exec('CREATE TABLE IF NOT EXISTS match_players (code TEXT NOT NULL, user_id INTEGER NOT NULL, joined INTEGER NOT NULL, pct INTEGER NOT NULL DEFAULT 0, ms INTEGER, done INTEGER, PRIMARY KEY (code, user_id))');
+    $db->exec('CREATE TABLE IF NOT EXISTS match_players (code TEXT NOT NULL, user_id INTEGER NOT NULL, joined INTEGER NOT NULL, tier INTEGER NOT NULL DEFAULT 2, pct INTEGER NOT NULL DEFAULT 0, ms INTEGER, done INTEGER, PRIMARY KEY (code, user_id))');
+    $pcols = array_column($db->query('PRAGMA table_info(match_players)')->fetchAll(), 'name');
+    if ($pcols && !in_array('tier', $pcols, true)) $db->exec('ALTER TABLE match_players ADD COLUMN tier INTEGER NOT NULL DEFAULT 2');
     $db->exec('CREATE INDEX IF NOT EXISTS matches_host ON matches(host_id)');
     $db->exec('CREATE INDEX IF NOT EXISTS match_players_user ON match_players(user_id)');
     aa_migrate_matches($db);
@@ -220,8 +221,16 @@ function aa_room(PDO $db, string $code): array {
     return $st->fetchAll();
 }
 
-function aa_seat(PDO $db, string $code, int $userId): void {
-    $db->prepare('INSERT OR IGNORE INTO match_players (code, user_id, joined) VALUES (?, ?, ?)')->execute([$code, $userId, time()]);
+function aa_seat(PDO $db, string $code, int $userId, int $tier = 2): void {
+    $db->prepare('INSERT OR IGNORE INTO match_players (code, user_id, joined, tier) VALUES (?, ?, ?, ?)')->execute([$code, $userId, time(), max(0, min(4, $tier))]);
+}
+
+// The board is as hard as the room deserves: the middle of everyone's own difficulty, never the size of the
+// stake. Gold buys a bigger pot, never an easier board.
+function aa_room_tier(PDO $db, string $code): int {
+    $tiers = array_map(fn($p) => max(0, min(4, (int)$p['tier'])), aa_room($db, $code));
+    if (!$tiers) return 2;
+    return (int)max(0, min(4, (int)round(array_sum($tiers) / count($tiers))));
 }
 
 // Everyone in the room, first place first. Whoever cleared the board earliest leads, because the race is won by
