@@ -9,10 +9,12 @@ const data = JSON.parse(fs.readFileSync(path.join(root, 'games/data/arrow-atlas.
 const html = fs.readFileSync(path.join(root, 'arrow-atlas.html'), 'utf8');
 // Pull the pure pieces of the engine out of the IIFE so the exact production code is tested.
 const grab = re => { const m = js.match(re); if (!m) throw new Error('could not find ' + re); return m[0]; };
-const src = [grab(/const REF = \d+;/), grab(/function parsePath\(d\) \{[\s\S]*?\n  \}\n/), grab(/function insidePath\([\s\S]*?\n  \}\n/), grab(/function rasterise\([\s\S]*?\n  \}\n/), grab(/const DIRS = [^\n]+/), grab(/const PALETTE = [^\n]+/), grab(/const BASE_TIER = [^\n]+/), grab(/const SKILL_UP = [^\n]+/), grab(/const skillShift = [^\n]+/), grab(/const tierFor = [^\n]+/), grab(/const rateRun = [\s\S]*?\n  \};\n/), grab(/const nextSkill = [^\n]+/), grab(/const MAXLEN_OF = [^\n]+/), grab(/const NARROW_OF = [^\n]+/), grab(/const FAR_OF = [^\n]+/), grab(/const RAIL_OF = [^\n]+/), grab(/const HOLE_OF = [^\n]+/), grab(/const LANE_OF = [^\n]+/), grab(/const GEN_OPTS = [^\n]+/), grab(/function mulberry32[^\n]+/), grab(/function generate\(mask, maxLen, seed[^)]*\) \{[\s\S]*?\n  \}\n/)].join('\n');
-const { generate, rasterise, BASE_TIER, tierFor, rateRun, nextSkill, MAXLEN_OF, GEN_OPTS, DIRS } = new Function(src + '\nreturn { generate, rasterise, BASE_TIER, tierFor, rateRun, nextSkill, MAXLEN_OF, GEN_OPTS, DIRS };')();
+const src = [grab(/const REF = \d+;/), grab(/function parsePath\(d\) \{[\s\S]*?\n  \}\n/), grab(/function insidePath\([\s\S]*?\n  \}\n/), grab(/function rasterise\([\s\S]*?\n  \}\n/), grab(/const DIRS = [^\n]+/), grab(/const PALETTE = [^\n]+/), grab(/const STEP_UP_WINS = [^\n]+/), grab(/const clampTier = [^\n]+/), grab(/const FORM0 = [^\n]+/), grab(/const nextForm = [\s\S]*?\n  \};\n/), grab(/const MAXLEN_OF = [^\n]+/), grab(/const NARROW_OF = [^\n]+/), grab(/const FAR_OF = [^\n]+/), grab(/const RAIL_OF = [^\n]+/), grab(/const HOLE_OF = [^\n]+/), grab(/const LANE_OF = [^\n]+/), grab(/const GEN_OPTS = [^\n]+/), grab(/function mulberry32[^\n]+/), grab(/function generate\(mask, maxLen, seed[^)]*\) \{[\s\S]*?\n  \}\n/)].join('\n');
+const { generate, rasterise, nextForm, FORM0, MAXLEN_OF, GEN_OPTS, DIRS } = new Function(src + '\nreturn { generate, rasterise, nextForm, FORM0, MAXLEN_OF, GEN_OPTS, DIRS };')();
+// a sampling ramp for the board tests (the game itself picks the tier from the player's form, not the level)
+const BASE_TIER = i => i < 5 ? 0 : i < 15 ? 1 : i < 40 ? 2 : i < 80 ? 3 : 4;
 const maskCache = new Map(); const maskFor = (L, t) => { const key = L.id + ':' + t; if (!maskCache.has(key)) maskCache.set(key, rasterise(L.d, L.k[t])); return maskCache.get(key); };
-const TIER_OF = i => tierFor(i, 0);
+const TIER_OF = i => BASE_TIER(i);
 let tests = 0;
 const test = (name, fn) => { tests++; try { fn(); console.log('  ✓ ' + name); } catch (e) { console.log('  ✗ ' + name + '\n    ' + e.message); process.exitCode = 1; } };
 
@@ -33,9 +35,10 @@ test('168 levels with name, capital, outline and 5 tier scales', () => {
   for (const L of data.levels) { assert.ok(L.name && L.cap && L.d.startsWith('M'), L.name); assert.equal(L.k.length, 5); assert.ok(L.k.every(k => k > 0), L.name); assert.ok(L.cont, `${L.name} has no continent`); }
 });
 test('every level id is unique', () => assert.equal(new Set(data.levels.map(l => l.id)).size, data.levels.length));
-test('rasterised tiers grow in cell count and stay within 32 cells (46 tall / 38 wide for elongated shapes)', () => {
+test('rasterised tiers grow in cell count and stay within the per-tier caps (32/32/32/36/40, long side 46/46/46/50/54)', () => {
+  const DIM = [32, 32, 32, 36, 40], LONG = [46, 46, 46, 50, 54];
   for (const L of data.levels) {
-    for (let t = 0; t < 5; t++) { const m = maskFor(L, t); assert.ok(m.count >= 20, `${L.name} tier ${t} has only ${m.count} cells`); assert.ok(m.w <= 38 && m.h <= 46 && (m.w <= 32 || m.h <= 32), `${L.name} tier ${t} is ${m.w}x${m.h}`); assert.equal(m.rows.length, m.h); assert.ok(m.rows.every(r => r.length === m.w)); }
+    for (let t = 0; t < 5; t++) { const m = maskFor(L, t); assert.ok(m.count >= 20, `${L.name} tier ${t} has only ${m.count} cells`); assert.ok(Math.max(m.w, m.h) <= LONG[t] && Math.min(m.w, m.h) <= DIM[t], `${L.name} tier ${t} is ${m.w}x${m.h}`); assert.equal(m.rows.length, m.h); assert.ok(m.rows.every(r => r.length === m.w)); }
     for (let t = 1; t < 5; t++) assert.ok(maskFor(L, t).count >= maskFor(L, t - 1).count, `${L.name} tier ${t} smaller than tier ${t - 1}`);
   }
 });
@@ -63,15 +66,15 @@ test('boards are dense: Hard tour levels average over 55 arrows, Normal over 35 
   const avg = tier => { const idx = data.levels.map((_, i) => i).filter(i => BASE_TIER(i) === tier); return idx.reduce((n, i) => n + generate(maskFor(data.levels[i], tier), MAXLEN_OF[tier], (i + 1) * 1000).pieces.length, 0) / idx.length; };
   assert.ok(avg(1) > 35, `Normal averages ${avg(1)}`); assert.ok(avg(2) > 55, `Hard averages ${avg(2)}`);
 });
-test('adaptive difficulty: clean quick clears step the tier up, repeated losses ease it off, levels 1-2 stay Normal', () => {
-  const perfect = { won: true, wrong: 0, hints: 0, retries: 0, secPerArrow: 0.8 };
-  const sloppy = { won: true, wrong: 2, hints: 1, retries: 0, secPerArrow: 1.5 };
-  const lost = { won: false, wrong: 4, hints: 0, retries: 1, secPerArrow: 2 };
-  let s = 0; s = nextSkill(s, perfect); assert.equal(tierFor(12, s), BASE_TIER(12), 'one clear is not enough'); s = nextSkill(s, perfect); assert.equal(tierFor(12, s), BASE_TIER(12) + 1, 'two clean clears step up');
-  assert.equal(tierFor(0, s), 0); assert.equal(tierFor(1, s), 0); assert.equal(tierFor(69, 2), 4, 'never above Master');
-  for (let k = 0; k < 6; k++) s = nextSkill(s, sloppy); assert.equal(tierFor(12, s), BASE_TIER(12), 'sloppy wins settle back to the base tier');
-  s = nextSkill(s, lost); assert.equal(tierFor(12, s), BASE_TIER(12), 'one loss keeps the tier'); s = nextSkill(s, lost); assert.equal(tierFor(12, s), BASE_TIER(12) - 1, 'two losses ease off');
-  assert.equal(tierFor(2, -2), 0, 'never below Normal'); assert.equal(rateRun(lost), -1); assert.ok(rateRun(perfect) === 1 && rateRun(sloppy) < 0.1);
+test('difficulty follows form, not the level: two first-try clears step up, two losses step down, a retry clear resets', () => {
+  let f = { ...FORM0 };
+  f = nextForm(f, true, true); assert.deepEqual(f, { tier: 0, wins: 1, losses: 0 }, 'one first-try clear is not enough');
+  f = nextForm(f, true, true); assert.deepEqual(f, { tier: 1, wins: 0, losses: 0 }, 'two in a row step up, hearts and hints spent or not');
+  f = nextForm(f, true, true); f = nextForm(f, false, false); assert.deepEqual(f, { tier: 1, wins: 0, losses: 1 }, 'one loss keeps the tier and breaks the win run');
+  f = nextForm(f, true, false); assert.deepEqual(f, { tier: 1, wins: 0, losses: 0 }, 'a clear after a retry resets both counters');
+  f = nextForm(f, false, false); f = nextForm(f, false, false); assert.deepEqual(f, { tier: 0, wins: 0, losses: 0 }, 'two losses in a row step down');
+  f = nextForm(f, false, false); f = nextForm(f, false, false); assert.equal(f.tier, 0, 'never below Easy');
+  for (let k = 0; k < 12; k++) f = nextForm(f, true, true); assert.equal(f.tier, 4, 'never above Master');
 });
 test('narrow play: on Hard tour boards fewer than 20% of the arrows are free at the start (the game then keeps the best of 8)', () => {
   const freeAtStart = b => b.pieces.filter(p => { const [dr, dc] = DIRS[p.dir]; let [y, x] = p.cells[0]; y += dr; x += dc; while (y >= 0 && y < b.H && x >= 0 && x < b.W) { if (b.occ[y][x] >= 0) return false; y += dr; x += dc; } return true; }).length;
