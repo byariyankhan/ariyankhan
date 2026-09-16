@@ -580,9 +580,11 @@ unlock (skip allowed after two fails), stars, best times and progress in
   by great-circle distance from it (`c` = centroid per level, `a2` = ISO code).
   The first answer is kept in `aa:v1:home` (Settings → Home country changes it,
   "World order" switches it off). Progress is keyed by country id (`lv:<id>`,
-  `fl:<id>`, skips likewise), migrated once from the old level-number keys; the
+  skips likewise), migrated once from the old level-number keys; the
   daily board is picked from the canonical list so everyone gets the same one.
-- **Flag boards** (`BOARD` = map | flags, lobby switch, separate progress): the
+- **Flag boards** (`boardFor`: one tour, the form ladder decides the kind; Easy
+  and Normal are always the outline, on Hard a flag follows a first-try clear,
+  on Expert and Master maps and flags alternate; Try again keeps the kind): the
   same generator on a plain 4:3 rectangle (`FLAG_DIM` per tier, 16x12 to 44x33),
   measured to leave half the free arrows of a coast outline (Hard 2.6 vs 5.7 at
   the start, Master 4.5 vs 11). `games/build-flags.mjs` renders every flag

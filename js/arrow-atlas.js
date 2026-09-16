@@ -15,18 +15,17 @@
   const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
   const SVG_NS = 'http://www.w3.org/2000/svg';
   const DATA_VERSION = '11';
-  const MAP_VERSION = '2';
+  const MAP_VERSION = '3';
   const FLAGS_VERSION = '1';
   // Two kinds of board: the country's outline (map) or its flag on a plain rectangle (flags). A rectangle has half
-  // the exits of a jagged coast, so flag boards play tighter. Progress is kept per kind.
-  let BOARD = 'map';   // set from the store once it exists (below)
+  // the exits of a jagged coast, so flag boards play tighter: the form ladder hands them out as the player gets
+  // better (see boardFor). One tour, one progress record per country, whichever kind was played.
   const FLAG_DIM = [[16, 12], [24, 18], [32, 24], [40, 30], [44, 33]];   // flag board cells per tier (4:3)
   const STORE = 'aa:v1:';
   const store = {
     get(k, fb) { try { const v = localStorage.getItem(STORE + k); return v == null ? fb : JSON.parse(v); } catch { return fb; } },
     set(k, v) { try { localStorage.setItem(STORE + k, JSON.stringify(v)); } catch { /* ignore */ } },
   };
-  BOARD = store.get('board', 'map') === 'flags' ? 'flags' : 'map';
   const LIVES = 4;                 // Classic and Rush; One Life has 1, Deep Focus none
   const DIFF_OF = tier => ['Easy', 'Normal', 'Hard', 'Expert', 'Master'][tier];
   const COMBO_WINDOW_MS = 1800;   // shots closer together than this chain into a combo; a wrong tap breaks it
@@ -61,6 +60,10 @@
     const losses = f.losses + 1; return losses >= STEP_DOWN_LOSSES ? { tier: clampTier(f.tier - 1), wins: 0, losses: 0 } : { tier: f.tier, wins: 0, losses };
   };
   const formNow = () => ({ ...FORM0, ...(store.get('form', null) || {}) });
+  // Which kind of board the next level gets, from form alone: Easy and Normal are always the country outline
+  // (learning the game); on Hard a flag board follows a first-try clear (the player is doing well, tighten the
+  // screws); on Expert and Master maps and flags alternate so both stay in play.
+  const boardFor = (i, f = formNow()) => f.tier <= 1 ? 'map' : f.tier === 2 ? (f.wins > 0 ? 'flags' : 'map') : (i % 2 ? 'flags' : 'map');
   const TIER_OF = () => clampTier(formNow().tier);
   const MAXLEN_OF = [7, 9, 11, 12, 10];  // longest body per tier: long snakes, as on the reference boards; Master a little shorter so it packs more arrows
   // How narrow the play is per tier (see generate()): narrow = prefer the end whose run holds more pieces (blocked
@@ -104,8 +107,8 @@
   const fmtPop = n => !n ? '' : n >= 1e9 ? `${(n / 1e9).toFixed(2)} billion` : n >= 1e6 ? `${Math.round(n / 1e6)} million` : `${Math.round(n / 1e3)}K`;
   const svgEl = (tag, attrs = {}) => { const n = document.createElementNS(SVG_NS, tag); for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v); return n; };
   // progress is keyed by country id (not by level number: the tour order is the player's own, home country first)
-  const progressKey = i => (BOARD === 'flags' ? 'fl:' : 'lv:') + DATA.levels[i].id;
-  const skipKey = i => (BOARD === 'flags' ? 'fskip:' : 'skip:') + DATA.levels[i].id;
+  const progressKey = i => 'lv:' + DATA.levels[i].id;
+  const skipKey = i => 'skip:' + DATA.levels[i].id;
   const cleared = i => store.get(progressKey(i));
   const unlocked = i => i === 0 || !!cleared(i - 1) || !!store.get(skipKey(i));
   const dayKey = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
@@ -196,7 +199,7 @@
     migrateProgress(d);
     d.levels = orderFor(d, await homeCountry(d));
     DATA = d;
-    if (BOARD === 'flags') await loadFlags();
+    loadFlags().catch(() => {});   // flags arrive in the background; a flag board waits for them
     return DATA;
   }
   // Progress used to be keyed by level number; it is keyed by country id now (the order is personal). One-off copy.
@@ -238,12 +241,6 @@
     const f = FLAGS?.flags[a2]; if (!f) return '';
     let out = ''; for (let y = 0; y < FLAGS.h; y++) { let x = 0; while (x < FLAGS.w) { const c = f.r[y][x]; let x2 = x; while (x2 + 1 < FLAGS.w && f.r[y][x2 + 1] === c) x2++; out += `<rect x="${x}" y="${y}" width="${x2 - x + 1}" height="1" fill="${f.p[+c]}"/>`; x = x2 + 1; } }
     return `<svg class="aa-flag-thumb" viewBox="0 0 ${FLAGS.w} ${FLAGS.h}" role="img" aria-label="Flag"><g shape-rendering="crispEdges">${out}</g></svg>`;
-  }
-  async function setBoard(b) {
-    BOARD = b === 'flags' ? 'flags' : 'map'; store.set('board', BOARD); maskCache.clear();
-    $$('[data-board]').forEach(x => { const on = x.dataset.board === BOARD; x.classList.toggle('is-on', on); x.setAttribute('aria-pressed', String(on)); });
-    if (BOARD === 'flags') { try { await loadFlags(); } catch { toast('Could not load the flags. Check your connection.', 'bad'); BOARD = 'map'; store.set('board', 'map'); } }
-    renderSelect();
   }
 
   // ── Lobby world map ──
@@ -304,10 +301,6 @@
     el.playSub.textContent = nextIdx < 0 ? `All ${DATA.levels.length} cleared · replay any level` : `Level ${nextIdx + 1} · ${DIFF_OF(TIER_OF())}`;
     el.play.dataset.level = nextIdx < 0 ? 0 : nextIdx;
     el.play.querySelector('.aa-play-label').textContent = done ? 'Continue' : 'Play';
-    const flags = BOARD === 'flags';
-    if (el.tagline) el.tagline.textContent = flags ? 'Clear the arrows. Reveal the flag.' : 'Clear the arrows. Reveal the country.';
-    if (el.tourKicker) el.tourKicker.textContent = flags ? 'Flag Tour' : 'World Tour';
-    $$('[data-board]').forEach(x => { const on = x.dataset.board === BOARD; x.classList.toggle('is-on', on); x.setAttribute('aria-pressed', String(on)); });
     renderHome();
     if (el.path) { el.path.innerHTML = '';
     const start = Math.max(0, (nextIdx < 0 ? n - 1 : nextIdx) - 1);
@@ -392,7 +385,7 @@
   }
   const maskCache = new Map();
   const rectMask = (w, h) => ({ k: 1, x: 0, y: 0, w, h, rows: Array.from({ length: h }, () => '1'.repeat(w)), count: w * h });
-  const maskFor = (L, tier, board = BOARD) => { const key = board + ':' + L.id + ':' + tier; if (!maskCache.has(key)) maskCache.set(key, board === 'flags' ? rectMask(...FLAG_DIM[tier]) : rasterise(L.d, L.k[tier])); return maskCache.get(key); };
+  const maskFor = (L, tier, board = 'map') => { const key = board + ':' + L.id + ':' + tier; if (!maskCache.has(key)) maskCache.set(key, board === 'flags' ? rectMask(...FLAG_DIM[tier]) : rasterise(L.d, L.k[tier])); return maskCache.get(key); };
 
   // ── Puzzle generation ──
   // Two stages, like a maze that is drawn first and signposted after.
@@ -714,14 +707,15 @@
   }
 
   // ── Game lifecycle ──
-  async function startLevel(i, bumpSeed = false, daily = null, keepTier = -1) {
+  async function startLevel(i, bumpSeed = false, daily = null, keepTier = -1, keepBoard = '') {
     try { await loadData(); } catch (err) { el.error.textContent = `Could not load the levels (${err.message}).`; el.error.hidden = false; return; }
     if (i < 0 || i >= DATA.levels.length) i = 0;
     if (!daily && !unlocked(i)) i = DATA.levels.findIndex((_, j) => !cleared(j) && unlocked(j));
     if (i < 0) i = 0;
     stopTimer();
     if (bumpSeed) state.seedBump++; else if (state.idx !== i || !!daily !== !!state.daily) { state.seedBump = 0; state.fails = 0; }
-    state.daily = daily; state.board = daily ? 'map' : BOARD;
+    state.daily = daily; state.board = daily ? 'map' : keepBoard || boardFor(i);
+    if (state.board === 'flags') { try { await loadFlags(); } catch { state.board = 'map'; } }
     state.idx = i; state.level = DATA.levels[i]; state.tier = daily ? daily.tier : keepTier >= 0 ? keepTier : TIER_OF();
     state.busy = true; el.select.hidden = true; el.game.hidden = false; el.overlay.hidden = true; el.board.innerHTML = '';
     el.hudLevel.textContent = daily ? 'Daily' : `Level ${i + 1}`; el.hudLeft.textContent = 'Drawing the board…';
@@ -934,7 +928,7 @@
     const learn = learnFrom(true);
     const prev = state.daily ? store.get(`daily:${state.daily.key}`) : cleared(i);
     const isBest = !prev || t < prev.t;
-    const rec = { t: isBest ? t : prev.t, stars: Math.max(s, prev?.stars || 0), quiz: !!(quizRight || prev?.quiz), tier: state.tier, arrows: state.pieces.length, at: Date.now() };
+    const rec = { t: isBest ? t : prev.t, stars: Math.max(s, prev?.stars || 0), quiz: !!(quizRight || prev?.quiz), tier: state.tier, board: state.board, arrows: state.pieces.length, at: Date.now() };
     if (state.daily) {
       store.set(`daily:${state.daily.key}`, rec);
       const ds = store.get('dailyStreak', { count: 0, last: '' });
@@ -989,7 +983,7 @@
   el.card.addEventListener('click', e => {
     const act = e.target.closest('[data-act]')?.dataset.act; if (!act) return;
     if (act === 'next') startLevel(state.idx + 1);
-    else if (act === 'again' || act === 'retry') startLevel(state.idx, false, state.daily, state.tier);
+    else if (act === 'again' || act === 'retry') startLevel(state.idx, false, state.daily, state.tier, state.board);
     else if (act === 'shuffle') startLevel(state.idx, true, state.daily);
     else if (act === 'skip') { store.set(skipKey(state.idx + 1), true); startLevel(state.idx + 1); }
     else if (act === 'levels') goToLevels();
@@ -1066,7 +1060,6 @@
     else setHome(v);
     toast(v === 'auto' ? 'Tour order follows where you are.' : v ? `Your tour now starts from ${DATA.levels[0].name}.` : 'Tour in world order.', 'hint');
   });
-  $$('[data-board]').forEach(b => b.addEventListener('click', () => setBoard(b.dataset.board)));
   // ── Wiring ──
   el.btnHint.addEventListener('click', hint);
   el.play.addEventListener('click', () => startLevel(+el.play.dataset.level || 0));
