@@ -102,6 +102,7 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-rank{ position:relative; width:34px; height:34px; border-radius:50%; background:var(--line-soft); color:var(--card); font-size:15px; font-weight:900; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 6px rgba(0,0,0,.18); transition:transform .25s; }
 .aa-rank.is-you{ background:var(--accent); }
 .aa-rank.is-out{ opacity:.45; }
+.aa-rank.is-won{ box-shadow:0 0 0 3px #FFC531, 0 2px 6px rgba(0,0,0,.18); }
 .aa-rank-no{ position:absolute; right:-3px; bottom:-3px; min-width:17px; height:17px; border-radius:9px; background:var(--card); color:var(--ink); font-size:11px; font-weight:900; display:flex; align-items:center; justify-content:center; box-shadow:0 1px 3px rgba(0,0,0,.25); padding:0 3px; }
 .aa-ranks--card{ position:static; justify-content:center; margin:0 0 10px; }
 .aa-wait{ display:flex; align-items:center; justify-content:center; gap:10px; margin:0 0 14px; font-weight:800; color:var(--muted); }

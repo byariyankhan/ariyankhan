@@ -1,7 +1,7 @@
 <?php
 // Checks the gold match server: stakes leave and return the right purses, the room only starts when the host
-// says so, the player who finishes first takes the pot even if someone else played a shorter clock, and the
-// gold always adds up.
+// says so, the player who finishes first takes the whole pot the instant they clear it even if someone else
+// played a shorter clock, the rest play on for second place and no gold, and the gold always adds up.
 declare(strict_types=1);
 $tmp = sys_get_temp_dir() . '/aa-match-test-' . getmypid();
 @mkdir($tmp, 0770, true);
@@ -93,25 +93,29 @@ ok($start($code, $guest) === false, 'only the host can start');
 ok($start($code, $host) === true && $row($code)['state'] === 'playing', 'the host starts the match');
 ok($join($code, $broke) === false, 'and the door is shut once it has started');
 
-echo "\nFinishing first is what wins\n";
-// the guest reports a shorter clock, but the host's result reaches the server first
+echo "\nThe first to clear it is paid at once, the rest play on for their place\n";
+// the host clears first on a longer clock; the guest is still playing and does not have to be waited for
 $result($code, $host, 77800, 1000);
-ok($row($code)['state'] === 'playing' && $gold($host) === 9000, 'one result alone settles nothing');
+$m = $row($code);
+ok((int)$m['winner_id'] === $host && $gold($host) === 11000, 'the pot is in the winner purse the moment they clear it');
+ok($m['state'] === 'playing', 'and the match carries on so the rest can play for their place');
 $result($code, $host, 1000, 1001);
 $line = aa_match_players($db, $row($code), null);
 ok($line[0]['ms'] === 77800, 'a second try cannot overwrite a time');
 $result($code, $guest, 69300, 5000);
-$m = $row($code);
-ok($m['state'] === 'done' && (int)$m['winner_id'] === $host, 'the one who finished first wins, even on a longer clock');
-ok($gold($host) === 11000 && $gold($guest) === 9000, 'the winner takes the whole pot');
-ok($gold($host) + $gold($guest) === 20000, 'no gold was made or lost');
+ok((int)$row($code)['winner_id'] === $host, 'a shorter clock reported later takes nothing');
+ok($row($code)['state'] === 'done', 'the match closes once everyone has reported');
+$line = aa_match_players($db, $row($code), null);
+ok($line[0]['won'] === true && $line[1]['place'] === 2 && $line[1]['won'] === false, 'the later finisher is second, and second place wins no gold');
+ok($gold($guest) === 9000 && $gold($host) + $gold($guest) === 20000, 'the loser is out their stake and no gold was made');
 
 echo "\nLosing the board\n";
 $c2 = $make($host, 500); $join($c2, $guest); $start($c2, $host);
 $result($c2, $host, -1, 2000);
+ok($row($c2)['state'] === 'playing', 'running out of hearts does not end the match for the others');
 $result($c2, $guest, 45000, 9000);
-ok((int)$row($c2)['winner_id'] === $guest, 'a player who runs out of hearts loses to one who clears, whenever they clear');
-ok($gold($guest) === 9500, 'and the clear takes the pot');
+ok((int)$row($c2)['winner_id'] === $guest && $gold($guest) === 9500, 'the one still going clears it and takes the pot');
+ok($row($c2)['state'] === 'done', 'with both reported the match is over');
 $c3 = $make($host, 500); $join($c3, $guest); $start($c3, $host);
 $before = [$gold($host), $gold($guest)];
 $result($c3, $host, -1); $result($c3, $guest, -1);
@@ -131,12 +135,16 @@ for ($i = 0; $i < 7; $i++) {
 ok(count(aa_room($db, $c4)) === 7, 'seven are in the room');
 $start($c4, $host);
 $pot = 500 * 7;
-foreach (array_slice($others, 0, 6) as $k => $u) $result($c4, $u, 60000 + $k, 8000 + $k * 10);
-$g0 = $gold($host);
+$g0 = $gold($others[0]);
+$result($c4, $others[0], 60000, 8000);
+ok((int)$row($c4)['winner_id'] === $others[0] && $gold($others[0]) === $g0 + $pot, "the first to clear takes all {$pot} gold without waiting for the other six");
+ok($row($c4)['state'] === 'playing', 'and the other six are still on the board');
+$g1 = $gold($host);
 $result($c4, $host, 30000, 9999);
-ok((int)$row($c4)['winner_id'] === $others[0], 'in a room of seven the first to finish takes it');
-ok($gold($others[0]) === 9500 + $pot, "the winner takes all {$pot} gold");
-ok($gold($host) === $g0, 'and the last to finish gets nothing back');
+$line = aa_match_players($db, $row($c4), null);
+ok($gold($host) === $g1 && $line[1]['place'] === 2, 'second place is a place, not a purse');
+foreach (array_slice($others, 1, 5) as $u) $result($c4, $u, -1);
+ok($row($c4)['state'] === 'done' && (int)$row($c4)['winner_id'] === $others[0], 'the match closes when the last of the seven reports');
 
 echo "\nWho is leading\n";
 $c5 = $make($host, 500); $join($c5, $guest); $start($c5, $host);
@@ -169,12 +177,19 @@ $db->prepare('UPDATE matches SET created = ? WHERE code = ?')->execute([time() -
 aa_expire_matches($db);
 ok($row($c7)['state'] === 'void' && $gold($host) === $g7 + 7000, 'a room nobody joined is refunded after a day');
 $c8 = $make($host, 500); $join($c8, $guest); $start($c8, $host);
-$result($c8, $guest, 30000, 1234);
 $g8 = $gold($guest);
+$result($c8, $guest, 30000, 1234);
+ok($gold($guest) === $g8 + 1000 && $row($c8)['state'] === 'playing', 'the one who cleared it is paid while the other is still on the board');
 $db->prepare('UPDATE matches SET created = ? WHERE code = ?')->execute([time() - (AA_MATCH_HOURS + 1) * 3600, $c8]);
 aa_expire_matches($db);
-ok($row($c8)['state'] === 'done' && (int)$row($c8)['winner_id'] === $guest, 'a player who never finishes loses a day later');
-ok($gold($guest) === $g8 + 1000, 'and the one who did clear takes the pot');
+ok($row($c8)['state'] === 'done' && (int)$row($c8)['winner_id'] === $guest, 'a player who never finishes is counted out a day later');
+ok($gold($guest) === $g8 + 1000, 'and the pot is never paid twice');
+$c9 = $make($host, 500); $join($c9, $guest); $start($c9, $host);
+$g9 = [$gold($host), $gold($guest)];
+$db->prepare('UPDATE matches SET created = ? WHERE code = ?')->execute([time() - (AA_MATCH_HOURS + 1) * 3600, $c9]);
+aa_expire_matches($db);
+ok($row($c9)['state'] === 'done' && $row($c9)['winner_id'] === null, 'a board nobody ever finished is closed out');
+ok($gold($host) === $g9[0] + 500 && $gold($guest) === $g9[1] + 500, 'and every stake goes home');
 
 array_map('unlink', glob($tmp . '/*') ?: []); @rmdir($tmp);
 echo $bad ? "\n$bad of $tests failed\n" : "\nall $tests tests passed\n";

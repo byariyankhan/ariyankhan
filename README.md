@@ -660,27 +660,38 @@ unlock (skip allowed after two fails), stars, best times and progress in
   is dealt only then (`get` hands out the country, tier and seed once the match
   is `playing`), so nobody can study it while the room fills up. Cancelling voids
   the room, hands every stake back and kills the link.
-  **The first player to clear the board takes the whole pot**, not the one with
-  the shortest clock: the server stamps the moment each result arrives and ranks
-  by that, so finishing first is what wins. A player who runs out of hearts loses
-  to anyone who clears; a board nobody cleared refunds every stake. Everything
+  **The first player to clear the board takes the whole pot, and is paid the
+  instant their result lands** — no waiting on anybody else. Not the shortest
+  clock: the server stamps the moment each result arrives and ranks by that, so
+  finishing first is what wins. `aa_settle_match` pays that first clear straight
+  into the purse (once only: the `winner_id IS NULL` guard on the row is what
+  makes it a race) and leaves the match `playing`, because **the rest play on for
+  second, third, fourth place — the places are still theirs to win, the gold is
+  not.** The match itself closes only when everyone has reported. A player who
+  runs out of hearts loses to anyone who clears; a board nobody cleared refunds
+  every stake. Everything
   about gold happens on the server, which also picks the country, the tier and
   the seed; the client only shows what `match.php` says. A result can only be
   reported once, so a retry cannot improve a time. A room nobody joins, or one
   the host never starts, is refunded after a day, and a match where someone never
-  finishes settles a day later with the missing run counted as a loss.
+  finishes is closed out a day later with the missing run counted as a loss.
   While they play, `progress` carries each player's percentage and returns the
   line-up in order, drawn over the top left of the board as circles numbered 1
   upwards (`renderRanks`, polled every 2 s). `match_players` is a row per player,
   so three to seven in a room needs no new shape; `aa_migrate_matches` moved the
   first two-seat version over and refunded anything unfinished.
-  Winning pays off properly: gold rains over the card, the purse badge pops and
-  counts up from the old balance (`goldRain`, `countTo`), with the canvas lifted
-  above the sheet for the duration (`.aa-confetti.is-over`).
-  `tests/match.test.php` (50 checks) covers the stakes, the room rules, a room of
-  seven, the finish-order rule against a shorter clock, that a 500 room of
-  beginners gets an easy board while a 7,000 room of strong players gets a master
-  one, and that no gold is made or lost. Signing out and deleting the account live in Settings.
+  Winning pays off properly and immediately: the win card, the `SFX.win` fanfare,
+  gold raining over the card, the purse badge popping and counting up from the old
+  balance (`goldRain`, `countTo`), with the canvas lifted above the sheet for the
+  duration (`.aa-confetti.is-over`) — all of it the moment the last arrow goes,
+  with the other six still playing. For them the poll says the pot is gone once
+  (`SFX.taken`, one toast) and rings the winner's circle in gold
+  (`.aa-rank.is-won`); their board carries on.
+  `tests/match.test.php` (57 checks) covers the stakes, the room rules, a room of
+  seven, the finish-order rule against a shorter clock, the instant payout and
+  that it never pays twice, that second place wins a place and no gold, that a 500
+  room of beginners gets an easy board while a 7,000 room of strong players gets a
+  master one, and that no gold is made or lost. Signing out and deleting the account live in Settings.
 - **Home country first** (`homeCountry`, `orderFor`): `games/geo.php` passes on
   Cloudflare's `CF-IPCountry` (nothing stored); the browser language region is
   the fallback. The tour order is the player's country, then every other country
