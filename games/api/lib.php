@@ -42,7 +42,10 @@ function aa_db(): PDO {
     $db->exec('CREATE INDEX IF NOT EXISTS sessions_user ON sessions(user_id)');
     // A gold match: both players stake the same, both play the very same board, the faster clear takes the pot.
     // host_ms and guest_ms are null while a player is still going, -1 when they ran out of hearts.
-    $db->exec('CREATE TABLE IF NOT EXISTS matches (code TEXT PRIMARY KEY, host_id INTEGER NOT NULL, guest_id INTEGER, stake INTEGER NOT NULL, board TEXT NOT NULL, tier INTEGER NOT NULL, seed INTEGER NOT NULL, host_ms INTEGER, guest_ms INTEGER, state TEXT NOT NULL, winner_id INTEGER, created INTEGER NOT NULL, settled INTEGER)');
+    $db->exec('CREATE TABLE IF NOT EXISTS matches (code TEXT PRIMARY KEY, host_id INTEGER NOT NULL, guest_id INTEGER, stake INTEGER NOT NULL, board TEXT NOT NULL, tier INTEGER NOT NULL, seed INTEGER NOT NULL, host_ms INTEGER, guest_ms INTEGER, host_pct INTEGER NOT NULL DEFAULT 0, guest_pct INTEGER NOT NULL DEFAULT 0, state TEXT NOT NULL, winner_id INTEGER, created INTEGER NOT NULL, settled INTEGER)');
+    // how far along each player is, 0..100, so the other side can be shown their place while they play
+    $mcols = array_column($db->query('PRAGMA table_info(matches)')->fetchAll(), 'name');
+    if ($mcols && !in_array('host_pct', $mcols, true)) { $db->exec('ALTER TABLE matches ADD COLUMN host_pct INTEGER NOT NULL DEFAULT 0'); $db->exec('ALTER TABLE matches ADD COLUMN guest_pct INTEGER NOT NULL DEFAULT 0'); }
     $db->exec('CREATE INDEX IF NOT EXISTS matches_host ON matches(host_id)');
     $db->exec('CREATE INDEX IF NOT EXISTS matches_guest ON matches(guest_id)');
     return $db;
@@ -237,4 +240,36 @@ function aa_settle_match(PDO $db, array $m): array {
     $m['state'] = 'done';
     $m['winner_id'] = $winner;
     return $m;
+}
+
+function aa_player_name(PDO $db, ?int $id): string {
+    if (!$id) return '';
+    $st = $db->prepare('SELECT name FROM users WHERE id = ?');
+    $st->execute([$id]);
+    return (string)($st->fetchColumn() ?: 'A friend');
+}
+
+// Everyone in the match, first place first: a finished board beats an unfinished one, a faster time beats a
+// slower one, and the one further along the board leads the ones behind. Built as a list so a room of seven
+// needs no new shape.
+function aa_match_players(PDO $db, array $m, ?array $me): array {
+    $rows = [];
+    foreach ([['host', $m['host_id'], $m['host_ms'], $m['host_pct']], ['guest', $m['guest_id'], $m['guest_ms'], $m['guest_pct']]] as [$seat, $id, $ms, $pct]) {
+        if ($id === null) continue;
+        $rows[] = [
+            'seat' => $seat,
+            'name' => aa_player_name($db, (int)$id),
+            'pct' => $ms !== null && (int)$ms > 0 ? 100 : max(0, min(100, (int)$pct)),
+            'ms' => $ms === null ? null : (int)$ms,
+            'you' => $me !== null && (int)$id === $me['id'],
+        ];
+    }
+    usort($rows, function ($a, $b) {
+        $rank = fn($p) => $p['ms'] !== null && $p['ms'] > 0 ? 0 : ($p['ms'] === null ? 1 : 2);
+        if ($rank($a) !== $rank($b)) return $rank($a) <=> $rank($b);
+        if ($rank($a) === 0) return $a['ms'] <=> $b['ms'];
+        return $b['pct'] <=> $a['pct'];
+    });
+    foreach ($rows as $i => $_) $rows[$i]['place'] = $i + 1;
+    return $rows;
 }

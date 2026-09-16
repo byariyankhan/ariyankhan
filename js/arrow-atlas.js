@@ -75,7 +75,7 @@
 
   const el = {
     select: $('#aaSelect'), tagline: $('#aaTagline'), dailyRow: $('#aaDailyRow'), homeSel: $('#aaHome'), streak: $('#aaStreak'), daily: $('#aaDaily'), hudDiff: $('#aaHudDiff'), play: $('#aaPlay'), path: $('#aaPath'), btnVibe: $('#aaVibe'), btnGuides: $('#aaGuides'), btnMusic: $('#aaMusic'), howTo: $('#aaHowTo'),
-    sheet: $('#aaSheet'), friends: $('#aaFriends'), signInSheet: $('#aaSignInSheet'), googleBtn: $('#aaGoogleBtn'), signInNote: $('#aaSignInNote'), matchSheet: $('#aaMatchSheet'), matchBody: $('#aaMatchBody'), matchTitle: $('#aaMatchTitle'), accountGroup: $('#aaAccountGroup'), accountWho: $('#aaAccountWho'), accountGold: $('#aaAccountGold'), signOutBtn: $('#aaSignOut'), deleteAccBtn: $('#aaDeleteAcc'), settingsBtns: $$('#aaSettings, #aaSettingsG'), themeBtn: $('#aaTheme'), themes: $('#aaThemes'),
+    sheet: $('#aaSheet'), friends: $('#aaFriends'), signInSheet: $('#aaSignInSheet'), googleBtn: $('#aaGoogleBtn'), signInNote: $('#aaSignInNote'), ranks: $('#aaRanks'), matchSheet: $('#aaMatchSheet'), matchBody: $('#aaMatchBody'), matchTitle: $('#aaMatchTitle'), accountGroup: $('#aaAccountGroup'), accountWho: $('#aaAccountWho'), accountGold: $('#aaAccountGold'), signOutBtn: $('#aaSignOut'), deleteAccBtn: $('#aaDeleteAcc'), settingsBtns: $$('#aaSettings, #aaSettingsG'), themeBtn: $('#aaTheme'), themes: $('#aaThemes'),
     game: $('#aaGame'), boardWrap: $('#aaBoardWrap'), board: $('#aaBoard'), toast: $('#aaToast'), confetti: $('#aaConfetti'),
     hudLevel: $('#aaHudLevel'), hudMode: $('#aaHudMode'), hudTime: $('#aaHudTime'), hudLeft: $('#aaHudLeft'), hudLives: $('#aaHudLives'), hudLivesWrap: $('#aaHudLivesWrap'), hudPct: $('#aaHudPct'), boardBar: $('#aaBoardBar'),
     btnHint: $('#aaHint'), btnLevels: $('#aaBackToLevels'), btnSound: $('#aaSound'),
@@ -702,7 +702,8 @@
     if (i < 0 || i >= DATA.levels.length) i = 0;
     if (!daily && !unlocked(i)) i = DATA.levels.findIndex((_, j) => !cleared(j) && unlocked(j));
     if (i < 0) i = 0;
-    stopTimer();
+    stopTimer(); stopProgressPoll();
+    if (el.ranks) el.ranks.hidden = true;
     if (daily?.race) state.seedBump = 0;   // a race is that exact board: a stray reshuffle must not change it
     else if (bumpSeed) state.seedBump++; else if (state.idx !== i || !!daily !== !!state.daily) { state.seedBump = 0; state.fails = 0; }
     state.daily = daily; state.level = DATA.levels[i]; state.disc = state.level.disc ? state.level : null;
@@ -983,13 +984,16 @@
     else if (act === 'shuffle') startLevel(state.idx, true, state.daily);
     else if (act === 'skip') { store.set(skipKey(state.idx + 1), true); startLevel(nextOpen(state.idx)); }
     else if (act === 'giveup') { el.card.innerHTML = '<h3>Sending…</h3>'; finishMatch(false, 0); }
+    else if (act === 'minvite') sendInvite(state.pendingMatch);
+    else if (act === 'mcancel') cancelMatch();
     else if (act === 'levels') goToLevels();
     else if (act === 'share') share();
     else if (act === 'gorace') el.overlay.hidden = true;
   });
 
   function goToLevels() {
-    stopTimer(); el.game.hidden = true; el.overlay.hidden = true; el.select.hidden = false; setHash(-1); renderSelect();
+    stopTimer(); stopMatchPoll(); stopProgressPoll();
+    if (el.ranks) el.ranks.hidden = true; el.game.hidden = true; el.overlay.hidden = true; el.select.hidden = false; setHash(-1); renderSelect();
   }
   async function share() {
     const n = DATA.levels.length, done = DATA.levels.filter((_, i) => cleared(i)).length;
@@ -1101,19 +1105,47 @@
     openSheet(el.matchSheet);
   }
 
-  function showInvite(m) {
-    el.matchTitle.textContent = 'Invite a friend';
-    el.matchBody.innerHTML = `
-      <p class="aa-purse"><span>Stake</span><span class="aa-gold"><span aria-hidden="true">🪙</span>${gfmt(m.stake)}</span></p>
-      <p class="aa-sheet-note">Send this to your friend. When they confirm, you both play the same board and the faster clear takes ${gfmt(m.stake * 2)}.</p>
-      <p class="aa-link-box" id="aaInviteLink">${escapeHtml(matchLink(m.code))}</p>
+  // The host waits on the game screen: the board only arrives once the friend is in, so nobody can study it
+  // while the other side decides.
+  function waitForFriend(m) {
+    stopMatchPoll();
+    state.pendingMatch = m;
+    closeSheets();
+    el.select.hidden = true; el.game.hidden = false; el.board.innerHTML = '';
+    el.hudLevel.textContent = 'Gold match'; el.hudLevel.classList.remove('is-disc');
+    el.hudDiff.textContent = DIFF_OF(m.tier ?? 1); el.hudLeft.textContent = '0'; el.hudPct.textContent = '0%';
+    el.boardBar.style.width = '0%'; el.ranks.hidden = true;
+    scrollToGame();
+    if (history.replaceState) history.replaceState(null, '', location.pathname + location.search + '#m=' + m.code);
+    el.card.innerHTML = `
+      <p class="aa-card-kicker">Gold match · ${gfmt(m.stake)}</p>
+      <h3>Waiting for your friend</h3>
+      <p class="aa-wait">The board opens the moment they accept.</p>
+      <p class="aa-link-box">${escapeHtml(matchLink(m.code))}</p>
       <div class="aa-actions">
-        <button type="button" class="aa-btn aa-btn--primary" data-mact="invite">Invite a friend</button>
-        <button type="button" class="aa-btn" data-mact="play">Start your run</button>
+        <button type="button" class="aa-btn aa-btn--primary" data-act="minvite">Invite a friend</button>
+        <button type="button" class="aa-btn" data-act="mcancel">Cancel</button>
       </div>
       <p class="aa-flash" hidden></p>`;
-    openSheet(el.matchSheet);
-    state.pendingMatch = m;
+    el.overlay.hidden = false;
+    state.matchPoll = setInterval(async () => {
+      try {
+        const d = await matchApi('get', null, '&code=' + encodeURIComponent(m.code));
+        if (typeof d.gold === 'number') setGold(d.gold);
+        if (d.match.state === 'playing') { stopMatchPoll(); playMatch(d.match); }
+        else if (d.match.state !== 'open') { stopMatchPoll(); toast('That match is over.', 'hint'); goToLevels(); }
+      } catch { /* a dropped poll is nothing: the next one will do */ }
+    }, 2500);
+  }
+  function stopMatchPoll() { clearInterval(state.matchPoll); state.matchPoll = 0; }
+  async function cancelMatch() {
+    const m = state.pendingMatch;
+    if (!m) return;
+    stopMatchPoll();
+    try { const d = await matchApi('cancel', { code: m.code }); setGold(d.gold); toast(`Invitation cancelled. ${gfmt(m.stake)} gold back.`, 'good'); }
+    catch (err) { toast(err.code === 'taken' ? 'Too late, your friend already accepted.' : 'Could not cancel that invitation.', 'bad'); }
+    state.pendingMatch = null;
+    goToLevels();
   }
 
   function showConfirm(m) {
@@ -1144,20 +1176,46 @@
     openSheet(el.matchSheet);
   }
 
+  // The line-up over the board: first place first, and the order moves as they play.
+  function renderRanks(players) {
+    if (!el.ranks) return;
+    if (!players?.length) { el.ranks.hidden = true; return; }
+    el.ranks.innerHTML = players.map(p => `<span class="aa-rank${p.you ? ' is-you' : ''}${p.ms === -1 ? ' is-out' : ''}" title="${escapeHtml(p.name)}"><span aria-hidden="true">${escapeHtml((p.name || '?').trim().charAt(0).toUpperCase() || '?')}</span><span class="aa-rank-no">${p.place}</span></span>`).join('');
+    el.ranks.setAttribute('aria-label', players.map(p => `${p.place}. ${p.name}`).join(', '));
+    el.ranks.hidden = false;
+  }
+  function startProgressPoll() {
+    stopProgressPoll();
+    const R = state.daily;
+    if (!R?.match) return;
+    const send = async () => {
+      try {
+        const pct = state.pieces.length ? Math.round(((state.pieces.length - state.left) / state.pieces.length) * 100) : 0;
+        const d = await matchApi('progress', { code: R.match.code, pct });
+        renderRanks(d.match.players);
+      } catch { /* the next tick will try again */ }
+    };
+    send();
+    state.progressPoll = setInterval(send, 2000);
+  }
+  function stopProgressPoll() { clearInterval(state.progressPoll); state.progressPoll = 0; }
+
   const matchBoardIndex = board => DATA.levels.findIndex(L => L.id === board);
   function playMatch(m) {
     const i = matchBoardIndex(m.board);
     if (i < 0) { toast('That board is not in this version of the game.', 'bad'); return; }
     closeSheets();
     state.pendingMatch = null;
-    startLevel(i, false, { key: 'match', race: true, match: m, board: m.board, tier: m.tier, seed: m.seed, hash: '#m=' + m.code });
+    stopMatchPoll();
+    startLevel(i, false, { key: 'match', race: true, match: m, board: m.board, tier: m.tier, seed: m.seed, hash: '#m=' + m.code }).then(() => { renderRanks(m.players); startProgressPoll(); });
     if (typeof gtag === 'function') gtag('event', 'match_play', { game: 'arrow_atlas', stake: m.stake });
   }
 
   async function sendInvite(m) {
+    if (!m) return;
     const link = matchLink(m.code);
     const text = `Arrow Atlas: I put ${gfmt(m.stake)} gold on this board. Match it, clear it faster than me and take ${gfmt(m.stake * 2)}.\n${link}`;
-    const flash = $('.aa-flash', el.matchBody);
+    const flash = $('.aa-flash', el.overlay.hidden ? el.matchBody : el.card);
     try {
       if (navigator.share) { await navigator.share({ text }); return; }
       await navigator.clipboard.writeText(text);
@@ -1172,15 +1230,13 @@
     const act = e.target.closest('[data-mact]')?.dataset.mact;
     if (stake) {
       const btn = e.target.closest('[data-stake]'); btn.disabled = true;
-      try { const d = await matchApi('create', { stake: +stake }); setGold(d.gold); showInvite(d.match); }
+      try { const d = await matchApi('create', { stake: +stake }); setGold(d.gold); waitForFriend(d.match); }
       catch (err) { btn.disabled = false; toast(goldError(err), 'bad'); if (typeof err.gold === 'number') setGold(err.gold); }
       return;
     }
     if (!act) return;
     const m = state.pendingMatch;
-    if (act === 'invite' && m) sendInvite(m);
-    else if (act === 'play' && m) playMatch(m);
-    else if (act === 'stakes') openFriends();
+    if (act === 'stakes') openFriends();
     else if (act === 'close') closeSheets();
     else if (act === 'join' && m) {
       const btn = e.target.closest('[data-mact]'); btn.disabled = true;
@@ -1206,8 +1262,9 @@
       if (typeof d.gold === 'number') setGold(d.gold);
       if (!auth.user) { state.pendingCode = code; openSignIn(`${m.host} put ${gfmt(m.stake)} gold on a board for you. Sign in to take the challenge.`); return; }
       if (m.you && m.state !== 'open') { if (m.your_ms == null && m.board) playMatch(m); else showMatchState(m); return; }
+      if (m.state === 'void') { toast('That invitation was called off.', 'hint', 4000); return; }
       if (m.state !== 'open') { toast('That match is over.', 'hint'); return; }
-      if (m.you === 'host') { showInvite({ ...m, board: m.board, tier: m.tier, seed: m.seed }); return; }
+      if (m.you === 'host') { waitForFriend(m); return; }
       showConfirm(m);
     } catch (err) {
       toast(err.code === 'no_match' ? 'That invitation link is not valid any more.' : 'Could not open that invitation.', 'bad', 4500);
@@ -1237,8 +1294,10 @@
     const R = state.daily;
     if (!R?.match) return;
     try {
+      stopProgressPoll();
       const d = await matchApi('result', { code: R.match.code, ms: Math.round(ms), cleared: !!cleared });
       setGold(d.gold);
+      renderRanks(d.match.players);
       el.overlay.hidden = true;
       showMatchState(d.match);
     } catch (err) {

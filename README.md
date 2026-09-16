@@ -658,6 +658,18 @@ unlock (skip allowed after two fails), stars, best times and progress in
   refunded after a day, and a match where one side never finishes settles a day
   later with the missing run counted as a loss, so no stake is ever stuck.
   A result can only be reported once, so a retry cannot improve a time.
+  After picking a stake the host lands on the board screen with a waiting card,
+  an **Invite a friend** and a **Cancel** button: the board is not dealt until
+  the friend accepts (`get` hands out the country, tier and seed only once the
+  match is on), so a waiting host cannot study it, and cancelling voids the
+  invitation and hands the stake back, which kills the link. A poll every 2.5 s
+  swaps the card for the board the moment the friend confirms.
+  While they play, `progress` carries each player's percentage and returns the
+  line-up in order, drawn over the top left of the board as circles numbered 1
+  upwards (`renderRanks`, polled every 2 s). The list comes from the server as a
+  list, so a room of seven needs no new shape: a finished board beats an
+  unfinished one, a faster time beats a slower one, and a player who ran out of
+  hearts drops behind anyone still going.
   `tests/match.test.php` (29 checks) covers the stakes, the joining rules and
   every way the pot can end up, including that no gold is made or lost.
   Signing out and deleting the account moved to Settings, where they belong.
