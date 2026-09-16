@@ -470,8 +470,8 @@ G6, low-passed, delayed, ~0.11 gain) — no audio file, no licence, works
 offline; it starts on the first tap and stops when the tab is hidden. This is the
 same shell we will wrap for Android/iOS (TWA / Capacitor). Each level is a
 country's outline filled with arrows; tap an arrow to shoot it off the board if its
-run to the edge is clear, a blocked tap costs one heart, no clock (time is still recorded for the result card), 4 hearts (3 on Expert, 2 on Master: `LIVES_OF`) and 3 hints (2 / 1: `HINTS_OF`) per
-level, difficulty that follows the player and never the level number (one
+run to the edge is clear, a blocked tap costs one heart, no clock (time is still recorded for the result card), 4 hearts and 3 hints per
+level (`LIVES_OF`, `HINTS_OF`: the same on every tier; fewer hearts or hints is not how the game gets hard), difficulty that follows the player and never the level number (one
 tier 0 Easy / 1 Normal / 2 Hard / 3 Expert / 4 Master lives in `aa:v1:form` as
 `{tier, wins, losses}`; `nextForm` moves it on form alone: a cleared board earns
 `clearPoints` towards the next step, 2 for a flawless fast first-try clear (no
@@ -564,9 +564,16 @@ unlock (skip allowed after two fails), stars, best times and progress in
   two rewritten generators were all measured against it). Freezing the excess
   and thawing it on a schedule was built and rejected: a visible thaw reveals
   the next free arrow, an invisible one just adds fruitless taps. The levers
-  that do add time are board size and hearts: Expert/Master boards grow to
-  700/900 cells (~105/135 arrows), Expert gives 3 hearts and 2 hints, Master
-  2 hearts and 1 hint (`LIVES_OF`, `HINTS_OF`).
+  that do add time are board size and where the free arrows sit: Expert/Master
+  boards grow to 700/900 cells (~84/113 arrows). Measured next: every arrow free
+  at the start is a coast arrow pointing straight out to sea (100% on Hard and
+  Master), i.e. the one kind of free arrow a player spots without tracing. A
+  coast-aware layout (no snake end pointing to sea, coast tips eroded, sea-safe
+  split points, corridors carved from the coast inland, splitting instead of
+  taking a sea exit) moved the sources onto short coastal fragments without
+  lowering their number: the dependency graph needs one source per coast chain.
+  Hiding the exits therefore needs a signposting redesign that chooses the
+  sources deliberately (corridor exits only, coast closed), not more tuning.
 - **Tightening** (generate stage 3, Hard and up, `TIGHTEN_OF` iterations): a local
   search over head ends after signposting. Flip one arrow to its other end, or,
   when that closes a cycle, also one arrow on its new run, and keep the flip when
