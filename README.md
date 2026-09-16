@@ -574,12 +574,31 @@ unlock (skip allowed after two fails), stars, best times and progress in
   lowering their number: the dependency graph needs one source per coast chain.
   Hiding the exits therefore needs a signposting redesign that chooses the
   sources deliberately (corridor exits only, coast closed), not more tuning.
-- **Discoveries** (`games/data/discover.json`, `discoverHtml`, `renderDiscoveries`):
-  what a traveller finds in each country: its animal, its bird, a place worth the
-  trip and a dish, four short strings per ISO code, hand-written for all 197.
-  The result card shows the four finds under the facts; Settings → Discoveries
-  lists everything found so far, newest first. Loaded in the background after
-  the level data.
+- **Discovery boards** (`games/data/discover-boards.json`, `games/build-discover-boards.mjs`,
+  `discLevelFor`, `nextStep`, `renderDiscoveries`): after a country's outline the tour
+  plays a second board shaped like something a traveller finds there: its animal,
+  its bird or a landmark. Shapes are Twemoji glyphs (graphics CC-BY 4.0, credited
+  on the page) traced to one silhouette with potrace at 240 px, flattened to
+  straight segments (the game's parser reads M/L/Z only), centred in the same
+  100-unit box as the country outlines and given one scale per tier by the same
+  `rasterise`, so the generator, tiers, hearts and hints are untouched; the
+  pyramids are drawn by hand (`CUSTOM`). Which glyph a country gets comes from
+  keyword rules over `games/data/discover.json` (the hand-written animal, bird,
+  place and dish per country, the build input), with `PLACE` overrides where a
+  landmark says more and `LABEL` names for place boards (the glyph shows one
+  landmark, the text often names two). 59 shapes for 197 countries, 55 KB.
+  In the game a discovery level is `{ id: 'd:<id>', name, kind, hex, d, k,
+  country, disc: true }`; seed `(i+1)*1000+500`; progress `dv:<id>`; hash
+  `#level-n-animal|bird|place`; HUD `Level n · Animal`. Play & Discover follows
+  `nextStep()`: the first country not cleared, unless a cleared country's board is
+  still open before it; the result card's Next button does the same. The quiz
+  asks "Which animal did you just clear?" with two other countries' finds of the
+  same kind, preferring one with the very same silhouette (so the shape gives
+  nothing away and the player has to know the country); names that contain one
+  another are never paired. Settings → Discoveries is the collection: one tile
+  per country, cleared ones show the shape and name, the rest a question mark
+  (playable once the country is cleared). The old "You discovered" facts list on
+  the result card was dropped for this.
 - **Home country first** (`homeCountry`, `orderFor`): `games/geo.php` passes on
   Cloudflare's `CF-IPCountry` (nothing stored); the browser language region is
   the fallback. The tour order is the player's country, then every other country
@@ -592,7 +611,8 @@ unlock (skip allowed after two fails), stars, best times and progress in
   rectangle leaves half the free arrows of a coast outline (Hard 2.6 vs 5.7 at
   the start, Master 4.5 vs 11), but every flag board is the same rectangle, so
   the boards stopped looking like anything. Removed; the numbers stay here for
-  the record. Level data keeps `a2` (ISO code) and `c` (centroid) for the
+  the record. The discovery boards above are the replacement: a different
+  silhouette per country. Level data keeps `a2` (ISO code) and `c` (centroid) for the
   home-country order.
 - **Tightening** (generate stage 3, Hard and up, `TIGHTEN_OF` iterations): a local
   search over head ends after signposting. Flip one arrow to its other end, or,

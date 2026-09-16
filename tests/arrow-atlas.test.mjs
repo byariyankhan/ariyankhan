@@ -101,6 +101,22 @@ test('discover.json holds an animal, a bird, a place and a dish for every countr
   for (const L of data.levels) { const d = disc.items[L.a2]; assert.ok(d, `${L.name} has no discoveries`); for (const k of ['a', 'b', 'p', 'f']) assert.ok(typeof d[k] === 'string' && d[k].length >= 3 && d[k].length <= 80, `${L.name}: ${k} missing or odd`); }
   assert.equal(Object.keys(disc.items).length, data.levels.length, 'no stray entries');
 });
+test('discover-boards.json: a board for every country, a shape for every board, M/L/Z paths with five scales', () => {
+  const b = JSON.parse(fs.readFileSync(path.join(root, 'games/data/discover-boards.json'), 'utf8'));
+  for (const L of data.levels) { const bd = b.boards[L.a2]; assert.ok(bd, `${L.name} has no discovery board`); assert.ok(['a', 'b', 'p'].includes(bd.kind), `${L.name}: kind ${bd.kind}`); assert.ok(typeof bd.name === 'string' && bd.name.length >= 2 && bd.name.length <= 40, `${L.name}: board name odd: ${bd.name}`); assert.ok(b.shapes[bd.hex], `${L.name}: shape ${bd.hex} missing`); }
+  assert.equal(Object.keys(b.boards).length, data.levels.length, 'no stray boards');
+  for (const [hex, sh] of Object.entries(b.shapes)) {
+    assert.match(sh.d, /^[MLZ0-9 .-]+$/, `${hex}: path is not M/L/Z`); assert.equal(sh.k.length, 5, `${hex}: five scales`);
+    for (let t = 0; t < 5; t++) { const m = rasterise(sh.d, sh.k[t]); assert.ok(m.count >= 60, `${hex} tier ${t}: only ${m.count} cells`); assert.ok(m.w <= 50 && m.h <= 58, `${hex} tier ${t}: ${m.w}x${m.h} too big`); }
+  }
+  assert.ok(fs.statSync(path.join(root, 'games/data/discover-boards.json')).size < 120 * 1024, 'boards file under 120 KB');
+});
+test('discovery boards generate and are solvable at every tier (every fifth shape)', () => {
+  const b = JSON.parse(fs.readFileSync(path.join(root, 'games/data/discover-boards.json'), 'utf8'));
+  Object.entries(b.shapes).filter((_, i) => i % 5 === 0).forEach(([hex, sh]) => {
+    for (let t = 0; t < 5; t++) { const board = generate(rasterise(sh.d, sh.k[t]), MAXLEN_OF[t], 1500 + t, GEN_OPTS(t)); assert.ok(board.pieces.length >= 15, `${hex} tier ${t}: ${board.pieces.length} arrows`); assert.ok(solvable(board), `${hex} tier ${t} not solvable`); }
+  });
+});
 test('data file stays under 200 KB', () => assert.ok(fs.statSync(path.join(root, 'games/data/arrow-atlas.json')).size < 200 * 1024));
 test('page copy quotes the level count and keeps the no-inline-style rule', () => { assert.ok(html.includes(`${data.levels.length} countries`)); assert.ok(!/\b70 (countries|levels)\b/.test(html)); assert.ok(!/<[a-z][^>]*\sstyle="/i.test(html)); });
 console.log(process.exitCode ? `\nsome of ${tests} tests failed` : `\nall ${tests} tests passed`);
