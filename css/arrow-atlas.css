@@ -95,7 +95,8 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-gamescreen{ gap:6px; }
 .aa-gbar{ display:flex; align-items:center; gap:6px; padding-bottom:8px; border-bottom:2px solid var(--bg2); }
 .aa-gtitle{ flex:1; display:flex; flex-direction:column; align-items:center; line-height:1.05; }
-.aa-glevel{ font-size:26px; font-weight:900; color:var(--accent); }
+.aa-glevel{ font-size:26px; font-weight:900; color:var(--accent); white-space:nowrap; }
+.aa-glevel.is-disc{ font-size:20px; }   /* “Level 12 · Animal” on a discovery board */
 .aa-hud-diff{ font-size:15px; font-weight:900; color:var(--muted); }
 .aa-hud-diff--hard{ color:var(--hard); }
 .aa-hud-diff--expert{ color:var(--expert); }
@@ -213,16 +214,12 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-facts{ font-size:14px; color:var(--muted); margin:0 0 6px; line-height:1.6; }
 .aa-facts b{ color:var(--ink); }
 /* discoveries: four finds per cleared country */
-.aa-discover{ margin:4px 0 10px; }
-.aa-disc-lead{ font-size:12px; letter-spacing:1.5px; text-transform:uppercase; font-weight:900; color:var(--accent); margin:0 0 6px; }
-.aa-disc-chips{ display:grid; grid-template-columns:1fr 1fr; gap:6px; text-align:left; }
-.aa-disc-chip{ display:flex; gap:8px; align-items:center; background:var(--bg2); border-radius:12px; padding:8px 10px; min-height:44px; }
-.aa-disc-ico{ font-size:20px; line-height:1; flex:0 0 auto; }
-.aa-disc-text{ font-size:13px; font-weight:800; color:var(--ink); line-height:1.25; }
-.aa-disc-text small{ display:block; font-size:10px; letter-spacing:1px; text-transform:uppercase; font-weight:800; color:var(--muted); }
-.aa-disc-list{ display:flex; flex-direction:column; gap:14px; }
-.aa-disc-country h3{ font-size:16px; margin:0 0 6px; }
-@media (max-width:360px){ .aa-disc-chips{ grid-template-columns:1fr; } }
+/* Discoveries: the collection of discovery boards, one tile per country (level tiles reused) */
+.aa-disc-list{ display:grid; gap:8px; grid-template-columns:repeat(auto-fill,minmax(96px,1fr)); }
+.aa-level--disc svg path{ fill:var(--good); }
+.aa-disc-q{ font-size:70px; font-weight:900; fill:var(--line-soft); text-anchor:middle; dominant-baseline:central; }
+.aa-level--disc .aa-level-sub--name{ color:var(--ink); font-weight:800; font-size:11px; white-space:normal; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
+.aa-seo-credit{ font-size:12px; color:var(--muted); }
 .aa-best{ font-size:14px; color:var(--muted); margin:0 0 14px; }
 .aa-adapt{ font-size:13px; font-weight:800; color:var(--muted); margin:-6px 0 14px; }
 .aa-adapt--up{ color:var(--hard); }

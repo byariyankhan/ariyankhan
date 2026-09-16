@@ -63,7 +63,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="css/arrow-atlas.css?v=31" />
+    <link rel="stylesheet" href="css/arrow-atlas.css?v=32" />
     <link rel="preload" href="games/data/arrow-atlas.json?v=11" as="fetch" crossorigin="anonymous" />
 
     <!-- SCHEMA -->
@@ -110,7 +110,7 @@
             "197 country boards on a world tour: every country in the world, from Italy and Bangladesh to Luxembourg and Vanuatu",
             "Tap-away mechanic: shoot arrows off the board when their path is clear",
             "4 hearts per level; a blocked arrow costs one",
-                        "Every cleared country hands you four finds (its animal, bird, a place and a dish). Difficulty that follows you, not the level number: Easy, Normal, Hard, Expert and Master boards from about 20 arrows to 80 and more; a flawless, fast clear steps the boards up at once, two first-try clears in a row step them up too, two losses in a row ease them off; milestones every 10 levels; win streaks; combo counter; daily bonus board",
+            "After every country comes a discovery board shaped like its animal, its bird or a landmark, with its own quiz; cleared discoveries build a collection. Difficulty that follows you, not the level number: Easy, Normal, Hard, Expert and Master boards from about 20 arrows to 80 and more; a flawless, fast clear steps the boards up at once, two first-try clears in a row step them up too, two losses in a row ease them off; milestones every 10 levels; win streaks; combo counter; daily bonus board",
             "Board clears reveal the country shape; a 3-option quiz asks which country it was",
             "Country facts on every clear: capital, population, region",
             "Stars, best times and tour progress saved in your browser",
@@ -143,7 +143,7 @@
             { "@type": "Question", "name": "How does the difficulty work?", "acceptedAnswer": { "@type": "Answer", "text": "It follows you, not the level number. Boards come in five tiers, Easy, Normal, Hard, Expert and Master, from about 20 arrows on Easy to 80 and more on Master. Clear a board flawlessly and fast, no heart lost and no hint, and the next one steps up a tier at once. Two first-try clears in a row step up too, whatever hearts and hints you spent. Lose two boards in a row and they ease off a tier. There is no clock to beat: four hearts and three hints per level, that is all." } },
             { "@type": "Question", "name": "Can a level become impossible?", "acceptedAnswer": { "@type": "Answer", "text": "No. Boards are generated so that a solution always exists, and removing an arrow can only free space for the others, so whatever order you tap in you can never get stuck. If you are out of ideas, use a hint: it lights up an arrow that is free right now and adds five seconds to your clock." } },
             { "@type": "Question", "name": "Are the puzzles the same for everyone?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. Each level has a fixed layout, so when you share a time on level 12 your friend faces exactly the same board. Choosing “New layout” after a fail gives you a fresh arrangement of the same country. Today's Country is likewise the same bonus board for everyone that day." } },
-            { "@type": "Question", "name": "Why are the countries hidden until I finish?", "acceptedAnswer": { "@type": "Answer", "text": "That is the geography part. The board is the country's real outline and it fades in as you clear arrows, so you are quietly learning shapes while you play. The quiz at the end checks whether you spotted it, and the level card shows the capital, population and region." } },
+            { "@type": "Question", "name": "Why are the countries hidden until I finish?", "acceptedAnswer": { "@type": "Answer", "text": "That is the geography part. The board is the country's real outline and it fades in as you clear arrows, so you are quietly learning shapes while you play. The quiz at the end checks whether you spotted it, and the level card shows the capital, population and region. Then comes a second board shaped like something you would find in that country (its animal, its bird or a landmark), with a quiz of its own." } },
             { "@type": "Question", "name": "Can I install it as an app?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. On Android and desktop Chrome use “Install” or “Add to Home Screen”; on iPhone use Share → Add to Home Screen. After the first visit the levels are cached so the game works offline." } }
           ]
         }
@@ -356,7 +356,7 @@
           <button class="faq-q" id="aa-faq-q-6" type="button" aria-expanded="false" aria-controls="aa-faq-a-6">
             <span class="faq-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg></span><span class="faq-q-text">Why are the countries hidden until I finish?</span><span class="faq-chevron" aria-hidden="true"></span>
           </button>
-          <div class="faq-a" id="aa-faq-a-6" role="region" aria-labelledby="aa-faq-q-6" aria-hidden="true"><p>That is the geography part. The board is the country's real outline and it fades in as you clear arrows, so you are quietly learning shapes while you play. The quiz at the end checks whether you spotted it, and the level card shows the capital, population and region.</p></div>
+          <div class="faq-a" id="aa-faq-a-6" role="region" aria-labelledby="aa-faq-q-6" aria-hidden="true"><p>That is the geography part. The board is the country's real outline and it fades in as you clear arrows, so you are quietly learning shapes while you play. The quiz at the end checks whether you spotted it, and the level card shows the capital, population and region. Then comes a second board shaped like something you would find in that country (its animal, its bird or a landmark), with a quiz of its own.</p></div>
         </div>
         <div class="faq-item">
           <button class="faq-q" id="aa-faq-q-7" type="button" aria-expanded="false" aria-controls="aa-faq-a-7">
@@ -385,12 +385,13 @@
       </div>
           </div>
       <p class="aa-seo-cta"><a class="aa-btn aa-btn--primary" href="#top">Play Arrow Atlas</a></p>
+      <p class="aa-seo-credit">Country outlines from Natural Earth (public domain). Discovery board shapes are silhouettes traced from <a href="https://github.com/twitter/twemoji" target="_blank" rel="noopener">Twemoji</a> graphics by Twitter and contributors, licensed <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC-BY 4.0</a>.</p>
     </section>
     <!-- ── LEVELS SHEET ── -->
     <div class="aa-sheet" id="aaDiscSheet" hidden>
       <div class="aa-sheet-panel" role="dialog" aria-label="Discoveries">
         <div class="aa-sheet-head"><h2>Discoveries</h2><button type="button" class="aa-icon" data-close-sheet aria-label="Close">✕</button></div>
-        <p class="aa-sheet-note">Every country you clear hands you four finds: its animal, its bird, a place worth the trip and a dish to try.</p>
+        <p class="aa-sheet-note">After every country you clear comes a second board shaped like something you would find there: its animal, its bird or a landmark. Clear it, name it, and it joins your collection.</p>
         <div class="aa-disc-list" id="aaDiscList"></div>
       </div>
     </div>
@@ -417,7 +418,7 @@
         </div>
         <div class="aa-group">
           <button type="button" class="aa-row aa-row--link" id="aaLevelsBtn"><span class="aa-row-ico">🌍</span><span class="aa-row-label">All levels<small id="aaProgress">0/197 cleared</small></span><span class="aa-row-chev">›</span></button>
-          <button type="button" class="aa-row aa-row--link" id="aaDiscBtn"><span class="aa-row-ico">🧭</span><span class="aa-row-label">Discoveries<small id="aaDiscCount">Animals, birds, places and dishes you found</small></span><span class="aa-row-chev">›</span></button>
+          <button type="button" class="aa-row aa-row--link" id="aaDiscBtn"><span class="aa-row-ico">🧭</span><span class="aa-row-label">Discoveries<small id="aaDiscCount">Animals, birds and landmarks you cleared</small></span><span class="aa-row-chev">›</span></button>
           <button type="button" class="aa-row aa-row--link" id="aaDailyRow"><span class="aa-row-ico">📅</span><span class="aa-row-label">Today's Country<small id="aaDaily">Mystery</small></span><span class="aa-row-chev">›</span></button>
           <button type="button" class="aa-row aa-row--link" id="aaHowTo"><span class="aa-row-ico">❓</span><span class="aa-row-label">How to play</span><span class="aa-row-chev">›</span></button>
           <a class="aa-row aa-row--link" href="/#contact"><span class="aa-row-ico">💬</span><span class="aa-row-label">Feedback</span><span class="aa-row-chev">›</span></a>
@@ -437,6 +438,6 @@
       </div>
     </div>
 
-    <script src="js/arrow-atlas.js?v=43"></script>
+    <script src="js/arrow-atlas.js?v=44"></script>
   </body>
 </html>
