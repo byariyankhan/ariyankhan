@@ -75,7 +75,7 @@
 
   const el = {
     select: $('#aaSelect'), tagline: $('#aaTagline'), dailyRow: $('#aaDailyRow'), homeSel: $('#aaHome'), streak: $('#aaStreak'), daily: $('#aaDaily'), hudDiff: $('#aaHudDiff'), play: $('#aaPlay'), path: $('#aaPath'), btnVibe: $('#aaVibe'), btnGuides: $('#aaGuides'), btnMusic: $('#aaMusic'), howTo: $('#aaHowTo'),
-    sheet: $('#aaSheet'), friends: $('#aaFriends'), signInSheet: $('#aaSignInSheet'), googleBtn: $('#aaGoogleBtn'), signInNote: $('#aaSignInNote'), dashSheet: $('#aaDashSheet'), dash: $('#aaDash'), settingsBtns: $$('#aaSettings, #aaSettingsG'), themeBtn: $('#aaTheme'), themes: $('#aaThemes'),
+    sheet: $('#aaSheet'), friends: $('#aaFriends'), signInSheet: $('#aaSignInSheet'), googleBtn: $('#aaGoogleBtn'), signInNote: $('#aaSignInNote'), matchSheet: $('#aaMatchSheet'), matchBody: $('#aaMatchBody'), matchTitle: $('#aaMatchTitle'), accountGroup: $('#aaAccountGroup'), accountWho: $('#aaAccountWho'), accountGold: $('#aaAccountGold'), signOutBtn: $('#aaSignOut'), deleteAccBtn: $('#aaDeleteAcc'), settingsBtns: $$('#aaSettings, #aaSettingsG'), themeBtn: $('#aaTheme'), themes: $('#aaThemes'),
     game: $('#aaGame'), boardWrap: $('#aaBoardWrap'), board: $('#aaBoard'), toast: $('#aaToast'), confetti: $('#aaConfetti'),
     hudLevel: $('#aaHudLevel'), hudMode: $('#aaHudMode'), hudTime: $('#aaHudTime'), hudLeft: $('#aaHudLeft'), hudLives: $('#aaHudLives'), hudLivesWrap: $('#aaHudLivesWrap'), hudPct: $('#aaHudPct'), boardBar: $('#aaBoardBar'),
     btnHint: $('#aaHint'), btnLevels: $('#aaBackToLevels'), btnSound: $('#aaSound'),
@@ -927,22 +927,9 @@
       if (ds.last !== state.daily.key) { const y = new Date(); y.setDate(y.getDate() - 1); const yk = `${y.getFullYear()}-${String(y.getMonth() + 1).padStart(2, '0')}-${String(y.getDate()).padStart(2, '0')}`; store.set('dailyStreak', { count: ds.last === yk ? ds.count + 1 : 1, last: state.daily.key }); }
     } else { store.set(progressKey(i), rec); forgetNums(); }
     if (R) {
-      const them = R.from ? R.from.t : null, won = them == null ? null : t <= them;
-      el.card.innerHTML = `
-        <p class="aa-card-kicker">${them == null ? 'Challenge ready' : won ? 'You win!' : `${escapeHtml(R.from.name)} wins`}</p>
-        <h3>${escapeHtml(L.name)}</h3>
-        <p class="aa-facts">${escapeHtml(C.name)} · ${DIFF_OF(state.tier)} · ${state.pieces.length} arrows</p>
-        ${them == null ? `<div class="aa-stats"><span><b>${fmtTime(t, true)}</b>your time</span><span><b>${state.livesMax - state.lives}</b>hearts lost</span><span><b>${state.hintsUsed}</b>hints</span><span><b>x${state.bestCombo}</b>best combo</span></div>`
-          : `<div class="aa-vs"><div class="aa-vs-row${won ? ' is-win' : ''}"><span>You</span><b>${fmtTime(t, true)}</b></div><div class="aa-vs-row${won ? '' : ' is-win'}"><span>${escapeHtml(R.from.name)}</span><b>${fmtTime(them, true)}</b></div></div>`}
-        <div class="aa-actions">
-          <button type="button" class="aa-btn aa-btn--primary" data-act="sendrace">${them == null ? 'Send the challenge' : 'Send a rematch'}</button>
-          <button type="button" class="aa-btn" data-act="again">Play again</button>
-          <button type="button" class="aa-btn" data-act="levels">World Tour</button>
-        </div>
-        <p class="aa-flash" hidden></p>`;
+      el.card.innerHTML = `<h3>Board cleared!</h3><p class="aa-card-lead">${fmtTime(t, true)}. Sending your time…</p>`;
       el.overlay.hidden = false;
-      $('[data-act]', el.card)?.focus({ preventScroll: true });
-      if (typeof gtag === 'function') gtag('event', 'challenge_done', { game: 'arrow_atlas', tier: state.tier, time_ms: t, won: won === null ? '' : won ? 1 : 0 });
+      finishMatch(true, t);
       return;
     }
     const streak = store.get('streak', 0) + 1; store.set('streak', streak);
@@ -976,13 +963,13 @@
     const canSkip = !state.daily && state.fails >= 2 && state.idx < DATA.levels.length - 1;
     const eased = !!learn && learn.after.tier < learn.before.tier;
     el.card.innerHTML = `
-      <p class="aa-card-kicker">${state.daily ? (state.daily.race ? 'Challenge' : 'Daily board') : hudLabel()} · ${DIFF_OF(state.tier)}</p>
+      <p class="aa-card-kicker">${state.daily ? (state.daily.race ? `Gold match · ${gfmt(state.daily.match?.stake || 0)}` : 'Daily board') : hudLabel()} · ${DIFF_OF(state.tier)}</p>
       <h3>${reason}</h3>
-      <p class="aa-card-lead">${state.left} of ${state.pieces.length} arrows were still on the board.${state.daily?.race && state.daily.from ? ` ${escapeHtml(state.daily.from.name)} still holds ${fmtTime(state.daily.from.t, true)}.` : ''}</p>
+      <p class="aa-card-lead">${state.left} of ${state.pieces.length} arrows were still on the board.${state.daily?.race ? ' Your friend only has to clear it to take the gold.' : ''}</p>
       ${eased ? `<p class="aa-adapt aa-adapt--down">Two losses in a row. A new layout eases to ${DIFF_OF(learn.after.tier)}; Try again keeps this board.</p>` : learn && learn.after.losses === 1 && state.tier > 0 ? '<p class="aa-adapt">One more loss and the boards ease off a step.</p>' : ''}
       <div class="aa-actions">
-        <button type="button" class="aa-btn aa-btn--primary" data-act="retry">Try again</button>
-        ${state.daily?.race ? '' : `<button type="button" class="aa-btn" data-act="shuffle">${eased ? 'Easier layout' : 'New layout'}</button>`}
+        ${state.daily?.race ? '<button type="button" class="aa-btn aa-btn--primary" data-act="giveup">Give the board up</button>' : '<button type="button" class="aa-btn aa-btn--primary" data-act="retry">Try again</button>'}
+        ${state.daily?.race ? '<button type="button" class="aa-btn" data-act="retry">Try again</button>' : `<button type="button" class="aa-btn" data-act="shuffle">${eased ? 'Easier layout' : 'New layout'}</button>`}
         ${canSkip ? '<button type="button" class="aa-btn" data-act="skip">Skip level</button>' : ''}
         <button type="button" class="aa-btn" data-act="levels">World Tour</button>
       </div>`;
@@ -995,9 +982,9 @@
     else if (act === 'again' || act === 'retry') startLevel(state.idx, false, state.daily, state.tier);
     else if (act === 'shuffle') startLevel(state.idx, true, state.daily);
     else if (act === 'skip') { store.set(skipKey(state.idx + 1), true); startLevel(nextOpen(state.idx)); }
+    else if (act === 'giveup') { el.card.innerHTML = '<h3>Sending…</h3>'; finishMatch(false, 0); }
     else if (act === 'levels') goToLevels();
     else if (act === 'share') share();
-    else if (act === 'sendrace') sendRace();
     else if (act === 'gorace') el.overlay.hidden = true;
   });
 
@@ -1035,11 +1022,13 @@
   }
   async function openFriends() {
     closeSheets();
-    await authLoad();
-    if (auth.user) openDash(); else openSignIn();
+    await authLoad(true);   // the purse may have changed on another device or in a match that has just settled
+    renderAccountRow();
+    if (auth.user) openStakes(); else openSignIn();
   }
   let gisAsked = false;
-  function openSignIn() {
+  function openSignIn(why) {
+    if (why && el.signInSheet) { const note = $('.aa-sheet-note', el.signInSheet); if (note) note.textContent = why; }
     if (el.googleBtn) el.googleBtn.innerHTML = '';
     if (el.signInNote) { el.signInNote.hidden = true; el.signInNote.textContent = ''; }
     openSheet(el.signInSheet);
@@ -1072,8 +1061,9 @@
       auth.user = d.user || null;
       const fresh = !!d.user && d.gold_granted;
       closeSheets();
+      renderAccountRow();
       if (auth.user) {
-        openDash();
+        if (state.pendingCode) { const c = state.pendingCode; state.pendingCode = null; openMatchLink(c); } else openStakes();
         toast(fresh ? `Welcome, ${auth.user.name}. ${Number(auth.user.gold || 0).toLocaleString('en-US')} gold to start you off.` : `Signed in as ${auth.user.name}`, 'good', fresh ? 5000 : 2800);
         if (typeof gtag === 'function') gtag('event', 'login', { method: 'google', game: 'arrow_atlas' });
       }
@@ -1081,99 +1071,180 @@
       signInNote(e.code === 'google_not_configured' ? 'Google sign-in is not switched on yet.' : 'That sign-in did not go through. Please try again.');
     }
   }
-  function openDash() { renderDash(); openSheet(el.dashSheet); }
-  function renderDash() {
-    const u = auth.user;
-    if (!u || !el.dash) return;
-    const boards = DATA ? DATA.levels.filter((_, i) => cleared(i)).length : 0;
-    const countries = DATA ? DATA.levels.filter((L, i) => !L.disc && cleared(i)).length : 0;
-    el.dash.innerHTML = `
-      <div class="aa-me"><span class="aa-me-face" aria-hidden="true">${escapeHtml((u.name || '?').trim().charAt(0).toUpperCase() || '?')}</span><span><span class="aa-me-name">${escapeHtml(u.name || 'Player')}</span><br><span class="aa-me-sub">Signed in with ${escapeHtml((u.provider || 'google').replace(/^./, c => c.toUpperCase()))}</span></span><span class="aa-gold" title="Your gold"><span aria-hidden="true">🪙</span>${Number(u.gold || 0).toLocaleString('en-US')}</span></div>
-      <div class="aa-stats"><span><b>${countries}</b>countries</span><span><b>${boards}</b>boards cleared</span><span><b>${DIFF_OF(TIER_OF())}</b>difficulty</span></div>
-      <div class="aa-group">
-        <button type="button" class="aa-row aa-row--link" data-dash="challenge"><span class="aa-row-ico">🏁</span><span class="aa-row-label">Challenge a friend<small>Play a board, then send it. Whoever clears it faster wins.</small></span><span class="aa-row-chev">›</span></button>
-        <div class="aa-row aa-row--soon"><span class="aa-row-ico">⚡</span><span class="aa-row-label">Live race, up to 7 players<small>Everyone starts together, first to clear wins</small></span><span class="aa-soon">Soon</span></div>
-        <div class="aa-row aa-row--soon"><span class="aa-row-ico">🌍</span><span class="aa-row-label">Race people online<small>We find you players at your level</small></span><span class="aa-soon">Soon</span></div>
-      </div>
-      <div class="aa-group">
-        <button type="button" class="aa-row aa-row--link" data-dash="signout"><span class="aa-row-ico">🚪</span><span class="aa-row-label">Sign out</span><span class="aa-row-chev">›</span></button>
-        <button type="button" class="aa-row aa-row--link aa-row--danger" data-dash="delete"><span class="aa-row-ico">🗑️</span><span class="aa-row-label">Delete account<small>Removes the account from our server for good</small></span><span class="aa-row-chev">›</span></button>
-      </div>`;
-  }
-  el.dash?.addEventListener('click', async e => {
-    const act = e.target.closest('[data-dash]')?.dataset.dash;
-    if (!act) return;
-    if (act === 'challenge') { closeSheets(); startChallenge(); return; }
-    if (act === 'signout') { try { await authApi('logout', {}); } catch { /* the cookie may already be gone */ } auth.user = null; closeSheets(); toast('Signed out.'); return; }
-    if (act === 'delete') {
-      if (!confirm('Delete your account? Your friends list and anything stored on our server goes with it. The progress on this device stays.')) return;
-      try { await authApi('delete', {}); auth.user = null; closeSheets(); toast('Account deleted.'); }
-      catch { toast('Could not delete the account. Please try again.', 'bad'); }
-    }
-  });
+  // ── Gold matches: stake, invite, play the same board, winner takes the pot ──
+  // The server holds both stakes, picks the board and decides the winner (games/api/match.php); the game only
+  // shows what it says. Three stakes, and the bigger the stake the harder the board.
+  const STAKES = [500, 1000, 7000];
+  const gfmt = n => Number(n || 0).toLocaleString('en-US');
+  const matchApi = (a, body, query = '') => fetch(`games/api/match.php?a=${a}${query}`, { method: body ? 'POST' : 'GET', credentials: 'same-origin', cache: 'no-store', headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined })
+    .then(async r => { const d = await r.json().catch(() => ({})); if (!r.ok) throw Object.assign(new Error(d.error || `HTTP ${r.status}`), { code: d.error, gold: d.gold }); return d; });
+  const matchLink = code => `${location.origin}${location.pathname}#m=${code}`;
+  const setGold = g => { if (auth.user && typeof g === 'number') auth.user.gold = g; renderAccountRow(); };
 
-  // ── Play with friends: challenge links ──
-  // A board is built from a seed, so two phones can play the very same board with no server at all: the link
-  // carries the board, the tier, the seed and the sender's time. Nothing is stored anywhere and no account is
-  // needed. Live races (a room of up to seven, or strangers matched online) do need a server and a sign-in;
-  // those two rows in the sheet are marked as coming.
-  const GEN_VERSION = '1';   // bump whenever generate() changes: older links would no longer build the same board
-  const b64uEnc = str => { let bin = ''; for (const b of new TextEncoder().encode(str)) bin += String.fromCharCode(b); return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); };
-  const b64uDec = code => { const bin = atob(code.replace(/-/g, '+').replace(/_/g, '/')); return new TextDecoder().decode(Uint8Array.from(bin, c => c.charCodeAt(0))); };
-  const cleanName = v => String(v || '').replace(/[~\u0000-\u001f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 14);
-  const myName = () => cleanName(auth.user?.name || store.get('name', '')) || 'A friend';
-  const raceCode = r => b64uEnc(['1', GEN_VERSION, r.board, r.tier, r.seed, r.t, r.stars, r.name].join('~'));
-  function raceParse(code) {
-    try {
-      const p = b64uDec(code).split('~');
-      if (p[0] !== '1' || p.length < 8) return null;
-      const r = { gen: p[1], board: p[2], tier: clampTier(parseInt(p[3], 10) || 0), seed: parseInt(p[4], 10), t: Math.max(0, parseInt(p[5], 10) || 0), stars: Math.max(1, Math.min(3, parseInt(p[6], 10) || 1)), name: cleanName(p[7]) || 'A friend' };
-      return r.board && Number.isFinite(r.seed) ? r : null;
-    } catch { return null; }
+  // the player's own strip, kept at the top of every match screen
+  function meStrip() {
+    const u = auth.user;
+    if (!u) return '';
+    return `<div class="aa-me"><span class="aa-me-face" aria-hidden="true">${escapeHtml((u.name || '?').trim().charAt(0).toUpperCase() || '?')}</span><span><span class="aa-me-name">${escapeHtml(u.name || 'Player')}</span><br><span class="aa-me-sub">Signed in with ${escapeHtml((u.provider || 'google').replace(/^./, c => c.toUpperCase()))}</span></span><span class="aa-gold" title="Your gold"><span aria-hidden="true">🪙</span>${gfmt(u.gold)}</span></div>`;
   }
-  const raceLink = r => `${location.origin}${location.pathname}#vs=${raceCode(r)}`;
-  // from = the sender's run when answering a challenge, null when making one
-  function playRace(r, from) {
-    const i = DATA.levels.findIndex(L => L.id === r.board);
-    if (i < 0) { toast('That challenge is for a board this version of the game does not have.', 'bad'); return; }
-    startLevel(i, false, { key: 'race', race: true, board: r.board, tier: r.tier, seed: r.seed, from, hash: from ? '#vs=' + raceCode(r) : '' }).then(() => {
-      if (!from) return;
-      if (r.gen && r.gen !== GEN_VERSION) toast('This challenge was made on an older version, so the board may differ.', 'hint', 4000);
-      showRaceIntro(from);
-    });
-    if (typeof gtag === 'function') gtag('event', from ? 'challenge_play' : 'challenge_create', { game: 'arrow_atlas', tier: r.tier });
+
+  function openStakes() {
+    const gold = auth.user?.gold ?? 0;
+    el.matchTitle.textContent = 'Dashboard';
+    el.matchBody.innerHTML = `
+      ${meStrip()}
+      <p class="aa-sheet-note">Pick what you both put in. You each play the same board, and whoever clears it faster takes the lot.</p>
+      <div class="aa-stakes">
+        ${STAKES.map((v, i) => `<button type="button" class="aa-stake" data-stake="${v}"${gold < v ? ' disabled' : ''}><span class="aa-stake-amt"><span aria-hidden="true">🪙</span>${gfmt(v)}</span><span class="aa-stake-sub">${['Normal', 'Hard', 'Expert'][i]} board<br>${gold < v ? 'not enough gold' : `winner takes ${gfmt(v * 2)}`}</span></button>`).join('')}
+      </div>
+      <p class="aa-sheet-note">Your stake is held until the match is over. If nobody accepts within a day, it comes straight back.</p>`;
+    openSheet(el.matchSheet);
   }
-  function showRaceIntro(from) {
-    el.card.innerHTML = `
-      <p class="aa-card-kicker">Challenge</p>
-      <h3>${escapeHtml(from.name)} challenges you</h3>
-      <p class="aa-facts">${escapeHtml(state.level.name)} · ${DIFF_OF(state.tier)} · ${state.pieces.length} arrows</p>
-      <div class="aa-vs"><div class="aa-vs-row"><span>Time to beat</span><b>${fmtTime(from.t, true)}</b></div></div>
+
+  function showInvite(m) {
+    el.matchTitle.textContent = 'Invite a friend';
+    el.matchBody.innerHTML = `
+      <p class="aa-purse"><span>Stake</span><span class="aa-gold"><span aria-hidden="true">🪙</span>${gfmt(m.stake)}</span></p>
+      <p class="aa-sheet-note">Send this to your friend. When they confirm, you both play the same board and the faster clear takes ${gfmt(m.stake * 2)}.</p>
+      <p class="aa-link-box" id="aaInviteLink">${escapeHtml(matchLink(m.code))}</p>
       <div class="aa-actions">
-        <button type="button" class="aa-btn aa-btn--primary" data-act="gorace">Start the race</button>
-        <button type="button" class="aa-btn" data-act="levels">World Tour</button>
-      </div>`;
-    el.overlay.hidden = false;
-    $('[data-act]', el.card)?.focus({ preventScroll: true });
+        <button type="button" class="aa-btn aa-btn--primary" data-mact="invite">Invite a friend</button>
+        <button type="button" class="aa-btn" data-mact="play">Start your run</button>
+      </div>
+      <p class="aa-flash" hidden></p>`;
+    openSheet(el.matchSheet);
+    state.pendingMatch = m;
   }
-  function startChallenge() {
-    const i = +el.play.dataset.level || 0, L = DATA.levels[i];
-    if (!L) return;
-    playRace({ board: L.id, tier: TIER_OF(), seed: 700000 + Math.floor(Math.random() * 200000) }, null);
-    toast('Clear this board, then send it to your friend.', 'hint', 4000);
+
+  function showConfirm(m) {
+    el.matchTitle.textContent = 'A challenge';
+    const gold = auth.user?.gold ?? 0, short = gold < m.stake;
+    el.matchBody.innerHTML = `
+      <p class="aa-sheet-note"><b>${escapeHtml(m.host)}</b> challenges you.</p>
+      <p class="aa-purse"><span>Stake</span><span class="aa-gold"><span aria-hidden="true">🪙</span>${gfmt(m.stake)}</span></p>
+      <p class="aa-sheet-note">You both put in ${gfmt(m.stake)} gold and play the very same board. Clear it faster and you take ${gfmt(m.stake * 2)}.${short ? ` <b>You have only ${gfmt(gold)}.</b>` : ''}</p>
+      <div class="aa-actions">
+        <button type="button" class="aa-btn aa-btn--primary" data-mact="join"${short ? ' disabled' : ''}>Confirm game</button>
+        <button type="button" class="aa-btn" data-mact="close">Not now</button>
+      </div>
+      <p class="aa-flash" hidden></p>`;
+    openSheet(el.matchSheet);
+    state.pendingMatch = m;
   }
-  // the link always carries the time the other side has to beat, so one button makes a challenge and a rematch
-  async function sendRace() {
-    const R = state.daily, L = state.level, mine = Math.round(state.elapsed);
-    const link = raceLink({ board: R.board, tier: R.tier, seed: R.seed, t: mine, stars: stars(), name: myName() });
-    const beat = R.from ? ` and beat ${R.from.name}'s ${fmtTime(R.from.t, true)}` : '';
-    const text = `Arrow Atlas: I cleared ${L.name} in ${fmtTime(mine, true)}${beat}. Same board, same arrows, can you beat it?\n${link}`;
-    const flash = $('.aa-flash', el.card);
+
+  function showMatchState(m) {
+    el.matchTitle.textContent = m.state === 'done' ? (m.draw ? 'Nobody cleared it' : m.you_won ? 'You win!' : `${escapeHtml(m.winner)} wins`) : 'Waiting';
+    const them = m.you === 'host' ? m.guest : m.host;
+    const row = (who, ms) => `<div class="aa-vs-row"><span>${escapeHtml(who)}</span><b>${ms == null ? 'still playing' : ms < 0 ? 'ran out of hearts' : fmtTime(ms, true)}</b></div>`;
+    el.matchBody.innerHTML = `
+      <div class="aa-vs">${row('You', m.your_ms)}${row(them || 'Your friend', m.their_ms)}</div>
+      <p class="aa-purse"><span>${m.state === 'done' ? (m.draw ? 'Both stakes came back' : m.you_won ? `You won ${gfmt(m.stake * 2)}` : `You lost ${gfmt(m.stake)}`) : 'Your stake is held'}</span><span class="aa-gold"><span aria-hidden="true">🪙</span>${gfmt(auth.user?.gold ?? 0)}</span></p>
+      ${m.state === 'done' ? '' : '<p class="aa-sheet-note">Your friend has not finished yet. Open this again later to see how it ended.</p>'}
+      <div class="aa-actions"><button type="button" class="aa-btn aa-btn--primary" data-mact="stakes">Play another</button><button type="button" class="aa-btn" data-mact="close">Close</button></div>`;
+    openSheet(el.matchSheet);
+  }
+
+  const matchBoardIndex = board => DATA.levels.findIndex(L => L.id === board);
+  function playMatch(m) {
+    const i = matchBoardIndex(m.board);
+    if (i < 0) { toast('That board is not in this version of the game.', 'bad'); return; }
+    closeSheets();
+    state.pendingMatch = null;
+    startLevel(i, false, { key: 'match', race: true, match: m, board: m.board, tier: m.tier, seed: m.seed, hash: '#m=' + m.code });
+    if (typeof gtag === 'function') gtag('event', 'match_play', { game: 'arrow_atlas', stake: m.stake });
+  }
+
+  async function sendInvite(m) {
+    const link = matchLink(m.code);
+    const text = `Arrow Atlas: I put ${gfmt(m.stake)} gold on this board. Match it, clear it faster than me and take ${gfmt(m.stake * 2)}.\n${link}`;
+    const flash = $('.aa-flash', el.matchBody);
     try {
       if (navigator.share) { await navigator.share({ text }); return; }
       await navigator.clipboard.writeText(text);
       if (flash) { flash.textContent = 'Link copied. Paste it to your friend.'; flash.hidden = false; }
     } catch { if (flash) { flash.textContent = link; flash.hidden = false; } }
+  }
+
+  const goldError = e => e.code === 'not_enough_gold' ? 'You do not have that much gold.' : e.code === 'taken' ? 'Someone already took that match.' : e.code === 'own_match' ? 'That is your own invitation.' : e.code === 'signed_out' ? 'Please sign in again.' : 'Something went wrong. Please try again.';
+
+  el.matchBody?.addEventListener('click', async e => {
+    const stake = e.target.closest('[data-stake]')?.dataset.stake;
+    const act = e.target.closest('[data-mact]')?.dataset.mact;
+    if (stake) {
+      const btn = e.target.closest('[data-stake]'); btn.disabled = true;
+      try { const d = await matchApi('create', { stake: +stake }); setGold(d.gold); showInvite(d.match); }
+      catch (err) { btn.disabled = false; toast(goldError(err), 'bad'); if (typeof err.gold === 'number') setGold(err.gold); }
+      return;
+    }
+    if (!act) return;
+    const m = state.pendingMatch;
+    if (act === 'invite' && m) sendInvite(m);
+    else if (act === 'play' && m) playMatch(m);
+    else if (act === 'stakes') openFriends();
+    else if (act === 'close') closeSheets();
+    else if (act === 'join' && m) {
+      const btn = e.target.closest('[data-mact]'); btn.disabled = true;
+      try { const d = await matchApi('join', { code: m.code }); setGold(d.gold); playMatch(d.match); }
+      catch (err) { btn.disabled = false; toast(goldError(err), 'bad'); if (typeof err.gold === 'number') setGold(err.gold); }
+    }
+  });
+
+  const matchHash = () => (/^#m=([A-Za-z0-9]{4,12})$/.exec(location.hash) || [])[1]?.toUpperCase() || '';
+  // An invitation opened while the game is already on screen only changes the address, so the page never
+  // reloads: catch that here, or tapping a friend's link in a chat would do nothing.
+  window.addEventListener('hashchange', () => {
+    const code = matchHash();
+    if (code && code !== state.daily?.match?.code) openMatchLink(code);
+  });
+
+  // Someone opened an invitation link. Signing in comes first, because the stake leaves a real purse.
+  async function openMatchLink(code) {
+    try {
+      await authLoad();
+      const d = await matchApi('get', null, '&code=' + encodeURIComponent(code));
+      const m = d.match;
+      if (typeof d.gold === 'number') setGold(d.gold);
+      if (!auth.user) { state.pendingCode = code; openSignIn(`${m.host} put ${gfmt(m.stake)} gold on a board for you. Sign in to take the challenge.`); return; }
+      if (m.you && m.state !== 'open') { if (m.your_ms == null && m.board) playMatch(m); else showMatchState(m); return; }
+      if (m.state !== 'open') { toast('That match is over.', 'hint'); return; }
+      if (m.you === 'host') { showInvite({ ...m, board: m.board, tier: m.tier, seed: m.seed }); return; }
+      showConfirm(m);
+    } catch (err) {
+      toast(err.code === 'no_match' ? 'That invitation link is not valid any more.' : 'Could not open that invitation.', 'bad', 4500);
+    }
+  }
+
+  function renderAccountRow() {
+    if (!el.accountGroup) return;
+    el.accountGroup.hidden = !auth.user;
+    if (!auth.user) return;
+    el.accountWho.textContent = `${auth.user.name} · signed in with ${(auth.user.provider || 'google').replace(/^./, c => c.toUpperCase())}`;
+    el.accountGold.innerHTML = `<span aria-hidden="true">🪙</span>${gfmt(auth.user.gold)}`;
+  }
+  el.signOutBtn?.addEventListener('click', async () => {
+    try { await authApi('logout', {}); } catch { /* the cookie may already be gone */ }
+    auth.user = null; renderAccountRow(); closeSheets(); toast('Signed out.');
+  });
+  el.deleteAccBtn?.addEventListener('click', async () => {
+    if (!confirm('Delete your account? Your gold and any matches go with it. The progress on this device stays.')) return;
+    try { await authApi('delete', {}); auth.user = null; renderAccountRow(); closeSheets(); toast('Account deleted.'); }
+    catch { toast('Could not delete the account. Please try again.', 'bad'); }
+  });
+
+  // The board is over: tell the server, then show where the gold went. Until both players report, a match is
+  // simply waiting, and the stakes stay held.
+  async function finishMatch(cleared, ms) {
+    const R = state.daily;
+    if (!R?.match) return;
+    try {
+      const d = await matchApi('result', { code: R.match.code, ms: Math.round(ms), cleared: !!cleared });
+      setGold(d.gold);
+      el.overlay.hidden = true;
+      showMatchState(d.match);
+    } catch (err) {
+      el.card.innerHTML = `<h3>${cleared ? 'Board cleared!' : 'Out of hearts'}</h3><p class="aa-card-lead">Your time could not reach the server. Open the invitation link again when you are back online.</p><div class="aa-actions"><button type="button" class="aa-btn aa-btn--primary" data-act="levels">World Tour</button></div>`;
+      el.overlay.hidden = false;
+    }
   }
 
   // ── Particles: one canvas over the board, one animation loop, several emitters ──
@@ -1290,7 +1361,7 @@
   el.play.addEventListener('click', () => startLevel(+el.play.dataset.level || 0));
   // Sheets
   const openSheet = sh => { sh.hidden = false; document.body.style.overflow = 'hidden'; };
-  const closeSheets = () => { el.sheet.hidden = true; if (el.signInSheet) el.signInSheet.hidden = true; if (el.dashSheet) el.dashSheet.hidden = true; document.body.style.overflow = ''; };
+  const closeSheets = () => { el.sheet.hidden = true; if (el.signInSheet) el.signInSheet.hidden = true; if (el.matchSheet) el.matchSheet.hidden = true; document.body.style.overflow = ''; };
   el.settingsBtns.forEach(b => b.addEventListener('click', () => openSheet(el.sheet)));
   el.friends?.addEventListener('click', openFriends);
   $$('[data-close-sheet]').forEach(b => b.addEventListener('click', closeSheets));
@@ -1357,7 +1428,7 @@
     el.accept.focus({ preventScroll: true });
   }
   {
-    const deep = /^#(level-\d+|b-[\w:]+|daily|vs=[\w-]+)$/.test(location.hash);
+    const deep = /^#(level-\d+|b-[\w:]+|daily|m=[A-Za-z0-9]+)$/.test(location.hash);
     let seenThisSession = false;
     try { seenThisSession = sessionStorage.getItem('aa:splash') === '1'; sessionStorage.setItem('aa:splash', '1'); } catch { /* ignore */ }
     if (!store.get('welcomed')) showGate();
@@ -1369,8 +1440,8 @@
   loadData().then(() => {
     el.loading.hidden = true;
     renderSelect();
-    const m = /^#level-(\d+)$/.exec(location.hash), mb = /^#b-([\w:]+)$/.exec(location.hash), mv = /^#vs=([\w-]+)$/.exec(location.hash);
-    if (mv) { const r = raceParse(mv[1]); if (r) playRace(r, { name: r.name, t: r.t, stars: r.stars }); else toast('That challenge link is broken. Ask your friend to send it again.', 'bad', 5000); }
+    const m = /^#level-(\d+)$/.exec(location.hash), mb = /^#b-([\w:]+)$/.exec(location.hash), mm = matchHash();
+    if (mm) openMatchLink(mm);
     else if (mb) { const j = DATA.levels.findIndex(L => L.id === mb[1]); startLevel(j < 0 ? 0 : j); }
     else if (m) startLevel(+m[1] - 1);   // older links: position in the list
     else if (location.hash === '#daily') { const d = dailyPick(); startLevel(d.idx, false, d); }

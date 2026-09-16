@@ -645,21 +645,23 @@ unlock (skip allowed after two fails), stars, best times and progress in
   sessions with it. The browser side is `aa-friends.mjs` and `aa-auth-full.mjs`
   in the scratchpad; the one step no test can do is Google actually signing a
   token, so a real sign-in has to be tried by hand once.
-- **Play with friends** (`playRace`, `raceCode`/`raceParse`, `#vs=<code>`): a board
-  comes from a seed, so two phones can play the identical board with no server at
-  all. The lobby's second button opens a sheet with three rows: **Challenge a
-  friend** works today, the two live rows (a room of up to seven, and online
-  matchmaking) are marked "Soon" because they need a server and a sign-in.
-  A challenge plays like the daily board (`state.daily` with `race: true`): fixed
-  tier, fixed seed, no quiz, nothing saved, the difficulty ladder untouched, and
-  no reshuffle button, since a race is that exact board and no other. The link is
-  base64url of `1~<gen>~<board id>~<tier>~<seed>~<ms>~<stars>~<name>`; it always
-  carries the time the other side must beat, so the same button sends a challenge
-  and a rematch. `GEN_VERSION` must be bumped whenever `generate()` changes,
-  otherwise old links would build a different board; a mismatch warns the player.
-  The name is local-only and goes nowhere but into the link the player sends
-  (privacy policy section 2). Tested end to end in `aa-friends.mjs`: two browser
-  profiles with different home countries get a byte-identical board.
+- **Gold matches** (`games/api/match.php`, `openStakes`/`showInvite`/`showConfirm`,
+  `#m=<code>`): the lobby's second button asks for a sign-in, then shows the
+  player's strip (name, provider, purse) and three stakes: 500, 1,000 and 7,000,
+  on a Normal, Hard and Expert board. Picking one holds the stake, gets a
+  six-letter code and shows the invitation link; the friend opens it, confirms,
+  and both play the identical board (the server picks the country, the tier and
+  the seed, so neither side can choose an easy one). The faster clear takes both
+  stakes; a player who runs out of hearts loses to one who clears; a board
+  neither cleared refunds both. **Everything about gold happens on the server**:
+  the client only shows what `match.php` says. An invitation nobody accepts is
+  refunded after a day, and a match where one side never finishes settles a day
+  later with the missing run counted as a loss, so no stake is ever stuck.
+  A result can only be reported once, so a retry cannot improve a time.
+  `tests/match.test.php` (29 checks) covers the stakes, the joining rules and
+  every way the pot can end up, including that no gold is made or lost.
+  Signing out and deleting the account moved to Settings, where they belong.
+  The free challenge links (`#vs=`) were replaced by this and removed.
 - **Home country first** (`homeCountry`, `orderFor`): `games/geo.php` passes on
   Cloudflare's `CF-IPCountry` (nothing stored); the browser language region is
   the fallback. The tour order is the player's country, then every other country

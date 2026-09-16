@@ -65,7 +65,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="css/arrow-atlas.css?v=41" />
+    <link rel="stylesheet" href="css/arrow-atlas.css?v=42" />
     <link rel="preload" href="games/data/arrow-atlas.json?v=11" as="fetch" crossorigin="anonymous" />
 
     <!-- SCHEMA -->
@@ -407,11 +407,11 @@
       </div>
     </div>
 
-    <!-- ── DASHBOARD (signed in) ── -->
-    <div class="aa-sheet" id="aaDashSheet" hidden>
-      <div class="aa-sheet-panel" role="dialog" aria-label="Your dashboard">
-        <div class="aa-sheet-head"><h2>Dashboard</h2><button type="button" class="aa-icon" data-close-sheet aria-label="Close">✕</button></div>
-        <div id="aaDash"></div>
+    <!-- ── GOLD MATCH (signed in) ── -->
+    <div class="aa-sheet" id="aaMatchSheet" hidden>
+      <div class="aa-sheet-panel" role="dialog" aria-label="Play with friends">
+        <div class="aa-sheet-head"><h2 id="aaMatchTitle">Play with Friends</h2><button type="button" class="aa-icon" data-close-sheet aria-label="Close">✕</button></div>
+        <div id="aaMatchBody"></div>
       </div>
     </div>
 
@@ -433,6 +433,11 @@
           <button type="button" class="aa-row aa-row--link" id="aaHowTo"><span class="aa-row-ico">❓</span><span class="aa-row-label">How to play</span><span class="aa-row-chev">›</span></button>
           <a class="aa-row aa-row--link" href="/#contact"><span class="aa-row-ico">💬</span><span class="aa-row-label">Feedback</span><span class="aa-row-chev">›</span></a>
         </div>
+        <div class="aa-group" id="aaAccountGroup" hidden>
+          <div class="aa-row"><span class="aa-row-ico">🙂</span><span class="aa-row-label">Account<small id="aaAccountWho">Signed in</small></span><span class="aa-gold" id="aaAccountGold"></span></div>
+          <button type="button" class="aa-row aa-row--link" id="aaSignOut"><span class="aa-row-ico">🚪</span><span class="aa-row-label">Sign out</span><span class="aa-row-chev">›</span></button>
+          <button type="button" class="aa-row aa-row--link aa-row--danger" id="aaDeleteAcc"><span class="aa-row-ico">🗑️</span><span class="aa-row-label">Delete account<small>Removes it from our server for good</small></span><span class="aa-row-chev">›</span></button>
+        </div>
         <div class="aa-group">
           <a class="aa-row aa-row--link" href="arrow-atlas-privacy.html"><span class="aa-row-ico">🔒</span><span class="aa-row-label">Privacy Policy</span><span class="aa-row-chev">›</span></a>
           <a class="aa-row aa-row--link" href="arrow-atlas-terms.html"><span class="aa-row-ico">📄</span><span class="aa-row-label">Terms of Service</span><span class="aa-row-chev">›</span></a>
@@ -448,6 +453,6 @@
       </div>
     </div>
 
-    <script src="js/arrow-atlas.js?v=54"></script>
+    <script src="js/arrow-atlas.js?v=55"></script>
   </body>
 </html>

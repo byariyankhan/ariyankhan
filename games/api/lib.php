@@ -7,6 +7,9 @@ declare(strict_types=1);
 
 const AA_COOKIE = 'aa_session';
 const AA_SIGNUP_GOLD = 10000;   // what a new player starts with, once, when the account is created
+const AA_STAKES = [500, 1000, 7000];        // the three stakes a player can pick
+const AA_STAKE_TIER = [500 => 1, 1000 => 2, 7000 => 3];   // the bigger the stake, the harder the board
+const AA_MATCH_HOURS = 24;      // an invitation nobody accepts is refunded after this
 const AA_SESSION_DAYS = 180;
 
 function aa_json($data, int $code = 200): void {
@@ -37,6 +40,11 @@ function aa_db(): PDO {
     if (!in_array('gold', $cols, true)) $db->exec('ALTER TABLE users ADD COLUMN gold INTEGER NOT NULL DEFAULT ' . AA_SIGNUP_GOLD);
     $db->exec('CREATE TABLE IF NOT EXISTS sessions (hash TEXT PRIMARY KEY, user_id INTEGER NOT NULL, created INTEGER NOT NULL, expires INTEGER NOT NULL)');
     $db->exec('CREATE INDEX IF NOT EXISTS sessions_user ON sessions(user_id)');
+    // A gold match: both players stake the same, both play the very same board, the faster clear takes the pot.
+    // host_ms and guest_ms are null while a player is still going, -1 when they ran out of hearts.
+    $db->exec('CREATE TABLE IF NOT EXISTS matches (code TEXT PRIMARY KEY, host_id INTEGER NOT NULL, guest_id INTEGER, stake INTEGER NOT NULL, board TEXT NOT NULL, tier INTEGER NOT NULL, seed INTEGER NOT NULL, host_ms INTEGER, guest_ms INTEGER, state TEXT NOT NULL, winner_id INTEGER, created INTEGER NOT NULL, settled INTEGER)');
+    $db->exec('CREATE INDEX IF NOT EXISTS matches_host ON matches(host_id)');
+    $db->exec('CREATE INDEX IF NOT EXISTS matches_guest ON matches(guest_id)');
     return $db;
 }
 
@@ -139,4 +147,94 @@ function aa_upsert_user(PDO $db, string $provider, string $sub, string $name, ?b
     $db->prepare('INSERT INTO users (provider, sub, name, created, seen) VALUES (?, ?, ?, ?, ?)')->execute([$provider, $sub, $name, $now, $now]);
     $created = true;   // the welcome gold comes from the column default, so it lands once and only here
     return (int)$db->lastInsertId();
+}
+
+// ── Gold matches ──
+
+function aa_gold(PDO $db, int $userId): int {
+    $st = $db->prepare('SELECT gold FROM users WHERE id = ?');
+    $st->execute([$userId]);
+    $g = $st->fetchColumn();
+    return $g === false ? 0 : (int)$g;
+}
+
+// Take a stake out of a purse. False when there is not enough, so a match can never be created on credit.
+function aa_take_gold(PDO $db, int $userId, int $amount): bool {
+    $st = $db->prepare('UPDATE users SET gold = gold - ? WHERE id = ? AND gold >= ?');
+    $st->execute([$amount, $userId, $amount]);
+    return $st->rowCount() === 1;
+}
+
+function aa_give_gold(PDO $db, int $userId, int $amount): void {
+    $db->prepare('UPDATE users SET gold = gold + ? WHERE id = ?')->execute([$amount, $userId]);
+}
+
+function aa_match_code(PDO $db): string {
+    $alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';   // no I, O, 0 or 1: these get read out loud
+    for ($try = 0; $try < 40; $try++) {
+        $code = '';
+        for ($i = 0; $i < 6; $i++) $code .= $alphabet[random_int(0, strlen($alphabet) - 1)];
+        $st = $db->prepare('SELECT 1 FROM matches WHERE code = ?');
+        $st->execute([$code]);
+        if ($st->fetchColumn() === false) return $code;
+    }
+    throw new RuntimeException('could not find a free match code');
+}
+
+// A country from the tour, picked by the server so neither player can choose an easy one.
+function aa_pick_board(): ?string {
+    static $ids = null;
+    if ($ids === null) {
+        $ids = [];
+        $raw = @file_get_contents(dirname(__DIR__) . '/data/arrow-atlas.json');
+        $data = $raw ? json_decode($raw, true) : null;
+        foreach (($data['levels'] ?? []) as $L) if (isset($L['id'])) $ids[] = (string)$L['id'];
+    }
+    return $ids ? $ids[random_int(0, count($ids) - 1)] : null;
+}
+
+// Nobody's stake is allowed to sit in limbo. An invitation nobody accepted is handed back; a match where one
+// side never finished is settled a day later with the missing run counted as a loss.
+function aa_expire_matches(PDO $db): void {
+    $cut = time() - AA_MATCH_HOURS * 3600;
+    $st = $db->prepare("SELECT code, host_id, stake FROM matches WHERE state = 'open' AND created < ? LIMIT 20");
+    $st->execute([$cut]);
+    foreach ($st->fetchAll() as $m) {
+        $db->beginTransaction();
+        $upd = $db->prepare("UPDATE matches SET state = 'void', settled = ? WHERE code = ? AND state = 'open'");
+        $upd->execute([time(), $m['code']]);
+        if ($upd->rowCount() === 1) aa_give_gold($db, (int)$m['host_id'], (int)$m['stake']);
+        $db->commit();
+    }
+    $st = $db->prepare("SELECT * FROM matches WHERE state = 'playing' AND created < ? LIMIT 20");
+    $st->execute([$cut]);
+    foreach ($st->fetchAll() as $m) {
+        $db->prepare("UPDATE matches SET host_ms = -1 WHERE code = ? AND host_ms IS NULL")->execute([$m['code']]);
+        $db->prepare("UPDATE matches SET guest_ms = -1 WHERE code = ? AND guest_ms IS NULL")->execute([$m['code']]);
+        $st2 = $db->prepare('SELECT * FROM matches WHERE code = ?');
+        $st2->execute([$m['code']]);
+        aa_settle_match($db, $st2->fetch());
+    }
+}
+
+// Both results are in, so pay out: the faster clear takes the pot, a board nobody cleared refunds both.
+function aa_settle_match(PDO $db, array $m): array {
+    $h = $m['host_ms'] === null ? null : (int)$m['host_ms'];
+    $g = $m['guest_ms'] === null ? null : (int)$m['guest_ms'];
+    if ($h === null || $g === null) return $m;
+    $hostWon = $h > 0 && ($g < 0 || $h <= $g);
+    $guestWon = $g > 0 && ($h < 0 || $g < $h);
+    $stake = (int)$m['stake'];
+    $db->beginTransaction();
+    $upd = $db->prepare("UPDATE matches SET state = 'done', winner_id = ?, settled = ? WHERE code = ? AND state = 'playing'");
+    $winner = $hostWon ? (int)$m['host_id'] : ($guestWon ? (int)$m['guest_id'] : null);
+    $upd->execute([$winner, time(), $m['code']]);
+    if ($upd->rowCount() === 1) {
+        if ($winner !== null) aa_give_gold($db, $winner, $stake * 2);
+        else { aa_give_gold($db, (int)$m['host_id'], $stake); aa_give_gold($db, (int)$m['guest_id'], $stake); }
+    }
+    $db->commit();
+    $m['state'] = 'done';
+    $m['winner_id'] = $winner;
+    return $m;
 }
