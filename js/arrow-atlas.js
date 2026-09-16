@@ -33,10 +33,10 @@
   const RUSH_SECONDS = 90;
   const HINT_PENALTY_MS = 5000;
   const HINTS_PER_LEVEL = 3;
-  const HINTS_OF = [3, 3, 3, 2, 1];   // hints per tier
+  const HINTS_OF = [3, 3, 3, 3, 3];   // hints per tier: three everywhere (fewer hints or hearts is not how this game gets hard)
   const hintsFor = tier => HINTS_OF[tier] ?? HINTS_PER_LEVEL;
   const MODES = { classic: 'Classic' };  // one way to play: the tour ramps up, and the player's own form shifts it
-  const LIVES_OF = [4, 4, 4, 3, 2];   // hearts per tier: Expert three, Master two
+  const LIVES_OF = [4, 4, 4, 4, 4];   // hearts per tier: four everywhere
   const livesFor = tier => LIVES_OF[tier] ?? LIVES;
   // ── Adaptive difficulty ──
   // Difficulty follows the player, never the level number. One tier (0 Easy … 4 Master) lives on the device and
