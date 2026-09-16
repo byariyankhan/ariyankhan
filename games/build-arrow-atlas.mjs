@@ -20,8 +20,11 @@ const grab = re => { const m = js.match(re); if (!m) throw new Error('could not 
 const { rasterise, REF } = new Function([grab(/const REF = \d+;/), grab(/function parsePath\(d\) \{[\s\S]*?\n  \}\n/), grab(/function insidePath\([\s\S]*?\n  \}\n/), grab(/function rasterise\([\s\S]*?\n  \}\n/)].join('\n') + '\nreturn { rasterise, REF };')();
 
 const TARGETS = [110, 240, 400, 540, 680]; // land cells per difficulty tier: boards ~28 cells across, like the reference apps (thick lines, long snakes)
-const MAX_DIM = 32;                        // widest/tallest board in cells for roundish countries (phones show ~12 px cells)
-const MAX_TALL = 46, MAX_WIDE = 38;        // long side for tall (Chile, Norway) and wide (Cuba, Malaysia) shapes
+// Board caps per tier (cells). Easy to Hard keep ~12 px cells on a phone; Expert and Master may grow so their
+// targets are actually reached (with one cap for all, Master boards were no bigger than Hard ones).
+const MAX_DIM_OF = [32, 32, 32, 36, 40];     // widest/tallest board for roundish countries
+const MAX_TALL_OF = [46, 46, 46, 50, 54];    // long side for tall shapes (Chile, Norway)
+const MAX_WIDE_OF = [38, 38, 38, 42, 46];    // long side for wide shapes (Cuba, Malaysia)
 
 // World Tour order: the original 70 (recognisable shapes first, then by area), then every other country by population.
 const TOUR = [
@@ -76,10 +79,10 @@ function mainland(f) {
 }
 // Find the scale whose land-cell count is closest to the target, keeping the board within the dimension caps.
 // Elongated countries would otherwise cap out at ~130 cells: their long side is allowed extra room.
-function scaleFor(d, target) {
+function scaleFor(d, target, tier) {
   const probe = rasterise(d, 0.3);
   const tall = probe.h > probe.w * 1.5, wide = probe.w > probe.h * 1.5;
-  const maxW = wide ? MAX_WIDE : MAX_DIM, maxH = tall ? MAX_TALL : MAX_DIM;
+  const maxW = wide ? MAX_WIDE_OF[tier] : MAX_DIM_OF[tier], maxH = tall ? MAX_TALL_OF[tier] : MAX_DIM_OF[tier];
   let lo = 0.06, hi = Math.max(maxW, maxH) / REF, best = null;
   for (let i = 0; i < 18; i++) {
     const k = Math.round((lo + hi) / 2 * 1000) / 1000; const m = rasterise(d, k);
@@ -103,7 +106,7 @@ for (const name of order) {
   const proj = d3.geoAzimuthalEqualArea().rotate([-centre[0], -centre[1]]);
   proj.fitExtent([[0, 0], [REF, REF]], main);
   const d = d3.geoPath(proj)(main).replace(/-?\d+\.\d+/g, m => String(r1(+m)));
-  const masks = TARGETS.map(t => scaleFor(d, t));
+  const masks = TARGETS.map((t, tier) => scaleFor(d, t, tier));
   levels.push({ id: idOf(f), name, cap: CAPITALS[name], pop: props.POP_EST || null, cont: props.CONTINENT || '', sub: props.SUBREGION || '', d, k: masks.map(m => m.k), _masks: masks });
 }
 fs.writeFileSync(OUT, JSON.stringify({ version: 2, targets: TARGETS, ref: REF, levels: levels.map(({ _masks, ...L }) => L) }));

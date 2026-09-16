@@ -64,7 +64,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="css/arrow-atlas.css?v=23" />
-    <link rel="preload" href="games/data/arrow-atlas.json?v=7" as="fetch" crossorigin="anonymous" />
+    <link rel="preload" href="games/data/arrow-atlas.json?v=8" as="fetch" crossorigin="anonymous" />
 
     <!-- SCHEMA -->
     <script type="application/ld+json">
@@ -110,7 +110,7 @@
             "168 country boards on a world tour: every country in the world, from Italy and Bangladesh to Luxembourg and Vanuatu",
             "Tap-away mechanic: shoot arrows off the board when their path is clear",
             "4 hearts per level; a blocked arrow costs one",
-                        "Adaptive difficulty: Normal, Hard, Expert and Master boards of 40 to 250 arrows; the next board steps up or eases off based on your own hearts lost, hints, retries and speed; milestones every 10 levels; win streaks; combo counter; daily bonus board",
+                        "Difficulty that follows you, not the level number: Easy, Normal, Hard, Expert and Master boards from about 20 arrows to 80 and more; clear two levels in a row at the first try and the boards step up, lose two in a row and they ease off; milestones every 10 levels; win streaks; combo counter; daily bonus board",
             "Board clears reveal the country shape; a 3-option quiz asks which country it was",
             "Country facts on every clear: capital, population, region",
             "Stars, best times and tour progress saved in your browser",
@@ -140,7 +140,7 @@
           "mainEntity": [
             { "@type": "Question", "name": "How do I play Arrow Atlas?", "acceptedAnswer": { "@type": "Answer", "text": "Every arrow slides in the direction it points. Tap one and, if nothing is in its path, it shoots off the board. If another arrow is in the way it stays put and you lose a heart. Clear every arrow to reveal the country underneath, then pick its name from three options." } },
             { "@type": "Question", "name": "Is it free and do I need an account?", "acceptedAnswer": { "@type": "Answer", "text": "Yes it is free and no account is needed. Progress, stars and best times are saved in your own browser. Nothing is uploaded." } },
-            { "@type": "Question", "name": "How does the difficulty work?", "acceptedAnswer": { "@type": "Answer", "text": "It adapts to you. The tour ramps from about 40 arrows on level 1 to 250 on the biggest Master boards, and after every board the game scores how you played: hearts lost, hints, retries and seconds per arrow. Two clean, quick clears and the next level steps up a tier; keep losing hearts and it eases off for a while. Levels are labelled Normal, Hard, Expert and Master. There is no clock to beat: four hearts and three hints per level, that is all." } },
+            { "@type": "Question", "name": "How does the difficulty work?", "acceptedAnswer": { "@type": "Answer", "text": "It follows you, not the level number. Boards come in five tiers, Easy, Normal, Hard, Expert and Master, from about 20 arrows on Easy to 80 and more on Master. Clear two levels in a row at the first try, whatever hearts and hints you spent, and the boards step up a tier. Lose two boards in a row and they ease off a tier. There is no clock to beat: four hearts and three hints per level, that is all." } },
             { "@type": "Question", "name": "Can a level become impossible?", "acceptedAnswer": { "@type": "Answer", "text": "No. Boards are generated so that a solution always exists, and removing an arrow can only free space for the others, so whatever order you tap in you can never get stuck. If you are out of ideas, use a hint: it lights up an arrow that is free right now and adds five seconds to your clock." } },
             { "@type": "Question", "name": "Are the puzzles the same for everyone?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. Each level has a fixed layout, so when you share a time on level 12 your friend faces exactly the same board. Choosing “New layout” after a fail gives you a fresh arrangement of the same country. Today's Country is likewise the same bonus board for everyone that day." } },
             { "@type": "Question", "name": "Why are the countries hidden until I finish?", "acceptedAnswer": { "@type": "Answer", "text": "That is the geography part. The board is the country's real outline and it fades in as you clear arrows, so you are quietly learning shapes while you play. The quiz at the end checks whether you spotted it, and the level card shows the capital, population and region." } },
@@ -290,10 +290,10 @@
           </p>
         </div>
         <p>
-          There is no clock to beat. Every level gives four hearts and three hints, and the difficulty adapts to you:
-          after every board the game scores how you played (hearts lost, hints, retries, seconds per arrow), and the
-          next level steps up a tier when you are on a roll or eases off when you keep losing hearts. Boards grow from
-          about 40 arrows to 250 and are labelled Normal, Hard, Expert and Master. Quick consecutive taps build a combo,
+          There is no clock to beat. Every level gives four hearts and three hints, and the difficulty follows you,
+          not the level number: clear two levels in a row at the first try, whatever hearts and hints you spent, and
+          the boards step up a tier; lose two boards in a row and they ease off a tier. Boards run from about 20
+          arrows on Easy to 80 and more on Master and are labelled Easy, Normal, Hard, Expert and Master. Quick consecutive taps build a combo,
           clearing levels back to back builds a win streak, every tenth level is a milestone, and the Today's Country
           board gives everyone the same bonus puzzle each day.
         </p>
@@ -343,7 +343,7 @@
           <button class="faq-q" id="aa-faq-q-3" type="button" aria-expanded="false" aria-controls="aa-faq-a-3">
             <span class="faq-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2M9 3h6"/></svg></span><span class="faq-q-text">How does the difficulty work?</span><span class="faq-chevron" aria-hidden="true"></span>
           </button>
-          <div class="faq-a" id="aa-faq-a-3" role="region" aria-labelledby="aa-faq-q-3" aria-hidden="true"><p>It adapts to you. The tour ramps from about 40 arrows on level 1 to 250 on the biggest Master boards, and after every board the game scores how you played: hearts lost, hints, retries and seconds per arrow. Two clean, quick clears and the next level steps up a tier; keep losing hearts and it eases off for a while. Levels are labelled Normal, Hard, Expert and Master. There is no clock to beat: four hearts and three hints per level, that is all.</p></div>
+          <div class="faq-a" id="aa-faq-a-3" role="region" aria-labelledby="aa-faq-q-3" aria-hidden="true"><p>It follows you, not the level number. Boards come in five tiers, Easy, Normal, Hard, Expert and Master, from about 20 arrows on Easy to 80 and more on Master. Clear two levels in a row at the first try, whatever hearts and hints you spent, and the boards step up a tier. Lose two boards in a row and they ease off a tier. There is no clock to beat: four hearts and three hints per level, that is all.</p></div>
         </div>
         <div class="faq-item">
           <button class="faq-q" id="aa-faq-q-4" type="button" aria-expanded="false" aria-controls="aa-faq-a-4">
@@ -395,7 +395,7 @@
     <div class="aa-sheet" id="aaLevelsSheet" hidden>
       <div class="aa-sheet-panel" role="dialog" aria-label="World Tour levels">
         <div class="aa-sheet-head"><h2>World Tour</h2><button type="button" class="aa-icon" data-close-sheet aria-label="Close">✕</button></div>
-        <p class="aa-sheet-note">Levels unlock in order and adapt to how you play: Normal, Hard, Expert, Master. Every 10th level is a milestone.</p>
+        <p class="aa-sheet-note">Levels unlock in order. The difficulty follows you: Easy, Normal, Hard, Expert, Master. Every 10th level is a milestone.</p>
         <div class="aa-levels" id="aaLevels"></div>
       </div>
     </div>
@@ -431,6 +431,6 @@
       </div>
     </div>
 
-    <script src="js/arrow-atlas.js?v=27"></script>
+    <script src="js/arrow-atlas.js?v=28"></script>
   </body>
 </html>

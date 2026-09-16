@@ -471,13 +471,13 @@ offline; it starts on the first tap and stops when the tab is hidden. This is th
 same shell we will wrap for Android/iOS (TWA / Capacitor). Each level is a
 country's outline filled with arrows; tap an arrow to shoot it off the board if its
 run to the edge is clear, a blocked tap costs one of 4 hearts, no clock (time is still recorded for the result card), 4 hearts and 3 hints per
-level, adaptive difficulty (Normal/Hard/Expert/Master by tier; the tour's
-`BASE_TIER` is shifted one tier up or down by a skill score in `aa:v1:skill`
-that `nextSkill`/`rateRun` update after every board from hearts lost, wrong taps,
-hints, retries and seconds per arrow — two clean quick clears step up, repeated
-losses ease off; `tierFor`/`TIER_OF`/`LEVEL_DIFF`; Try again keeps the same
-board, New layout takes the adapted tier; the result card says why), combo
-counter (taps within 1.5 s), win streak, milestones every 10 levels, a Today's Country
+level, difficulty that follows the player and never the level number (one
+tier 0 Easy / 1 Normal / 2 Hard / 3 Expert / 4 Master lives in `aa:v1:form` as
+`{tier, wins, losses}`; `nextForm` moves it on form alone: two levels in a row
+cleared at the first try step it up whatever hearts and hints were spent, two
+lost boards in a row step it down, a clear after a retry resets both counters;
+`TIER_OF()`; Try again keeps the same board, New layout takes the new tier; the
+result card says what the form did), combo counter (taps within 1.8 s), win streak, milestones every 10 levels, a Today's Country
 bonus board (date-seeded, same for everyone, `#daily`), and clearing the board reveals the country for a
 3-option quiz plus capital/population/region. 168-country World Tour (every country in world-atlas 110m minus dependencies and disputed areas) with sequential
 unlock (skip allowed after two fails), stars, best times and progress in
@@ -533,7 +533,8 @@ unlock (skip allowed after two fails), stars, best times and progress in
   rows scroll to it); the homepage has a "Games" section linking both games
   with keyword anchor text; sitemap priority 1.0 with an image entry.
 - **Scale and feel** (matched to the reference apps): boards are at most 32 cells
-  across (46 tall / 38 wide for elongated shapes; `TARGETS` 110/240/400/540/680
+  across on Easy to Hard (46 tall / 38 wide for elongated shapes) and up to 36/40
+  on Expert/Master (`MAX_DIM_OF`, `MAX_TALL_OF`, `MAX_WIDE_OF`; `TARGETS` 110/240/400/540/680
   cells), so phones show ~12 px cells; strokes are 0.2 of a cell with 0.5-cell
   arrowheads; snakes run up to 7-15 cells (`MAXLEN_OF`). Every tap has feedback:
   pressing thickens the arrow; a blocked arrow lunges forward, hits and comes

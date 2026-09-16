@@ -14,7 +14,7 @@
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
   const SVG_NS = 'http://www.w3.org/2000/svg';
-  const DATA_VERSION = '7';
+  const DATA_VERSION = '8';
   const MAP_VERSION = '1';
   const STORE = 'aa:v1:';
   const store = {
@@ -22,7 +22,7 @@
     set(k, v) { try { localStorage.setItem(STORE + k, JSON.stringify(v)); } catch { /* ignore */ } },
   };
   const LIVES = 4;                 // Classic and Rush; One Life has 1, Deep Focus none
-  const DIFF_OF = tier => ['Normal', 'Normal', 'Hard', 'Expert', 'Master'][tier];
+  const DIFF_OF = tier => ['Easy', 'Normal', 'Hard', 'Expert', 'Master'][tier];
   const COMBO_WINDOW_MS = 1800;   // shots closer together than this chain into a combo; a wrong tap breaks it
   const COMBO_WORDS = ['Good!', 'Great!', 'Amazing!', 'Unstoppable!'];
   const comboLevel = n => n >= 12 ? 3 : n >= 8 ? 2 : n >= 5 ? 1 : 0;
@@ -36,23 +36,19 @@
   const MODES = { classic: 'Classic' };  // one way to play: the tour ramps up, and the player's own form shifts it
   const livesFor = () => LIVES;
   // ── Adaptive difficulty ──
-  // The tour has a base tier per level. A skill score in [-2, 2], updated after every board from the player's own
-  // play (hearts lost, wrong taps, hints, retries, seconds per arrow), shifts that base one tier up or down, so a
-  // player on a roll meets Hard boards early and a player who keeps losing hearts gets a breather. Never generic:
-  // two players on level 12 can get different boards. Levels 1 and 2 always stay Normal.
-  const BASE_TIER = i => i < 5 ? 0 : i < 15 ? 1 : i < 40 ? 2 : i < 80 ? 3 : 4;
-  const SKILL_UP = 1.2, SKILL_DOWN = -1.2, SKILL_KEEP = 0.6, SKILL_GAIN = 0.8;
-  const skillShift = skill => skill >= SKILL_UP ? 1 : skill <= SKILL_DOWN ? -1 : 0;
-  const tierFor = (i, skill) => i < 2 ? 0 : Math.max(0, Math.min(4, BASE_TIER(i) + skillShift(skill)));
-  // How a finished board went, in [-1, 1]. A lost board is -1; a clean, quick clear is 1.
-  const rateRun = ({ won, wrong, hints, retries, secPerArrow }) => {
-    if (!won) return -1;
-    const q = 0.9 - 0.35 * wrong - 0.2 * hints - (retries ? 0.5 : 0) - (secPerArrow > 1.8 ? 0.3 : 0) + (secPerArrow < 1 && wrong === 0 ? 0.3 : 0);
-    return Math.max(-1, Math.min(1, q));
+  // Difficulty follows the player, never the level number. One tier (0 Easy … 4 Master) lives on the device and
+  // moves on form alone: two levels in a row cleared at the first try (hearts and hints spent or not) step it up;
+  // two lost boards in a row step it down. Nobody stays bored on an easy board or stuck on a hard one.
+  const STEP_UP_WINS = 2, STEP_DOWN_LOSSES = 2;
+  const clampTier = t => Math.max(0, Math.min(4, t));
+  // form = { tier, wins: first-try clears in a row, losses: lost boards in a row }
+  const FORM0 = { tier: 0, wins: 0, losses: 0 };
+  const nextForm = (f, won, firstTry) => {
+    if (won) { const wins = firstTry ? f.wins + 1 : 0; return wins >= STEP_UP_WINS ? { tier: clampTier(f.tier + 1), wins: 0, losses: 0 } : { tier: f.tier, wins, losses: 0 }; }
+    const losses = f.losses + 1; return losses >= STEP_DOWN_LOSSES ? { tier: clampTier(f.tier - 1), wins: 0, losses: 0 } : { tier: f.tier, wins: 0, losses };
   };
-  const nextSkill = (skill, run) => Math.max(-2, Math.min(2, skill * SKILL_KEEP + rateRun(run) * SKILL_GAIN));
-  const TIER_OF = i => tierFor(i, store.get('skill', 0));
-  const LEVEL_DIFF = (i, tier = TIER_OF(i)) => tier <= 1 && tier > BASE_TIER(i) ? 'Hard' : DIFF_OF(tier);
+  const formNow = () => ({ ...FORM0, ...(store.get('form', null) || {}) });
+  const TIER_OF = () => clampTier(formNow().tier);
   const MAXLEN_OF = [7, 9, 11, 13, 15];  // longest body per tier: long snakes, as on the reference boards, free arrows far from where the player tapped
   // How narrow the play is per tier (see generate()): narrow = prefer the end whose run holds more pieces (blocked
   // longer), far = prefer the end with a gap right ahead (the arrow it frees when it goes is that far away), rail =
@@ -236,7 +232,7 @@
     el.streak.textContent = streak >= 2 ? `🔥 ${streak} in a row` : dStreak.count >= 2 ? `🔥 ${dStreak.count}-day daily streak` : '';
     renderDaily();
     const nextIdx = DATA.levels.findIndex((_, j) => !cleared(j) && unlocked(j));
-    el.playSub.textContent = nextIdx < 0 ? `All ${DATA.levels.length} cleared · replay any level` : `Level ${nextIdx + 1} · ${LEVEL_DIFF(nextIdx)}`;
+    el.playSub.textContent = nextIdx < 0 ? `All ${DATA.levels.length} cleared · replay any level` : `Level ${nextIdx + 1} · ${DIFF_OF(TIER_OF())}`;
     el.play.dataset.level = nextIdx < 0 ? 0 : nextIdx;
     el.play.querySelector('.aa-play-label').textContent = done ? 'Continue' : 'Play';
     if (el.path) { el.path.innerHTML = '';
@@ -260,7 +256,7 @@
       b.appendChild(svg);
       const t = document.createElement('span'); t.className = 'aa-level-num'; t.textContent = String(i + 1); b.appendChild(t);
       const s = document.createElement('span'); s.className = 'aa-level-sub';
-      s.textContent = rec ? `${L.name} ${'★'.repeat(rec.stars)}` : open ? LEVEL_DIFF(i) : '🔒';
+      s.textContent = rec ? `${L.name} ${'★'.repeat(rec.stars)}` : open ? DIFF_OF(TIER_OF()) : '🔒';
       b.appendChild(s);
       b.addEventListener('click', () => startLevel(i));
       el.levels.appendChild(b);
@@ -595,7 +591,7 @@
     stopTimer();
     if (bumpSeed) state.seedBump++; else if (state.idx !== i || !!daily !== !!state.daily) { state.seedBump = 0; state.fails = 0; }
     state.daily = daily;
-    state.idx = i; state.level = DATA.levels[i]; state.tier = daily ? daily.tier : keepTier >= 0 ? keepTier : TIER_OF(i);
+    state.idx = i; state.level = DATA.levels[i]; state.tier = daily ? daily.tier : keepTier >= 0 ? keepTier : TIER_OF();
     state.busy = true; el.select.hidden = true; el.game.hidden = false; el.overlay.hidden = true; el.board.innerHTML = '';
     el.hudLevel.textContent = daily ? 'Daily' : `Level ${i + 1}`; el.hudLeft.textContent = 'Drawing the board…';
     await new Promise(r => setTimeout(r, 20));   // let the game screen paint before the (up to ~1 s on phones) generation
@@ -606,11 +602,11 @@
     el.error.hidden = true; el.loading.hidden = true;
     if (daily) { if (history.replaceState) history.replaceState(null, '', location.pathname + location.search + '#daily'); } else setHash(i);
     scrollToGame();
-    const diff = daily ? DIFF_OF(state.tier) : LEVEL_DIFF(i, state.tier);
+    const diff = DIFF_OF(state.tier);
     state.diff = diff;
     renderBoard(); renderHud();
     if (i === 0 && !cleared(0) && !daily) toast('Tap an arrow to shoot it off the board. If another arrow is in its way, you lose a heart.', 'hint');
-    else if (diff !== 'Normal') toast(`${diff.toUpperCase()} LEVEL · ${state.pieces.length} arrows${!daily && state.tier > BASE_TIER(i) ? ' · you earned this' : ''}`, 'hard');
+    else if (state.tier >= 2) toast(`${diff.toUpperCase()} LEVEL · ${state.pieces.length} arrows${daily ? '' : ' · you earned this'}`, 'hard');
     else toast(`${daily ? 'Daily board' : 'Level ' + (i + 1)} · ${state.pieces.length} arrows · which country is this?`);
   }
 
@@ -757,24 +753,22 @@
   }
 
   // ── End of level ──
-  // Feed the finished board into the skill score (tour levels only; the daily board has a fixed tier).
+  // Move the player's form on the finished board (tour levels only; the daily board has a fixed tier).
   function learnFrom(won) {
     if (state.daily) return null;
-    const before = store.get('skill', 0);
-    const run = { won, wrong: state.wrong, hints: state.hintsUsed, retries: state.fails - (won ? 0 : 1), secPerArrow: state.elapsed / 1000 / Math.max(1, state.pieces.length) };
-    const after = nextSkill(before, run);
-    store.set('skill', after);
-    store.set('lastRun', { level: state.idx + 1, tier: state.tier, ...run, q: rateRun(run), skill: after, at: Date.now() });
-    return { before, after, shift: skillShift(after), was: skillShift(before) };
+    const before = formNow(), firstTry = won && state.fails === 0, after = nextForm(before, won, firstTry);
+    store.set('form', after);
+    store.set('lastRun', { level: state.idx + 1, tier: state.tier, won, firstTry, wrong: state.wrong, hints: state.hintsUsed, at: Date.now() });
+    return { before, after, firstTry };
   }
   // One line for the result card explaining what the player's form did to the next board.
   function adaptNote(learn, nextIdx) {
     if (!learn || nextIdx == null || nextIdx >= DATA.levels.length) return '';
-    const nextTier = tierFor(nextIdx, learn.after), base = BASE_TIER(nextIdx);
-    if (nextTier > base) return `<p class="aa-adapt aa-adapt--up">On a roll: Level ${nextIdx + 1} steps up to ${LEVEL_DIFF(nextIdx, nextTier)}.</p>`;
-    if (nextTier < base) return `<p class="aa-adapt aa-adapt--down">Breather: Level ${nextIdx + 1} eases to ${LEVEL_DIFF(nextIdx, nextTier)} for now.</p>`;
-    if (learn.shift > 0 || learn.was > 0) return `<p class="aa-adapt">Level ${nextIdx + 1} is ${LEVEL_DIFF(nextIdx, nextTier)}. Clean, quick clears push the difficulty up.</p>`;
-    return '';
+    const { before, after } = learn;
+    if (after.tier > before.tier) return `<p class="aa-adapt aa-adapt--up">Two in a row at the first try. Level ${nextIdx + 1} steps up to ${DIFF_OF(after.tier)}.</p>`;
+    if (after.tier >= 4) return `<p class="aa-adapt aa-adapt--up">Master boards. As hard as it gets.</p>`;
+    if (after.wins === 1) return `<p class="aa-adapt">First try. One more like that and the boards step up to ${DIFF_OF(after.tier + 1)}.</p>`;
+    return `<p class="aa-adapt">Level ${nextIdx + 1} stays ${DIFF_OF(after.tier)}. Two first-try clears in a row step it up.</p>`;
   }
   function stars() { const lost = state.livesMax - state.lives; return lost === 0 ? 3 : lost === 1 ? 2 : 1; }
   function winLevel() {
@@ -825,7 +819,7 @@
       <p class="aa-best">${isBest ? (prev ? `New best time! Previous ${fmtTime(prev.t, true)}.` : 'First clear. That is your time to beat.') : `Your best: ${fmtTime(prev.t, true)}.`}</p>
       ${last ? '' : adaptNote(learn, i + 1)}
       <div class="aa-actions">
-        ${last || state.daily ? '' : `<button type="button" class="aa-btn aa-btn--primary" data-act="next">Next: Level ${i + 2} · ${LEVEL_DIFF(i + 1)}</button>`}
+        ${last || state.daily ? '' : `<button type="button" class="aa-btn aa-btn--primary" data-act="next">Next: Level ${i + 2} · ${DIFF_OF(TIER_OF())}</button>`}
         <button type="button" class="aa-btn" data-act="again">Play again</button>
         <button type="button" class="aa-btn" data-act="share">Share</button>
         <button type="button" class="aa-btn" data-act="levels">World Tour</button>
@@ -834,7 +828,7 @@
       <p class="aa-yt">Curious about ${L.name}? I make geography, history and economy videos: <a href="https://www.youtube.com/@ariyankhan" target="_blank" rel="noopener">youtube.com/@ariyankhan</a></p>`;
     el.overlay.hidden = false;
     $('[data-act]', el.card)?.focus({ preventScroll: true });
-    if (typeof gtag === 'function') gtag('event', 'level_complete', { game: 'arrow_atlas', level: i + 1, mode: state.mode, tier: state.tier, arrows: state.pieces.length, time_ms: t, stars: s, quiz: quizRight ? 1 : 0, skill: Math.round((learn?.after ?? 0) * 100) / 100 });
+    if (typeof gtag === 'function') gtag('event', 'level_complete', { game: 'arrow_atlas', level: i + 1, mode: state.mode, tier: state.tier, arrows: state.pieces.length, time_ms: t, stars: s, quiz: quizRight ? 1 : 0, tier_next: learn?.after.tier ?? state.tier });
   }
   function failLevel(reason) {
     if (state.finished) return;
@@ -843,12 +837,12 @@
     SFX.lose(); renderHud();
     const learn = learnFrom(false);
     const canSkip = !state.daily && state.fails >= 2 && state.idx < DATA.levels.length - 1;
-    const eased = learn && tierFor(state.idx, learn.after) < state.tier;
+    const eased = !!learn && learn.after.tier < learn.before.tier;
     el.card.innerHTML = `
       <p class="aa-card-kicker">${state.daily ? 'Daily board' : `Level ${state.idx + 1}`} · ${DIFF_OF(state.tier)}</p>
       <h3>${reason}</h3>
       <p class="aa-card-lead">${state.left} of ${state.pieces.length} arrows were still on the board.</p>
-      ${eased ? '<p class="aa-adapt aa-adapt--down">Breather: a new layout will be a smaller board. Try again keeps this one.</p>' : ''}
+      ${eased ? `<p class="aa-adapt aa-adapt--down">Two losses in a row. A new layout eases to ${DIFF_OF(learn.after.tier)}; Try again keeps this board.</p>` : learn && learn.after.losses === 1 && state.tier > 0 ? '<p class="aa-adapt">One more loss and the boards ease off a step.</p>' : ''}
       <div class="aa-actions">
         <button type="button" class="aa-btn aa-btn--primary" data-act="retry">Try again</button>
         <button type="button" class="aa-btn" data-act="shuffle">${eased ? 'Easier layout' : 'New layout'}</button>
@@ -954,7 +948,7 @@
   el.btnGuides?.addEventListener('click', () => { state.guides = !state.guides; store.set('guides', state.guides); renderToggles(); });
   const goAbout = () => { closeSheets(); if (!el.game.hidden) goToLevels(); document.getElementById('aaAbout')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); };
   el.howTo?.addEventListener('click', goAbout);
-  // Reset progress: wipes everything the game stored on this device (progress, streaks, skill, settings, launches)
+  // Reset progress: wipes everything the game stored on this device (progress, streaks, form, settings, launches)
   document.getElementById('aaReset')?.addEventListener('click', () => {
     if (!confirm('Delete all Arrow Atlas progress and settings on this device? This cannot be undone.')) return;
     try { Object.keys(localStorage).filter(k => k.startsWith(STORE)).forEach(k => localStorage.removeItem(k)); } catch { /* ignore */ }
