@@ -75,7 +75,7 @@
 
   const el = {
     select: $('#aaSelect'), tagline: $('#aaTagline'), dailyRow: $('#aaDailyRow'), homeSel: $('#aaHome'), streak: $('#aaStreak'), daily: $('#aaDaily'), hudDiff: $('#aaHudDiff'), play: $('#aaPlay'), path: $('#aaPath'), btnVibe: $('#aaVibe'), btnGuides: $('#aaGuides'), btnMusic: $('#aaMusic'), howTo: $('#aaHowTo'),
-    sheet: $('#aaSheet'), settingsBtns: $$('#aaSettings, #aaSettingsG'), themeBtn: $('#aaTheme'), themes: $('#aaThemes'),
+    sheet: $('#aaSheet'), friends: $('#aaFriends'), friendsSheet: $('#aaFriendsSheet'), challengeBtn: $('#aaChallenge'), nameInput: $('#aaName'), settingsBtns: $$('#aaSettings, #aaSettingsG'), themeBtn: $('#aaTheme'), themes: $('#aaThemes'),
     game: $('#aaGame'), boardWrap: $('#aaBoardWrap'), board: $('#aaBoard'), toast: $('#aaToast'), confetti: $('#aaConfetti'),
     hudLevel: $('#aaHudLevel'), hudMode: $('#aaHudMode'), hudTime: $('#aaHudTime'), hudLeft: $('#aaHudLeft'), hudLives: $('#aaHudLives'), hudLivesWrap: $('#aaHudLivesWrap'), hudPct: $('#aaHudPct'), boardBar: $('#aaBoardBar'),
     btnHint: $('#aaHint'), btnLevels: $('#aaBackToLevels'), btnSound: $('#aaSound'),
@@ -382,7 +382,7 @@
     for (let j = 0; j <= i && j < DATA.levels.length; j++) if (open(j)) return j;
     return -1;
   }
-  const hudLabel = () => state.daily ? 'Daily' : `Level ${levelNo(state.idx)}`;
+  const hudLabel = () => state.daily ? (state.daily.race ? 'Challenge' : 'Daily') : `Level ${levelNo(state.idx)}`;
   const maskFor = (L, tier) => { const key = L.id + ':' + tier; if (!maskCache.has(key)) maskCache.set(key, rasterise(L.d, L.k[tier])); return maskCache.get(key); };
 
   // ── Puzzle generation ──
@@ -703,7 +703,8 @@
     if (!daily && !unlocked(i)) i = DATA.levels.findIndex((_, j) => !cleared(j) && unlocked(j));
     if (i < 0) i = 0;
     stopTimer();
-    if (bumpSeed) state.seedBump++; else if (state.idx !== i || !!daily !== !!state.daily) { state.seedBump = 0; state.fails = 0; }
+    if (daily?.race) state.seedBump = 0;   // a race is that exact board: a stray reshuffle must not change it
+    else if (bumpSeed) state.seedBump++; else if (state.idx !== i || !!daily !== !!state.daily) { state.seedBump = 0; state.fails = 0; }
     state.daily = daily; state.level = DATA.levels[i]; state.disc = state.level.disc ? state.level : null;
     state.idx = i; state.tier = daily ? daily.tier : keepTier >= 0 ? keepTier : TIER_OF();
     state.busy = true; el.select.hidden = true; el.game.hidden = false; el.overlay.hidden = true; el.board.innerHTML = '';
@@ -715,7 +716,7 @@
     const livesMax = livesFor(state.tier);
     Object.assign(state, { W: gen.W, H: gen.H, pieces: gen.pieces, occ: gen.occ, land: gen.land, left: gen.pieces.length, hintsMax: hintsFor(state.tier), lives: livesMax, livesMax, elapsed: 0, startedAt: 0, finished: false, hintsUsed: 0, wrong: 0, busy: false, combo: 0, bestCombo: 0, lastShot: 0, cheerHold: 0, shown: new Set(), armed: new Set() });
     el.error.hidden = true; el.loading.hidden = true;
-    if (daily) { if (history.replaceState) history.replaceState(null, '', location.pathname + location.search + '#daily'); } else setHash(i);
+    if (daily) { if (history.replaceState) history.replaceState(null, '', location.pathname + location.search + (daily.hash ?? '#daily')); } else setHash(i);
     scrollToGame();
     const diff = DIFF_OF(state.tier);
     state.diff = diff;
@@ -723,6 +724,7 @@
     if (i === 0 && !cleared(0) && !daily) toast('Tap an arrow to shoot it off the board. If another arrow is in its way, you lose a heart.', 'hint');
     else if (state.disc) toast(`${state.disc.country.name}'s ${KIND_WORD[state.disc.kind]} · ${state.pieces.length} arrows · what is it?`, state.tier >= 2 ? 'hard' : '');
     else if (state.tier >= 2) toast(`${diff.toUpperCase()} LEVEL · ${state.pieces.length} arrows${daily ? '' : ' · you earned this'}`, 'hard');
+    else if (daily?.race) toast(`Challenge board · ${state.pieces.length} arrows · clear it as fast as you can.`);
     else toast(`${daily ? 'Daily board' : 'Level ' + levelNo(i)} · ${state.pieces.length} arrows · which country is this?`);
   }
 
@@ -884,7 +886,7 @@
     state.outlineEl?.style.setProperty('fill-opacity', '0.9');
     SFX.win(); confetti();
     // only a country gets the quiz; a discovery board simply tells what it was
-    setTimeout(state.disc ? () => showResult(null) : showQuiz, 700);
+    setTimeout(state.disc || state.daily?.race ? () => showResult(null) : showQuiz, 700);
   }
   function showQuiz() {
     const L = state.level, D = state.disc;
@@ -914,14 +916,35 @@
     const L = state.level, i = state.idx, D = state.disc, C = D ? D.country : L;
     const t = Math.round(state.elapsed), s = stars();
     const learn = learnFrom(true);
-    const prev = state.daily ? store.get(`daily:${state.daily.key}`) : cleared(i);
+    const R = state.daily?.race ? state.daily : null;
+    const prev = R ? null : state.daily ? store.get(`daily:${state.daily.key}`) : cleared(i);
     const isBest = !prev || t < prev.t;
     const rec = { t: isBest ? t : prev.t, stars: Math.max(s, prev?.stars || 0), quiz: !!D || !!(quizRight || prev?.quiz), tier: state.tier, arrows: state.pieces.length, at: Date.now() };
-    if (state.daily) {
+    if (R) { /* a race is not part of the tour: nothing is saved and the difficulty ladder does not move */ }
+    else if (state.daily) {
       store.set(`daily:${state.daily.key}`, rec);
       const ds = store.get('dailyStreak', { count: 0, last: '' });
       if (ds.last !== state.daily.key) { const y = new Date(); y.setDate(y.getDate() - 1); const yk = `${y.getFullYear()}-${String(y.getMonth() + 1).padStart(2, '0')}-${String(y.getDate()).padStart(2, '0')}`; store.set('dailyStreak', { count: ds.last === yk ? ds.count + 1 : 1, last: state.daily.key }); }
     } else { store.set(progressKey(i), rec); forgetNums(); }
+    if (R) {
+      const them = R.from ? R.from.t : null, won = them == null ? null : t <= them;
+      el.card.innerHTML = `
+        <p class="aa-card-kicker">${them == null ? 'Challenge ready' : won ? 'You win!' : `${escapeHtml(R.from.name)} wins`}</p>
+        <h3>${escapeHtml(L.name)}</h3>
+        <p class="aa-facts">${escapeHtml(C.name)} · ${DIFF_OF(state.tier)} · ${state.pieces.length} arrows</p>
+        ${them == null ? `<div class="aa-stats"><span><b>${fmtTime(t, true)}</b>your time</span><span><b>${state.livesMax - state.lives}</b>hearts lost</span><span><b>${state.hintsUsed}</b>hints</span><span><b>x${state.bestCombo}</b>best combo</span></div>`
+          : `<div class="aa-vs"><div class="aa-vs-row${won ? ' is-win' : ''}"><span>You</span><b>${fmtTime(t, true)}</b></div><div class="aa-vs-row${won ? '' : ' is-win'}"><span>${escapeHtml(R.from.name)}</span><b>${fmtTime(them, true)}</b></div></div>`}
+        <div class="aa-actions">
+          <button type="button" class="aa-btn aa-btn--primary" data-act="sendrace">${them == null ? 'Send the challenge' : 'Send a rematch'}</button>
+          <button type="button" class="aa-btn" data-act="again">Play again</button>
+          <button type="button" class="aa-btn" data-act="levels">World Tour</button>
+        </div>
+        <p class="aa-flash" hidden></p>`;
+      el.overlay.hidden = false;
+      $('[data-act]', el.card)?.focus({ preventScroll: true });
+      if (typeof gtag === 'function') gtag('event', 'challenge_done', { game: 'arrow_atlas', tier: state.tier, time_ms: t, won: won === null ? '' : won ? 1 : 0 });
+      return;
+    }
     const streak = store.get('streak', 0) + 1; store.set('streak', streak);
     const n = levelNo(i), milestone = !state.daily && n % 10 === 0;
     const facts = D ? escapeHtml(D.rel.charAt(0).toUpperCase() + D.rel.slice(1)) : [L.cap ? `Capital: <b>${L.cap}</b>` : '', L.pop ? `Population: <b>${fmtPop(L.pop)}</b>` : '', L.sub ? `Region: <b>${L.sub}</b>` : ''].filter(Boolean).join(' · ');
@@ -953,13 +976,13 @@
     const canSkip = !state.daily && state.fails >= 2 && state.idx < DATA.levels.length - 1;
     const eased = !!learn && learn.after.tier < learn.before.tier;
     el.card.innerHTML = `
-      <p class="aa-card-kicker">${state.daily ? 'Daily board' : hudLabel()} · ${DIFF_OF(state.tier)}</p>
+      <p class="aa-card-kicker">${state.daily ? (state.daily.race ? 'Challenge' : 'Daily board') : hudLabel()} · ${DIFF_OF(state.tier)}</p>
       <h3>${reason}</h3>
-      <p class="aa-card-lead">${state.left} of ${state.pieces.length} arrows were still on the board.</p>
+      <p class="aa-card-lead">${state.left} of ${state.pieces.length} arrows were still on the board.${state.daily?.race && state.daily.from ? ` ${escapeHtml(state.daily.from.name)} still holds ${fmtTime(state.daily.from.t, true)}.` : ''}</p>
       ${eased ? `<p class="aa-adapt aa-adapt--down">Two losses in a row. A new layout eases to ${DIFF_OF(learn.after.tier)}; Try again keeps this board.</p>` : learn && learn.after.losses === 1 && state.tier > 0 ? '<p class="aa-adapt">One more loss and the boards ease off a step.</p>' : ''}
       <div class="aa-actions">
         <button type="button" class="aa-btn aa-btn--primary" data-act="retry">Try again</button>
-        <button type="button" class="aa-btn" data-act="shuffle">${eased ? 'Easier layout' : 'New layout'}</button>
+        ${state.daily?.race ? '' : `<button type="button" class="aa-btn" data-act="shuffle">${eased ? 'Easier layout' : 'New layout'}</button>`}
         ${canSkip ? '<button type="button" class="aa-btn" data-act="skip">Skip level</button>' : ''}
         <button type="button" class="aa-btn" data-act="levels">World Tour</button>
       </div>`;
@@ -974,6 +997,8 @@
     else if (act === 'skip') { store.set(skipKey(state.idx + 1), true); startLevel(nextOpen(state.idx)); }
     else if (act === 'levels') goToLevels();
     else if (act === 'share') share();
+    else if (act === 'sendrace') sendRace();
+    else if (act === 'gorace') el.overlay.hidden = true;
   });
 
   function goToLevels() {
@@ -990,6 +1015,70 @@
       await navigator.clipboard.writeText(text);
       if (flash) { flash.textContent = 'Copied. Paste it anywhere.'; flash.hidden = false; }
     } catch { if (flash) { flash.textContent = text; flash.hidden = false; } }
+  }
+
+  // ── Play with friends: challenge links ──
+  // A board is built from a seed, so two phones can play the very same board with no server at all: the link
+  // carries the board, the tier, the seed and the sender's time. Nothing is stored anywhere and no account is
+  // needed. Live races (a room of up to seven, or strangers matched online) do need a server and a sign-in;
+  // those two rows in the sheet are marked as coming.
+  const GEN_VERSION = '1';   // bump whenever generate() changes: older links would no longer build the same board
+  const b64uEnc = str => { let bin = ''; for (const b of new TextEncoder().encode(str)) bin += String.fromCharCode(b); return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); };
+  const b64uDec = code => { const bin = atob(code.replace(/-/g, '+').replace(/_/g, '/')); return new TextDecoder().decode(Uint8Array.from(bin, c => c.charCodeAt(0))); };
+  const cleanName = v => String(v || '').replace(/[~\u0000-\u001f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 14);
+  const myName = () => cleanName(store.get('name', '')) || 'A friend';
+  const raceCode = r => b64uEnc(['1', GEN_VERSION, r.board, r.tier, r.seed, r.t, r.stars, r.name].join('~'));
+  function raceParse(code) {
+    try {
+      const p = b64uDec(code).split('~');
+      if (p[0] !== '1' || p.length < 8) return null;
+      const r = { gen: p[1], board: p[2], tier: clampTier(parseInt(p[3], 10) || 0), seed: parseInt(p[4], 10), t: Math.max(0, parseInt(p[5], 10) || 0), stars: Math.max(1, Math.min(3, parseInt(p[6], 10) || 1)), name: cleanName(p[7]) || 'A friend' };
+      return r.board && Number.isFinite(r.seed) ? r : null;
+    } catch { return null; }
+  }
+  const raceLink = r => `${location.origin}${location.pathname}#vs=${raceCode(r)}`;
+  // from = the sender's run when answering a challenge, null when making one
+  function playRace(r, from) {
+    const i = DATA.levels.findIndex(L => L.id === r.board);
+    if (i < 0) { toast('That challenge is for a board this version of the game does not have.', 'bad'); return; }
+    startLevel(i, false, { key: 'race', race: true, board: r.board, tier: r.tier, seed: r.seed, from, hash: from ? '#vs=' + raceCode(r) : '' }).then(() => {
+      if (!from) return;
+      if (r.gen && r.gen !== GEN_VERSION) toast('This challenge was made on an older version, so the board may differ.', 'hint', 4000);
+      showRaceIntro(from);
+    });
+    if (typeof gtag === 'function') gtag('event', from ? 'challenge_play' : 'challenge_create', { game: 'arrow_atlas', tier: r.tier });
+  }
+  function showRaceIntro(from) {
+    el.card.innerHTML = `
+      <p class="aa-card-kicker">Challenge</p>
+      <h3>${escapeHtml(from.name)} challenges you</h3>
+      <p class="aa-facts">${escapeHtml(state.level.name)} · ${DIFF_OF(state.tier)} · ${state.pieces.length} arrows</p>
+      <div class="aa-vs"><div class="aa-vs-row"><span>Time to beat</span><b>${fmtTime(from.t, true)}</b></div></div>
+      <div class="aa-actions">
+        <button type="button" class="aa-btn aa-btn--primary" data-act="gorace">Start the race</button>
+        <button type="button" class="aa-btn" data-act="levels">World Tour</button>
+      </div>`;
+    el.overlay.hidden = false;
+    $('[data-act]', el.card)?.focus({ preventScroll: true });
+  }
+  function startChallenge() {
+    const i = +el.play.dataset.level || 0, L = DATA.levels[i];
+    if (!L) return;
+    playRace({ board: L.id, tier: TIER_OF(), seed: 700000 + Math.floor(Math.random() * 200000) }, null);
+    toast('Clear this board, then send it to your friend.', 'hint', 4000);
+  }
+  // the link always carries the time the other side has to beat, so one button makes a challenge and a rematch
+  async function sendRace() {
+    const R = state.daily, L = state.level, mine = Math.round(state.elapsed);
+    const link = raceLink({ board: R.board, tier: R.tier, seed: R.seed, t: mine, stars: stars(), name: myName() });
+    const beat = R.from ? ` and beat ${R.from.name}'s ${fmtTime(R.from.t, true)}` : '';
+    const text = `Arrow Atlas: I cleared ${L.name} in ${fmtTime(mine, true)}${beat}. Same board, same arrows, can you beat it?\n${link}`;
+    const flash = $('.aa-flash', el.card);
+    try {
+      if (navigator.share) { await navigator.share({ text }); return; }
+      await navigator.clipboard.writeText(text);
+      if (flash) { flash.textContent = 'Link copied. Paste it to your friend.'; flash.hidden = false; }
+    } catch { if (flash) { flash.textContent = link; flash.hidden = false; } }
   }
 
   // ── Particles: one canvas over the board, one animation loop, several emitters ──
@@ -1106,8 +1195,11 @@
   el.play.addEventListener('click', () => startLevel(+el.play.dataset.level || 0));
   // Sheets
   const openSheet = sh => { sh.hidden = false; document.body.style.overflow = 'hidden'; };
-  const closeSheets = () => { el.sheet.hidden = true; document.body.style.overflow = ''; };
+  const closeSheets = () => { el.sheet.hidden = true; if (el.friendsSheet) el.friendsSheet.hidden = true; document.body.style.overflow = ''; };
   el.settingsBtns.forEach(b => b.addEventListener('click', () => openSheet(el.sheet)));
+  el.friends?.addEventListener('click', () => { if (el.nameInput) el.nameInput.value = cleanName(store.get('name', '')); openSheet(el.friendsSheet); });
+  el.nameInput?.addEventListener('input', () => store.set('name', cleanName(el.nameInput.value)));
+  el.challengeBtn?.addEventListener('click', () => { closeSheets(); startChallenge(); });
   $$('[data-close-sheet]').forEach(b => b.addEventListener('click', closeSheets));
   $$('.aa-sheet').forEach(sh => sh.addEventListener('click', e => { if (e.target === sh) closeSheets(); }));
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSheets(); });
@@ -1172,7 +1264,7 @@
     el.accept.focus({ preventScroll: true });
   }
   {
-    const deep = /^#(level-\d+|b-[\w:]+|daily)$/.test(location.hash);
+    const deep = /^#(level-\d+|b-[\w:]+|daily|vs=[\w-]+)$/.test(location.hash);
     let seenThisSession = false;
     try { seenThisSession = sessionStorage.getItem('aa:splash') === '1'; sessionStorage.setItem('aa:splash', '1'); } catch { /* ignore */ }
     if (!store.get('welcomed')) showGate();
@@ -1184,8 +1276,9 @@
   loadData().then(() => {
     el.loading.hidden = true;
     renderSelect();
-    const m = /^#level-(\d+)$/.exec(location.hash), mb = /^#b-([\w:]+)$/.exec(location.hash);
-    if (mb) { const j = DATA.levels.findIndex(L => L.id === mb[1]); startLevel(j < 0 ? 0 : j); }
+    const m = /^#level-(\d+)$/.exec(location.hash), mb = /^#b-([\w:]+)$/.exec(location.hash), mv = /^#vs=([\w-]+)$/.exec(location.hash);
+    if (mv) { const r = raceParse(mv[1]); if (r) playRace(r, { name: r.name, t: r.t, stars: r.stars }); else toast('That challenge link is broken. Ask your friend to send it again.', 'bad', 5000); }
+    else if (mb) { const j = DATA.levels.findIndex(L => L.id === mb[1]); startLevel(j < 0 ? 0 : j); }
     else if (m) startLevel(+m[1] - 1);   // older links: position in the list
     else if (location.hash === '#daily') { const d = dailyPick(); startLevel(d.idx, false, d); }
   }).catch(err => { el.loading.hidden = true; el.error.textContent = `Could not load the levels (${err.message}). Check your connection and reload.`; el.error.hidden = false; });

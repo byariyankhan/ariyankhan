@@ -65,7 +65,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="css/arrow-atlas.css?v=37" />
+    <link rel="stylesheet" href="css/arrow-atlas.css?v=38" />
     <link rel="preload" href="games/data/arrow-atlas.json?v=11" as="fetch" crossorigin="anonymous" />
 
     <!-- SCHEMA -->
@@ -209,6 +209,7 @@
         </div>
 
         <button type="button" class="aa-play" id="aaPlay" aria-label="Play and discover the next country"><span class="aa-play-label">Play &amp; Discover</span></button>
+        <button type="button" class="aa-play aa-play--ghost" id="aaFriends"><span class="aa-play-label">Play with Friends</span></button>
         <p class="aa-loading" id="aaLoading" hidden>Loading…</p>
         <p class="aa-error" id="aaError" hidden></p>
       </section>
@@ -390,6 +391,23 @@
       <p class="aa-seo-credit">Country outlines from Natural Earth (public domain). Discovery board shapes are silhouettes traced from <a href="https://github.com/twitter/twemoji" target="_blank" rel="noopener">Twemoji</a> graphics by Twitter and contributors, licensed <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC-BY 4.0</a>.</p>
     </section>
 
+    <!-- ── PLAY WITH FRIENDS ── -->
+    <div class="aa-sheet" id="aaFriendsSheet" hidden>
+      <div class="aa-sheet-panel" role="dialog" aria-label="Play with friends">
+        <div class="aa-sheet-head"><h2>Play with Friends</h2><button type="button" class="aa-icon" data-close-sheet aria-label="Close">✕</button></div>
+        <p class="aa-sheet-note">Send a board to a friend and see who clears it faster. Same country, same arrows, same difficulty for both of you.</p>
+        <div class="aa-group">
+          <label class="aa-row aa-row--select" for="aaName"><span class="aa-row-ico">🙂</span><span class="aa-row-label">Your name<small>Only goes into the link you send</small></span><input class="aa-select aa-input" id="aaName" type="text" maxlength="14" placeholder="Ariyan" autocomplete="nickname" /></label>
+        </div>
+        <div class="aa-group">
+          <button type="button" class="aa-row aa-row--link" id="aaChallenge"><span class="aa-row-ico">🏁</span><span class="aa-row-label">Challenge a friend<small>Play a board, then send the link. No account needed.</small></span><span class="aa-row-chev">›</span></button>
+          <div class="aa-row aa-row--soon"><span class="aa-row-ico">⚡</span><span class="aa-row-label">Live race, up to 7 players<small>Everyone starts together, first to clear wins</small></span><span class="aa-soon">Soon</span></div>
+          <div class="aa-row aa-row--soon"><span class="aa-row-ico">🌍</span><span class="aa-row-label">Race people online<small>We find you players at your level</small></span><span class="aa-soon">Soon</span></div>
+        </div>
+        <p class="aa-sheet-note">Playing on your own always stays free and needs no account. The two live modes need a sign-in, so your friends know it is really you and your progress follows you to every device. They are on the way.</p>
+      </div>
+    </div>
+
     <!-- ── SETTINGS PAGE ── -->
     <div class="aa-sheet aa-sheet--page" id="aaSheet" hidden>
       <div class="aa-sheet-panel" role="dialog" aria-label="Settings">
@@ -423,6 +441,6 @@
       </div>
     </div>
 
-    <script src="js/arrow-atlas.js?v=51"></script>
+    <script src="js/arrow-atlas.js?v=52"></script>
   </body>
 </html>
