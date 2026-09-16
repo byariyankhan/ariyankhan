@@ -28,17 +28,7 @@ if ($action === 'google') {
     $token = (string)(aa_body()['credential'] ?? '');
     $claims = aa_google_verify($token, $clientId);
     if (!$claims) aa_json(['error' => 'bad_token'], 401);
-    $now = time();
-    $st = $db->prepare('SELECT id, name FROM users WHERE provider = ? AND sub = ?');
-    $st->execute(['google', $claims['sub']]);
-    $row = $st->fetch();
-    if ($row) {
-        $id = (int)$row['id'];
-        $db->prepare('UPDATE users SET seen = ?, name = CASE WHEN name = \'\' THEN ? ELSE name END WHERE id = ?')->execute([$now, $claims['name'], $id]);
-    } else {
-        $db->prepare('INSERT INTO users (provider, sub, name, created, seen) VALUES (?, ?, ?, ?, ?)')->execute(['google', $claims['sub'], $claims['name'], $now, $now]);
-        $id = (int)$db->lastInsertId();
-    }
+    $id = aa_upsert_user($db, 'google', $claims['sub'], $claims['name']);
     aa_start_session($db, $id);
     $st = $db->prepare('SELECT id, name, provider FROM users WHERE id = ?');
     $st->execute([$id]);

@@ -91,6 +91,7 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-play--ghost:active{ box-shadow:0 1px 0 var(--line-soft); }
 .aa-row--soon{ opacity:.55; }
 .aa-signin{ display:flex; justify-content:center; min-height:44px; margin:4px 0 12px; }
+.aa-signin:empty{ display:none; margin:0; min-height:0; }   /* no empty gap when Google's button could not load */
 .aa-signin-list{ margin:0 0 14px; padding:0 0 0 18px; color:var(--muted); font-size:14px; line-height:1.7; }
 .aa-me{ display:flex; align-items:center; gap:12px; margin:0 0 14px; }
 .aa-me-face{ width:48px; height:48px; border-radius:50%; background:var(--accent); color:#fff; font-size:22px; font-weight:900; display:flex; align-items:center; justify-content:center; flex:0 0 auto; }

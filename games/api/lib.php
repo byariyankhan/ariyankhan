@@ -85,20 +85,28 @@ function aa_body(): array {
     return is_array($data) ? $data : [];
 }
 
-// Ask Google whether this ID token is real and was issued for this site.
-function aa_google_verify(string $idToken, string $clientId): ?array {
-    if ($idToken === '' || strlen($idToken) > 4096) return null;
+// Fetch Google's verdict on an ID token. Split out so the checks below can be tested without the network.
+function aa_google_fetch(string $idToken): ?string {
     $url = 'https://oauth2.googleapis.com/tokeninfo?id_token=' . urlencode($idToken);
-    $body = null;
     if (function_exists('curl_init')) {
         $ch = curl_init($url);
         curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 6, CURLOPT_CONNECTTIMEOUT => 4]);
         $body = curl_exec($ch);
-        if (curl_getinfo($ch, CURLINFO_RESPONSE_CODE) !== 200) $body = null;
+        $code = curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
         curl_close($ch);
-    } elseif (ini_get('allow_url_fopen')) {
-        $body = @file_get_contents($url, false, stream_context_create(['http' => ['timeout' => 6]]));
+        return $code === 200 && is_string($body) ? $body : null;
     }
+    if (ini_get('allow_url_fopen')) {
+        $body = @file_get_contents($url, false, stream_context_create(['http' => ['timeout' => 6]]));
+        return is_string($body) ? $body : null;
+    }
+    return null;
+}
+
+// Is this ID token real, meant for this site, and still valid? Returns the claims we keep, or null.
+function aa_google_verify(string $idToken, string $clientId, ?callable $fetch = null): ?array {
+    if ($idToken === '' || strlen($idToken) > 4096 || $clientId === '') return null;
+    $body = ($fetch ?? 'aa_google_fetch')($idToken);
     if (!is_string($body) || $body === '') return null;
     $d = json_decode($body, true);
     if (!is_array($d)) return null;
@@ -106,7 +114,22 @@ function aa_google_verify(string $idToken, string $clientId): ?array {
     if (($d['aud'] ?? '') !== $clientId) return null;
     if ($iss !== 'accounts.google.com' && $iss !== 'https://accounts.google.com') return null;
     if ((int)($d['exp'] ?? 0) <= time()) return null;
+    if (array_key_exists('email_verified', $d) && ($d['email_verified'] === false || $d['email_verified'] === 'false')) return null;
     $sub = (string)($d['sub'] ?? '');
     if ($sub === '') return null;
     return ['sub' => $sub, 'name' => aa_name((string)($d['name'] ?? ''))];
+}
+
+// One account per provider id. Returns the user id, creating the row the first time someone signs in.
+function aa_upsert_user(PDO $db, string $provider, string $sub, string $name): int {
+    $now = time();
+    $st = $db->prepare('SELECT id FROM users WHERE provider = ? AND sub = ?');
+    $st->execute([$provider, $sub]);
+    $id = $st->fetchColumn();
+    if ($id !== false) {
+        $db->prepare('UPDATE users SET seen = ?, name = CASE WHEN name = \'\' THEN ? ELSE name END WHERE id = ?')->execute([$now, $name, (int)$id]);
+        return (int)$id;
+    }
+    $db->prepare('INSERT INTO users (provider, sub, name, created, seen) VALUES (?, ?, ?, ?, ?)')->execute([$provider, $sub, $name, $now, $now]);
+    return (int)$db->lastInsertId();
 }

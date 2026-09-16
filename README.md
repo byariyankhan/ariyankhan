@@ -629,9 +629,18 @@ unlock (skip allowed after two fails), stars, best times and progress in
   sessions are random tokens stored hashed behind an HttpOnly, SameSite=Lax
   cookie. `GET ?a=me` also reports which providers the server can actually use:
   Google sign-in is live only when `GOOGLE_CLIENT_ID` is set in the container's
-  environment, otherwise the sheet says so. `arrow-atlas.html` gets its own
+  environment, otherwise the sheet says so. The OAuth client's **Authorized
+  JavaScript origins** must list `https://ariyankhan.com`, or Google's library
+  refuses to show the button on the live site. `arrow-atlas.html` gets its own
   slightly wider CSP in `.htaccess` for Google's sign-in library. Deleting the
   account is in the dashboard because Google Play requires it.
+  `tests/auth.test.php` covers the security-critical half without the network:
+  which ID tokens are accepted (audience, issuer, expiry, unverified accounts,
+  junk answers), that one Google account makes exactly one player, that session
+  tokens are stored hashed and expire, and that deleting an account takes its
+  sessions with it. The browser side is `aa-friends.mjs` and `aa-auth-full.mjs`
+  in the scratchpad; the one step no test can do is Google actually signing a
+  token, so a real sign-in has to be tried by hand once.
 - **Play with friends** (`playRace`, `raceCode`/`raceParse`, `#vs=<code>`): a board
   comes from a seed, so two phones can play the identical board with no server at
   all. The lobby's second button opens a sheet with three rows: **Challenge a
