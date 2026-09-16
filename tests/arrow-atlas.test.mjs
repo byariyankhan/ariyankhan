@@ -9,7 +9,7 @@ const data = JSON.parse(fs.readFileSync(path.join(root, 'games/data/arrow-atlas.
 const html = fs.readFileSync(path.join(root, 'arrow-atlas.html'), 'utf8');
 // Pull the pure pieces of the engine out of the IIFE so the exact production code is tested.
 const grab = re => { const m = js.match(re); if (!m) throw new Error('could not find ' + re); return m[0]; };
-const src = [grab(/const REF = \d+;/), grab(/function parsePath\(d\) \{[\s\S]*?\n  \}\n/), grab(/function insidePath\([\s\S]*?\n  \}\n/), grab(/function rasterise\([\s\S]*?\n  \}\n/), grab(/const DIRS = [^\n]+/), grab(/const PALETTE = [^\n]+/), grab(/const STEP_UP_WINS = [^\n]+/), grab(/const clampTier = [^\n]+/), grab(/const FORM0 = [^\n]+/), grab(/const nextForm = [\s\S]*?\n  \};\n/), grab(/const MAXLEN_OF = [^\n]+/), grab(/const NARROW_OF = [^\n]+/), grab(/const FAR_OF = [^\n]+/), grab(/const RAIL_OF = [^\n]+/), grab(/const HOLE_OF = [^\n]+/), grab(/const LANE_OF = [^\n]+/), grab(/const GEN_OPTS = [^\n]+/), grab(/function mulberry32[^\n]+/), grab(/function generate\(mask, maxLen, seed[^)]*\) \{[\s\S]*?\n  \}\n/)].join('\n');
+const src = [grab(/const REF = \d+;/), grab(/function parsePath\(d\) \{[\s\S]*?\n  \}\n/), grab(/function insidePath\([\s\S]*?\n  \}\n/), grab(/function rasterise\([\s\S]*?\n  \}\n/), grab(/const DIRS = [^\n]+/), grab(/const PALETTE = [^\n]+/), grab(/const STEP_POINTS = [^\n]+/), grab(/const FAST_SEC_PER_ARROW = [^\n]+/), grab(/const clampTier = [^\n]+/), grab(/const clearPoints = [^\n]+/), grab(/const FORM0 = [^\n]+/), grab(/const nextForm = [\s\S]*?\n  \};\n/), grab(/const MAXLEN_OF = [^\n]+/), grab(/const NARROW_OF = [^\n]+/), grab(/const FAR_OF = [^\n]+/), grab(/const RAIL_OF = [^\n]+/), grab(/const HOLE_OF = [^\n]+/), grab(/const LANE_OF = [^\n]+/), grab(/const GEN_OPTS = [^\n]+/), grab(/function mulberry32[^\n]+/), grab(/function generate\(mask, maxLen, seed[^)]*\) \{[\s\S]*?\n  \}\n/)].join('\n');
 const { generate, rasterise, nextForm, FORM0, MAXLEN_OF, GEN_OPTS, DIRS } = new Function(src + '\nreturn { generate, rasterise, nextForm, FORM0, MAXLEN_OF, GEN_OPTS, DIRS };')();
 // a sampling ramp for the board tests (the game itself picks the tier from the player's form, not the level)
 const BASE_TIER = i => i < 5 ? 0 : i < 15 ? 1 : i < 40 ? 2 : i < 80 ? 3 : 4;
@@ -66,15 +66,17 @@ test('boards are dense: Hard tour levels average over 55 arrows, Normal over 35 
   const avg = tier => { const idx = data.levels.map((_, i) => i).filter(i => BASE_TIER(i) === tier); return idx.reduce((n, i) => n + generate(maskFor(data.levels[i], tier), MAXLEN_OF[tier], (i + 1) * 1000).pieces.length, 0) / idx.length; };
   assert.ok(avg(1) > 35, `Normal averages ${avg(1)}`); assert.ok(avg(2) > 55, `Hard averages ${avg(2)}`);
 });
-test('difficulty follows form, not the level: two first-try clears step up, two losses step down, a retry clear resets', () => {
+test('difficulty follows form, not the level: a flawless fast clear steps up at once, two first-try clears step up, two losses step down, a retry clear resets', () => {
+  const flawless = { firstTry: true, heartsLost: 0, hints: 0, secPerArrow: 0.9 }, scrappy = { firstTry: true, heartsLost: 3, hints: 3, secPerArrow: 2.5 }, slow = { firstTry: true, heartsLost: 0, hints: 0, secPerArrow: 2 }, retry = { firstTry: false, heartsLost: 0, hints: 0, secPerArrow: 0.9 };
   let f = { ...FORM0 };
-  f = nextForm(f, true, true); assert.deepEqual(f, { tier: 0, wins: 1, losses: 0 }, 'one first-try clear is not enough');
-  f = nextForm(f, true, true); assert.deepEqual(f, { tier: 1, wins: 0, losses: 0 }, 'two in a row step up, hearts and hints spent or not');
-  f = nextForm(f, true, true); f = nextForm(f, false, false); assert.deepEqual(f, { tier: 1, wins: 0, losses: 1 }, 'one loss keeps the tier and breaks the win run');
-  f = nextForm(f, true, false); assert.deepEqual(f, { tier: 1, wins: 0, losses: 0 }, 'a clear after a retry resets both counters');
-  f = nextForm(f, false, false); f = nextForm(f, false, false); assert.deepEqual(f, { tier: 0, wins: 0, losses: 0 }, 'two losses in a row step down');
-  f = nextForm(f, false, false); f = nextForm(f, false, false); assert.equal(f.tier, 0, 'never below Easy');
-  for (let k = 0; k < 12; k++) f = nextForm(f, true, true); assert.equal(f.tier, 4, 'never above Master');
+  f = nextForm(f, true, flawless); assert.deepEqual(f, { tier: 1, wins: 0, losses: 0 }, 'level 1 flawless and fast: level 2 is already Normal');
+  f = nextForm(f, true, scrappy); assert.deepEqual(f, { tier: 1, wins: 1, losses: 0 }, 'a scrappy first-try clear is half a step');
+  f = nextForm(f, true, slow); assert.deepEqual(f, { tier: 2, wins: 0, losses: 0 }, 'two first-try clears in a row step up, hearts and hints spent or not');
+  f = nextForm(f, true, scrappy); f = nextForm(f, false, null); assert.deepEqual(f, { tier: 2, wins: 0, losses: 1 }, 'one loss keeps the tier and breaks the run');
+  f = nextForm(f, true, retry); assert.deepEqual(f, { tier: 2, wins: 0, losses: 0 }, 'a clear after a retry resets both counters');
+  f = nextForm(f, false, null); f = nextForm(f, false, null); assert.deepEqual(f, { tier: 1, wins: 0, losses: 0 }, 'two losses in a row step down');
+  for (let k = 0; k < 6; k++) f = nextForm(f, false, null); assert.equal(f.tier, 0, 'never below Easy');
+  for (let k = 0; k < 6; k++) f = nextForm(f, true, flawless); assert.equal(f.tier, 4, 'never above Master');
 });
 test('narrow play: on Hard tour boards fewer than 20% of the arrows are free at the start (the game then keeps the best of 8)', () => {
   const freeAtStart = b => b.pieces.filter(p => { const [dr, dc] = DIRS[p.dir]; let [y, x] = p.cells[0]; y += dr; x += dc; while (y >= 0 && y < b.H && x >= 0 && x < b.W) { if (b.occ[y][x] >= 0) return false; y += dr; x += dc; } return true; }).length;

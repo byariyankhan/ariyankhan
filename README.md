@@ -473,9 +473,12 @@ country's outline filled with arrows; tap an arrow to shoot it off the board if 
 run to the edge is clear, a blocked tap costs one of 4 hearts, no clock (time is still recorded for the result card), 4 hearts and 3 hints per
 level, difficulty that follows the player and never the level number (one
 tier 0 Easy / 1 Normal / 2 Hard / 3 Expert / 4 Master lives in `aa:v1:form` as
-`{tier, wins, losses}`; `nextForm` moves it on form alone: two levels in a row
-cleared at the first try step it up whatever hearts and hints were spent, two
-lost boards in a row step it down, a clear after a retry resets both counters;
+`{tier, wins, losses}`; `nextForm` moves it on form alone: a cleared board earns
+`clearPoints` towards the next step, 2 for a flawless fast first-try clear (no
+heart, no hint, ≤ `FAST_SEC_PER_ARROW` 1.2 s per arrow) so a strong player steps
+up after a single level, 1 for any other first-try clear so two in a row step up
+whatever hearts and hints were spent, 0 after a retry (resets); two lost boards
+in a row step it down;
 `TIER_OF()`; Try again keeps the same board, New layout takes the new tier; the
 result card says what the form did), combo counter (taps within 1.8 s), win streak, milestones every 10 levels, a Today's Country
 bonus board (date-seeded, same for everyone, `#daily`), and clearing the board reveals the country for a
