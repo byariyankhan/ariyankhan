@@ -582,16 +582,12 @@ unlock (skip allowed after two fails), stars, best times and progress in
   "World order" switches it off). Progress is keyed by country id (`lv:<id>`,
   skips likewise), migrated once from the old level-number keys; the
   daily board is picked from the canonical list so everyone gets the same one.
-- **Flag boards** (`boardFor`: one tour, the form ladder decides the kind; Easy
-  and Normal are always the outline, on Hard a flag follows a first-try clear,
-  on Expert and Master maps and flags alternate; Try again keeps the kind): the
-  same generator on a plain 4:3 rectangle (`FLAG_DIM` per tier, 16x12 to 44x33),
-  measured to leave half the free arrows of a coast outline (Hard 2.6 vs 5.7 at
-  the start, Master 4.5 vs 11). `games/build-flags.mjs` renders every flag
-  (flag-icons, MIT) to a 32x24 palette grid in `games/data/flags.json`; the
-  board lays it under the arrows at 22% and lights each cell as its arrow
-  leaves; the quiz and result cards show the real flag (`games/flags/*.svg`,
-  flag-icons, MIT; the grid is only for the board).
+- **Flag boards, tried and removed**: the same generator on a plain 4:3
+  rectangle leaves half the free arrows of a coast outline (Hard 2.6 vs 5.7 at
+  the start, Master 4.5 vs 11), but every flag board is the same rectangle, so
+  the boards stopped looking like anything. Removed; the numbers stay here for
+  the record. Level data keeps `a2` (ISO code) and `c` (centroid) for the
+  home-country order.
 - **Tightening** (generate stage 3, Hard and up, `TIGHTEN_OF` iterations): a local
   search over head ends after signposting. Flip one arrow to its other end, or,
   when that closes a cycle, also one arrow on its new run, and keep the flip when

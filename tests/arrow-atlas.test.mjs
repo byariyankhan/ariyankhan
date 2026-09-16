@@ -92,13 +92,8 @@ test('lobby world map has every tour country with a label point and stays under 
   assert.ok(fs.statSync(path.join(root, 'games/data/world-map.json')).size < 200 * 1024);
   assert.ok(html.includes('id="aaWorldMap"'));
 });
-test('every level has an ISO code and a centroid, and flags.json holds a 32x24 palette grid for each', () => {
-  const flags = JSON.parse(fs.readFileSync(path.join(root, 'games/data/flags.json'), 'utf8'));
-  assert.equal(flags.w, 32); assert.equal(flags.h, 24);
-  for (const L of data.levels) {
-    assert.match(L.a2, /^[A-Z]{2}$/, `${L.name} has no ISO code`); assert.ok(Array.isArray(L.c) && L.c.length === 2, `${L.name} has no centroid`);
-    const f = flags.flags[L.a2]; assert.ok(f, `${L.name} has no flag`); assert.ok(f.p.length >= 1 && f.p.length <= 8); assert.equal(f.r.length, 24); assert.ok(f.r.every(r => r.length === 32 && [...r].every(ch => +ch < f.p.length)));
-  }
+test('every level has a unique ISO code and a centroid (home-country ordering)', () => {
+  for (const L of data.levels) { assert.match(L.a2, /^[A-Z]{2}$/, `${L.name} has no ISO code`); assert.ok(Array.isArray(L.c) && L.c.length === 2, `${L.name} has no centroid`); }
   assert.equal(new Set(data.levels.map(L => L.a2)).size, data.levels.length, 'ISO codes are unique');
 });
 test('data file stays under 200 KB', () => assert.ok(fs.statSync(path.join(root, 'games/data/arrow-atlas.json')).size < 200 * 1024));
