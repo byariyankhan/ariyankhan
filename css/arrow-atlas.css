@@ -75,10 +75,6 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-tagline{ margin:6px 0 0; color:var(--muted); font-size:15px; }
 /* compact secondary actions under the map: daily board and the level list */
 .aa-minis{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
-/* flag boards: the flag lies under the arrows and lights up cell by cell */
-.aa-flagcell{ opacity:.22; transition:opacity .35s ease; }
-.aa-flagcell.is-open{ opacity:1; }
-.aa-flag-thumb{ display:block; width:min(60%,180px); height:auto; aspect-ratio:4/3; object-fit:cover; margin:6px auto 10px; border-radius:6px; box-shadow:var(--shadow); }
 .aa-row--select{ cursor:default; }
 .aa-row-label small{ display:block; font-size:12px; font-weight:600; color:var(--muted); }
 .aa-select{ font:inherit; font-weight:700; font-size:14px; color:var(--ink); background:var(--bg2); border:none; border-radius:12px; padding:8px 10px; max-width:46%; }
