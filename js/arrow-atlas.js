@@ -74,7 +74,7 @@
   const PALETTE = ['#FFED54', '#5CD6FF', '#8CFF7A', '#FF9AD5', '#C79BFF', '#FFB347', '#6EE7B7', '#FDBA74', '#F97373', '#38BDF8'];
 
   const el = {
-    select: $('#aaSelect'), tagline: $('#aaTagline'), dailyRow: $('#aaDailyRow'), homeSel: $('#aaHome'), streak: $('#aaStreak'), daily: $('#aaDaily'), hudDiff: $('#aaHudDiff'), play: $('#aaPlay'), path: $('#aaPath'), btnVibe: $('#aaVibe'), btnGuides: $('#aaGuides'), btnMusic: $('#aaMusic'), howTo: $('#aaHowTo'),
+    select: $('#aaSelect'), tagline: $('#aaTagline'), dailyRow: $('#aaDailyRow'), homeSel: $('#aaHome'), purse: $('#aaPurse'), purseNo: $('#aaPurseNo'), daily: $('#aaDaily'), hudDiff: $('#aaHudDiff'), play: $('#aaPlay'), path: $('#aaPath'), btnVibe: $('#aaVibe'), btnGuides: $('#aaGuides'), btnMusic: $('#aaMusic'), howTo: $('#aaHowTo'),
     sheet: $('#aaSheet'), friends: $('#aaFriends'), signInSheet: $('#aaSignInSheet'), googleBtn: $('#aaGoogleBtn'), signInNote: $('#aaSignInNote'), ranks: $('#aaRanks'), matchSheet: $('#aaMatchSheet'), matchBody: $('#aaMatchBody'), matchTitle: $('#aaMatchTitle'), accountGroup: $('#aaAccountGroup'), accountWho: $('#aaAccountWho'), accountGold: $('#aaAccountGold'), signOutBtn: $('#aaSignOut'), deleteAccBtn: $('#aaDeleteAcc'), settingsBtns: $$('#aaSettings, #aaSettingsG'), themeBtn: $('#aaTheme'), themes: $('#aaThemes'),
     game: $('#aaGame'), boardWrap: $('#aaBoardWrap'), board: $('#aaBoard'), toast: $('#aaToast'), confetti: $('#aaConfetti'),
     hudLevel: $('#aaHudLevel'), hudMode: $('#aaHudMode'), hudTime: $('#aaHudTime'), hudLeft: $('#aaHudLeft'), hudLives: $('#aaHudLives'), hudLivesWrap: $('#aaHudLivesWrap'), hudPct: $('#aaHudPct'), boardBar: $('#aaBoardBar'),
@@ -286,8 +286,7 @@
     if (!DATA) return;
     renderWorld();
     const n = DATA.levels.length;
-    const streak = store.get('streak', 0), dStreak = store.get('dailyStreak', { count: 0, last: '' });
-    el.streak.textContent = streak >= 2 ? `🔥 ${streak} in a row` : dStreak.count >= 2 ? `🔥 ${dStreak.count}-day daily streak` : '';
+    renderPurse();
     renderDaily();
     const nextIdx = DATA.levels.findIndex((_, j) => !cleared(j) && unlocked(j));
     el.play.dataset.level = nextIdx < 0 ? 0 : nextIdx;
@@ -710,6 +709,7 @@
     state.idx = i; state.tier = daily ? daily.tier : keepTier >= 0 ? keepTier : TIER_OF();
     state.busy = true; el.select.hidden = true; el.game.hidden = false; el.overlay.hidden = true; el.board.innerHTML = '';
     el.hudLevel.textContent = hudLabel(); el.hudLeft.textContent = 'Drawing the board…';
+    el.btnLevels.setAttribute('aria-label', daily?.race ? 'Leave the challenge' : 'Back to home');
     await new Promise(r => setTimeout(r, 20));   // let the game screen paint before the (up to ~1 s on phones) generation
     state.maskInfo = maskFor(state.level, state.tier);
     const seed = (daily ? daily.seed : (i + 1) * 1000) + state.seedBump;
@@ -1084,7 +1084,7 @@
   const matchApi = (a, body, query = '') => fetch(`games/api/match.php?a=${a}${query}`, { method: body ? 'POST' : 'GET', credentials: 'same-origin', cache: 'no-store', headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined })
     .then(async r => { const d = await r.json().catch(() => ({})); if (!r.ok) throw Object.assign(new Error(d.error || `HTTP ${r.status}`), { code: d.error, gold: d.gold }); return d; });
   const matchLink = code => `${location.origin}${location.pathname}#m=${code}`;
-  const setGold = g => { if (auth.user && typeof g === 'number') auth.user.gold = g; renderAccountRow(); };
+  const setGold = g => { if (auth.user && typeof g === 'number') auth.user.gold = g; renderAccountRow(); renderPurse(); };
 
   // the player's own strip, kept at the top of every match screen
   function meStrip() {
@@ -1193,6 +1193,7 @@
       <div class="aa-actions"><button type="button" class="aa-btn aa-btn--primary" data-mact="stakes">Play another</button><button type="button" class="aa-btn" data-mact="close">Close</button></div>`;
     openSheet(el.matchSheet);
     if (m.you_won) {
+      if (typeof goldBefore === 'number') purseWin = { from: goldBefore, to: auth.user?.gold ?? goldBefore };
       SFX.win(); vibe([0, 40, 60, 120]); goldRain(100, true);
       setTimeout(() => goldRain(60, true), 500);
       if (typeof goldBefore === 'number') countTo($('#aaPurseCount', el.matchBody), goldBefore, auth.user?.gold ?? goldBefore);
@@ -1264,7 +1265,7 @@
     if (!act) return;
     const m = state.pendingMatch;
     if (act === 'stakes') openFriends();
-    else if (act === 'close') closeSheets();
+    else if (act === 'close') { closeSheets(); if (state.daily?.race && state.finished) goToLevels(); }
     else if (act === 'join' && m) {
       const btn = e.target.closest('[data-mact]'); btn.disabled = true;
       try { const d = await matchApi('join', { code: m.code, tier: TIER_OF() }); setGold(d.gold); showRoom(d.match); }
@@ -1297,6 +1298,37 @@
     } catch (err) {
       toast(err.code === 'no_match' ? 'That invitation link is not valid any more.' : 'Could not open that invitation.', 'bad', 4500);
     }
+  }
+
+  // The lobby chip is the purse. A win counts up into it with the coins and the fanfare, so the gold is still
+  // landing when the player gets back from the board.
+  let purseWin = null;
+  function renderPurse() {
+    if (!el.purse) return;
+    el.purse.hidden = !auth.user;
+    if (!auth.user) { purseWin = null; return; }
+    const gold = auth.user.gold ?? 0;
+    const win = purseWin && purseWin.to === gold ? purseWin : null;
+    purseWin = null;
+    el.purseNo.textContent = gfmt(win ? win.from : gold);
+    if (!win) { el.purse.classList.remove('is-won'); return; }
+    el.purse.classList.add('is-won');
+    SFX.win(); vibe([0, 40, 60, 120]); goldRain(80, true);
+    countTo(el.purseNo, win.from, win.to, 1300);
+    setTimeout(() => el.purse.classList.remove('is-won'), 1600);
+  }
+
+  // Quitting a challenge is giving the board up: the stake stays in the pot and the others carry on without you.
+  async function leaveMatch() {
+    const m = state.daily?.match;
+    if (!m) return;
+    if (!confirm(`Leave the challenge? Your ${gfmt(m.stake)} gold stays in the pot and the others play on.`)) return;
+    stopProgressPoll(); stopTimer();
+    state.finished = true; state.busy = true;
+    try { const d = await matchApi('result', { code: m.code, ms: 0, cleared: false }); setGold(d.gold); }
+    catch { /* the day's sweep counts a run that never came back as a loss anyway */ }
+    goToLevels();
+    toast('You left the challenge.');
   }
 
   function renderAccountRow() {
@@ -1339,7 +1371,10 @@
   const GOLD_COLORS = ['#FFD34D', '#FFB300', '#FFE9A3', '#E7A100'];
   function goldRain(n = 90, overSheet = false) {
     const c = el.confetti; if (!c) return;
-    if (overSheet) { c.classList.add('is-over'); c.width = innerWidth; c.height = innerHeight; }
+    if (overSheet) {
+      if (c.parentNode !== document.body) document.body.appendChild(c);   // the board is hidden in the lobby
+      c.classList.add('is-over'); c.width = innerWidth; c.height = innerHeight;
+    }
     const r = overSheet ? { width: innerWidth, height: innerHeight } : el.boardWrap.getBoundingClientRect();
     const list = [];
     for (let i = 0; i < n; i++) {
@@ -1365,7 +1400,11 @@
   const fx = { parts: [], running: false };
   const particle = (x, y, vx, vy) => ({ x, y, vx, vy, g: 0.3 + Math.random() * 0.2, w: 5 + Math.random() * 7, h: 3 + Math.random() * 4, rot: Math.random() * Math.PI, vr: (Math.random() - 0.5) * 0.3, round: Math.random() < 0.3, color: PALETTE[Math.floor(Math.random() * PALETTE.length)], life: 1, ttl: 70 + Math.random() * 40 });
   function fxEmit(list) {
-    const c = el.confetti; if (!c || !c.getContext || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const c = el.confetti; if (!c || !c.getContext) return;
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      if (c.classList.contains('is-over')) { c.classList.remove('is-over'); el.boardWrap.insertBefore(c, el.toast); }
+      return;
+    }
     if (!fx.running && !c.classList.contains('is-over')) { const r = el.boardWrap.getBoundingClientRect(); c.width = Math.round(r.width); c.height = Math.round(r.height); }
     c.hidden = false; fx.parts.push(...list);
     if (fx.running) return;
@@ -1381,7 +1420,7 @@
         if (p.round) { ctx.beginPath(); ctx.arc(0, 0, p.w / 2, 0, Math.PI * 2); ctx.fill(); } else ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
         ctx.restore(); return true;
       });
-      if (fx.parts.length) requestAnimationFrame(frame); else { ctx.clearRect(0, 0, c.width, c.height); c.hidden = true; c.classList.remove('is-over'); fx.running = false; }
+      if (fx.parts.length) requestAnimationFrame(frame); else { ctx.clearRect(0, 0, c.width, c.height); c.hidden = true; if (c.classList.contains('is-over')) { c.classList.remove('is-over'); el.boardWrap.insertBefore(c, el.toast); } fx.running = false; }
     })(last);
   }
   // Level won: a fountain from the middle of the board.
@@ -1492,7 +1531,11 @@
   }
   el.themeBtn.addEventListener('click', () => { const cur = document.documentElement.dataset.theme || 'paper'; applyTheme(THEMES[(THEMES.indexOf(cur) + 1) % THEMES.length]); });
   applyTheme(THEMES.includes(store.get('theme')) ? store.get('theme') : 'paper');
-  el.btnLevels.addEventListener('click', () => { if (state.left < state.pieces.length && !state.finished && !confirm('Leave this level? Progress on it will be lost.')) return; goToLevels(); });
+  el.btnLevels.addEventListener('click', () => {
+    if (state.daily?.race && state.daily.match && !state.finished) { leaveMatch(); return; }
+    if (state.left < state.pieces.length && !state.finished && !confirm('Leave this level? Progress on it will be lost.')) return;
+    goToLevels();
+  });
   el.btnSound.addEventListener('click', () => { state.muted = !state.muted; store.set('muted', state.muted); renderSound(); if (!state.muted) SFX.shoot(); });
   el.btnVibe?.addEventListener('click', () => { state.vibe = !state.vibe; store.set('vibe', state.vibe); renderToggles(); vibe(20); });
   el.btnMusic?.addEventListener('click', () => { state.music = !state.music; store.set('music', state.music); renderToggles(); if (state.music) musicStart(); else musicStop(); });
@@ -1554,6 +1597,7 @@
   loadData().then(() => {
     el.loading.hidden = true;
     renderSelect();
+    authLoad().then(renderPurse);   // the chip shows the purse as soon as the page knows who is playing
     const m = /^#level-(\d+)$/.exec(location.hash), mb = /^#b-([\w:]+)$/.exec(location.hash), mm = matchHash();
     if (mm) openMatchLink(mm);
     else if (mb) { const j = DATA.levels.findIndex(L => L.id === mb[1]); startLevel(j < 0 ? 0 : j); }

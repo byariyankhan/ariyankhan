@@ -458,7 +458,7 @@ text, `#level-mode` deep links (`#africa-hard`). English only, continuous play
 standalone game, not a site page: it does not load `css/style.css`, the nav or the
 footer, and has its own look (`css/arrow-atlas.css`: Nunito, cream “paper” theme
 plus “night” and “mint” via `data-theme` on `<html>`, picked in Settings or with
-the palette button). Home = streak chip, settings, a card carousel (Today's
+the palette button). Home = purse chip, settings, a card carousel (Today's
 Country, World Tour progress, Mode), title, a level path and a Continue button;
 game = back / Level + difficulty / palette + settings, hearts + arrows left + hint,
 the board (its outline is made of arrow pieces, see below; optional guideline dots),
@@ -680,13 +680,24 @@ unlock (skip allowed after two fails), stars, best times and progress in
   upwards (`renderRanks`, polled every 2 s). `match_players` is a row per player,
   so three to seven in a room needs no new shape; `aa_migrate_matches` moved the
   first two-seat version over and refunded anything unfinished.
+  The lobby chip (top left, where the daily streak used to be) is the **purse**:
+  `renderPurse` fills it from `authLoad` on the first paint and from every
+  `setGold`, and it is hidden when nobody is signed in.
+  **Leaving a challenge is an option, not an escape** (`leaveMatch`): during a
+  match the corner arrow says "Leave the challenge", asks first, and reports the
+  board as given up, so the stake stays in the pot and nobody waits a day for a
+  player who walked away.
   Winning pays off properly and immediately: the win card, the `SFX.win` fanfare,
   gold raining over the card, the purse badge popping and counting up from the old
   balance (`goldRain`, `countTo`), with the canvas lifted above the sheet for the
   duration (`.aa-confetti.is-over`) — all of it the moment the last arrow goes,
   with the other six still playing. For them the poll says the pot is gone once
   (`SFX.taken`, one toast) and rings the winner's circle in gold
-  (`.aa-rank.is-won`); their board carries on.
+  (`.aa-rank.is-won`); their board carries on. Closing the win card drops the
+  winner back in the lobby and the gold lands **again** there: the purse chip
+  counts up from the old balance, pops, and the coins rain over the whole page
+  (`goldRain` lifts the canvas out of the hidden board and on to `document.body`
+  for the duration).
   `tests/match.test.php` (57 checks) covers the stakes, the room rules, a room of
   seven, the finish-order rule against a shorter clock, the instant payout and
   that it never pays twice, that second place wins a place and no gold, that a 500
