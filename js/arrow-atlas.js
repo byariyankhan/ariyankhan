@@ -14,13 +14,19 @@
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
   const SVG_NS = 'http://www.w3.org/2000/svg';
-  const DATA_VERSION = '10';
+  const DATA_VERSION = '11';
   const MAP_VERSION = '2';
+  const FLAGS_VERSION = '1';
+  // Two kinds of board: the country's outline (map) or its flag on a plain rectangle (flags). A rectangle has half
+  // the exits of a jagged coast, so flag boards play tighter. Progress is kept per kind.
+  let BOARD = 'map';   // set from the store once it exists (below)
+  const FLAG_DIM = [[16, 12], [24, 18], [32, 24], [40, 30], [44, 33]];   // flag board cells per tier (4:3)
   const STORE = 'aa:v1:';
   const store = {
     get(k, fb) { try { const v = localStorage.getItem(STORE + k); return v == null ? fb : JSON.parse(v); } catch { return fb; } },
     set(k, v) { try { localStorage.setItem(STORE + k, JSON.stringify(v)); } catch { /* ignore */ } },
   };
+  BOARD = store.get('board', 'map') === 'flags' ? 'flags' : 'map';
   const LIVES = 4;                 // Classic and Rush; One Life has 1, Deep Focus none
   const DIFF_OF = tier => ['Easy', 'Normal', 'Hard', 'Expert', 'Master'][tier];
   const COMBO_WINDOW_MS = 1800;   // shots closer together than this chain into a combo; a wrong tap breaks it
@@ -73,7 +79,7 @@
   const PALETTE = ['#FFED54', '#5CD6FF', '#8CFF7A', '#FF9AD5', '#C79BFF', '#FFB347', '#6EE7B7', '#FDBA74', '#F97373', '#38BDF8'];
 
   const el = {
-    select: $('#aaSelect'), levels: $('#aaLevels'), progress: $('#aaProgress'), streak: $('#aaStreak'), daily: $('#aaDaily'), hudDiff: $('#aaHudDiff'), play: $('#aaPlay'), playSub: $('#aaPlaySub'), path: $('#aaPath'), btnVibe: $('#aaVibe'), btnGuides: $('#aaGuides'), btnMusic: $('#aaMusic'), howTo: $('#aaHowTo'),
+    select: $('#aaSelect'), tagline: $('#aaTagline'), tourKicker: $('#aaTourKicker'), homeSel: $('#aaHome'), levels: $('#aaLevels'), progress: $('#aaProgress'), streak: $('#aaStreak'), daily: $('#aaDaily'), hudDiff: $('#aaHudDiff'), play: $('#aaPlay'), playSub: $('#aaPlaySub'), path: $('#aaPath'), btnVibe: $('#aaVibe'), btnGuides: $('#aaGuides'), btnMusic: $('#aaMusic'), howTo: $('#aaHowTo'),
     sheet: $('#aaSheet'), levelsSheet: $('#aaLevelsSheet'), levelsBtn: $('#aaLevelsBtn'), settingsBtns: $$('#aaSettings, #aaSettingsG'), themeBtn: $('#aaTheme'), themes: $('#aaThemes'),
     game: $('#aaGame'), boardWrap: $('#aaBoardWrap'), board: $('#aaBoard'), toast: $('#aaToast'), confetti: $('#aaConfetti'),
     hudLevel: $('#aaHudLevel'), hudMode: $('#aaHudMode'), hudTime: $('#aaHudTime'), hudLeft: $('#aaHudLeft'), hudLives: $('#aaHudLives'), hudLivesWrap: $('#aaHudLivesWrap'), hudPct: $('#aaHudPct'), boardBar: $('#aaBoardBar'),
@@ -97,12 +103,15 @@
   const fmtTime = (ms, tenths) => { const s = Math.max(0, ms) / 1000, m = Math.floor(s / 60), r = s - m * 60; return tenths ? `${m}:${r.toFixed(1).padStart(4, '0')}` : `${m}:${String(Math.floor(r)).padStart(2, '0')}`; };
   const fmtPop = n => !n ? '' : n >= 1e9 ? `${(n / 1e9).toFixed(2)} billion` : n >= 1e6 ? `${Math.round(n / 1e6)} million` : `${Math.round(n / 1e3)}K`;
   const svgEl = (tag, attrs = {}) => { const n = document.createElementNS(SVG_NS, tag); for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v); return n; };
-  const progressKey = i => `lv:${i}`;
+  // progress is keyed by country id (not by level number: the tour order is the player's own, home country first)
+  const progressKey = i => (BOARD === 'flags' ? 'fl:' : 'lv:') + DATA.levels[i].id;
+  const skipKey = i => (BOARD === 'flags' ? 'fskip:' : 'skip:') + DATA.levels[i].id;
   const cleared = i => store.get(progressKey(i));
-  const unlocked = i => i === 0 || !!cleared(i - 1) || !!store.get(`skip:${i}`);
+  const unlocked = i => i === 0 || !!cleared(i - 1) || !!store.get(skipKey(i));
   const dayKey = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
   const hashStr = str => { let h = 2166136261; for (const ch of str) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; };
-  const dailyPick = () => { const h = hashStr('aa-daily-' + dayKey()); return { key: dayKey(), idx: h % DATA.levels.length, tier: 1 + (h >> 8) % 4, seed: 900000 + (h % 100000) }; };
+  // the daily board is the same country for everyone: picked from the canonical list, then found in the player's own order
+  const dailyPick = () => { const h = hashStr('aa-daily-' + dayKey()); const L = DATA.canon[h % DATA.canon.length]; return { key: dayKey(), idx: DATA.levels.indexOf(L), tier: 1 + (h >> 8) % 4, seed: 900000 + (h % 100000) }; };
   function mulberry32(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
   function scrollToGame() { window.scrollTo({ top: 0, behavior: 'smooth' }); }
   function setHash(i) { if (history.replaceState) history.replaceState(null, '', location.pathname + location.search + (i >= 0 ? `#level-${i + 1}` : '')); }
@@ -183,8 +192,58 @@
     if (DATA) return DATA;
     const r = await fetch(`games/data/arrow-atlas.json?v=${DATA_VERSION}`, { cache: 'force-cache' });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    DATA = await r.json();
+    const d = await r.json(); d.canon = d.levels.slice();
+    migrateProgress(d);
+    d.levels = orderFor(d, await homeCountry(d));
+    DATA = d;
+    if (BOARD === 'flags') await loadFlags();
     return DATA;
+  }
+  // Progress used to be keyed by level number; it is keyed by country id now (the order is personal). One-off copy.
+  function migrateProgress(d) {
+    if (store.get('idsMigrated')) return;
+    d.canon.forEach((L, i) => { const v = store.get(`lv:${i}`); if (v) store.set(`lv:${L.id}`, v); if (store.get(`skip:${i}`)) store.set(`skip:${L.id}`, true); });
+    store.set('idsMigrated', true);
+  }
+  // ── Home country: the tour starts at the player's own country and spreads out from there ──
+  // Cloudflare tells the server which country a connection comes from (games/geo.php passes on the two-letter code,
+  // nothing is stored); the browser's language region is the fallback. The first answer is kept, so the order stays
+  // put when the player travels; Settings → Home country changes it.
+  async function homeCountry(d) {
+    const saved = store.get('home', null);
+    if (saved != null) return saved;   // '' = keep the canonical order (chosen explicitly)
+    let c = '';
+    try { const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), 2500); const r = await fetch('games/geo.php', { signal: ctrl.signal, cache: 'no-store' }); clearTimeout(t); if (r.ok) c = ((await r.json()).c || '').toUpperCase(); } catch { /* offline or local: fall back */ }
+    if (!c) { const m = /-([A-Za-z]{2})$/.exec(navigator.language || ''); if (m) c = m[1].toUpperCase(); }
+    if (!d.canon.some(L => L.a2 === c)) c = '';
+    if (c) store.set('home', c);
+    return c;
+  }
+  const kmBetween = (a, b) => { const R = Math.PI / 180, dl = (b[0] - a[0]) * R, dp = (b[1] - a[1]) * R, h = Math.sin(dp / 2) ** 2 + Math.cos(a[1] * R) * Math.cos(b[1] * R) * Math.sin(dl / 2) ** 2; return 12742 * Math.asin(Math.sqrt(h)); };
+  function orderFor(d, home) {
+    const H = d.canon.find(L => L.a2 === home);
+    if (!H) return d.canon.slice();
+    return [H].concat(d.canon.filter(L => L !== H).sort((a, b) => kmBetween(H.c, a.c) - kmBetween(H.c, b.c)));
+  }
+  function setHome(a2) { store.set('home', a2); DATA.levels = orderFor(DATA, a2); maskCache.clear(); renderSelect(); }
+  // ── Flags ──
+  let FLAGS = null, flagsPromise = null;
+  function loadFlags() {
+    if (!flagsPromise) flagsPromise = fetch(`games/data/flags.json?v=${FLAGS_VERSION}`, { cache: 'force-cache' }).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }).then(f => { FLAGS = f; return f; });
+    return flagsPromise;
+  }
+  const flagColour = (a2, x, y, W, H) => { const f = FLAGS?.flags[a2]; if (!f) return null; const fx = Math.min(FLAGS.w - 1, Math.floor((x + 0.5) / W * FLAGS.w)), fy = Math.min(FLAGS.h - 1, Math.floor((y + 0.5) / H * FLAGS.h)); return f.p[+f.r[fy][fx]] || f.p[0]; };
+  // a small inline SVG of the flag for the result card (runs of equal cells merged into one rect per run)
+  function flagSvg(a2) {
+    const f = FLAGS?.flags[a2]; if (!f) return '';
+    let out = ''; for (let y = 0; y < FLAGS.h; y++) { let x = 0; while (x < FLAGS.w) { const c = f.r[y][x]; let x2 = x; while (x2 + 1 < FLAGS.w && f.r[y][x2 + 1] === c) x2++; out += `<rect x="${x}" y="${y}" width="${x2 - x + 1}" height="1" fill="${f.p[+c]}"/>`; x = x2 + 1; } }
+    return `<svg class="aa-flag-thumb" viewBox="0 0 ${FLAGS.w} ${FLAGS.h}" role="img" aria-label="Flag"><g shape-rendering="crispEdges">${out}</g></svg>`;
+  }
+  async function setBoard(b) {
+    BOARD = b === 'flags' ? 'flags' : 'map'; store.set('board', BOARD); maskCache.clear();
+    $$('[data-board]').forEach(x => { const on = x.dataset.board === BOARD; x.classList.toggle('is-on', on); x.setAttribute('aria-pressed', String(on)); });
+    if (BOARD === 'flags') { try { await loadFlags(); } catch { toast('Could not load the flags. Check your connection.', 'bad'); BOARD = 'map'; store.set('board', 'map'); } }
+    renderSelect();
   }
 
   // ── Lobby world map ──
@@ -245,6 +304,11 @@
     el.playSub.textContent = nextIdx < 0 ? `All ${DATA.levels.length} cleared · replay any level` : `Level ${nextIdx + 1} · ${DIFF_OF(TIER_OF())}`;
     el.play.dataset.level = nextIdx < 0 ? 0 : nextIdx;
     el.play.querySelector('.aa-play-label').textContent = done ? 'Continue' : 'Play';
+    const flags = BOARD === 'flags';
+    if (el.tagline) el.tagline.textContent = flags ? 'Clear the arrows. Reveal the flag.' : 'Clear the arrows. Reveal the country.';
+    if (el.tourKicker) el.tourKicker.textContent = flags ? 'Flag Tour' : 'World Tour';
+    $$('[data-board]').forEach(x => { const on = x.dataset.board === BOARD; x.classList.toggle('is-on', on); x.setAttribute('aria-pressed', String(on)); });
+    renderHome();
     if (el.path) { el.path.innerHTML = '';
     const start = Math.max(0, (nextIdx < 0 ? n - 1 : nextIdx) - 1);
     for (let i = start; i < Math.min(n, start + 5); i++) {
@@ -327,7 +391,8 @@
     return { k, x: c0, y: r0, rows, count: rows.join('').split('1').length - 1, w: rows[0].length, h: rows.length };
   }
   const maskCache = new Map();
-  const maskFor = (L, tier) => { const key = L.id + ':' + tier; if (!maskCache.has(key)) maskCache.set(key, rasterise(L.d, L.k[tier])); return maskCache.get(key); };
+  const rectMask = (w, h) => ({ k: 1, x: 0, y: 0, w, h, rows: Array.from({ length: h }, () => '1'.repeat(w)), count: w * h });
+  const maskFor = (L, tier, board = BOARD) => { const key = board + ':' + L.id + ':' + tier; if (!maskCache.has(key)) maskCache.set(key, board === 'flags' ? rectMask(...FLAG_DIM[tier]) : rasterise(L.d, L.k[tier])); return maskCache.get(key); };
 
   // ── Puzzle generation ──
   // Two stages, like a maze that is drawn first and signposted after.
@@ -590,9 +655,17 @@
     defs.appendChild(grad); svg.appendChild(defs);
     svg.classList.toggle('aa-board--tall', H > W * 1.25);
     const t = state.maskInfo;
-    const outline = svgEl('path', { d: state.level.d, class: 'aa-outline', transform: `translate(${-t.x} ${-t.y}) scale(${t.k})` });
-    svg.appendChild(outline);
-    state.outlineEl = outline;
+    state.outlineEl = null; state.flagCells = null;
+    if (state.board === 'flags') {
+      // the flag lies under the arrows, dim; every cell lights up the moment its arrow leaves
+      const fg = svgEl('g', { class: 'aa-flag' }); state.flagCells = new Map();
+      for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) { const rect = svgEl('rect', { x: c, y: r, width: 1, height: 1, class: 'aa-flagcell' + (state.occ[r][c] < 0 ? ' is-open' : ''), fill: flagColour(state.level.a2, c, r, W, H) || '#888' }); fg.appendChild(rect); state.flagCells.set(r * W + c, rect); }   // lane cells carry no arrow: lit from the start
+      svg.appendChild(fg);
+    } else {
+      const outline = svgEl('path', { d: state.level.d, class: 'aa-outline', transform: `translate(${-t.x} ${-t.y}) scale(${t.k})` });
+      svg.appendChild(outline);
+      state.outlineEl = outline;
+    }
     // Guide dots (Settings → Guideline). The outline itself is made of arrows: see generate() phase 1.
     const land = state.land; const dots = svgEl('g', { class: 'aa-guides' });
     for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) if (land[r][c]) dots.appendChild(svgEl('circle', { cx: c + 0.5, cy: r + 0.5, r: 0.09 }));
@@ -648,12 +721,12 @@
     if (i < 0) i = 0;
     stopTimer();
     if (bumpSeed) state.seedBump++; else if (state.idx !== i || !!daily !== !!state.daily) { state.seedBump = 0; state.fails = 0; }
-    state.daily = daily;
+    state.daily = daily; state.board = daily ? 'map' : BOARD;
     state.idx = i; state.level = DATA.levels[i]; state.tier = daily ? daily.tier : keepTier >= 0 ? keepTier : TIER_OF();
     state.busy = true; el.select.hidden = true; el.game.hidden = false; el.overlay.hidden = true; el.board.innerHTML = '';
     el.hudLevel.textContent = daily ? 'Daily' : `Level ${i + 1}`; el.hudLeft.textContent = 'Drawing the board…';
     await new Promise(r => setTimeout(r, 20));   // let the game screen paint before the (up to ~1 s on phones) generation
-    state.maskInfo = maskFor(state.level, state.tier);
+    state.maskInfo = maskFor(state.level, state.tier, state.board);
     const seed = (daily ? daily.seed : (i + 1) * 1000) + state.seedBump;
     const gen = bestBoard(state.maskInfo, state.tier, seed);
     const livesMax = livesFor(state.tier);
@@ -666,7 +739,7 @@
     renderBoard(); renderHud();
     if (i === 0 && !cleared(0) && !daily) toast('Tap an arrow to shoot it off the board. If another arrow is in its way, you lose a heart.', 'hint');
     else if (state.tier >= 2) toast(`${diff.toUpperCase()} LEVEL · ${state.pieces.length} arrows${daily ? '' : ' · you earned this'}`, 'hard');
-    else toast(`${daily ? 'Daily board' : 'Level ' + (i + 1)} · ${state.pieces.length} arrows · which country is this?`);
+    else toast(`${daily ? 'Daily board' : 'Level ' + (i + 1)} · ${state.pieces.length} arrows · ${state.board === 'flags' ? 'whose flag is this?' : 'which country is this?'}`);
   }
 
   function renderHud() {
@@ -754,6 +827,7 @@
   }
   function shoot(p, auto = false) {
     p.gone = true; state.left--;
+    if (state.flagCells) for (const [y, x] of p.cells) state.flagCells.get(y * state.W + x)?.classList.add('is-open');
     if (state.armed.has(p)) disarm(p);
     for (const [y, x] of p.cells) state.occ[y][x] = -1;
     if (state.armed.size) setTimeout(releaseArmed, auto ? 90 : 160);   // armed arrows whose lane just opened go by themselves
@@ -844,7 +918,7 @@
     const rnd = mulberry32(state.idx * 31 + 7);
     for (let i = others.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [others[i], others[j]] = [others[j], others[i]]; }
     const options = [L, others[0], others[1]]; for (let i = options.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [options[i], options[j]] = [options[j], options[i]]; }
-    el.card.innerHTML = `<h3>Board cleared!</h3><p class="aa-card-lead">Which country did you just clear?</p><div class="aa-quiz"></div>`;
+    el.card.innerHTML = `<h3>Board cleared!</h3><p class="aa-card-lead">${state.board === 'flags' ? 'Whose flag is this?' : 'Which country did you just clear?'}</p>${state.board === 'flags' ? flagSvg(L.a2) : ''}<div class="aa-quiz"></div>`;
     const box = $('.aa-quiz', el.card);
     for (const o of options) {
       const b = document.createElement('button'); b.type = 'button'; b.className = 'aa-btn aa-quiz-opt'; b.textContent = o.name;
@@ -917,7 +991,7 @@
     if (act === 'next') startLevel(state.idx + 1);
     else if (act === 'again' || act === 'retry') startLevel(state.idx, false, state.daily, state.tier);
     else if (act === 'shuffle') startLevel(state.idx, true, state.daily);
-    else if (act === 'skip') { store.set(`skip:${state.idx + 1}`, true); startLevel(state.idx + 1); }
+    else if (act === 'skip') { store.set(skipKey(state.idx + 1), true); startLevel(state.idx + 1); }
     else if (act === 'levels') goToLevels();
     else if (act === 'share') share();
   });
@@ -928,7 +1002,7 @@
   async function share() {
     const n = DATA.levels.length, done = DATA.levels.filter((_, i) => cleared(i)).length;
     const rec = state.daily ? store.get(`daily:${state.daily.key}`) : cleared(state.idx);
-    const text = `Arrow Atlas: I cleared ${state.level.name} (${state.daily ? 'daily board ' + state.daily.key : 'level ' + (state.idx + 1)}) in ${fmtTime(rec?.t ?? state.elapsed, true)} ${'★'.repeat(rec?.stars || stars())} and ${done}/${n} countries so far.\nYour turn: https://ariyankhan.com/arrow-atlas.html${state.daily ? '#daily' : '#level-' + (state.idx + 1)}`;
+    const text = `Arrow Atlas: I cleared ${state.board === 'flags' ? 'the flag of ' : ''}${state.level.name} (${state.daily ? 'daily board ' + state.daily.key : 'level ' + (state.idx + 1)}) in ${fmtTime(rec?.t ?? state.elapsed, true)} ${'★'.repeat(rec?.stars || stars())} and ${done}/${n} countries so far.\nYour turn: https://ariyankhan.com/arrow-atlas.html${state.daily ? '#daily' : '#level-' + (state.idx + 1)}`;
     const flash = $('.aa-flash', el.card);
     try {
       if (navigator.share) { await navigator.share({ text }); return; }
@@ -975,6 +1049,24 @@
     fxEmit(list);
   }
 
+  // Settings → Home country: a list of every country (canonical order), plus Auto
+  function renderHome() {
+    const sel = el.homeSel; if (!sel || !DATA) return;
+    if (!sel.options.length) {
+      sel.appendChild(new Option('Auto (where you are)', 'auto'));
+      sel.appendChild(new Option('World order (no home)', ''));
+      for (const L of DATA.canon.slice().sort((a, b) => a.name.localeCompare(b.name))) sel.appendChild(new Option(L.name, L.a2));
+    }
+    const home = store.get('home', null); sel.value = home == null ? 'auto' : home;
+    if (sel.value !== (home == null ? 'auto' : home)) sel.value = '';
+  }
+  el.homeSel?.addEventListener('change', async () => {
+    const v = el.homeSel.value;
+    if (v === 'auto') { try { localStorage.removeItem(STORE + 'home'); } catch { /* ignore */ } const c = await homeCountry(DATA); DATA.levels = orderFor(DATA, c); maskCache.clear(); renderSelect(); }
+    else setHome(v);
+    toast(v === 'auto' ? 'Tour order follows where you are.' : v ? `Your tour now starts from ${DATA.levels[0].name}.` : 'Tour in world order.', 'hint');
+  });
+  $$('[data-board]').forEach(b => b.addEventListener('click', () => setBoard(b.dataset.board)));
   // ── Wiring ──
   el.btnHint.addEventListener('click', hint);
   el.play.addEventListener('click', () => startLevel(+el.play.dataset.level || 0));

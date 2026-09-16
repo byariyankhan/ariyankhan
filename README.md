@@ -574,6 +574,21 @@ unlock (skip allowed after two fails), stars, best times and progress in
   lowering their number: the dependency graph needs one source per coast chain.
   Hiding the exits therefore needs a signposting redesign that chooses the
   sources deliberately (corridor exits only, coast closed), not more tuning.
+- **Home country first** (`homeCountry`, `orderFor`): `games/geo.php` passes on
+  Cloudflare's `CF-IPCountry` (nothing stored); the browser language region is
+  the fallback. The tour order is the player's country, then every other country
+  by great-circle distance from it (`c` = centroid per level, `a2` = ISO code).
+  The first answer is kept in `aa:v1:home` (Settings → Home country changes it,
+  "World order" switches it off). Progress is keyed by country id (`lv:<id>`,
+  `fl:<id>`, skips likewise), migrated once from the old level-number keys; the
+  daily board is picked from the canonical list so everyone gets the same one.
+- **Flag boards** (`BOARD` = map | flags, lobby switch, separate progress): the
+  same generator on a plain 4:3 rectangle (`FLAG_DIM` per tier, 16x12 to 44x33),
+  measured to leave half the free arrows of a coast outline (Hard 2.6 vs 5.7 at
+  the start, Master 4.5 vs 11). `games/build-flags.mjs` renders every flag
+  (flag-icons, MIT) to a 32x24 palette grid in `games/data/flags.json`; the
+  board lays it under the arrows at 22% and lights each cell as its arrow
+  leaves; the quiz asks whose flag it is and shows the flag.
 - **Tightening** (generate stage 3, Hard and up, `TIGHTEN_OF` iterations): a local
   search over head ends after signposting. Flip one arrow to its other end, or,
   when that closes a cycle, also one arrow on its new run, and keep the flip when
