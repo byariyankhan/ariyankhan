@@ -103,7 +103,7 @@ test('discover.json holds an animal, a bird, a place and a dish for every countr
 });
 test('discover-boards.json: a board for every country, a shape for every board, M/L/Z paths with five scales', () => {
   const b = JSON.parse(fs.readFileSync(path.join(root, 'games/data/discover-boards.json'), 'utf8'));
-  for (const L of data.levels) { const bd = b.boards[L.a2]; assert.ok(bd, `${L.name} has no discovery board`); assert.ok(['a', 'b', 'p'].includes(bd.kind), `${L.name}: kind ${bd.kind}`); assert.ok(typeof bd.name === 'string' && bd.name.length >= 2 && bd.name.length <= 40, `${L.name}: board name odd: ${bd.name}`); assert.ok(b.shapes[bd.hex], `${L.name}: shape ${bd.hex} missing`); }
+  for (const L of data.levels) { const bd = b.boards[L.a2]; assert.ok(bd, `${L.name} has no discovery board`); assert.ok(['a', 'b', 'p'].includes(bd.kind), `${L.name}: kind ${bd.kind}`); assert.ok(typeof bd.name === 'string' && bd.name.length >= 2 && bd.name.length <= 40, `${L.name}: board name odd: ${bd.name}`); assert.ok(b.shapes[bd.hex], `${L.name}: shape ${bd.hex} missing`); assert.ok(typeof bd.rel === 'string' && bd.rel.length >= 8 && bd.rel.length <= 90, `${L.name}: relation line odd: ${bd.rel}`); assert.ok(typeof bd.fact === 'string' && bd.fact.length >= 30 && bd.fact.length <= 200 && /\.$/.test(bd.fact), `${L.name}: fact odd: ${bd.fact}`); }
   assert.equal(Object.keys(b.boards).length, data.levels.length, 'no stray boards');
   for (const [hex, sh] of Object.entries(b.shapes)) {
     assert.match(sh.d, /^[MLZ0-9 .-]+$/, `${hex}: path is not M/L/Z`); assert.equal(sh.k.length, 5, `${hex}: five scales`);

@@ -603,9 +603,12 @@ unlock (skip allowed after two fails), stars, best times and progress in
   data, not in the background. The HUD says only `Level n`; the start toast
   ("Bangladesh's animal · 104 arrows · what is it?") is the one hint. No quiz after a
   discovery board (a quiz after every board wears thin, and guessing "Karabakh
-  horse" from a horse silhouette is unfair): the result card just says what it
-  was ("You cleared · Royal Bengal tiger · Bangladesh's animal"). Only country
-  boards keep the three-option quiz. The lobby map marks the country whose step (outline or
+  horse" from a horse silhouette is unfair): the card says what it was and why
+  it belongs to that country, then one odd fact about it, both hand-written per
+  country in the build script's `ABOUT` table and carried in the boards file as
+  `rel` and `fact` ("Royal Bengal tiger · Bangladesh's national animal" / "The
+  tigers of the Sundarbans swim between islands and drink slightly salty
+  water."). Only country boards keep the three-option quiz. The lobby map marks the country whose step (outline or
   discovery) is next and is the only level picker: the All levels sheet, the
   Discoveries collection and the "You discovered" facts list are all gone. The
   tour unlocks itself from the player's play and location.
