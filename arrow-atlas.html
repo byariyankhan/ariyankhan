@@ -63,7 +63,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="css/arrow-atlas.css?v=26" />
+    <link rel="stylesheet" href="css/arrow-atlas.css?v=27" />
     <link rel="preload" href="games/data/arrow-atlas.json?v=11" as="fetch" crossorigin="anonymous" />
 
     <!-- SCHEMA -->
@@ -207,14 +207,6 @@
         </div>
 
         <button type="button" class="aa-play" id="aaPlay"><span class="aa-play-label">Continue</span><span class="aa-play-sub" id="aaPlaySub">Level 1</span></button>
-        <div class="aa-minis">
-          <div class="aa-mini-slot" id="aaDaily"></div>
-          <button type="button" class="aa-mini aa-mini--tour" id="aaLevelsBtn">
-            <span class="aa-mini-kicker" id="aaTourKicker">World Tour</span>
-            <span class="aa-mini-big" id="aaProgress">0/197</span>
-            <span class="aa-mini-sub">All levels</span>
-          </button>
-        </div>
         <p class="aa-loading" id="aaLoading" hidden>Loading…</p>
         <p class="aa-error" id="aaError" hidden></p>
       </section>
@@ -416,6 +408,8 @@
           <div class="aa-row aa-row--col"><span class="aa-row-label">Colours</span><div class="aa-themes" id="aaThemes"></div></div>
         </div>
         <div class="aa-group">
+          <button type="button" class="aa-row aa-row--link" id="aaLevelsBtn"><span class="aa-row-ico">🌍</span><span class="aa-row-label">All levels<small id="aaProgress">0/197 cleared</small></span><span class="aa-row-chev">›</span></button>
+          <button type="button" class="aa-row aa-row--link" id="aaDailyRow"><span class="aa-row-ico">📅</span><span class="aa-row-label">Today's Country<small id="aaDaily">Mystery</small></span><span class="aa-row-chev">›</span></button>
           <button type="button" class="aa-row aa-row--link" id="aaHowTo"><span class="aa-row-ico">❓</span><span class="aa-row-label">How to play</span><span class="aa-row-chev">›</span></button>
           <a class="aa-row aa-row--link" href="/#contact"><span class="aa-row-ico">💬</span><span class="aa-row-label">Feedback</span><span class="aa-row-chev">›</span></a>
         </div>
@@ -434,6 +428,6 @@
       </div>
     </div>
 
-    <script src="js/arrow-atlas.js?v=37"></script>
+    <script src="js/arrow-atlas.js?v=38"></script>
   </body>
 </html>
