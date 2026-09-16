@@ -679,3 +679,21 @@ unlock (skip allowed after two fails), stars, best times and progress in
 - Do not add `site-config.js`
 - Do not load JS/CSS from a CDN — the CSP only allows `'self'`; vendor it under `js/vendor/`
 
+### Google AdSense (verification only)
+
+Every public page carries the AdSense loader in `<head>`, right after the
+opening tag and before the gtag block:
+
+```html
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1570944160084395" crossorigin="anonymous"></script>
+```
+
+It is there so Google can verify the site. **No ad units, no Auto ads**: there
+is no `<ins class="adsbygoogle">` anywhere and nothing calls
+`adsbygoogle.push`. The `.htaccess` CSP was widened only as far as that loader
+needs: `https://*.googlesyndication.com` in `script-src`, `img-src`,
+`frame-src` and `connect-src`, plus `https://*.g.doubleclick.net` in `img-src`
+and `https://*.adtrafficquality.google` in `frame-src`/`connect-src` (the
+loader's beacons and its invisible traffic-quality frame). Turning ads on later
+needs more hosts and a privacy-policy update, not just an `<ins>` tag.
+
