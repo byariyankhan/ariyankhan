@@ -91,6 +91,32 @@ $result($c3, $guest, -1);
 ok($row($c3)['winner_id'] === null && $row($c3)['state'] === 'done', 'a board neither of them cleared is a draw');
 ok($gold($host) === $before[0] + 500 && $gold($guest) === $before[1] + 500, 'and both stakes come back');
 
+echo "\nCalling the invitation off\n";
+$c6 = $make($host, 500);
+$g6 = $gold($host);
+$db->prepare("UPDATE matches SET state = 'void', settled = ? WHERE code = ? AND state = 'open'")->execute([time(), $c6]);
+aa_give_gold($db, $host, 500);
+ok($row($c6)['state'] === 'void' && $gold($host) === $g6 + 500, 'cancelling hands the stake straight back');
+ok($join($c6, $guest) === false && $gold($guest) === $gold($guest), 'and the friend can no longer take that link');
+
+echo "\nWho is leading\n";
+$c7 = $make($host, 500); $join($c7, $guest);
+$db->prepare('UPDATE matches SET host_pct = 30, guest_pct = 70 WHERE code = ?')->execute([$c7]);
+$line = aa_match_players($db, $row($c7), ['id' => $host]);
+ok(count($line) === 2 && $line[0]['name'] === 'Rahim' && $line[0]['place'] === 1, 'the player further along the board is first');
+ok($line[1]['name'] === 'Ariyan' && $line[1]['place'] === 2 && $line[1]['you'] === true, 'and you are marked in the line-up');
+$db->prepare('UPDATE matches SET host_pct = 95 WHERE code = ?')->execute([$c7]);
+$line = aa_match_players($db, $row($c7), null);
+ok($line[0]['name'] === 'Ariyan', 'pulling ahead moves you to first');
+$db->prepare('UPDATE matches SET host_ms = 40000 WHERE code = ?')->execute([$c7]);
+$line = aa_match_players($db, $row($c7), null);
+ok($line[0]['name'] === 'Ariyan' && $line[0]['pct'] === 100, 'a finished board counts as all the way along');
+$db->prepare('UPDATE matches SET host_ms = -1, guest_pct = 10 WHERE code = ?')->execute([$c7]);
+$line = aa_match_players($db, $row($c7), null);
+ok($line[0]['name'] === 'Rahim' && $line[1]['name'] === 'Ariyan', 'running out of hearts drops you behind someone still playing');
+$db->prepare('UPDATE matches SET host_ms = NULL, guest_ms = NULL, host_pct = 0, guest_pct = 0 WHERE code = ?')->execute([$c7]);
+$result($c7, $host, -1); $result($c7, $guest, -1);
+
 echo "\nNobody turns up\n";
 $c4 = $make($host, 7000);
 ok($gold($host) === 4000 - 500 + 500 + 500 - 7000 + 7000 || true, 'stake held');
