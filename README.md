@@ -597,13 +597,15 @@ unlock (skip allowed after two fails), stars, best times and progress in
   63 countries before the discovery boards existed is on level 65, not back on
   level 4 because Bhutan's animal sits fourth in their list. Milestones (every
   10th) and the share text use that number; `#level-n` (position in the list)
-  is still read for old links. The boards file is loaded with the level
+  is still read for old links. The result card's Next button and Skip go to the
+  next *open* board (`nextOpen`: first uncleared, unlocked level further down
+  the list, else from the top), never to a replay of a cleared one. The boards file is loaded with the level
   data, not in the background. The HUD says only `Level n`; the start toast
-  ("Bangladesh's animal · 104 arrows · what is it?") is the one hint. The quiz asks
-  "Which animal did you just clear?" with two other countries' finds of the same
-  kind, preferring one with the very same silhouette (so the shape gives nothing
-  away and the player has to know the country); names that contain one another
-  are never paired. The lobby map marks the country whose step (outline or
+  ("Bangladesh's animal · 104 arrows · what is it?") is the one hint. No quiz after a
+  discovery board (a quiz after every board wears thin, and guessing "Karabakh
+  horse" from a horse silhouette is unfair): the result card just says what it
+  was ("You cleared · Royal Bengal tiger · Bangladesh's animal"). Only country
+  boards keep the three-option quiz. The lobby map marks the country whose step (outline or
   discovery) is next and is the only level picker: the All levels sheet, the
   Discoveries collection and the "You discovered" facts list are all gone. The
   tour unlocks itself from the player's play and location.
