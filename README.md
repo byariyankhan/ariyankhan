@@ -592,14 +592,15 @@ unlock (skip allowed after two fails), stars, best times and progress in
   country (`tourFor`: 197 countries → 394 levels; more kinds of board later mean
   more levels), so it unlocks, numbers, seeds, saves (`lv:d:<id>`) and deep-links
   (`#level-n`) exactly like a country. The boards file is loaded with the level
-  data, not in the background. HUD shows `Level n · Animal`. The quiz asks
+  data, not in the background. The HUD says only `Level n`; the start toast
+  ("Bangladesh's animal · 104 arrows · what is it?") is the one hint. The quiz asks
   "Which animal did you just clear?" with two other countries' finds of the same
   kind, preferring one with the very same silhouette (so the shape gives nothing
   away and the player has to know the country); names that contain one another
-  are never paired. In All levels a discovery tile shows a question mark until it
-  is cleared, then its green silhouette. The lobby map marks the country whose
-  step (outline or discovery) is next. The old "You discovered" facts list and
-  the separate Discoveries collection sheet were dropped for this.
+  are never paired. The lobby map marks the country whose step (outline or
+  discovery) is next and is the only level picker: the All levels sheet, the
+  Discoveries collection and the "You discovered" facts list are all gone. The
+  tour unlocks itself from the player's play and location.
 - **Home country first** (`homeCountry`, `orderFor`): `games/geo.php` passes on
   Cloudflare's `CF-IPCountry` (nothing stored); the browser language region is
   the fallback. The tour order is the player's country, then every other country

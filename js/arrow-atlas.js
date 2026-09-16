@@ -74,8 +74,8 @@
   const PALETTE = ['#FFED54', '#5CD6FF', '#8CFF7A', '#FF9AD5', '#C79BFF', '#FFB347', '#6EE7B7', '#FDBA74', '#F97373', '#38BDF8'];
 
   const el = {
-    select: $('#aaSelect'), tagline: $('#aaTagline'), dailyRow: $('#aaDailyRow'), homeSel: $('#aaHome'), levels: $('#aaLevels'), progress: $('#aaProgress'), streak: $('#aaStreak'), daily: $('#aaDaily'), hudDiff: $('#aaHudDiff'), play: $('#aaPlay'), path: $('#aaPath'), btnVibe: $('#aaVibe'), btnGuides: $('#aaGuides'), btnMusic: $('#aaMusic'), howTo: $('#aaHowTo'),
-    sheet: $('#aaSheet'), levelsSheet: $('#aaLevelsSheet'), levelsBtn: $('#aaLevelsBtn'), settingsBtns: $$('#aaSettings, #aaSettingsG'), themeBtn: $('#aaTheme'), themes: $('#aaThemes'),
+    select: $('#aaSelect'), tagline: $('#aaTagline'), dailyRow: $('#aaDailyRow'), homeSel: $('#aaHome'), streak: $('#aaStreak'), daily: $('#aaDaily'), hudDiff: $('#aaHudDiff'), play: $('#aaPlay'), path: $('#aaPath'), btnVibe: $('#aaVibe'), btnGuides: $('#aaGuides'), btnMusic: $('#aaMusic'), howTo: $('#aaHowTo'),
+    sheet: $('#aaSheet'), settingsBtns: $$('#aaSettings, #aaSettingsG'), themeBtn: $('#aaTheme'), themes: $('#aaThemes'),
     game: $('#aaGame'), boardWrap: $('#aaBoardWrap'), board: $('#aaBoard'), toast: $('#aaToast'), confetti: $('#aaConfetti'),
     hudLevel: $('#aaHudLevel'), hudMode: $('#aaHudMode'), hudTime: $('#aaHudTime'), hudLeft: $('#aaHudLeft'), hudLives: $('#aaHudLives'), hudLivesWrap: $('#aaHudLivesWrap'), hudPct: $('#aaHudPct'), boardBar: $('#aaBoardBar'),
     btnHint: $('#aaHint'), btnLevels: $('#aaBackToLevels'), btnSound: $('#aaSound'),
@@ -273,9 +273,6 @@
     if (!DATA) return;
     renderWorld();
     const n = DATA.levels.length;
-    const done = DATA.levels.filter((_, i) => cleared(i)).length;
-    const learned = DATA.levels.filter((_, i) => cleared(i)?.quiz).length;
-    if (el.progress) { el.progress.textContent = `${done}/${n} cleared · ${learned} named`; el.progress.setAttribute('aria-label', `${done} of ${n} countries cleared, ${learned} named correctly`); }
     const streak = store.get('streak', 0), dStreak = store.get('dailyStreak', { count: 0, last: '' });
     el.streak.textContent = streak >= 2 ? `🔥 ${streak} in a row` : dStreak.count >= 2 ? `🔥 ${dStreak.count}-day daily streak` : '';
     renderDaily();
@@ -293,25 +290,6 @@
       el.path.appendChild(d);
     } }
     renderThemes();
-    el.levels.innerHTML = '';
-    DATA.levels.forEach((L, i) => {
-      const rec = cleared(i), open = unlocked(i);
-      const b = document.createElement('button');
-      b.type = 'button'; b.className = 'aa-level' + (rec ? ' is-done' : '') + (open ? '' : ' is-locked') + ((i + 1) % 10 === 0 ? ' is-milestone' : ''); b.dataset.level = i; b.disabled = !open;
-      const what = L.disc ? `${L.country.name}'s ${KIND_WORD[L.kind]}` : '';
-      if (L.disc) b.classList.add('aa-level--disc');
-      b.setAttribute('aria-label', rec ? `Level ${i + 1}, ${L.name}, ${rec.stars} stars` : open ? `Level ${i + 1}${what ? ', ' + what : ''}` : `Level ${i + 1}, locked`);
-      const svg = svgEl('svg', { viewBox: '-2 -2 104 104', 'aria-hidden': 'true', focusable: 'false' });
-      // a discovery board keeps its shape secret until it is cleared
-      if (L.disc && !rec) { const q = svgEl('text', { x: 50, y: 54, class: 'aa-disc-q' }); q.textContent = '?'; svg.appendChild(q); } else svg.appendChild(svgEl('path', { d: L.d }));
-      b.appendChild(svg);
-      const t = document.createElement('span'); t.className = 'aa-level-num'; t.textContent = String(i + 1); b.appendChild(t);
-      const s = document.createElement('span'); s.className = 'aa-level-sub';
-      s.textContent = rec ? `${L.name} ${'★'.repeat(rec.stars)}` : open ? (what || DIFF_OF(TIER_OF())) : '🔒';
-      b.appendChild(s);
-      b.addEventListener('click', () => startLevel(i));
-      el.levels.appendChild(b);
-    });
   }
 
   function renderDaily() {
@@ -375,7 +353,6 @@
     return discbPromise;
   }
   const KIND_WORD = { a: 'animal', b: 'bird', p: 'place' };
-  const kindLabel = k => KIND_WORD[k][0].toUpperCase() + KIND_WORD[k].slice(1);
   const escapeHtml = str => String(str).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[ch]);
   const discCache = new Map();
   // the discovery level of country C: a level of its own that borrows the shape's outline and scales
@@ -384,7 +361,7 @@
     if (!discCache.has(C.id)) discCache.set(C.id, { id: 'd:' + C.id, name: b.name, kind: b.kind, hex: b.hex, d: sh.d, k: sh.k, country: C, disc: true });
     return discCache.get(C.id);
   }
-  const hudLabel = () => state.daily ? 'Daily' : `Level ${state.idx + 1}${state.disc ? ' · ' + kindLabel(state.disc.kind) : ''}`;
+  const hudLabel = () => state.daily ? 'Daily' : `Level ${state.idx + 1}`;
   const maskFor = (L, tier) => { const key = L.id + ':' + tier; if (!maskCache.has(key)) maskCache.set(key, rasterise(L.d, L.k[tier])); return maskCache.get(key); };
 
   // ── Puzzle generation ──
@@ -729,7 +706,7 @@
   }
 
   function renderHud() {
-    el.hudLevel.textContent = hudLabel(); el.hudLevel.classList.toggle('is-disc', !!state.disc);
+    el.hudLevel.textContent = hudLabel();
     const diffLabel = state.diff || DIFF_OF(state.tier);
     el.hudDiff.textContent = diffLabel;
     el.hudDiff.className = 'aa-hud-diff aa-hud-diff--' + diffLabel.toLowerCase().replace(' ', '-');
@@ -1118,13 +1095,11 @@
   el.play.addEventListener('click', () => startLevel(+el.play.dataset.level || 0));
   // Sheets
   const openSheet = sh => { sh.hidden = false; document.body.style.overflow = 'hidden'; };
-  const closeSheets = () => { el.sheet.hidden = true; el.levelsSheet.hidden = true; document.body.style.overflow = ''; };
+  const closeSheets = () => { el.sheet.hidden = true; document.body.style.overflow = ''; };
   el.settingsBtns.forEach(b => b.addEventListener('click', () => openSheet(el.sheet)));
-  el.levelsBtn?.addEventListener('click', () => { closeSheets(); renderSelect(); openSheet(el.levelsSheet); });
   $$('[data-close-sheet]').forEach(b => b.addEventListener('click', closeSheets));
   $$('.aa-sheet').forEach(sh => sh.addEventListener('click', e => { if (e.target === sh) closeSheets(); }));
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSheets(); });
-  el.levels.addEventListener('click', e => { if (e.target.closest('.aa-level')) closeSheets(); });
   // Themes
   const THEMES = ['paper', 'night', 'mint'];
   function applyTheme(t) { document.documentElement.dataset.theme = t; store.set('theme', t); $('meta[name="theme-color"]')?.setAttribute('content', t === 'night' ? '#0E0E10' : t === 'mint' ? '#E6F2EC' : '#F4EDE0'); renderThemes(); }
