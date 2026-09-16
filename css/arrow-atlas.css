@@ -52,6 +52,8 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-home-top .aa-chip{ margin-right:auto; }
 .aa-chip{ font-size:13px; color:var(--muted); background:var(--bg2); border-radius:30px; padding:6px 12px; }
 .aa-chip:empty{ display:none; }
+.aa-chip--purse{ display:inline-flex; align-items:center; gap:6px; color:var(--ink); font-weight:900; font-size:14px; font-variant-numeric:tabular-nums; }
+.aa-chip--purse.is-won{ animation:aapop .5s ease-out 2; color:var(--accent); }
 /* lobby world map: every country faint, tour countries outlined, cleared ones filled and numbered */
 /* the map fits the screen width (bleeding into the side gutters); the height left over in the lobby is split
    evenly above and below it */
