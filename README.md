@@ -588,17 +588,18 @@ unlock (skip allowed after two fails), stars, best times and progress in
   landmark says more and `LABEL` names for place boards (the glyph shows one
   landmark, the text often names two). 59 shapes for 197 countries, 55 KB.
   In the game a discovery level is `{ id: 'd:<id>', name, kind, hex, d, k,
-  country, disc: true }`; seed `(i+1)*1000+500`; progress `dv:<id>`; hash
-  `#level-n-animal|bird|place`; HUD `Level n · Animal`. Play & Discover follows
-  `nextStep()`: the first country not cleared, unless a cleared country's board is
-  still open before it; the result card's Next button does the same. The quiz
-  asks "Which animal did you just clear?" with two other countries' finds of the
-  same kind, preferring one with the very same silhouette (so the shape gives
-  nothing away and the player has to know the country); names that contain one
-  another are never paired. Settings → Discoveries is the collection: one tile
-  per country, cleared ones show the shape and name, the rest a question mark
-  (playable once the country is cleared). The old "You discovered" facts list on
-  the result card was dropped for this.
+  country, disc: true }` and sits in the one numbered tour list right after its
+  country (`tourFor`: 197 countries → 394 levels; more kinds of board later mean
+  more levels), so it unlocks, numbers, seeds, saves (`lv:d:<id>`) and deep-links
+  (`#level-n`) exactly like a country. The boards file is loaded with the level
+  data, not in the background. HUD shows `Level n · Animal`. The quiz asks
+  "Which animal did you just clear?" with two other countries' finds of the same
+  kind, preferring one with the very same silhouette (so the shape gives nothing
+  away and the player has to know the country); names that contain one another
+  are never paired. In All levels a discovery tile shows a question mark until it
+  is cleared, then its green silhouette. The lobby map marks the country whose
+  step (outline or discovery) is next. The old "You discovered" facts list and
+  the separate Discoveries collection sheet were dropped for this.
 - **Home country first** (`homeCountry`, `orderFor`): `games/geo.php` passes on
   Cloudflare's `CF-IPCountry` (nothing stored); the browser language region is
   the fallback. The tour order is the player's country, then every other country

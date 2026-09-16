@@ -75,7 +75,7 @@
 
   const el = {
     select: $('#aaSelect'), tagline: $('#aaTagline'), dailyRow: $('#aaDailyRow'), homeSel: $('#aaHome'), levels: $('#aaLevels'), progress: $('#aaProgress'), streak: $('#aaStreak'), daily: $('#aaDaily'), hudDiff: $('#aaHudDiff'), play: $('#aaPlay'), path: $('#aaPath'), btnVibe: $('#aaVibe'), btnGuides: $('#aaGuides'), btnMusic: $('#aaMusic'), howTo: $('#aaHowTo'),
-    sheet: $('#aaSheet'), levelsSheet: $('#aaLevelsSheet'), discSheet: $('#aaDiscSheet'), discList: $('#aaDiscList'), discBtn: $('#aaDiscBtn'), discCount: $('#aaDiscCount'), levelsBtn: $('#aaLevelsBtn'), settingsBtns: $$('#aaSettings, #aaSettingsG'), themeBtn: $('#aaTheme'), themes: $('#aaThemes'),
+    sheet: $('#aaSheet'), levelsSheet: $('#aaLevelsSheet'), levelsBtn: $('#aaLevelsBtn'), settingsBtns: $$('#aaSettings, #aaSettingsG'), themeBtn: $('#aaTheme'), themes: $('#aaThemes'),
     game: $('#aaGame'), boardWrap: $('#aaBoardWrap'), board: $('#aaBoard'), toast: $('#aaToast'), confetti: $('#aaConfetti'),
     hudLevel: $('#aaHudLevel'), hudMode: $('#aaHudMode'), hudTime: $('#aaHudTime'), hudLeft: $('#aaHudLeft'), hudLives: $('#aaHudLives'), hudLivesWrap: $('#aaHudLivesWrap'), hudPct: $('#aaHudPct'), boardBar: $('#aaBoardBar'),
     btnHint: $('#aaHint'), btnLevels: $('#aaBackToLevels'), btnSound: $('#aaSound'),
@@ -101,9 +101,7 @@
   // progress is keyed by country id (not by level number: the tour order is the player's own, home country first)
   const progressKey = i => 'lv:' + DATA.levels[i].id;
   const skipKey = i => 'skip:' + DATA.levels[i].id;
-  const discKey = i => 'dv:' + DATA.levels[i].id;   // the country's discovery board
   const cleared = i => store.get(progressKey(i));
-  const discCleared = i => store.get(discKey(i));
   const unlocked = i => i === 0 || !!cleared(i - 1) || !!store.get(skipKey(i));
   const dayKey = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
   const hashStr = str => { let h = 2166136261; for (const ch of str) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; };
@@ -111,7 +109,7 @@
   const dailyPick = () => { const h = hashStr('aa-daily-' + dayKey()); const L = DATA.canon[h % DATA.canon.length]; return { key: dayKey(), idx: DATA.levels.indexOf(L), tier: 1 + (h >> 8) % 4, seed: 900000 + (h % 100000) }; };
   function mulberry32(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
   function scrollToGame() { window.scrollTo({ top: 0, behavior: 'smooth' }); }
-  function setHash(i, disc = null) { if (history.replaceState) history.replaceState(null, '', location.pathname + location.search + (i >= 0 ? `#level-${i + 1}${disc ? '-' + KIND_WORD[disc.kind] : ''}` : '')); }
+  function setHash(i) { if (history.replaceState) history.replaceState(null, '', location.pathname + location.search + (i >= 0 ? `#level-${i + 1}` : '')); }
 
   // ── Sound ──
   let audio = null;
@@ -187,13 +185,12 @@
   // ── Data ──
   async function loadData() {
     if (DATA) return DATA;
-    const r = await fetch(`games/data/arrow-atlas.json?v=${DATA_VERSION}`, { cache: 'force-cache' });
+    const [r] = await Promise.all([fetch(`games/data/arrow-atlas.json?v=${DATA_VERSION}`, { cache: 'force-cache' }), loadDiscBoards()]);
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     const d = await r.json(); d.canon = d.levels.slice();
     migrateProgress(d);
-    d.levels = orderFor(d, await homeCountry(d));
+    d.levels = tourFor(d, await homeCountry(d));
     DATA = d;
-    loadDiscBoards().catch(() => {});   // the discovery boards arrive in the background; the tour skips them until they are here
     return DATA;
   }
   // Progress used to be keyed by level number; it is keyed by country id now (the order is personal). One-off copy.
@@ -201,6 +198,14 @@
     if (store.get('idsMigrated')) return;
     d.canon.forEach((L, i) => { const v = store.get(`lv:${i}`); if (v) store.set(`lv:${L.id}`, v); if (store.get(`skip:${i}`)) store.set(`skip:${L.id}`, true); });
     store.set('idsMigrated', true);
+  }
+  // The tour: every country in the player's order, each followed by its discovery board, one numbered list.
+  // More kinds of board later simply mean more levels.
+  function tourFor(d, home) {
+    const tour = orderFor(d, home).flatMap(C => [C, discLevelFor(C)].filter(Boolean));
+    // discovery clears were briefly kept under dv:<id> before the boards became levels of their own
+    for (const L of tour) if (L.disc && !store.get('lv:' + L.id)) { const v = store.get('dv:' + L.country.id); if (v) store.set('lv:' + L.id, v); }
+    return tour;
   }
   // ── Home country: the tour starts at the player's own country and spreads out from there ──
   // Cloudflare tells the server which country a connection comes from (games/geo.php passes on the two-letter code,
@@ -222,7 +227,7 @@
     if (!H) return d.canon.slice();
     return [H].concat(d.canon.filter(L => L !== H).sort((a, b) => kmBetween(H.c, a.c) - kmBetween(H.c, b.c)));
   }
-  function setHome(a2) { store.set('home', a2); DATA.levels = orderFor(DATA, a2); maskCache.clear(); renderSelect(); }
+  function setHome(a2) { store.set('home', a2); DATA.levels = tourFor(DATA, a2); maskCache.clear(); renderSelect(); }
 
   // ── Lobby world map ──
   // Every country faint; the tour countries outlined; cleared ones filled and numbered with their level;
@@ -242,17 +247,18 @@
       for (const c of MAP.countries) {
         const p = svgEl('path', { d: c.d, 'data-id': c.id });
         const i = byId.get(c.id);
-        if (i != null) { p.classList.add('is-tour'); p.setAttribute('tabindex', '0'); p.setAttribute('role', 'button'); p.addEventListener('click', () => { if (unlocked(i)) startLevel(i); else toast(`Level ${i + 1} is locked. Clear the levels before it first.`, 'bad'); }); p.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); p.click(); } }); }
+        if (i != null) { p.classList.add('is-tour'); p.setAttribute('tabindex', '0'); p.setAttribute('role', 'button'); p.addEventListener('click', () => { if (!unlocked(i)) { toast(`Level ${i + 1} is locked. Clear the levels before it first.`, 'bad'); return; } const j = cleared(i) && DATA.levels[i + 1]?.disc && !cleared(i + 1) ? i + 1 : i; startLevel(j); }); p.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); p.click(); } }); }
         land.appendChild(p);
       }
     }
     labels.innerHTML = '';
-    const n = DATA.levels.length, done = DATA.levels.filter((_, i) => cleared(i)).length;
-    const nextIdx = DATA.levels.findIndex((_, j) => !cleared(j) && unlocked(j));
+    const n = DATA.levels.filter(L => !L.disc).length, done = DATA.levels.filter((L, i) => !L.disc && cleared(i)).length;
+    const nextIdx = DATA.levels.findIndex((_, j) => !cleared(j) && unlocked(j)), nextL = DATA.levels[nextIdx];
+    const nextId = nextL ? (nextL.disc ? nextL.country.id : nextL.id) : null;
     for (const c of MAP.countries) {
       const i = byId.get(c.id); if (i == null) continue;
       const p = land.querySelector(`path[data-id="${c.id}"]`);
-      const rec = cleared(i), isNext = i === nextIdx, open = unlocked(i);
+      const rec = cleared(i), isNext = c.id === nextId, open = unlocked(i);
       p.classList.toggle('is-done', !!rec); p.classList.toggle('is-next', isNext); p.classList.toggle('is-locked', !open);
       p.setAttribute('aria-label', rec ? `Level ${i + 1}, ${DATA.levels[i].name}, cleared, replay` : isNext ? `Level ${i + 1}, next, play` : open ? `Level ${i + 1}, play` : `Level ${i + 1}, locked`);
       // no numbers on the map: cleared countries are simply coloured in, only the next one gets a marker
@@ -272,7 +278,7 @@
     if (el.progress) { el.progress.textContent = `${done}/${n} cleared · ${learned} named`; el.progress.setAttribute('aria-label', `${done} of ${n} countries cleared, ${learned} named correctly`); }
     const streak = store.get('streak', 0), dStreak = store.get('dailyStreak', { count: 0, last: '' });
     el.streak.textContent = streak >= 2 ? `🔥 ${streak} in a row` : dStreak.count >= 2 ? `🔥 ${dStreak.count}-day daily streak` : '';
-    renderDaily(); renderDiscCount();
+    renderDaily();
     const nextIdx = DATA.levels.findIndex((_, j) => !cleared(j) && unlocked(j));
     el.play.dataset.level = nextIdx < 0 ? 0 : nextIdx;
     // one button, one label: Play & Discover (no level number or tier: the game picks the next country and its difficulty)
@@ -292,13 +298,16 @@
       const rec = cleared(i), open = unlocked(i);
       const b = document.createElement('button');
       b.type = 'button'; b.className = 'aa-level' + (rec ? ' is-done' : '') + (open ? '' : ' is-locked') + ((i + 1) % 10 === 0 ? ' is-milestone' : ''); b.dataset.level = i; b.disabled = !open;
-      b.setAttribute('aria-label', rec ? `Level ${i + 1}, ${L.name}, ${rec.stars} stars` : open ? `Level ${i + 1}` : `Level ${i + 1}, locked`);
+      const what = L.disc ? `${L.country.name}'s ${KIND_WORD[L.kind]}` : '';
+      if (L.disc) b.classList.add('aa-level--disc');
+      b.setAttribute('aria-label', rec ? `Level ${i + 1}, ${L.name}, ${rec.stars} stars` : open ? `Level ${i + 1}${what ? ', ' + what : ''}` : `Level ${i + 1}, locked`);
       const svg = svgEl('svg', { viewBox: '-2 -2 104 104', 'aria-hidden': 'true', focusable: 'false' });
-      svg.appendChild(svgEl('path', { d: L.d }));
+      // a discovery board keeps its shape secret until it is cleared
+      if (L.disc && !rec) { const q = svgEl('text', { x: 50, y: 54, class: 'aa-disc-q' }); q.textContent = '?'; svg.appendChild(q); } else svg.appendChild(svgEl('path', { d: L.d }));
       b.appendChild(svg);
       const t = document.createElement('span'); t.className = 'aa-level-num'; t.textContent = String(i + 1); b.appendChild(t);
       const s = document.createElement('span'); s.className = 'aa-level-sub';
-      s.textContent = rec ? `${L.name} ${'★'.repeat(rec.stars)}` : open ? DIFF_OF(TIER_OF()) : '🔒';
+      s.textContent = rec ? `${L.name} ${'★'.repeat(rec.stars)}` : open ? (what || DIFF_OF(TIER_OF())) : '🔒';
       b.appendChild(s);
       b.addEventListener('click', () => startLevel(i));
       el.levels.appendChild(b);
@@ -357,9 +366,9 @@
   }
   const maskCache = new Map();
   // ── Discovery boards ──
-  // After a country's outline comes a second board shaped like something a traveller finds there: its animal, its
-  // bird or a landmark (Twemoji silhouettes, see games/build-discover-boards.mjs). Same generator, same tiers, its
-  // own quiz. Cleared ones fill the collection in Settings → Discoveries.
+  // After a country's outline comes a level shaped like something a traveller finds there: its animal, its bird or
+  // a landmark (Twemoji silhouettes, see games/build-discover-boards.mjs). Same generator, same tiers, its own quiz;
+  // one numbered list with the countries (see tourFor).
   let DISCB = null, discbPromise = null;
   function loadDiscBoards() {
     if (!discbPromise) discbPromise = fetch(`games/data/discover-boards.json?v=${DISCB_VERSION}`, { cache: 'force-cache' }).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }).then(d => { DISCB = d; return d; });
@@ -369,47 +378,13 @@
   const kindLabel = k => KIND_WORD[k][0].toUpperCase() + KIND_WORD[k].slice(1);
   const escapeHtml = str => String(str).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[ch]);
   const discCache = new Map();
-  // the discovery level of tour level i: a level of its own that borrows the shape's outline and scales
-  function discLevelFor(i) {
-    const L = DATA.levels[i]; const b = DISCB?.boards?.[L.a2], sh = b && DISCB.shapes[b.hex]; if (!sh) return null;
-    if (!discCache.has(L.id)) discCache.set(L.id, { id: 'd:' + L.id, name: b.name, kind: b.kind, hex: b.hex, d: sh.d, k: sh.k, country: L, disc: true });
-    return discCache.get(L.id);
+  // the discovery level of country C: a level of its own that borrows the shape's outline and scales
+  function discLevelFor(C) {
+    const b = DISCB?.boards?.[C.a2], sh = b && DISCB.shapes[b.hex]; if (!sh) return null;
+    if (!discCache.has(C.id)) discCache.set(C.id, { id: 'd:' + C.id, name: b.name, kind: b.kind, hex: b.hex, d: sh.d, k: sh.k, country: C, disc: true });
+    return discCache.get(C.id);
   }
-  const hasDisc = i => !!discLevelFor(i);
-  const discPending = i => hasDisc(i) && !!cleared(i) && !discCleared(i);
-  // what Play & Discover opens: the first country not yet cleared, unless a cleared country's discovery board is still waiting before it
-  function nextStep() {
-    for (let i = 0; i < DATA.levels.length; i++) {
-      if (cleared(i)) { if (discPending(i)) return { i, disc: true }; continue; }
-      if (unlocked(i)) return { i, disc: false };
-    }
-    return { i: 0, disc: false };
-  }
-  const hudLabel = () => state.daily ? 'Daily' : state.disc ? `Level ${state.idx + 1} · ${kindLabel(state.disc.kind)}` : `Level ${state.idx + 1}`;
-  function renderDiscCount() {
-    if (!el.discCount || !DATA) return;
-    const found = DATA.levels.filter((_, i) => discCleared(i)).length;
-    el.discCount.textContent = `${found} of ${DATA.levels.length} found`;
-  }
-  // Settings → Discoveries: the collection, one tile per country; cleared ones show their shape and name, the rest a question mark
-  function renderDiscoveries() {
-    if (!el.discList || !DATA) return;
-    renderDiscCount();
-    el.discList.innerHTML = '';
-    DATA.levels.forEach((L, i) => {
-      const D = discLevelFor(i); if (!D) return;
-      const rec = discCleared(i), open = !!cleared(i);
-      const b = document.createElement('button'); b.type = 'button'; b.className = 'aa-level aa-level--disc' + (rec ? ' is-done' : '') + (open ? '' : ' is-locked'); b.disabled = !open;
-      b.setAttribute('aria-label', rec ? `${D.name}, ${L.name}'s ${KIND_WORD[D.kind]}, ${rec.stars} stars, replay` : open ? `${L.name}'s ${KIND_WORD[D.kind]}, play` : `${L.name}'s ${KIND_WORD[D.kind]}, clear ${L.name} first`);
-      const svg = svgEl('svg', { viewBox: '-2 -2 104 104', 'aria-hidden': 'true', focusable: 'false' });
-      if (rec) svg.appendChild(svgEl('path', { d: D.d })); else { const q = svgEl('text', { x: 50, y: 54, class: 'aa-disc-q' }); q.textContent = '?'; svg.appendChild(q); }
-      b.appendChild(svg);
-      const t = document.createElement('span'); t.className = 'aa-level-sub aa-level-sub--name'; t.textContent = rec ? D.name : `${L.name}'s ${KIND_WORD[D.kind]}`; b.appendChild(t);
-      const sub = document.createElement('span'); sub.className = 'aa-level-sub'; sub.textContent = rec ? `${L.name} ${'★'.repeat(rec.stars)}` : open ? 'Play' : '🔒'; b.appendChild(sub);
-      b.addEventListener('click', () => { closeSheets(); startLevel(i, false, null, -1, true); });
-      el.discList.appendChild(b);
-    });
-  }
+  const hudLabel = () => state.daily ? 'Daily' : `Level ${state.idx + 1}${state.disc ? ' · ' + kindLabel(state.disc.kind) : ''}`;
   const maskFor = (L, tier) => { const key = L.id + ':' + tier; if (!maskCache.has(key)) maskCache.set(key, rasterise(L.d, L.k[tier])); return maskCache.get(key); };
 
   // ── Puzzle generation ──
@@ -724,27 +699,25 @@
   }
 
   // ── Game lifecycle ──
-  // disc = true plays country i's discovery board (its animal, bird or landmark) instead of its outline
-  async function startLevel(i, bumpSeed = false, daily = null, keepTier = -1, disc = false) {
+  async function startLevel(i, bumpSeed = false, daily = null, keepTier = -1) {
     try { await loadData(); } catch (err) { el.error.textContent = `Could not load the levels (${err.message}).`; el.error.hidden = false; return; }
     if (i < 0 || i >= DATA.levels.length) i = 0;
     if (!daily && !unlocked(i)) i = DATA.levels.findIndex((_, j) => !cleared(j) && unlocked(j));
     if (i < 0) i = 0;
-    if (disc) { try { await loadDiscBoards(); } catch { /* no boards: on with the tour */ } if (!cleared(i) || !hasDisc(i)) { disc = false; if (i + 1 < DATA.levels.length) i += 1; } }
     stopTimer();
-    if (bumpSeed) state.seedBump++; else if (state.idx !== i || !!daily !== !!state.daily || disc !== !!state.disc) { state.seedBump = 0; state.fails = 0; }
-    state.daily = daily; state.disc = disc ? discLevelFor(i) : null;
-    state.idx = i; state.level = disc ? state.disc : DATA.levels[i]; state.tier = daily ? daily.tier : keepTier >= 0 ? keepTier : TIER_OF();
+    if (bumpSeed) state.seedBump++; else if (state.idx !== i || !!daily !== !!state.daily) { state.seedBump = 0; state.fails = 0; }
+    state.daily = daily; state.level = DATA.levels[i]; state.disc = state.level.disc ? state.level : null;
+    state.idx = i; state.tier = daily ? daily.tier : keepTier >= 0 ? keepTier : TIER_OF();
     state.busy = true; el.select.hidden = true; el.game.hidden = false; el.overlay.hidden = true; el.board.innerHTML = '';
     el.hudLevel.textContent = hudLabel(); el.hudLeft.textContent = 'Drawing the board…';
     await new Promise(r => setTimeout(r, 20));   // let the game screen paint before the (up to ~1 s on phones) generation
     state.maskInfo = maskFor(state.level, state.tier);
-    const seed = (daily ? daily.seed : (i + 1) * 1000 + (disc ? 500 : 0)) + state.seedBump;
+    const seed = (daily ? daily.seed : (i + 1) * 1000) + state.seedBump;
     const gen = bestBoard(state.maskInfo, state.tier, seed);
     const livesMax = livesFor(state.tier);
     Object.assign(state, { W: gen.W, H: gen.H, pieces: gen.pieces, occ: gen.occ, land: gen.land, left: gen.pieces.length, hintsMax: hintsFor(state.tier), lives: livesMax, livesMax, elapsed: 0, startedAt: 0, finished: false, hintsUsed: 0, wrong: 0, busy: false, combo: 0, bestCombo: 0, lastShot: 0, cheerHold: 0, shown: new Set(), armed: new Set() });
     el.error.hidden = true; el.loading.hidden = true;
-    if (daily) { if (history.replaceState) history.replaceState(null, '', location.pathname + location.search + '#daily'); } else setHash(i, state.disc);
+    if (daily) { if (history.replaceState) history.replaceState(null, '', location.pathname + location.search + '#daily'); } else setHash(i);
     scrollToGame();
     const diff = DIFF_OF(state.tier);
     state.diff = diff;
@@ -933,9 +906,9 @@
       // nothing away, the player has to know the country), then the rest of the kind
       // "Bengal tiger" is no distractor for "Royal Bengal tiger": names that contain one another are out
       const norm = n => n.toLowerCase().replace(/[^a-z]/g, ''), me = norm(D.name), names = new Set();
-      const all = DATA.levels.map((_, j) => discLevelFor(j)).filter(x => { if (!x || x.kind !== D.kind) return false; const n = norm(x.name); if (n.includes(me) || me.includes(n) || names.has(n)) return false; names.add(n); return true; });
+      const all = DATA.levels.filter(x => { if (!x.disc || x.kind !== D.kind) return false; const n = norm(x.name); if (n.includes(me) || me.includes(n) || names.has(n)) return false; names.add(n); return true; });
       others = shuffle(all.filter(x => x.hex === D.hex)).slice(0, 1).concat(shuffle(all.filter(x => x.hex !== D.hex)));
-    } else { const pool = DATA.levels.filter(x => x !== L && x.cont === L.cont); others = shuffle((pool.length >= 2 ? pool : DATA.levels.filter(x => x !== L)).slice()); }
+    } else { const pool = DATA.canon.filter(x => x !== L && x.cont === L.cont); others = shuffle((pool.length >= 2 ? pool : DATA.canon.filter(x => x !== L)).slice()); }
     const options = shuffle([L, others[0], others[1]]);
     el.card.innerHTML = `<h3>Board cleared!</h3><p class="aa-card-lead">${D ? `Which ${KIND_WORD[D.kind]} did you just clear?` : 'Which country did you just clear?'}</p><div class="aa-quiz"></div>`;
     const box = $('.aa-quiz', el.card);
@@ -951,21 +924,18 @@
     const L = state.level, i = state.idx, D = state.disc, C = D ? D.country : L;
     const t = Math.round(state.elapsed), s = stars();
     const learn = learnFrom(true);
-    const prev = state.daily ? store.get(`daily:${state.daily.key}`) : D ? discCleared(i) : cleared(i);
+    const prev = state.daily ? store.get(`daily:${state.daily.key}`) : cleared(i);
     const isBest = !prev || t < prev.t;
     const rec = { t: isBest ? t : prev.t, stars: Math.max(s, prev?.stars || 0), quiz: !!(quizRight || prev?.quiz), tier: state.tier, arrows: state.pieces.length, at: Date.now() };
     if (state.daily) {
       store.set(`daily:${state.daily.key}`, rec);
       const ds = store.get('dailyStreak', { count: 0, last: '' });
       if (ds.last !== state.daily.key) { const y = new Date(); y.setDate(y.getDate() - 1); const yk = `${y.getFullYear()}-${String(y.getMonth() + 1).padStart(2, '0')}-${String(y.getDate()).padStart(2, '0')}`; store.set('dailyStreak', { count: ds.last === yk ? ds.count + 1 : 1, last: state.daily.key }); }
-    } else store.set(D ? discKey(i) : progressKey(i), rec);
+    } else store.set(progressKey(i), rec);
     const streak = store.get('streak', 0) + 1; store.set('streak', streak);
     const milestone = !state.daily && !D && (i + 1) % 10 === 0;
     const facts = D ? `${escapeHtml(C.name)}'s ${KIND_WORD[D.kind]} · <b>${escapeHtml(L.name)}</b>` : [L.cap ? `Capital: <b>${L.cap}</b>` : '', L.pop ? `Population: <b>${fmtPop(L.pop)}</b>` : '', L.sub ? `Region: <b>${L.sub}</b>` : ''].filter(Boolean).join(' · ');
-    // after a country comes its discovery board (if still open), after that the next country
-    const nextDisc = !state.daily && !D && discPending(i);
-    const last = !nextDisc && i >= DATA.levels.length - 1;
-    const nextName = nextDisc ? `${C.name}'s ${KIND_WORD[discLevelFor(i).kind]}` : `Level ${i + 2}`;
+    const last = i >= DATA.levels.length - 1;
     el.card.innerHTML = `
       <p class="aa-card-kicker">${milestone ? `Milestone · ${i + 1} countries` : streak >= 2 ? `${streak} in a row · ` : ''}${quizRight ? 'Correct!' : 'It was'}</p>
       <h3>${escapeHtml(L.name)}</h3>
@@ -973,9 +943,9 @@
       <div class="aa-stats"><span><b>${fmtTime(t, true)}</b>time</span><span><b>${state.livesMax - state.lives}</b>hearts lost</span><span><b>${state.hintsUsed}</b>hints</span><span><b>x${state.bestCombo}</b>best combo</span></div>
       <p class="aa-facts">${facts}</p>
       <p class="aa-best">${isBest ? (prev ? `New best time! Previous ${fmtTime(prev.t, true)}.` : 'First clear. That is your time to beat.') : `Your best: ${fmtTime(prev.t, true)}.`}</p>
-      ${last ? '' : adaptNote(learn, nextDisc ? `${C.name}'s ${KIND_WORD[discLevelFor(i).kind]} board` : nextName)}
+      ${last ? '' : adaptNote(learn, `Level ${i + 2}`)}
       <div class="aa-actions">
-        ${last || state.daily ? '' : `<button type="button" class="aa-btn aa-btn--primary" data-act="next">Next: ${escapeHtml(nextName)} · ${DIFF_OF(TIER_OF())}</button>`}
+        ${last || state.daily ? '' : `<button type="button" class="aa-btn aa-btn--primary" data-act="next">Next: Level ${i + 2} · ${DIFF_OF(TIER_OF())}</button>`}
         <button type="button" class="aa-btn" data-act="again">Play again</button>
         <button type="button" class="aa-btn" data-act="share">Share</button>
         <button type="button" class="aa-btn" data-act="levels">World Tour</button>
@@ -1010,10 +980,10 @@
   }
   el.card.addEventListener('click', e => {
     const act = e.target.closest('[data-act]')?.dataset.act; if (!act) return;
-    if (act === 'next') { if (!state.disc && !state.daily && discPending(state.idx)) startLevel(state.idx, false, null, -1, true); else startLevel(state.idx + 1); }
-    else if (act === 'again' || act === 'retry') startLevel(state.idx, false, state.daily, state.tier, !!state.disc);
-    else if (act === 'shuffle') startLevel(state.idx, true, state.daily, -1, !!state.disc);
-    else if (act === 'skip') { if (!state.disc) store.set(skipKey(state.idx + 1), true); startLevel(state.idx + 1); }
+    if (act === 'next') startLevel(state.idx + 1);
+    else if (act === 'again' || act === 'retry') startLevel(state.idx, false, state.daily, state.tier);
+    else if (act === 'shuffle') startLevel(state.idx, true, state.daily);
+    else if (act === 'skip') { store.set(skipKey(state.idx + 1), true); startLevel(state.idx + 1); }
     else if (act === 'levels') goToLevels();
     else if (act === 'share') share();
   });
@@ -1023,9 +993,9 @@
   }
   async function share() {
     const n = DATA.levels.length, done = DATA.levels.filter((_, i) => cleared(i)).length;
-    const D = state.disc, rec = state.daily ? store.get(`daily:${state.daily.key}`) : D ? discCleared(state.idx) : cleared(state.idx);
+    const D = state.disc, rec = state.daily ? store.get(`daily:${state.daily.key}`) : cleared(state.idx);
     const what = D ? `${D.country.name}'s ${KIND_WORD[D.kind]}, the ${state.level.name}` : state.level.name;
-    const text = `Arrow Atlas: I cleared ${what} (${state.daily ? 'daily board ' + state.daily.key : 'level ' + (state.idx + 1)}) in ${fmtTime(rec?.t ?? state.elapsed, true)} ${'★'.repeat(rec?.stars || stars())} and ${done}/${n} countries so far.\nYour turn: https://ariyankhan.com/arrow-atlas.html${state.daily ? '#daily' : '#level-' + (state.idx + 1) + (D ? '-' + KIND_WORD[D.kind] : '')}`;
+    const text = `Arrow Atlas: I cleared ${what} (${state.daily ? 'daily board ' + state.daily.key : 'level ' + (state.idx + 1)}) in ${fmtTime(rec?.t ?? state.elapsed, true)} ${'★'.repeat(rec?.stars || stars())} and ${done}/${n} countries so far.\nYour turn: https://ariyankhan.com/arrow-atlas.html${state.daily ? '#daily' : '#level-' + (state.idx + 1)}`;
     const flash = $('.aa-flash', el.card);
     try {
       if (navigator.share) { await navigator.share({ text }); return; }
@@ -1145,13 +1115,12 @@
   }
   // ── Wiring ──
   el.btnHint.addEventListener('click', hint);
-  el.play.addEventListener('click', () => { const s = nextStep(); startLevel(s.i, false, null, -1, s.disc); });
+  el.play.addEventListener('click', () => startLevel(+el.play.dataset.level || 0));
   // Sheets
   const openSheet = sh => { sh.hidden = false; document.body.style.overflow = 'hidden'; };
-  const closeSheets = () => { el.sheet.hidden = true; el.levelsSheet.hidden = true; if (el.discSheet) el.discSheet.hidden = true; document.body.style.overflow = ''; };
+  const closeSheets = () => { el.sheet.hidden = true; el.levelsSheet.hidden = true; document.body.style.overflow = ''; };
   el.settingsBtns.forEach(b => b.addEventListener('click', () => openSheet(el.sheet)));
   el.levelsBtn?.addEventListener('click', () => { closeSheets(); renderSelect(); openSheet(el.levelsSheet); });
-  el.discBtn?.addEventListener('click', async () => { closeSheets(); try { await loadDiscBoards(); } catch { toast('Could not load the discovery boards. Check your connection.', 'bad'); return; } renderDiscoveries(); openSheet(el.discSheet); });
   $$('[data-close-sheet]').forEach(b => b.addEventListener('click', closeSheets));
   $$('.aa-sheet').forEach(sh => sh.addEventListener('click', e => { if (e.target === sh) closeSheets(); }));
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSheets(); });
@@ -1217,7 +1186,7 @@
     el.accept.focus({ preventScroll: true });
   }
   {
-    const deep = /^#(level-\d+(-[a-z]+)?|daily)$/.test(location.hash);
+    const deep = /^#(level-\d+|daily)$/.test(location.hash);
     let seenThisSession = false;
     try { seenThisSession = sessionStorage.getItem('aa:splash') === '1'; sessionStorage.setItem('aa:splash', '1'); } catch { /* ignore */ }
     if (!store.get('welcomed')) showGate();
@@ -1229,8 +1198,8 @@
   loadData().then(() => {
     el.loading.hidden = true;
     renderSelect();
-    const m = /^#level-(\d+)(?:-(animal|bird|place))?$/.exec(location.hash);
-    if (m) startLevel(+m[1] - 1, false, null, -1, !!m[2]);
+    const m = /^#level-(\d+)$/.exec(location.hash);
+    if (m) startLevel(+m[1] - 1);
     else if (location.hash === '#daily') { const d = dailyPick(); startLevel(d.idx, false, d); }
   }).catch(err => { el.loading.hidden = true; el.error.textContent = `Could not load the levels (${err.message}). Check your connection and reload.`; el.error.hidden = false; });
 
