@@ -34,7 +34,8 @@
   const HINT_PENALTY_MS = 5000;
   const HINTS_PER_LEVEL = 3;       // Classic and Rush; Deep Focus is unlimited
   const MODES = { classic: 'Classic' };  // one way to play: the tour ramps up, and the player's own form shifts it
-  const livesFor = () => LIVES;
+  const LIVES_OF = [4, 4, 4, 4, 3];   // hearts per tier: Master boards, as the reference apps' hard levels, give three
+  const livesFor = tier => LIVES_OF[tier] ?? LIVES;
   // ── Adaptive difficulty ──
   // Difficulty follows the player, never the level number. One tier (0 Easy … 4 Master) lives on the device and
   // moves on form alone. A cleared board earns points towards the next step: a flawless, fast first-try clear (no
@@ -53,7 +54,7 @@
   };
   const formNow = () => ({ ...FORM0, ...(store.get('form', null) || {}) });
   const TIER_OF = () => clampTier(formNow().tier);
-  const MAXLEN_OF = [7, 9, 11, 13, 15];  // longest body per tier: long snakes, as on the reference boards, free arrows far from where the player tapped
+  const MAXLEN_OF = [7, 9, 11, 12, 10];  // longest body per tier: long snakes, as on the reference boards; Master a little shorter so it packs more arrows
   // How narrow the play is per tier (see generate()): narrow = prefer the end whose run holds more pieces (blocked
   // longer), far = prefer the end with a gap right ahead (the arrow it frees when it goes is that far away), rail =
   // straighter, longer snakes, holes/lane = share and length of the lanes carved out first.
@@ -62,7 +63,10 @@
   const RAIL_OF = [0.1, 0.15, 0.2, 0.25, 0.3];     // share of pieces that run long and straight across the board
   const HOLE_OF = [0.1, 0.15, 0.2, 0.22, 0.25];    // share of inland cells carved out as lanes: the cleared arrow frees one far away, across the lane
   const LANE_OF = [1, 2, 3, 3, 4];                 // longest lane (empty cells between an arrow and its blocker)
-  const GEN_OPTS = tier => ({ narrow: NARROW_OF[tier], far: FAR_OF[tier], rail: RAIL_OF[tier], holes: HOLE_OF[tier], lane: LANE_OF[tier] });
+  // Tightening iterations per tier (see generate stage 3): a local search that turns arrows to face a blocker so a
+  // simulated player has fewer free arrows to pick from at any moment. Hard and up.
+  const TIGHTEN_OF = [0, 0, 250, 350, 400];
+  const GEN_OPTS = tier => ({ narrow: NARROW_OF[tier], far: FAR_OF[tier], rail: RAIL_OF[tier], holes: HOLE_OF[tier], lane: LANE_OF[tier], tighten: TIGHTEN_OF[tier] });
   const DIRS = { r: [0, 1], l: [0, -1], d: [1, 0], u: [-1, 0] };
   const PALETTE = ['#FFED54', '#5CD6FF', '#8CFF7A', '#FF9AD5', '#C79BFF', '#FFB347', '#6EE7B7', '#FDBA74', '#F97373', '#38BDF8'];
 
@@ -336,7 +340,7 @@
   //    the game prefers, per tier, one that points at pieces (`narrow`: it is then blocked until they go), across
   //    a gap (`far`: the arrow it frees when it goes is that far away), and with more pieces on its run. A snake
   //    with no legal end is split in two and tried again; a lone inland cell that fits nowhere becomes a gap.
-  function generate(mask, maxLen, seed, { far = 0.5, hug = 0.6, narrow = 0.8, rail = 0.2, holes = 0.2, lane = 3 } = {}) {
+  function generate(mask, maxLen, seed, { far = 0.5, hug = 0.6, narrow = 0.8, rail = 0.2, holes = 0.2, lane = 3, tighten = 0 } = {}) {
     const H = mask.rows.length, W = mask.rows[0].length;
     const land = mask.rows.map(r => r.split('').map(ch => ch === '1'));
     const shape = land.map(r => r.slice());   // the country itself; `land` loses the gaps
@@ -466,6 +470,54 @@
         if (!coast.has(y * W + x)) { land[y][x] = false; occ[y][x] = -1; paths[i] = []; refresh([[y, x]]); continue; }
         failed = true; break;
       }
+      if (!failed && tighten > 0) {
+        // ── 3. tightening ──
+        // Local search over head ends. Flip one arrow to its other end (and, when that would close a cycle, also
+        // one arrow on its new run) whenever a simulated player who always takes the nearest free arrow then sees
+        // fewer free arrows on average and at the start. The graph stays acyclic, so every board stays solvable.
+        const alive = pieces.filter(Boolean); const N = alive.length; const at = new Map(alive.map((p, k) => [p.idx, k]));
+        const endsOf = p => { const c = p.cells; if (c.length === 1) return dirKeys.map(d => ({ cells: c, dir: d })); const r = c.slice().reverse(); return [{ cells: c, dir: dirKeys.find(k => c[1][0] + DIRS[k][0] === c[0][0] && c[1][1] + DIRS[k][1] === c[0][1]) }, { cells: r, dir: dirKeys.find(k => r[1][0] + DIRS[k][0] === r[0][0] && r[1][1] + DIRS[k][1] === r[0][1]) }].filter(e => e.dir && !onOwnRun(e.cells, e.dir)); };
+        const ends = alive.map(endsOf);
+        const rayOf = e => { const [dr, dc] = DIRS[e.dir]; let [y, x] = e.cells[0]; y += dr; x += dc; const S = []; while (inb(y, x)) { const i = occ[y][x]; if (i >= 0 && at.has(i) && !S.includes(at.get(i))) S.push(at.get(i)); y += dr; x += dc; } return S; };
+        const rays = ends.map(es => es.map(rayOf));   // alive indices on each run: they block that end
+        const cur = alive.map((p, k) => ends[k].findIndex(e => e.dir === p.dir && e.cells[0][0] === p.cells[0][0] && e.cells[0][1] === p.cells[0][1]));
+        if (cur.every(k => k >= 0)) {
+          const bl = Array.from({ length: N }, () => new Set());
+          for (let k = 0; k < N; k++) for (const a of rays[k][cur[k]]) bl[a].add(k);
+          const reaches = (from, targets) => { const seen = new Uint8Array(N); const stack = [from]; seen[from] = 1; while (stack.length) { const a = stack.pop(); for (const c of bl[a]) { if (targets.includes(c)) return true; if (!seen[c]) { seen[c] = 1; stack.push(c); } } } return false; };
+          const acyclic = () => { const indeg = new Int32Array(N); for (let k = 0; k < N; k++) indeg[k] = rays[k][cur[k]].length; const q = []; for (let k = 0; k < N; k++) if (!indeg[k]) q.push(k); let n = 0; while (q.length) { const a = q.pop(); n++; for (const c of bl[a]) if (--indeg[c] === 0) q.push(c); } return n === N; };
+          const setEnd = (k, e) => { for (const a of rays[k][cur[k]]) bl[a].delete(k); cur[k] = e; for (const a of rays[k][e]) bl[a].add(k); };
+          const width = () => {
+            const gone = new Uint8Array(N); let left = N, sum = 0, start = 0, last = null;
+            while (left) {
+              let pick = -1, best = Infinity, cnt = 0;
+              for (let k = 0; k < N; k++) { if (gone[k]) continue; let free = true; for (const a of rays[k][cur[k]]) if (!gone[a]) { free = false; break; } if (!free) continue; cnt++; const h = ends[k][cur[k]].cells[0]; const d = last ? Math.abs(h[0] - last[0]) + Math.abs(h[1] - last[1]) : 0; if (d < best) { best = d; pick = k; } }
+              if (pick < 0) return Infinity;
+              if (left === N) start = cnt; sum += cnt; gone[pick] = 1; left--; last = ends[pick][cur[pick]].cells[0];
+            }
+            return sum / N + 0.3 * start;
+          };
+          let score = width();
+          for (let it = 0; it < tighten; it++) {
+            const k = Math.floor(rnd() * N); if (ends[k].length < 2) continue;
+            const e = (cur[k] + 1 + Math.floor(rnd() * (ends[k].length - 1))) % ends[k].length;
+            const R = rays[k][e], changed = [[k, cur[k]]];
+            setEnd(k, e);
+            if (R.length && reaches(k, R)) {
+              const qs = R.filter(q => ends[q].length > 1 && reaches(k, [q]));
+              if (!qs.length) { setEnd(k, changed[0][1]); continue; }
+              const q = qs[Math.floor(rnd() * qs.length)]; const eq = (cur[q] + 1 + Math.floor(rnd() * (ends[q].length - 1))) % ends[q].length;
+              changed.push([q, cur[q]]); setEnd(q, eq);
+              if (!acyclic()) { for (const [j, kk] of changed.reverse()) setEnd(j, kk); continue; }
+            }
+            const sc = width();
+            if (sc <= score) score = sc; else for (const [j, kk] of changed.reverse()) setEnd(j, kk);
+          }
+          alive.forEach((p, k) => { p.cells = ends[k][cur[k]].cells; p.dir = ends[k][cur[k]].dir; });
+          blocks.clear();
+          for (let k = 0; k < N; k++) for (const a of rays[k][cur[k]]) { const ai = alive[a].idx; if (!blocks.has(ai)) blocks.set(ai, new Set()); blocks.get(ai).add(alive[k].idx); }
+        }
+      }
       if (!failed) {
         // ords from a topological order: pieces with nothing on their run go first (largest ord)
         const alive = pieces.filter(Boolean); const N = alive.length;
@@ -485,7 +537,7 @@
 
   // Generate a few candidate boards from the seed and keep the narrowest (fewest arrows free at the start), so the
   // difficulty a tier promises does not depend on the luck of one seed. Candidates per tier: CANDIDATES_OF.
-  const CANDIDATES_OF = [4, 6, 8, 8, 8];
+  const CANDIDATES_OF = [4, 6, 8, 8, 6];
   function freeAtStart(b) { const { W, H, occ } = b; return b.pieces.filter(p => { const [dr, dc] = DIRS[p.dir]; let [y, x] = p.cells[0]; y += dr; x += dc; while (y >= 0 && y < H && x >= 0 && x < W) { if (occ[y][x] >= 0) return false; y += dr; x += dc; } return true; }).length; }
   // Lower is better. A quick simulated player who always takes the free arrow nearest the one just tapped (the
   // way people actually play) measures how many arrows are free at any moment and how often the arrow freed by
@@ -601,7 +653,7 @@
     await new Promise(r => setTimeout(r, 20));   // let the game screen paint before the (up to ~1 s on phones) generation
     state.maskInfo = maskFor(state.level, state.tier);
     const gen = bestBoard(state.maskInfo, state.tier, (daily ? daily.seed : (i + 1) * 1000) + state.seedBump);
-    const livesMax = livesFor(state.mode);
+    const livesMax = livesFor(state.tier);
     Object.assign(state, { W: gen.W, H: gen.H, pieces: gen.pieces, occ: gen.occ, land: gen.land, left: gen.pieces.length, lives: livesMax, livesMax, elapsed: 0, startedAt: 0, finished: false, hintsUsed: 0, wrong: 0, busy: false, combo: 0, bestCombo: 0, lastShot: 0, cheerHold: 0, shown: new Set(), armed: new Set() });
     el.error.hidden = true; el.loading.hidden = true;
     if (daily) { if (history.replaceState) history.replaceState(null, '', location.pathname + location.search + '#daily'); } else setHash(i);
@@ -819,7 +871,7 @@
       <p class="aa-card-kicker">${milestone ? `Milestone · ${i + 1} countries` : streak >= 2 ? `${streak} in a row · ` : ''}${quizRight ? 'Correct!' : 'It was'}</p>
       <h3>${L.name}</h3>
       <p class="aa-stars" aria-label="${s} of 3 stars">${'★'.repeat(s)}${'☆'.repeat(3 - s)}</p>
-      <div class="aa-stats"><span><b>${fmtTime(t, true)}</b>time</span><span><b>${LIVES - state.lives}</b>hearts lost</span><span><b>${state.hintsUsed}</b>hints</span><span><b>x${state.bestCombo}</b>best combo</span></div>
+      <div class="aa-stats"><span><b>${fmtTime(t, true)}</b>time</span><span><b>${state.livesMax - state.lives}</b>hearts lost</span><span><b>${state.hintsUsed}</b>hints</span><span><b>x${state.bestCombo}</b>best combo</span></div>
       <p class="aa-facts">${facts}</p>
       <p class="aa-best">${isBest ? (prev ? `New best time! Previous ${fmtTime(prev.t, true)}.` : 'First clear. That is your time to beat.') : `Your best: ${fmtTime(prev.t, true)}.`}</p>
       ${last ? '' : adaptNote(learn, i + 1)}

@@ -470,7 +470,7 @@ G6, low-passed, delayed, ~0.11 gain) — no audio file, no licence, works
 offline; it starts on the first tap and stops when the tab is hidden. This is the
 same shell we will wrap for Android/iOS (TWA / Capacitor). Each level is a
 country's outline filled with arrows; tap an arrow to shoot it off the board if its
-run to the edge is clear, a blocked tap costs one of 4 hearts, no clock (time is still recorded for the result card), 4 hearts and 3 hints per
+run to the edge is clear, a blocked tap costs one heart, no clock (time is still recorded for the result card), 4 hearts (3 on Master, `LIVES_OF`) and 3 hints per
 level, difficulty that follows the player and never the level number (one
 tier 0 Easy / 1 Normal / 2 Hard / 3 Expert / 4 Master lives in `aa:v1:form` as
 `{tier, wins, losses}`; `nextForm` moves it on form alone: a cleared board earns
@@ -558,6 +558,13 @@ unlock (skip allowed after two fails), stars, best times and progress in
 - **No zoom**: the viewport meta sets `maximum-scale=1, user-scalable=no` and
   `html, body, .aa-app` carry `touch-action: manipulation`, so fast double taps
   and stray pinches can no longer zoom the page and push the board off screen.
+- **Tightening** (generate stage 3, Hard and up, `TIGHTEN_OF` iterations): a local
+  search over head ends after signposting. Flip one arrow to its other end, or,
+  when that closes a cycle, also one arrow on its new run, and keep the flip when
+  a simulated nearest-free player then sees fewer free arrows (mean over the game
+  plus 0.3 × free at the start). Acyclicity is re-checked (Kahn), so boards stay
+  solvable. Master snakes are capped at 10 cells (`MAXLEN_OF`) to pack ~90
+  arrows. Measured on Master: free at any moment 5.0 → 4.1, free at start 11 → 10.
 - **Armed arrows and lane preview** (as in the reference apps): a blocked tap
   costs a heart once and leaves the arrow *armed* (it just turns red);
   after every shot `releaseArmed()` fires any armed arrow whose lane is now clear
