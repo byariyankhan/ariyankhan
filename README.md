@@ -620,6 +620,21 @@ unlock (skip allowed after two fails), stars, best times and progress in
   discovery) is next and is the only level picker: the All levels sheet, the
   Discoveries collection and the "You discovered" facts list are all gone. The
   tour unlocks itself from the player's play and location.
+- **Play with friends** (`playRace`, `raceCode`/`raceParse`, `#vs=<code>`): a board
+  comes from a seed, so two phones can play the identical board with no server at
+  all. The lobby's second button opens a sheet with three rows: **Challenge a
+  friend** works today, the two live rows (a room of up to seven, and online
+  matchmaking) are marked "Soon" because they need a server and a sign-in.
+  A challenge plays like the daily board (`state.daily` with `race: true`): fixed
+  tier, fixed seed, no quiz, nothing saved, the difficulty ladder untouched, and
+  no reshuffle button, since a race is that exact board and no other. The link is
+  base64url of `1~<gen>~<board id>~<tier>~<seed>~<ms>~<stars>~<name>`; it always
+  carries the time the other side must beat, so the same button sends a challenge
+  and a rematch. `GEN_VERSION` must be bumped whenever `generate()` changes,
+  otherwise old links would build a different board; a mismatch warns the player.
+  The name is local-only and goes nowhere but into the link the player sends
+  (privacy policy section 2). Tested end to end in `aa-friends.mjs`: two browser
+  profiles with different home countries get a byte-identical board.
 - **Home country first** (`homeCountry`, `orderFor`): `games/geo.php` passes on
   Cloudflare's `CF-IPCountry` (nothing stored); the browser language region is
   the fallback. The tour order is the player's country, then every other country
