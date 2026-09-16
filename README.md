@@ -574,6 +574,12 @@ unlock (skip allowed after two fails), stars, best times and progress in
   lowering their number: the dependency graph needs one source per coast chain.
   Hiding the exits therefore needs a signposting redesign that chooses the
   sources deliberately (corridor exits only, coast closed), not more tuning.
+- **Discoveries** (`games/data/discover.json`, `discoverHtml`, `renderDiscoveries`):
+  what a traveller finds in each country: its animal, its bird, a place worth the
+  trip and a dish, four short strings per ISO code, hand-written for all 197.
+  The result card shows the four finds under the facts; Settings → Discoveries
+  lists everything found so far, newest first. Loaded in the background after
+  the level data.
 - **Home country first** (`homeCountry`, `orderFor`): `games/geo.php` passes on
   Cloudflare's `CF-IPCountry` (nothing stored); the browser language region is
   the fallback. The tour order is the player's country, then every other country

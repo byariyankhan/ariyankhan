@@ -63,7 +63,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="css/arrow-atlas.css?v=30" />
+    <link rel="stylesheet" href="css/arrow-atlas.css?v=31" />
     <link rel="preload" href="games/data/arrow-atlas.json?v=11" as="fetch" crossorigin="anonymous" />
 
     <!-- SCHEMA -->
@@ -110,7 +110,7 @@
             "197 country boards on a world tour: every country in the world, from Italy and Bangladesh to Luxembourg and Vanuatu",
             "Tap-away mechanic: shoot arrows off the board when their path is clear",
             "4 hearts per level; a blocked arrow costs one",
-                        "Difficulty that follows you, not the level number: Easy, Normal, Hard, Expert and Master boards from about 20 arrows to 80 and more; a flawless, fast clear steps the boards up at once, two first-try clears in a row step them up too, two losses in a row ease them off; milestones every 10 levels; win streaks; combo counter; daily bonus board",
+                        "Every cleared country hands you four finds (its animal, bird, a place and a dish). Difficulty that follows you, not the level number: Easy, Normal, Hard, Expert and Master boards from about 20 arrows to 80 and more; a flawless, fast clear steps the boards up at once, two first-try clears in a row step them up too, two losses in a row ease them off; milestones every 10 levels; win streaks; combo counter; daily bonus board",
             "Board clears reveal the country shape; a 3-option quiz asks which country it was",
             "Country facts on every clear: capital, population, region",
             "Stars, best times and tour progress saved in your browser",
@@ -387,6 +387,13 @@
       <p class="aa-seo-cta"><a class="aa-btn aa-btn--primary" href="#top">Play Arrow Atlas</a></p>
     </section>
     <!-- ── LEVELS SHEET ── -->
+    <div class="aa-sheet" id="aaDiscSheet" hidden>
+      <div class="aa-sheet-panel" role="dialog" aria-label="Discoveries">
+        <div class="aa-sheet-head"><h2>Discoveries</h2><button type="button" class="aa-icon" data-close-sheet aria-label="Close">✕</button></div>
+        <p class="aa-sheet-note">Every country you clear hands you four finds: its animal, its bird, a place worth the trip and a dish to try.</p>
+        <div class="aa-disc-list" id="aaDiscList"></div>
+      </div>
+    </div>
     <div class="aa-sheet" id="aaLevelsSheet" hidden>
       <div class="aa-sheet-panel" role="dialog" aria-label="World Tour levels">
         <div class="aa-sheet-head"><h2>World Tour</h2><button type="button" class="aa-icon" data-close-sheet aria-label="Close">✕</button></div>
@@ -410,6 +417,7 @@
         </div>
         <div class="aa-group">
           <button type="button" class="aa-row aa-row--link" id="aaLevelsBtn"><span class="aa-row-ico">🌍</span><span class="aa-row-label">All levels<small id="aaProgress">0/197 cleared</small></span><span class="aa-row-chev">›</span></button>
+          <button type="button" class="aa-row aa-row--link" id="aaDiscBtn"><span class="aa-row-ico">🧭</span><span class="aa-row-label">Discoveries<small id="aaDiscCount">Animals, birds, places and dishes you found</small></span><span class="aa-row-chev">›</span></button>
           <button type="button" class="aa-row aa-row--link" id="aaDailyRow"><span class="aa-row-ico">📅</span><span class="aa-row-label">Today's Country<small id="aaDaily">Mystery</small></span><span class="aa-row-chev">›</span></button>
           <button type="button" class="aa-row aa-row--link" id="aaHowTo"><span class="aa-row-ico">❓</span><span class="aa-row-label">How to play</span><span class="aa-row-chev">›</span></button>
           <a class="aa-row aa-row--link" href="/#contact"><span class="aa-row-ico">💬</span><span class="aa-row-label">Feedback</span><span class="aa-row-chev">›</span></a>
@@ -429,6 +437,6 @@
       </div>
     </div>
 
-    <script src="js/arrow-atlas.js?v=42"></script>
+    <script src="js/arrow-atlas.js?v=43"></script>
   </body>
 </html>

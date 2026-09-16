@@ -212,6 +212,17 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-stats b{ font-size:20px; font-weight:900; color:var(--ink); letter-spacing:0; text-transform:none; margin-bottom:2px; font-variant-numeric:tabular-nums; }
 .aa-facts{ font-size:14px; color:var(--muted); margin:0 0 6px; line-height:1.6; }
 .aa-facts b{ color:var(--ink); }
+/* discoveries: four finds per cleared country */
+.aa-discover{ margin:4px 0 10px; }
+.aa-disc-lead{ font-size:12px; letter-spacing:1.5px; text-transform:uppercase; font-weight:900; color:var(--accent); margin:0 0 6px; }
+.aa-disc-chips{ display:grid; grid-template-columns:1fr 1fr; gap:6px; text-align:left; }
+.aa-disc-chip{ display:flex; gap:8px; align-items:center; background:var(--bg2); border-radius:12px; padding:8px 10px; min-height:44px; }
+.aa-disc-ico{ font-size:20px; line-height:1; flex:0 0 auto; }
+.aa-disc-text{ font-size:13px; font-weight:800; color:var(--ink); line-height:1.25; }
+.aa-disc-text small{ display:block; font-size:10px; letter-spacing:1px; text-transform:uppercase; font-weight:800; color:var(--muted); }
+.aa-disc-list{ display:flex; flex-direction:column; gap:14px; }
+.aa-disc-country h3{ font-size:16px; margin:0 0 6px; }
+@media (max-width:360px){ .aa-disc-chips{ grid-template-columns:1fr; } }
 .aa-best{ font-size:14px; color:var(--muted); margin:0 0 14px; }
 .aa-adapt{ font-size:13px; font-weight:800; color:var(--muted); margin:-6px 0 14px; }
 .aa-adapt--up{ color:var(--hard); }

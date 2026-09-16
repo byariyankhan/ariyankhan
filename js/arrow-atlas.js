@@ -16,6 +16,7 @@
   const SVG_NS = 'http://www.w3.org/2000/svg';
   const DATA_VERSION = '11';
   const MAP_VERSION = '3';
+  const DISC_VERSION = '1';   // games/data/discover.json: what a traveller finds in each country (animal, bird, place, dish)
   const STORE = 'aa:v1:';
   const store = {
     get(k, fb) { try { const v = localStorage.getItem(STORE + k); return v == null ? fb : JSON.parse(v); } catch { return fb; } },
@@ -74,7 +75,7 @@
 
   const el = {
     select: $('#aaSelect'), tagline: $('#aaTagline'), dailyRow: $('#aaDailyRow'), homeSel: $('#aaHome'), levels: $('#aaLevels'), progress: $('#aaProgress'), streak: $('#aaStreak'), daily: $('#aaDaily'), hudDiff: $('#aaHudDiff'), play: $('#aaPlay'), path: $('#aaPath'), btnVibe: $('#aaVibe'), btnGuides: $('#aaGuides'), btnMusic: $('#aaMusic'), howTo: $('#aaHowTo'),
-    sheet: $('#aaSheet'), levelsSheet: $('#aaLevelsSheet'), levelsBtn: $('#aaLevelsBtn'), settingsBtns: $$('#aaSettings, #aaSettingsG'), themeBtn: $('#aaTheme'), themes: $('#aaThemes'),
+    sheet: $('#aaSheet'), levelsSheet: $('#aaLevelsSheet'), discSheet: $('#aaDiscSheet'), discList: $('#aaDiscList'), discBtn: $('#aaDiscBtn'), discCount: $('#aaDiscCount'), levelsBtn: $('#aaLevelsBtn'), settingsBtns: $$('#aaSettings, #aaSettingsG'), themeBtn: $('#aaTheme'), themes: $('#aaThemes'),
     game: $('#aaGame'), boardWrap: $('#aaBoardWrap'), board: $('#aaBoard'), toast: $('#aaToast'), confetti: $('#aaConfetti'),
     hudLevel: $('#aaHudLevel'), hudMode: $('#aaHudMode'), hudTime: $('#aaHudTime'), hudLeft: $('#aaHudLeft'), hudLives: $('#aaHudLives'), hudLivesWrap: $('#aaHudLivesWrap'), hudPct: $('#aaHudPct'), boardBar: $('#aaBoardBar'),
     btnHint: $('#aaHint'), btnLevels: $('#aaBackToLevels'), btnSound: $('#aaSound'),
@@ -190,6 +191,7 @@
     migrateProgress(d);
     d.levels = orderFor(d, await homeCountry(d));
     DATA = d;
+    loadDiscover().catch(() => {});   // finds arrive in the background; the result card shows them when they are here
     return DATA;
   }
   // Progress used to be keyed by level number; it is keyed by country id now (the order is personal). One-off copy.
@@ -352,6 +354,26 @@
     return { k, x: c0, y: r0, rows, count: rows.join('').split('1').length - 1, w: rows[0].length, h: rows.length };
   }
   const maskCache = new Map();
+  // ── Discoveries: every cleared country hands the traveller four finds ──
+  let DISC = null, discPromise = null;
+  function loadDiscover() {
+    if (!discPromise) discPromise = fetch(`games/data/discover.json?v=${DISC_VERSION}`, { cache: 'force-cache' }).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }).then(d => { DISC = d; return d; });
+    return discPromise;
+  }
+  const DISC_KINDS = [['a', '🐾', 'Animal'], ['b', '🐦', 'Bird'], ['p', '🏛️', 'Place'], ['f', '🍽️', 'Dish']];
+  const escapeHtml = str => String(str).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[ch]);
+  function discoverHtml(L, lead = true) {
+    const d = DISC?.items?.[L.a2]; if (!d) return '';
+    const chips = DISC_KINDS.filter(([k]) => d[k]).map(([k, ico, label]) => `<span class="aa-disc-chip"><span class="aa-disc-ico" aria-hidden="true">${ico}</span><span class="aa-disc-text"><small>${label}</small>${escapeHtml(d[k])}</span></span>`).join('');
+    return `<div class="aa-discover">${lead ? '<p class="aa-disc-lead">You discovered</p>' : ''}<div class="aa-disc-chips">${chips}</div></div>`;
+  }
+  // Settings → Discoveries: everything found so far, newest first
+  function renderDiscoveries() {
+    if (!el.discList || !DATA) return;
+    const found = DATA.levels.map((L, i) => ({ L, rec: cleared(i) })).filter(x => x.rec).sort((x, y) => (y.rec.at || 0) - (x.rec.at || 0));
+    if (el.discCount) el.discCount.textContent = `${found.length * 4} finds in ${found.length} ${found.length === 1 ? 'country' : 'countries'}`;
+    el.discList.innerHTML = found.length ? found.map(({ L }) => `<section class="aa-disc-country"><h3>${escapeHtml(L.name)}</h3>${discoverHtml(L, false)}</section>`).join('') : '<p class="aa-sheet-note">Clear a country and its finds show up here.</p>';
+  }
   const maskFor = (L, tier) => { const key = L.id + ':' + tier; if (!maskCache.has(key)) maskCache.set(key, rasterise(L.d, L.k[tier])); return maskCache.get(key); };
 
   // ── Puzzle generation ──
@@ -901,6 +923,7 @@
       <p class="aa-stars" aria-label="${s} of 3 stars">${'★'.repeat(s)}${'☆'.repeat(3 - s)}</p>
       <div class="aa-stats"><span><b>${fmtTime(t, true)}</b>time</span><span><b>${state.livesMax - state.lives}</b>hearts lost</span><span><b>${state.hintsUsed}</b>hints</span><span><b>x${state.bestCombo}</b>best combo</span></div>
       <p class="aa-facts">${facts}</p>
+      ${state.daily ? '' : discoverHtml(L)}
       <p class="aa-best">${isBest ? (prev ? `New best time! Previous ${fmtTime(prev.t, true)}.` : 'First clear. That is your time to beat.') : `Your best: ${fmtTime(prev.t, true)}.`}</p>
       ${last ? '' : adaptNote(learn, i + 1)}
       <div class="aa-actions">
@@ -1076,9 +1099,10 @@
   el.play.addEventListener('click', () => startLevel(+el.play.dataset.level || 0));
   // Sheets
   const openSheet = sh => { sh.hidden = false; document.body.style.overflow = 'hidden'; };
-  const closeSheets = () => { el.sheet.hidden = true; el.levelsSheet.hidden = true; document.body.style.overflow = ''; };
+  const closeSheets = () => { el.sheet.hidden = true; el.levelsSheet.hidden = true; if (el.discSheet) el.discSheet.hidden = true; document.body.style.overflow = ''; };
   el.settingsBtns.forEach(b => b.addEventListener('click', () => openSheet(el.sheet)));
   el.levelsBtn?.addEventListener('click', () => { closeSheets(); renderSelect(); openSheet(el.levelsSheet); });
+  el.discBtn?.addEventListener('click', async () => { closeSheets(); try { await loadDiscover(); } catch { toast('Could not load the discoveries. Check your connection.', 'bad'); return; } renderDiscoveries(); openSheet(el.discSheet); });
   $$('[data-close-sheet]').forEach(b => b.addEventListener('click', closeSheets));
   $$('.aa-sheet').forEach(sh => sh.addEventListener('click', e => { if (e.target === sh) closeSheets(); }));
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSheets(); });
