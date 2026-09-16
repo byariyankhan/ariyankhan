@@ -40,11 +40,12 @@ function aa_match_view(PDO $db, array $m, ?array $me): array {
         $out += ['board' => $m['board'], 'tier' => (int)$m['tier'], 'seed' => (int)$m['seed']];
         foreach ($players as $p) if (!empty($p['you'])) { $out['your_ms'] = $p['ms']; break; }
     }
-    if ($m['state'] === 'done') {
-        $out['winner'] = $m['winner_id'] === null ? '' : aa_player_name($db, (int)$m['winner_id']);
-        $out['you_won'] = $mine && $m['winner_id'] !== null && (int)$m['winner_id'] === $me['id'];
-        $out['draw'] = $m['winner_id'] === null;
+    // the pot is paid the instant somebody clears it, so the winner is named long before the match closes
+    if ($m['winner_id'] !== null) {
+        $out['winner'] = aa_player_name($db, (int)$m['winner_id']);
+        $out['you_won'] = $mine && (int)$m['winner_id'] === $me['id'];
     }
+    if ($m['state'] === 'done') $out['draw'] = $m['winner_id'] === null;
     return $out;
 }
 

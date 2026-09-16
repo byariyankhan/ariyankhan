@@ -248,6 +248,7 @@ function aa_match_players(PDO $db, array $m, ?array $me): array {
             'race_ms' => $done !== null && $ms !== null && $ms > 0 && $m['started'] ? max(0, $done - (int)$m['started'] * 1000) : null,
             'you' => $me !== null && (int)$p['user_id'] === $me['id'],
             'host' => (int)$p['user_id'] === (int)$m['host_id'],
+            'won' => $m['winner_id'] !== null && (int)$p['user_id'] === (int)$m['winner_id'],
         ];
         $rows[count($rows) - 1]['_done'] = $done;
     }
@@ -288,28 +289,35 @@ function aa_match_row_raw(PDO $db, string $code): ?array {
     return $st->fetch() ?: null;
 }
 
-// Every run is in, so pay out: the first player to have cleared the board takes the whole pot; if nobody cleared
-// it, every stake goes back.
+// The first player to clear the board takes the whole pot the moment their result lands: nobody waits on the
+// rest. The others play on for second, third, fourth place — the places are still theirs to win, the gold is
+// not. The match itself only closes once everyone has reported, and if not one of them cleared it every stake
+// goes back.
 function aa_settle_match(PDO $db, array $m): array {
     $room = aa_room($db, $m['code']);
     if (!$room) return $m;
-    foreach ($room as $p) if ($p['ms'] === null) return $m;
-    $winner = null; $best = null;
+    $first = null; $best = null; $everyoneIn = true;
     foreach ($room as $p) {
+        if ($p['ms'] === null) { $everyoneIn = false; continue; }
         if ((int)$p['ms'] <= 0) continue;
-        if ($best === null || (int)$p['done'] < $best) { $best = (int)$p['done']; $winner = (int)$p['user_id']; }
+        if ($best === null || (int)$p['done'] < $best) { $best = (int)$p['done']; $first = (int)$p['user_id']; }
     }
     $stake = (int)$m['stake'];
-    $db->beginTransaction();
-    $upd = $db->prepare("UPDATE matches SET state = 'done', winner_id = ?, settled = ? WHERE code = ? AND state = 'playing'");
-    $upd->execute([$winner, time(), $m['code']]);
-    if ($upd->rowCount() === 1) {
-        if ($winner !== null) aa_give_gold($db, $winner, $stake * count($room));
-        else foreach ($room as $p) aa_give_gold($db, (int)$p['user_id'], $stake);
+    if ($m['winner_id'] === null && $first !== null) {
+        $db->beginTransaction();
+        $upd = $db->prepare("UPDATE matches SET winner_id = ?, settled = ? WHERE code = ? AND state = 'playing' AND winner_id IS NULL");
+        $upd->execute([$first, time(), $m['code']]);
+        if ($upd->rowCount() === 1) aa_give_gold($db, $first, $stake * count($room));
+        $db->commit();
+        $m['winner_id'] = aa_match_row_raw($db, $m['code'])['winner_id'] ?? null;   // whoever won the race to the row
     }
+    if (!$everyoneIn) return $m;                       // the rest are still on the board, playing for their place
+    $db->beginTransaction();
+    $upd = $db->prepare("UPDATE matches SET state = 'done', settled = ? WHERE code = ? AND state = 'playing'");
+    $upd->execute([time(), $m['code']]);
+    if ($upd->rowCount() === 1 && $m['winner_id'] === null) foreach ($room as $p) aa_give_gold($db, (int)$p['user_id'], $stake);
     $db->commit();
     $m['state'] = 'done';
-    $m['winner_id'] = $winner;
     return $m;
 }
 

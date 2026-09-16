@@ -90,7 +90,7 @@
   const state = {
     mode: 'classic', muted: !!store.get('muted', false), music: store.get('music', true) !== false, vibe: store.get('vibe', true) !== false, guides: !!store.get('guides', false),
     idx: -1, level: null, tier: 0, mask: null, pieces: [], occ: null, W: 0, H: 0, left: 0,
-    lives: LIVES, livesMax: LIVES, startedAt: 0, elapsed: 0, timerId: 0, finished: false, hintsUsed: 0, wrong: 0, fails: 0, seedBump: 0, busy: false,
+    lives: LIVES, livesMax: LIVES, startedAt: 0, elapsed: 0, timerId: 0, finished: false, hintsUsed: 0, wrong: 0, fails: 0, seedBump: 0, busy: false, potGone: false,
     combo: 0, bestCombo: 0, lastShot: 0, cheerHold: 0, shown: new Set(), daily: null,
   };
 
@@ -182,7 +182,7 @@
     music.on = false; clearTimeout(music.timer);
     try { const t = music.ctx.currentTime; music.master.gain.setValueAtTime(music.master.gain.value, t); music.master.gain.exponentialRampToValueAtTime(0.0001, t + 1.5); setTimeout(() => { try { music.master.disconnect(); music.lfo.stop(); } catch { /* ignore */ } }, 1700); } catch { /* ignore */ }
   }
-  const SFX = { shoot: () => beep([[880, 0, 0.07], [1320, 0.04, 0.08]]), cheer: lv => { const f = 587 * Math.pow(2, lv * 3 / 12); beep([[f, 0, 0.09], [f * 1.26, 0.07, 0.1], [f * 1.5, 0.14, 0.14], [f * 2, 0.21, 0.22, 'sine', 0.06]]); }, block: () => beep([[220, 0, 0.06, 'square', 0.05], [110, 0.05, 0.22, 'triangle', 0.06]]), win: () => beep([[523, 0, 0.12], [659, 0.1, 0.12], [784, 0.2, 0.12], [1047, 0.3, 0.35]]), lose: () => beep([[300, 0, 0.2, 'triangle'], [220, 0.2, 0.35, 'triangle']]) };
+  const SFX = { shoot: () => beep([[880, 0, 0.07], [1320, 0.04, 0.08]]), cheer: lv => { const f = 587 * Math.pow(2, lv * 3 / 12); beep([[f, 0, 0.09], [f * 1.26, 0.07, 0.1], [f * 1.5, 0.14, 0.14], [f * 2, 0.21, 0.22, 'sine', 0.06]]); }, block: () => beep([[220, 0, 0.06, 'square', 0.05], [110, 0.05, 0.22, 'triangle', 0.06]]), win: () => beep([[523, 0, 0.12], [659, 0.1, 0.12], [784, 0.2, 0.12], [1047, 0.3, 0.35]]), lose: () => beep([[300, 0, 0.2, 'triangle'], [220, 0.2, 0.35, 'triangle']]), taken: () => beep([[784, 0, 0.1], [523, 0.09, 0.18, 'triangle', 0.05]]) };
   function vibe(ms) { if (state.vibe && navigator.vibrate) { try { navigator.vibrate(ms); } catch { /* ignore */ } } }
   function renderToggles() {
     el.btnMusic?.setAttribute('aria-checked', String(state.music));
@@ -715,7 +715,7 @@
     const seed = (daily ? daily.seed : (i + 1) * 1000) + state.seedBump;
     const gen = bestBoard(state.maskInfo, state.tier, seed);
     const livesMax = livesFor(state.tier);
-    Object.assign(state, { W: gen.W, H: gen.H, pieces: gen.pieces, occ: gen.occ, land: gen.land, left: gen.pieces.length, hintsMax: hintsFor(state.tier), lives: livesMax, livesMax, elapsed: 0, startedAt: 0, finished: false, hintsUsed: 0, wrong: 0, busy: false, combo: 0, bestCombo: 0, lastShot: 0, cheerHold: 0, shown: new Set(), armed: new Set() });
+    Object.assign(state, { W: gen.W, H: gen.H, pieces: gen.pieces, occ: gen.occ, land: gen.land, left: gen.pieces.length, hintsMax: hintsFor(state.tier), lives: livesMax, livesMax, elapsed: 0, startedAt: 0, finished: false, hintsUsed: 0, wrong: 0, busy: false, potGone: false, combo: 0, bestCombo: 0, lastShot: 0, cheerHold: 0, shown: new Set(), armed: new Set() });
     el.error.hidden = true; el.loading.hidden = true;
     if (daily) { if (history.replaceState) history.replaceState(null, '', location.pathname + location.search + (daily.hash ?? '#daily')); } else setHash(i);
     scrollToGame();
@@ -1183,15 +1183,16 @@
   }
 
   function showMatchState(m, goldBefore) {
-    el.matchTitle.textContent = m.state === 'done' ? (m.draw ? 'Nobody cleared it' : m.you_won ? 'You win!' : `${escapeHtml(m.winner)} wins`) : 'Waiting';
-    const row = p => `<div class="aa-vs-row${m.state === 'done' && p.place === 1 && p.ms > 0 ? ' is-win' : ''}"><span>${p.ms > 0 ? `${p.place}. ` : ''}${escapeHtml(p.you ? 'You' : p.name)}</span><b>${p.ms == null ? 'still playing' : p.ms < 0 ? 'ran out of hearts' : fmtTime(p.ms, true)}</b></div>`;
+    el.matchTitle.textContent = m.you_won ? 'You win!' : m.winner ? `${m.winner} wins` : m.state === 'done' ? 'Nobody cleared it' : 'Waiting';
+    const row = p => `<div class="aa-vs-row${p.won ? ' is-win' : ''}"><span>${p.ms > 0 ? `${p.place}. ` : ''}${escapeHtml(p.you ? 'You' : p.name)}</span><b>${p.ms == null ? 'still playing' : p.ms < 0 ? 'ran out of hearts' : fmtTime(p.ms, true)}</b></div>`;
+    const purse = m.you_won ? `You won ${gfmt(m.pot)}` : m.winner ? `You lost ${gfmt(m.stake)}` : m.draw ? 'Every stake came back' : 'Your stake is held';
     el.matchBody.innerHTML = `
       <div class="aa-vs">${(m.players || []).map(row).join('')}</div>
-      <p class="aa-purse"><span>${m.state === 'done' ? (m.draw ? 'Every stake came back' : m.you_won ? `You won ${gfmt(m.pot)}` : `You lost ${gfmt(m.stake)}`) : 'Your stake is held'}</span><span class="aa-gold${m.you_won ? ' is-won' : ''}"><span aria-hidden="true">🪙</span><span id="aaPurseCount">${gfmt(auth.user?.gold ?? 0)}</span></span></p>
-      <p class="aa-sheet-note">${m.state === 'done' ? 'The first player to clear the board takes the pot.' : 'The others have not finished yet. Open this again later to see how it ended.'}</p>
+      <p class="aa-purse"><span>${purse}</span><span class="aa-gold${m.you_won ? ' is-won' : ''}"><span aria-hidden="true">🪙</span><span id="aaPurseCount">${gfmt(auth.user?.gold ?? 0)}</span></span></p>
+      ${m.state === 'done' ? '' : '<p class="aa-sheet-note">The others are still playing for their place.</p>'}
       <div class="aa-actions"><button type="button" class="aa-btn aa-btn--primary" data-mact="stakes">Play another</button><button type="button" class="aa-btn" data-mact="close">Close</button></div>`;
     openSheet(el.matchSheet);
-    if (m.state === 'done' && m.you_won) {
+    if (m.you_won) {
       SFX.win(); vibe([0, 40, 60, 120]); goldRain(100, true);
       setTimeout(() => goldRain(60, true), 500);
       if (typeof goldBefore === 'number') countTo($('#aaPurseCount', el.matchBody), goldBefore, auth.user?.gold ?? goldBefore);
@@ -1202,7 +1203,7 @@
   function renderRanks(players) {
     if (!el.ranks) return;
     if (!players?.length) { el.ranks.hidden = true; return; }
-    el.ranks.innerHTML = players.map(p => `<span class="aa-rank${p.you ? ' is-you' : ''}${p.ms === -1 ? ' is-out' : ''}" title="${escapeHtml(p.name)}"><span aria-hidden="true">${escapeHtml((p.name || '?').trim().charAt(0).toUpperCase() || '?')}</span><span class="aa-rank-no">${p.place}</span></span>`).join('');
+    el.ranks.innerHTML = players.map(p => `<span class="aa-rank${p.you ? ' is-you' : ''}${p.won ? ' is-won' : ''}${p.ms === -1 ? ' is-out' : ''}" title="${escapeHtml(p.name)}"><span aria-hidden="true">${escapeHtml((p.name || '?').trim().charAt(0).toUpperCase() || '?')}</span><span class="aa-rank-no">${p.place}</span></span>`).join('');
     el.ranks.setAttribute('aria-label', players.map(p => `${p.place}. ${p.name}`).join(', '));
     el.ranks.hidden = false;
   }
@@ -1215,6 +1216,10 @@
         const pct = state.pieces.length ? Math.round(((state.pieces.length - state.left) / state.pieces.length) * 100) : 0;
         const d = await matchApi('progress', { code: R.match.code, pct });
         renderRanks(d.match.players);
+        if (d.match.winner && !state.potGone && !state.finished) {   // the pot is gone; the places behind it are not
+          state.potGone = true;
+          SFX.taken(); toast(`${d.match.winner} cleared it first. Play on for second place.`);
+        }
       } catch { /* the next tick will try again */ }
     };
     send();
@@ -1311,8 +1316,8 @@
     catch { toast('Could not delete the account. Please try again.', 'bad'); }
   });
 
-  // The board is over: tell the server, then show where the gold went. Until both players report, a match is
-  // simply waiting, and the stakes stay held.
+  // The board is over: tell the server, then show where the gold went. Clearing it first pays the whole pot on
+  // the spot; anyone finishing after that is playing for a place on the list, not for gold.
   async function finishMatch(cleared, ms) {
     const R = state.daily;
     if (!R?.match) return;
