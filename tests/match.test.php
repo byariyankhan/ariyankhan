@@ -1,6 +1,7 @@
 <?php
-// Checks the gold match server: stakes leave and return the right purses, the board is the server's choice,
-// nobody can play their own invitation twice or grab a taken one, and the pot always ends up somewhere.
+// Checks the gold match server: stakes leave and return the right purses, the room only starts when the host
+// says so, the player who finishes first takes the pot even if someone else played a shorter clock, and the
+// gold always adds up.
 declare(strict_types=1);
 $tmp = sys_get_temp_dir() . '/aa-match-test-' . getmypid();
 @mkdir($tmp, 0770, true);
@@ -17,6 +18,7 @@ $db = aa_db();
 $host = aa_upsert_user($db, 'google', 'host', 'Ariyan');
 $guest = aa_upsert_user($db, 'google', 'guest', 'Rahim');
 $gold = fn(int $u) => aa_gold($db, $u);
+$row = fn(string $code) => aa_match_row_raw($db, $code);
 
 // the pieces the endpoint puts together, exercised here without HTTP
 $make = function (int $uid, int $stake) use ($db) {
@@ -24,113 +26,136 @@ $make = function (int $uid, int $stake) use ($db) {
     $code = aa_match_code($db);
     $db->prepare('INSERT INTO matches (code, host_id, stake, board, tier, seed, state, created) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
        ->execute([$code, $uid, $stake, aa_pick_board() ?? '380', AA_STAKE_TIER[$stake], 424242, 'open', time()]);
+    aa_seat($db, $code, $uid);
     return $code;
 };
 $join = function (string $code, int $uid) use ($db) {
-    $st = $db->prepare('SELECT * FROM matches WHERE code = ?'); $st->execute([$code]); $m = $st->fetch();
-    if (!$m || $m['state'] !== 'open' || (int)$m['host_id'] === $uid || !aa_take_gold($db, $uid, (int)$m['stake'])) return false;
-    $db->prepare("UPDATE matches SET guest_id = ?, state = 'playing' WHERE code = ? AND state = 'open'")->execute([$uid, $code]);
+    $m = aa_match_row_raw($db, $code);
+    if (!$m || $m['state'] !== 'open' || count(aa_room($db, $code)) >= AA_MATCH_SEATS) return false;
+    foreach (aa_room($db, $code) as $p) if ((int)$p['user_id'] === $uid) return false;
+    if (!aa_take_gold($db, $uid, (int)$m['stake'])) return false;
+    aa_seat($db, $code, $uid);
     return true;
 };
-$result = function (string $code, int $uid, int $ms) use ($db) {
-    $st = $db->prepare('SELECT * FROM matches WHERE code = ?'); $st->execute([$code]); $m = $st->fetch();
-    $col = (int)$m['host_id'] === $uid ? 'host_ms' : 'guest_ms';
-    $db->prepare("UPDATE matches SET $col = ? WHERE code = ? AND $col IS NULL")->execute([$ms, $code]);
-    $st->execute([$code]); $m = $st->fetch();
-    if ($m['host_ms'] !== null && $m['guest_ms'] !== null) return aa_settle_match($db, $m);
-    return $m;
+$start = function (string $code, int $uid) use ($db) {
+    $m = aa_match_row_raw($db, $code);
+    if (!$m || $m['state'] !== 'open' || (int)$m['host_id'] !== $uid || count(aa_room($db, $code)) < 2) return false;
+    $db->prepare("UPDATE matches SET state = 'playing', started = ? WHERE code = ?")->execute([time(), $code]);
+    return true;
 };
-$row = function (string $code) use ($db) { $st = $db->prepare('SELECT * FROM matches WHERE code = ?'); $st->execute([$code]); return $st->fetch(); };
+// ms = their own clock, at = the moment their result reached the server
+$result = function (string $code, int $uid, int $ms, int $at = null) use ($db) {
+    $db->prepare('UPDATE match_players SET ms = ?, done = ?, pct = ? WHERE code = ? AND user_id = ? AND ms IS NULL')
+       ->execute([$ms, $at ?? (int)round(microtime(true) * 1000), $ms > 0 ? 100 : 0, $code, $uid]);
+    return aa_settle_match($db, aa_match_row_raw($db, $code));
+};
 
-echo "Stakes\n";
+echo "Stakes and the room\n";
 ok(AA_STAKES === [500, 1000, 7000], 'the three stakes are 500, 1,000 and 7,000');
-ok(AA_STAKE_TIER[500] < AA_STAKE_TIER[1000] && AA_STAKE_TIER[1000] < AA_STAKE_TIER[7000], 'a bigger stake means a harder board');
+ok(AA_MATCH_SEATS === 7, 'a room holds seven');
 ok($gold($host) === 10000 && $gold($guest) === 10000, 'both players start with 10,000');
 $code = $make($host, 1000);
-ok(is_string($code) && strlen($code) === 6, "an invitation has a six-letter code ($code)");
-ok($gold($host) === 9000, 'the stake leaves the host purse right away');
-ok(!preg_match('/[IO01]/', $code), 'the code avoids letters that read like digits');
-$m = $row($code);
-ok($m['board'] !== '' && (int)$m['tier'] === 2, 'the server picked the board and the tier, not the player');
+ok(is_string($code) && strlen($code) === 6 && !preg_match('/[IO01]/', $code), "the room has a six-letter code ($code)");
+ok($gold($host) === 9000, 'the stake leaves the host purse at once');
+ok(count(aa_room($db, $code)) === 1, 'the host is the only one in the room');
+ok((int)$row($code)['tier'] === 2 && $row($code)['board'] !== '', 'the server picked the board and the tier');
 ok($make($guest, 999) === null, 'a stake that is not on the list is refused');
 $broke = aa_upsert_user($db, 'google', 'broke', 'Karim');
 $db->prepare('UPDATE users SET gold = 100 WHERE id = ?')->execute([$broke]);
-ok($make($broke, 500) === null && $gold($broke) === 100, 'a player without the stake cannot open a match');
+ok($make($broke, 500) === null && $gold($broke) === 100, 'a player without the stake cannot open a room');
 
-echo "\nJoining\n";
-ok($join($code, $host) === false, 'the host cannot accept their own invitation');
-ok($join($code, $broke) === false && $gold($broke) === 100, 'a player without the stake cannot accept');
-ok($join($code, $guest) === true, 'the friend accepts');
-ok($gold($guest) === 9000, 'and their stake leaves too');
-ok($row($code)['state'] === 'playing', 'the match is on');
-$third = aa_upsert_user($db, 'google', 'third', 'Salma');
-ok($join($code, $third) === false && $gold($third) === 10000, 'nobody else can take a match that is already on');
+echo "\nThe host starts it\n";
+ok($start($code, $host) === false, 'one player alone cannot start');
+ok($join($code, $guest) === true && $gold($guest) === 9000, 'the friend joins and stakes');
+ok($row($code)['state'] === 'open', 'the room stays open until the host says go');
+ok(count(aa_room($db, $code)) === 2, 'two are in the room');
+ok($join($code, $guest) === false, 'nobody joins twice');
+ok($start($code, $guest) === false, 'only the host can start');
+ok($start($code, $host) === true && $row($code)['state'] === 'playing', 'the host starts the match');
+ok($join($code, $broke) === false, 'and the door is shut once it has started');
 
-echo "\nWinning\n";
-$result($code, $host, 92000);
+echo "\nFinishing first is what wins\n";
+// the guest reports a shorter clock, but the host's result reaches the server first
+$result($code, $host, 77800, 1000);
 ok($row($code)['state'] === 'playing' && $gold($host) === 9000, 'one result alone settles nothing');
-$result($code, $host, 1000);
-ok((int)$row($code)['host_ms'] === 92000, 'a second try cannot overwrite the first time');
-$result($code, $guest, 120000);
+$result($code, $host, 1000, 1001);
+$line = aa_match_players($db, $row($code), null);
+ok($line[0]['ms'] === 77800, 'a second try cannot overwrite a time');
+$result($code, $guest, 69300, 5000);
 $m = $row($code);
-ok($m['state'] === 'done' && (int)$m['winner_id'] === $host, 'the faster clear wins');
-ok($gold($host) === 11000, 'the winner takes both stakes');
-ok($gold($guest) === 9000, 'the loser is out their stake');
-ok($gold($host) + $gold($guest) === 20000, 'no gold was made or lost along the way');
+ok($m['state'] === 'done' && (int)$m['winner_id'] === $host, 'the one who finished first wins, even on a longer clock');
+ok($gold($host) === 11000 && $gold($guest) === 9000, 'the winner takes the whole pot');
+ok($gold($host) + $gold($guest) === 20000, 'no gold was made or lost');
 
 echo "\nLosing the board\n";
-$c2 = $make($host, 500); $join($c2, $guest);
-$result($c2, $host, -1);
-$result($c2, $guest, 45000);
-ok((int)$row($c2)['winner_id'] === $guest, 'a player who runs out of hearts loses to one who clears');
+$c2 = $make($host, 500); $join($c2, $guest); $start($c2, $host);
+$result($c2, $host, -1, 2000);
+$result($c2, $guest, 45000, 9000);
+ok((int)$row($c2)['winner_id'] === $guest, 'a player who runs out of hearts loses to one who clears, whenever they clear');
 ok($gold($guest) === 9500, 'and the clear takes the pot');
-$c3 = $make($host, 500); $join($c3, $guest);
+$c3 = $make($host, 500); $join($c3, $guest); $start($c3, $host);
 $before = [$gold($host), $gold($guest)];
-$result($c3, $host, -1);
-$result($c3, $guest, -1);
+$result($c3, $host, -1); $result($c3, $guest, -1);
 ok($row($c3)['winner_id'] === null && $row($c3)['state'] === 'done', 'a board neither of them cleared is a draw');
 ok($gold($host) === $before[0] + 500 && $gold($guest) === $before[1] + 500, 'and both stakes come back');
 
-echo "\nCalling the invitation off\n";
-$c6 = $make($host, 500);
-$g6 = $gold($host);
-$db->prepare("UPDATE matches SET state = 'void', settled = ? WHERE code = ? AND state = 'open'")->execute([time(), $c6]);
-aa_give_gold($db, $host, 500);
-ok($row($c6)['state'] === 'void' && $gold($host) === $g6 + 500, 'cancelling hands the stake straight back');
-ok($join($c6, $guest) === false && $gold($guest) === $gold($guest), 'and the friend can no longer take that link');
+echo "\nA room of seven\n";
+$c4 = $make($host, 500);
+$others = [];
+for ($i = 0; $i < 7; $i++) {
+    $u = aa_upsert_user($db, 'google', 'seat' . $i, 'Player' . $i);
+    $others[] = $u;
+    $joined = $join($c4, $u);
+    if ($i < 6) ok($joined === true, 'seat ' . ($i + 2) . ' joins');
+    else ok($joined === false && $gold($u) === 10000, 'the eighth is turned away and keeps their gold');
+}
+ok(count(aa_room($db, $c4)) === 7, 'seven are in the room');
+$start($c4, $host);
+$pot = 500 * 7;
+foreach (array_slice($others, 0, 6) as $k => $u) $result($c4, $u, 60000 + $k, 8000 + $k * 10);
+$g0 = $gold($host);
+$result($c4, $host, 30000, 9999);
+ok((int)$row($c4)['winner_id'] === $others[0], 'in a room of seven the first to finish takes it');
+ok($gold($others[0]) === 9500 + $pot, "the winner takes all {$pot} gold");
+ok($gold($host) === $g0, 'and the last to finish gets nothing back');
 
 echo "\nWho is leading\n";
-$c7 = $make($host, 500); $join($c7, $guest);
-$db->prepare('UPDATE matches SET host_pct = 30, guest_pct = 70 WHERE code = ?')->execute([$c7]);
-$line = aa_match_players($db, $row($c7), ['id' => $host]);
-ok(count($line) === 2 && $line[0]['name'] === 'Rahim' && $line[0]['place'] === 1, 'the player further along the board is first');
-ok($line[1]['name'] === 'Ariyan' && $line[1]['place'] === 2 && $line[1]['you'] === true, 'and you are marked in the line-up');
-$db->prepare('UPDATE matches SET host_pct = 95 WHERE code = ?')->execute([$c7]);
-$line = aa_match_players($db, $row($c7), null);
-ok($line[0]['name'] === 'Ariyan', 'pulling ahead moves you to first');
-$db->prepare('UPDATE matches SET host_ms = 40000 WHERE code = ?')->execute([$c7]);
-$line = aa_match_players($db, $row($c7), null);
-ok($line[0]['name'] === 'Ariyan' && $line[0]['pct'] === 100, 'a finished board counts as all the way along');
-$db->prepare('UPDATE matches SET host_ms = -1, guest_pct = 10 WHERE code = ?')->execute([$c7]);
-$line = aa_match_players($db, $row($c7), null);
-ok($line[0]['name'] === 'Rahim' && $line[1]['name'] === 'Ariyan', 'running out of hearts drops you behind someone still playing');
-$db->prepare('UPDATE matches SET host_ms = NULL, guest_ms = NULL, host_pct = 0, guest_pct = 0 WHERE code = ?')->execute([$c7]);
-$result($c7, $host, -1); $result($c7, $guest, -1);
+$c5 = $make($host, 500); $join($c5, $guest); $start($c5, $host);
+$db->prepare('UPDATE match_players SET pct = 30 WHERE code = ? AND user_id = ?')->execute([$c5, $host]);
+$db->prepare('UPDATE match_players SET pct = 70 WHERE code = ? AND user_id = ?')->execute([$c5, $guest]);
+$line = aa_match_players($db, $row($c5), ['id' => $host]);
+ok($line[0]['name'] === 'Rahim' && $line[0]['place'] === 1, 'the player further along the board is first');
+ok($line[1]['name'] === 'Ariyan' && $line[1]['you'] === true, 'and you are marked in the line-up');
+$db->prepare('UPDATE match_players SET pct = 95 WHERE code = ? AND user_id = ?')->execute([$c5, $host]);
+ok(aa_match_players($db, $row($c5), null)[0]['name'] === 'Ariyan', 'pulling ahead moves you to first');
+$db->prepare('UPDATE match_players SET ms = 40000, done = 700 WHERE code = ? AND user_id = ?')->execute([$c5, $guest]);
+$line = aa_match_players($db, $row($c5), null);
+ok($line[0]['name'] === 'Rahim' && $line[0]['pct'] === 100, 'a finished board goes in front of everyone still playing');
+$result($c5, $host, -1);
+
+echo "\nCalling the room off\n";
+$c6 = $make($host, 500); $join($c6, $guest);
+$g6 = [$gold($host), $gold($guest)];
+$db->beginTransaction();
+$db->prepare("UPDATE matches SET state = 'void', settled = ? WHERE code = ?")->execute([time(), $c6]);
+foreach (aa_room($db, $c6) as $p) aa_give_gold($db, (int)$p['user_id'], 500);
+$db->commit();
+ok($row($c6)['state'] === 'void' && $gold($host) === $g6[0] + 500 && $gold($guest) === $g6[1] + 500, 'cancelling hands every stake back');
+ok($join($c6, $broke) === false, 'and the link is dead');
 
 echo "\nNobody turns up\n";
-$c4 = $make($host, 7000);
-ok($gold($host) === 4000 - 500 + 500 + 500 - 7000 + 7000 || true, 'stake held');
-$g0 = $gold($host);
-$db->prepare('UPDATE matches SET created = ? WHERE code = ?')->execute([time() - (AA_MATCH_HOURS + 1) * 3600, $c4]);
+$c7 = $make($host, 7000);
+$g7 = $gold($host);
+$db->prepare('UPDATE matches SET created = ? WHERE code = ?')->execute([time() - (AA_MATCH_HOURS + 1) * 3600, $c7]);
 aa_expire_matches($db);
-ok($row($c4)['state'] === 'void' && $gold($host) === $g0 + 7000, 'an invitation nobody accepted is refunded after a day');
-$c5 = $make($host, 500); $join($c5, $guest);
-$result($c5, $guest, 30000);
-$g1 = [$gold($host), $gold($guest)];
-$db->prepare('UPDATE matches SET created = ? WHERE code = ?')->execute([time() - (AA_MATCH_HOURS + 1) * 3600, $c5]);
+ok($row($c7)['state'] === 'void' && $gold($host) === $g7 + 7000, 'a room nobody joined is refunded after a day');
+$c8 = $make($host, 500); $join($c8, $guest); $start($c8, $host);
+$result($c8, $guest, 30000, 1234);
+$g8 = $gold($guest);
+$db->prepare('UPDATE matches SET created = ? WHERE code = ?')->execute([time() - (AA_MATCH_HOURS + 1) * 3600, $c8]);
 aa_expire_matches($db);
-ok($row($c5)['state'] === 'done' && (int)$row($c5)['winner_id'] === $guest, 'a player who never finishes loses a day later');
-ok($gold($guest) === $g1[1] + 1000, 'and the one who did clear takes the pot');
+ok($row($c8)['state'] === 'done' && (int)$row($c8)['winner_id'] === $guest, 'a player who never finishes loses a day later');
+ok($gold($guest) === $g8 + 1000, 'and the one who did clear takes the pot');
 
 array_map('unlink', glob($tmp . '/*') ?: []); @rmdir($tmp);
 echo $bad ? "\n$bad of $tests failed\n" : "\nall $tests tests passed\n";

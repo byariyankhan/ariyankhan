@@ -10,6 +10,7 @@ const AA_SIGNUP_GOLD = 10000;   // what a new player starts with, once, when the
 const AA_STAKES = [500, 1000, 7000];        // the three stakes a player can pick
 const AA_STAKE_TIER = [500 => 1, 1000 => 2, 7000 => 3];   // the bigger the stake, the harder the board
 const AA_MATCH_HOURS = 24;      // an invitation nobody accepts is refunded after this
+const AA_MATCH_SEATS = 7;       // how many can be in one room
 const AA_SESSION_DAYS = 180;
 
 function aa_json($data, int $code = 200): void {
@@ -40,14 +41,15 @@ function aa_db(): PDO {
     if (!in_array('gold', $cols, true)) $db->exec('ALTER TABLE users ADD COLUMN gold INTEGER NOT NULL DEFAULT ' . AA_SIGNUP_GOLD);
     $db->exec('CREATE TABLE IF NOT EXISTS sessions (hash TEXT PRIMARY KEY, user_id INTEGER NOT NULL, created INTEGER NOT NULL, expires INTEGER NOT NULL)');
     $db->exec('CREATE INDEX IF NOT EXISTS sessions_user ON sessions(user_id)');
-    // A gold match: both players stake the same, both play the very same board, the faster clear takes the pot.
-    // host_ms and guest_ms are null while a player is still going, -1 when they ran out of hearts.
-    $db->exec('CREATE TABLE IF NOT EXISTS matches (code TEXT PRIMARY KEY, host_id INTEGER NOT NULL, guest_id INTEGER, stake INTEGER NOT NULL, board TEXT NOT NULL, tier INTEGER NOT NULL, seed INTEGER NOT NULL, host_ms INTEGER, guest_ms INTEGER, host_pct INTEGER NOT NULL DEFAULT 0, guest_pct INTEGER NOT NULL DEFAULT 0, state TEXT NOT NULL, winner_id INTEGER, created INTEGER NOT NULL, settled INTEGER)');
-    // how far along each player is, 0..100, so the other side can be shown their place while they play
-    $mcols = array_column($db->query('PRAGMA table_info(matches)')->fetchAll(), 'name');
-    if ($mcols && !in_array('host_pct', $mcols, true)) { $db->exec('ALTER TABLE matches ADD COLUMN host_pct INTEGER NOT NULL DEFAULT 0'); $db->exec('ALTER TABLE matches ADD COLUMN guest_pct INTEGER NOT NULL DEFAULT 0'); }
+    // A gold match: everyone in the room stakes the same, everyone plays the very same board, and the first to
+    // clear it takes the pot. The room stays open until the host starts it.
+    $db->exec('CREATE TABLE IF NOT EXISTS matches (code TEXT PRIMARY KEY, host_id INTEGER NOT NULL, stake INTEGER NOT NULL, board TEXT NOT NULL, tier INTEGER NOT NULL, seed INTEGER NOT NULL, state TEXT NOT NULL, winner_id INTEGER, created INTEGER NOT NULL, started INTEGER, settled INTEGER)');
+    // one row per player: pct is how far along they are, ms their own clock (-1 = out of hearts), done the moment
+    // their result reached the server, which is what decides who finished first.
+    $db->exec('CREATE TABLE IF NOT EXISTS match_players (code TEXT NOT NULL, user_id INTEGER NOT NULL, joined INTEGER NOT NULL, pct INTEGER NOT NULL DEFAULT 0, ms INTEGER, done INTEGER, PRIMARY KEY (code, user_id))');
     $db->exec('CREATE INDEX IF NOT EXISTS matches_host ON matches(host_id)');
-    $db->exec('CREATE INDEX IF NOT EXISTS matches_guest ON matches(guest_id)');
+    $db->exec('CREATE INDEX IF NOT EXISTS match_players_user ON match_players(user_id)');
+    aa_migrate_matches($db);
     return $db;
 }
 
@@ -196,45 +198,105 @@ function aa_pick_board(): ?string {
     return $ids ? $ids[random_int(0, count($ids) - 1)] : null;
 }
 
-// Nobody's stake is allowed to sit in limbo. An invitation nobody accepted is handed back; a match where one
-// side never finished is settled a day later with the missing run counted as a loss.
+// The first shape of a match held two seats in the matches table. Anything still unfinished from then is handed
+// back rather than quietly changed under the players.
+function aa_migrate_matches(PDO $db): void {
+    $cols = array_column($db->query('PRAGMA table_info(matches)')->fetchAll(), 'name');
+    if (!in_array('guest_id', $cols, true)) return;
+    foreach ($db->query("SELECT * FROM matches WHERE state IN ('open','playing')")->fetchAll() as $m) {
+        aa_give_gold($db, (int)$m['host_id'], (int)$m['stake']);
+        if (!empty($m['guest_id'])) aa_give_gold($db, (int)$m['guest_id'], (int)$m['stake']);
+        $db->prepare("UPDATE matches SET state = 'void', settled = ? WHERE code = ?")->execute([time(), $m['code']]);
+    }
+    $db->exec('ALTER TABLE matches RENAME TO matches_v1');
+    $db->exec('CREATE TABLE matches (code TEXT PRIMARY KEY, host_id INTEGER NOT NULL, stake INTEGER NOT NULL, board TEXT NOT NULL, tier INTEGER NOT NULL, seed INTEGER NOT NULL, state TEXT NOT NULL, winner_id INTEGER, created INTEGER NOT NULL, started INTEGER, settled INTEGER)');
+    $db->exec('INSERT INTO matches (code, host_id, stake, board, tier, seed, state, winner_id, created, settled) SELECT code, host_id, stake, board, tier, seed, state, winner_id, created, settled FROM matches_v1');
+    $db->exec('DROP TABLE matches_v1');
+}
+
+function aa_room(PDO $db, string $code): array {
+    $st = $db->prepare('SELECT mp.*, u.name FROM match_players mp JOIN users u ON u.id = mp.user_id WHERE mp.code = ? ORDER BY mp.joined');
+    $st->execute([$code]);
+    return $st->fetchAll();
+}
+
+function aa_seat(PDO $db, string $code, int $userId): void {
+    $db->prepare('INSERT OR IGNORE INTO match_players (code, user_id, joined) VALUES (?, ?, ?)')->execute([$code, $userId, time()]);
+}
+
+// Everyone in the room, first place first. Whoever cleared the board earliest leads, because the race is won by
+// finishing first, not by the shortest clock; then the players still going, the one furthest along in front; and
+// last anyone who ran out of hearts.
+function aa_match_players(PDO $db, array $m, ?array $me): array {
+    $rows = [];
+    foreach (aa_room($db, $m['code']) as $p) {
+        $ms = $p['ms'] === null ? null : (int)$p['ms'];
+        $done = $p['done'] === null ? null : (int)$p['done'];
+        $rows[] = [
+            'name' => (string)$p['name'],
+            'pct' => $ms !== null && $ms > 0 ? 100 : max(0, min(100, (int)$p['pct'])),
+            'ms' => $ms,
+            'race_ms' => $done !== null && $ms !== null && $ms > 0 && $m['started'] ? max(0, $done - (int)$m['started'] * 1000) : null,
+            'you' => $me !== null && (int)$p['user_id'] === $me['id'],
+            'host' => (int)$p['user_id'] === (int)$m['host_id'],
+        ];
+        $rows[count($rows) - 1]['_done'] = $done;
+    }
+    usort($rows, function ($a, $b) {
+        $rank = fn($p) => $p['ms'] !== null && $p['ms'] > 0 ? 0 : ($p['ms'] === null ? 1 : 2);
+        if ($rank($a) !== $rank($b)) return $rank($a) <=> $rank($b);
+        if ($rank($a) === 0) return ($a['_done'] ?? 0) <=> ($b['_done'] ?? 0);
+        return $b['pct'] <=> $a['pct'];
+    });
+    foreach ($rows as $i => $_) { $rows[$i]['place'] = $i + 1; unset($rows[$i]['_done']); }
+    return $rows;
+}
+
+// Nobody's stake is allowed to sit in limbo. A room nobody joined, or one the host never started, is handed
+// back; a match where someone never finished is settled a day later with the missing run counted as a loss.
 function aa_expire_matches(PDO $db): void {
     $cut = time() - AA_MATCH_HOURS * 3600;
-    $st = $db->prepare("SELECT code, host_id, stake FROM matches WHERE state = 'open' AND created < ? LIMIT 20");
+    $st = $db->prepare("SELECT code, stake FROM matches WHERE state = 'open' AND created < ? LIMIT 20");
     $st->execute([$cut]);
     foreach ($st->fetchAll() as $m) {
         $db->beginTransaction();
         $upd = $db->prepare("UPDATE matches SET state = 'void', settled = ? WHERE code = ? AND state = 'open'");
         $upd->execute([time(), $m['code']]);
-        if ($upd->rowCount() === 1) aa_give_gold($db, (int)$m['host_id'], (int)$m['stake']);
+        if ($upd->rowCount() === 1) foreach (aa_room($db, $m['code']) as $p) aa_give_gold($db, (int)$p['user_id'], (int)$m['stake']);
         $db->commit();
     }
-    $st = $db->prepare("SELECT * FROM matches WHERE state = 'playing' AND created < ? LIMIT 20");
+    $st = $db->prepare("SELECT code FROM matches WHERE state = 'playing' AND created < ? LIMIT 20");
     $st->execute([$cut]);
     foreach ($st->fetchAll() as $m) {
-        $db->prepare("UPDATE matches SET host_ms = -1 WHERE code = ? AND host_ms IS NULL")->execute([$m['code']]);
-        $db->prepare("UPDATE matches SET guest_ms = -1 WHERE code = ? AND guest_ms IS NULL")->execute([$m['code']]);
-        $st2 = $db->prepare('SELECT * FROM matches WHERE code = ?');
-        $st2->execute([$m['code']]);
-        aa_settle_match($db, $st2->fetch());
+        $db->prepare('UPDATE match_players SET ms = -1, done = ? WHERE code = ? AND ms IS NULL')->execute([time() * 1000, $m['code']]);
+        aa_settle_match($db, aa_match_row_raw($db, $m['code']));
     }
 }
 
-// Both results are in, so pay out: the faster clear takes the pot, a board nobody cleared refunds both.
+function aa_match_row_raw(PDO $db, string $code): ?array {
+    $st = $db->prepare('SELECT * FROM matches WHERE code = ?');
+    $st->execute([$code]);
+    return $st->fetch() ?: null;
+}
+
+// Every run is in, so pay out: the first player to have cleared the board takes the whole pot; if nobody cleared
+// it, every stake goes back.
 function aa_settle_match(PDO $db, array $m): array {
-    $h = $m['host_ms'] === null ? null : (int)$m['host_ms'];
-    $g = $m['guest_ms'] === null ? null : (int)$m['guest_ms'];
-    if ($h === null || $g === null) return $m;
-    $hostWon = $h > 0 && ($g < 0 || $h <= $g);
-    $guestWon = $g > 0 && ($h < 0 || $g < $h);
+    $room = aa_room($db, $m['code']);
+    if (!$room) return $m;
+    foreach ($room as $p) if ($p['ms'] === null) return $m;
+    $winner = null; $best = null;
+    foreach ($room as $p) {
+        if ((int)$p['ms'] <= 0) continue;
+        if ($best === null || (int)$p['done'] < $best) { $best = (int)$p['done']; $winner = (int)$p['user_id']; }
+    }
     $stake = (int)$m['stake'];
     $db->beginTransaction();
     $upd = $db->prepare("UPDATE matches SET state = 'done', winner_id = ?, settled = ? WHERE code = ? AND state = 'playing'");
-    $winner = $hostWon ? (int)$m['host_id'] : ($guestWon ? (int)$m['guest_id'] : null);
     $upd->execute([$winner, time(), $m['code']]);
     if ($upd->rowCount() === 1) {
-        if ($winner !== null) aa_give_gold($db, $winner, $stake * 2);
-        else { aa_give_gold($db, (int)$m['host_id'], $stake); aa_give_gold($db, (int)$m['guest_id'], $stake); }
+        if ($winner !== null) aa_give_gold($db, $winner, $stake * count($room));
+        else foreach ($room as $p) aa_give_gold($db, (int)$p['user_id'], $stake);
     }
     $db->commit();
     $m['state'] = 'done';
@@ -247,29 +309,4 @@ function aa_player_name(PDO $db, ?int $id): string {
     $st = $db->prepare('SELECT name FROM users WHERE id = ?');
     $st->execute([$id]);
     return (string)($st->fetchColumn() ?: 'A friend');
-}
-
-// Everyone in the match, first place first: a finished board beats an unfinished one, a faster time beats a
-// slower one, and the one further along the board leads the ones behind. Built as a list so a room of seven
-// needs no new shape.
-function aa_match_players(PDO $db, array $m, ?array $me): array {
-    $rows = [];
-    foreach ([['host', $m['host_id'], $m['host_ms'], $m['host_pct']], ['guest', $m['guest_id'], $m['guest_ms'], $m['guest_pct']]] as [$seat, $id, $ms, $pct]) {
-        if ($id === null) continue;
-        $rows[] = [
-            'seat' => $seat,
-            'name' => aa_player_name($db, (int)$id),
-            'pct' => $ms !== null && (int)$ms > 0 ? 100 : max(0, min(100, (int)$pct)),
-            'ms' => $ms === null ? null : (int)$ms,
-            'you' => $me !== null && (int)$id === $me['id'],
-        ];
-    }
-    usort($rows, function ($a, $b) {
-        $rank = fn($p) => $p['ms'] !== null && $p['ms'] > 0 ? 0 : ($p['ms'] === null ? 1 : 2);
-        if ($rank($a) !== $rank($b)) return $rank($a) <=> $rank($b);
-        if ($rank($a) === 0) return $a['ms'] <=> $b['ms'];
-        return $b['pct'] <=> $a['pct'];
-    });
-    foreach ($rows as $i => $_) $rows[$i]['place'] = $i + 1;
-    return $rows;
 }

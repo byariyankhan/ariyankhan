@@ -645,35 +645,34 @@ unlock (skip allowed after two fails), stars, best times and progress in
   sessions with it. The browser side is `aa-friends.mjs` and `aa-auth-full.mjs`
   in the scratchpad; the one step no test can do is Google actually signing a
   token, so a real sign-in has to be tried by hand once.
-- **Gold matches** (`games/api/match.php`, `openStakes`/`showInvite`/`showConfirm`,
+- **Gold matches** (`games/api/match.php`, `openStakes`/`showRoom`/`showConfirm`,
   `#m=<code>`): the lobby's second button asks for a sign-in, then shows the
   player's strip (name, provider, purse) and three stakes: 500, 1,000 and 7,000,
-  on a Normal, Hard and Expert board. Picking one holds the stake, gets a
-  six-letter code and shows the invitation link; the friend opens it, confirms,
-  and both play the identical board (the server picks the country, the tier and
-  the seed, so neither side can choose an easy one). The faster clear takes both
-  stakes; a player who runs out of hearts loses to one who clears; a board
-  neither cleared refunds both. **Everything about gold happens on the server**:
-  the client only shows what `match.php` says. An invitation nobody accepts is
-  refunded after a day, and a match where one side never finishes settles a day
-  later with the missing run counted as a loss, so no stake is ever stuck.
-  A result can only be reported once, so a retry cannot improve a time.
-  After picking a stake the host lands on the board screen with a waiting card,
-  an **Invite a friend** and a **Cancel** button: the board is not dealt until
-  the friend accepts (`get` hands out the country, tier and seed only once the
-  match is on), so a waiting host cannot study it, and cancelling voids the
-  invitation and hands the stake back, which kills the link. A poll every 2.5 s
-  swaps the card for the board the moment the friend confirms.
+  on a Normal, Hard and Expert board. Picking one holds the stake and opens a
+  **room** on the game screen: how many of the seven seats are filled, the faces
+  of who is in, the invitation link, **Invite**, **Start** (host only, dead until
+  someone else is in) and **Cancel**. Friends open the link, confirm the stake
+  and wait in the same room; the host starts when everyone is in, and the board
+  is dealt only then (`get` hands out the country, tier and seed once the match
+  is `playing`), so nobody can study it while the room fills up. Cancelling voids
+  the room, hands every stake back and kills the link.
+  **The first player to clear the board takes the whole pot**, not the one with
+  the shortest clock: the server stamps the moment each result arrives and ranks
+  by that, so finishing first is what wins. A player who runs out of hearts loses
+  to anyone who clears; a board nobody cleared refunds every stake. Everything
+  about gold happens on the server, which also picks the country, the tier and
+  the seed; the client only shows what `match.php` says. A result can only be
+  reported once, so a retry cannot improve a time. A room nobody joins, or one
+  the host never starts, is refunded after a day, and a match where someone never
+  finishes settles a day later with the missing run counted as a loss.
   While they play, `progress` carries each player's percentage and returns the
   line-up in order, drawn over the top left of the board as circles numbered 1
-  upwards (`renderRanks`, polled every 2 s). The list comes from the server as a
-  list, so a room of seven needs no new shape: a finished board beats an
-  unfinished one, a faster time beats a slower one, and a player who ran out of
-  hearts drops behind anyone still going.
-  `tests/match.test.php` (29 checks) covers the stakes, the joining rules and
-  every way the pot can end up, including that no gold is made or lost.
-  Signing out and deleting the account moved to Settings, where they belong.
-  The free challenge links (`#vs=`) were replaced by this and removed.
+  upwards (`renderRanks`, polled every 2 s). `match_players` is a row per player,
+  so three to seven in a room needs no new shape; `aa_migrate_matches` moved the
+  first two-seat version over and refunded anything unfinished.
+  `tests/match.test.php` (46 checks) covers the stakes, the room rules, a room of
+  seven, the finish-order rule against a shorter clock, and that no gold is made
+  or lost. Signing out and deleting the account live in Settings.
 - **Home country first** (`homeCountry`, `orderFor`): `games/geo.php` passes on
   Cloudflare's `CF-IPCountry` (nothing stored); the browser language region is
   the fallback. The tour order is the player's country, then every other country
