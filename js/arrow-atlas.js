@@ -109,7 +109,20 @@
   const dailyPick = () => { const h = hashStr('aa-daily-' + dayKey()); const L = DATA.canon[h % DATA.canon.length]; return { key: dayKey(), idx: DATA.levels.indexOf(L), tier: 1 + (h >> 8) % 4, seed: 900000 + (h % 100000) }; };
   function mulberry32(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
   function scrollToGame() { window.scrollTo({ top: 0, behavior: 'smooth' }); }
-  function setHash(i) { if (history.replaceState) history.replaceState(null, '', location.pathname + location.search + (i >= 0 ? `#level-${i + 1}` : '')); }
+  // the address names the board (#b-<id>), not its place in the list: the list is personal and the numbers are progress
+  function setHash(i) { if (history.replaceState) history.replaceState(null, '', location.pathname + location.search + (i >= 0 ? `#b-${DATA.levels[i].id}` : '')); }
+  // Level numbers count the player's own journey: cleared boards in the order they were cleared, then the board in
+  // hand. The tour list only decides what comes next, so a player who cleared 63 countries before the discovery
+  // boards existed is on level 65, not back on level 4 because Bhutan's animal sits fourth in the list.
+  let numCache = null;
+  const forgetNums = () => { numCache = null; };
+  function levelNo(i) {
+    if (!numCache) {
+      const done = DATA.levels.map((_, j) => ({ j, rec: cleared(j) })).filter(x => x.rec).sort((a, b) => ((a.rec.at || 0) - (b.rec.at || 0)) || (a.j - b.j));
+      numCache = { n: done.length, of: new Map(done.map((x, k) => [x.j, k + 1])) };
+    }
+    return numCache.of.get(i) || numCache.n + 1;
+  }
 
   // ── Sound ──
   let audio = null;
@@ -227,7 +240,7 @@
     if (!H) return d.canon.slice();
     return [H].concat(d.canon.filter(L => L !== H).sort((a, b) => kmBetween(H.c, a.c) - kmBetween(H.c, b.c)));
   }
-  function setHome(a2) { store.set('home', a2); DATA.levels = tourFor(DATA, a2); maskCache.clear(); renderSelect(); }
+  function setHome(a2) { store.set('home', a2); DATA.levels = tourFor(DATA, a2); maskCache.clear(); forgetNums(); renderSelect(); }
 
   // ── Lobby world map ──
   // Every country faint; the tour countries outlined; cleared ones filled and numbered with their level;
@@ -247,7 +260,7 @@
       for (const c of MAP.countries) {
         const p = svgEl('path', { d: c.d, 'data-id': c.id });
         const i = byId.get(c.id);
-        if (i != null) { p.classList.add('is-tour'); p.setAttribute('tabindex', '0'); p.setAttribute('role', 'button'); p.addEventListener('click', () => { if (!unlocked(i)) { toast(`Level ${i + 1} is locked. Clear the levels before it first.`, 'bad'); return; } const j = cleared(i) && DATA.levels[i + 1]?.disc && !cleared(i + 1) ? i + 1 : i; startLevel(j); }); p.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); p.click(); } }); }
+        if (i != null) { p.classList.add('is-tour'); p.setAttribute('tabindex', '0'); p.setAttribute('role', 'button'); p.addEventListener('click', () => { if (!unlocked(i)) { toast(`${DATA.levels[i].name} is locked. Clear the levels before it first.`, 'bad'); return; } const j = cleared(i) && DATA.levels[i + 1]?.disc && !cleared(i + 1) ? i + 1 : i; startLevel(j); }); p.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); p.click(); } }); }
         land.appendChild(p);
       }
     }
@@ -260,7 +273,7 @@
       const p = land.querySelector(`path[data-id="${c.id}"]`);
       const rec = cleared(i), isNext = c.id === nextId, open = unlocked(i);
       p.classList.toggle('is-done', !!rec); p.classList.toggle('is-next', isNext); p.classList.toggle('is-locked', !open);
-      p.setAttribute('aria-label', rec ? `Level ${i + 1}, ${DATA.levels[i].name}, cleared, replay` : isNext ? `Level ${i + 1}, next, play` : open ? `Level ${i + 1}, play` : `Level ${i + 1}, locked`);
+      p.setAttribute('aria-label', rec ? `${DATA.levels[i].name}, cleared, replay` : isNext ? `${DATA.levels[i].name}, next, play` : open ? `${DATA.levels[i].name}, play` : `${DATA.levels[i].name}, locked`);
       // no numbers on the map: cleared countries are simply coloured in, only the next one gets a marker
       if (isNext) { const g = svgEl('g', { class: 'is-next' }); g.appendChild(svgEl('circle', { cx: c.cx, cy: c.cy, r: 9 })); labels.appendChild(g); }
     }
@@ -285,7 +298,7 @@
     for (let i = start; i < Math.min(n, start + 5); i++) {
       const d = document.createElement('button'); d.type = 'button';
       d.className = 'aa-dot' + (cleared(i) ? ' is-done' : '') + (i === nextIdx ? ' is-current' : '') + (unlocked(i) ? '' : ' is-locked');
-      d.textContent = String(i + 1); d.disabled = !unlocked(i); d.setAttribute('aria-label', `Level ${i + 1}`);
+      d.textContent = String(levelNo(i)); d.disabled = !unlocked(i); d.setAttribute('aria-label', `Level ${levelNo(i)}`);
       d.addEventListener('click', () => startLevel(i));
       el.path.appendChild(d);
     } }
@@ -361,7 +374,7 @@
     if (!discCache.has(C.id)) discCache.set(C.id, { id: 'd:' + C.id, name: b.name, kind: b.kind, hex: b.hex, d: sh.d, k: sh.k, country: C, disc: true });
     return discCache.get(C.id);
   }
-  const hudLabel = () => state.daily ? 'Daily' : `Level ${state.idx + 1}`;
+  const hudLabel = () => state.daily ? 'Daily' : `Level ${levelNo(state.idx)}`;
   const maskFor = (L, tier) => { const key = L.id + ':' + tier; if (!maskCache.has(key)) maskCache.set(key, rasterise(L.d, L.k[tier])); return maskCache.get(key); };
 
   // ── Puzzle generation ──
@@ -702,7 +715,7 @@
     if (i === 0 && !cleared(0) && !daily) toast('Tap an arrow to shoot it off the board. If another arrow is in its way, you lose a heart.', 'hint');
     else if (state.disc) toast(`${state.disc.country.name}'s ${KIND_WORD[state.disc.kind]} · ${state.pieces.length} arrows · what is it?`, state.tier >= 2 ? 'hard' : '');
     else if (state.tier >= 2) toast(`${diff.toUpperCase()} LEVEL · ${state.pieces.length} arrows${daily ? '' : ' · you earned this'}`, 'hard');
-    else toast(`${daily ? 'Daily board' : 'Level ' + (i + 1)} · ${state.pieces.length} arrows · which country is this?`);
+    else toast(`${daily ? 'Daily board' : 'Level ' + levelNo(i)} · ${state.pieces.length} arrows · which country is this?`);
   }
 
   function renderHud() {
@@ -854,7 +867,7 @@
     const run = { firstTry: won && state.fails === 0, heartsLost: state.livesMax - state.lives, hints: state.hintsUsed, secPerArrow: state.elapsed / 1000 / Math.max(1, state.pieces.length) };
     const before = formNow(), after = nextForm(before, won, run), points = won ? clearPoints(run) : 0;
     store.set('form', after);
-    store.set('lastRun', { level: state.idx + 1, disc: !!state.disc, tier: state.tier, won, ...run, points, at: Date.now() });
+    store.set('lastRun', { level: levelNo(state.idx), disc: !!state.disc, tier: state.tier, won, ...run, points, at: Date.now() });
     return { before, after, points };
   }
   // One line for the result card explaining what the player's form did to the next board.
@@ -908,21 +921,21 @@
       store.set(`daily:${state.daily.key}`, rec);
       const ds = store.get('dailyStreak', { count: 0, last: '' });
       if (ds.last !== state.daily.key) { const y = new Date(); y.setDate(y.getDate() - 1); const yk = `${y.getFullYear()}-${String(y.getMonth() + 1).padStart(2, '0')}-${String(y.getDate()).padStart(2, '0')}`; store.set('dailyStreak', { count: ds.last === yk ? ds.count + 1 : 1, last: state.daily.key }); }
-    } else store.set(progressKey(i), rec);
+    } else { store.set(progressKey(i), rec); forgetNums(); }
     const streak = store.get('streak', 0) + 1; store.set('streak', streak);
-    const milestone = !state.daily && !D && (i + 1) % 10 === 0;
+    const n = levelNo(i), milestone = !state.daily && n % 10 === 0;
     const facts = D ? `${escapeHtml(C.name)}'s ${KIND_WORD[D.kind]} · <b>${escapeHtml(L.name)}</b>` : [L.cap ? `Capital: <b>${L.cap}</b>` : '', L.pop ? `Population: <b>${fmtPop(L.pop)}</b>` : '', L.sub ? `Region: <b>${L.sub}</b>` : ''].filter(Boolean).join(' · ');
     const last = i >= DATA.levels.length - 1;
     el.card.innerHTML = `
-      <p class="aa-card-kicker">${milestone ? `Milestone · ${i + 1} countries` : streak >= 2 ? `${streak} in a row · ` : ''}${quizRight ? 'Correct!' : 'It was'}</p>
+      <p class="aa-card-kicker">${milestone ? `Milestone · level ${n}` : streak >= 2 ? `${streak} in a row · ` : ''}${quizRight ? 'Correct!' : 'It was'}</p>
       <h3>${escapeHtml(L.name)}</h3>
       <p class="aa-stars" aria-label="${s} of 3 stars">${'★'.repeat(s)}${'☆'.repeat(3 - s)}</p>
       <div class="aa-stats"><span><b>${fmtTime(t, true)}</b>time</span><span><b>${state.livesMax - state.lives}</b>hearts lost</span><span><b>${state.hintsUsed}</b>hints</span><span><b>x${state.bestCombo}</b>best combo</span></div>
       <p class="aa-facts">${facts}</p>
       <p class="aa-best">${isBest ? (prev ? `New best time! Previous ${fmtTime(prev.t, true)}.` : 'First clear. That is your time to beat.') : `Your best: ${fmtTime(prev.t, true)}.`}</p>
-      ${last ? '' : adaptNote(learn, `Level ${i + 2}`)}
+      ${last ? '' : adaptNote(learn, `Level ${levelNo(i + 1)}`)}
       <div class="aa-actions">
-        ${last || state.daily ? '' : `<button type="button" class="aa-btn aa-btn--primary" data-act="next">Next: Level ${i + 2} · ${DIFF_OF(TIER_OF())}</button>`}
+        ${last || state.daily ? '' : `<button type="button" class="aa-btn aa-btn--primary" data-act="next">Next: Level ${levelNo(i + 1)} · ${DIFF_OF(TIER_OF())}</button>`}
         <button type="button" class="aa-btn" data-act="again">Play again</button>
         <button type="button" class="aa-btn" data-act="share">Share</button>
         <button type="button" class="aa-btn" data-act="levels">World Tour</button>
@@ -931,7 +944,7 @@
       <p class="aa-yt">Curious about ${escapeHtml(C.name)}? I make geography, history and economy videos: <a href="https://www.youtube.com/@ariyankhan" target="_blank" rel="noopener">youtube.com/@ariyankhan</a></p>`;
     el.overlay.hidden = false;
     $('[data-act]', el.card)?.focus({ preventScroll: true });
-    if (typeof gtag === 'function') gtag('event', 'level_complete', { game: 'arrow_atlas', level: i + 1, disc: D ? 1 : 0, mode: state.mode, tier: state.tier, arrows: state.pieces.length, time_ms: t, stars: s, quiz: quizRight ? 1 : 0, tier_next: learn?.after.tier ?? state.tier });
+    if (typeof gtag === 'function') gtag('event', 'level_complete', { game: 'arrow_atlas', level: n, disc: D ? 1 : 0, mode: state.mode, tier: state.tier, arrows: state.pieces.length, time_ms: t, stars: s, quiz: quizRight ? 1 : 0, tier_next: learn?.after.tier ?? state.tier });
   }
   function failLevel(reason) {
     if (state.finished) return;
@@ -972,7 +985,7 @@
     const n = DATA.levels.length, done = DATA.levels.filter((_, i) => cleared(i)).length;
     const D = state.disc, rec = state.daily ? store.get(`daily:${state.daily.key}`) : cleared(state.idx);
     const what = D ? `${D.country.name}'s ${KIND_WORD[D.kind]}, the ${state.level.name}` : state.level.name;
-    const text = `Arrow Atlas: I cleared ${what} (${state.daily ? 'daily board ' + state.daily.key : 'level ' + (state.idx + 1)}) in ${fmtTime(rec?.t ?? state.elapsed, true)} ${'★'.repeat(rec?.stars || stars())} and ${done}/${n} countries so far.\nYour turn: https://ariyankhan.com/arrow-atlas.html${state.daily ? '#daily' : '#level-' + (state.idx + 1)}`;
+    const text = `Arrow Atlas: I cleared ${what} (${state.daily ? 'daily board ' + state.daily.key : 'level ' + levelNo(state.idx)}) in ${fmtTime(rec?.t ?? state.elapsed, true)} ${'★'.repeat(rec?.stars || stars())} and ${done}/${n} countries so far.\nYour turn: https://ariyankhan.com/arrow-atlas.html${state.daily ? '#daily' : '#b-' + state.level.id}`;
     const flash = $('.aa-flash', el.card);
     try {
       if (navigator.share) { await navigator.share({ text }); return; }
@@ -1161,7 +1174,7 @@
     el.accept.focus({ preventScroll: true });
   }
   {
-    const deep = /^#(level-\d+|daily)$/.test(location.hash);
+    const deep = /^#(level-\d+|b-[\w:]+|daily)$/.test(location.hash);
     let seenThisSession = false;
     try { seenThisSession = sessionStorage.getItem('aa:splash') === '1'; sessionStorage.setItem('aa:splash', '1'); } catch { /* ignore */ }
     if (!store.get('welcomed')) showGate();
@@ -1173,8 +1186,9 @@
   loadData().then(() => {
     el.loading.hidden = true;
     renderSelect();
-    const m = /^#level-(\d+)$/.exec(location.hash);
-    if (m) startLevel(+m[1] - 1);
+    const m = /^#level-(\d+)$/.exec(location.hash), mb = /^#b-([\w:]+)$/.exec(location.hash);
+    if (mb) { const j = DATA.levels.findIndex(L => L.id === mb[1]); startLevel(j < 0 ? 0 : j); }
+    else if (m) startLevel(+m[1] - 1);   // older links: position in the list
     else if (location.hash === '#daily') { const d = dailyPick(); startLevel(d.idx, false, d); }
   }).catch(err => { el.loading.hidden = true; el.error.textContent = `Could not load the levels (${err.message}). Check your connection and reload.`; el.error.hidden = false; });
 
