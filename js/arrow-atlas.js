@@ -878,15 +878,6 @@
     store.set('lastRun', { level: levelNo(state.idx), disc: !!state.disc, tier: state.tier, won, ...run, points, at: Date.now() });
     return { before, after, points };
   }
-  // One line for the result card explaining what the player's form did to the next board.
-  function adaptNote(learn, next) {
-    if (!learn || !next) return '';
-    const { before, after, points } = learn;
-    if (after.tier > before.tier) return `<p class="aa-adapt aa-adapt--up">${points >= STEP_POINTS ? 'Flawless and fast.' : 'Two in a row at the first try.'} ${next} steps up to ${DIFF_OF(after.tier)}.</p>`;
-    if (after.tier >= 4) return `<p class="aa-adapt aa-adapt--up">Master boards. As hard as it gets.</p>`;
-    if (after.wins > 0) return `<p class="aa-adapt">First try. One more like that and the boards step up to ${DIFF_OF(after.tier + 1)}; a flawless, fast clear steps up at once.</p>`;
-    return `<p class="aa-adapt">${next} stays ${DIFF_OF(after.tier)}. Two first-try clears in a row step it up, a flawless fast clear at once.</p>`;
-  }
   function stars() { const lost = state.livesMax - state.lives; return lost === 0 ? 3 : lost === 1 ? 2 : 1; }
   function winLevel() {
     stopTimer(); state.finished = true; state.busy = true;
@@ -933,7 +924,7 @@
     } else { store.set(progressKey(i), rec); forgetNums(); }
     const streak = store.get('streak', 0) + 1; store.set('streak', streak);
     const n = levelNo(i), milestone = !state.daily && n % 10 === 0;
-    const facts = D ? `<b>${escapeHtml(L.name)}</b> · ${escapeHtml(D.rel)}` : [L.cap ? `Capital: <b>${L.cap}</b>` : '', L.pop ? `Population: <b>${fmtPop(L.pop)}</b>` : '', L.sub ? `Region: <b>${L.sub}</b>` : ''].filter(Boolean).join(' · ');
+    const facts = D ? escapeHtml(D.rel.charAt(0).toUpperCase() + D.rel.slice(1)) : [L.cap ? `Capital: <b>${L.cap}</b>` : '', L.pop ? `Population: <b>${fmtPop(L.pop)}</b>` : '', L.sub ? `Region: <b>${L.sub}</b>` : ''].filter(Boolean).join(' · ');
     const nj = nextOpen(i), last = nj < 0;
     el.card.innerHTML = `
       <p class="aa-card-kicker">${milestone ? `Milestone · level ${n}` : streak >= 2 ? `${streak} in a row · ` : ''}${D ? 'You cleared' : quizRight ? 'Correct!' : 'It was'}</p>
@@ -942,8 +933,6 @@
       <div class="aa-stats"><span><b>${fmtTime(t, true)}</b>time</span><span><b>${state.livesMax - state.lives}</b>hearts lost</span><span><b>${state.hintsUsed}</b>hints</span><span><b>x${state.bestCombo}</b>best combo</span></div>
       <p class="aa-facts">${facts}</p>
       ${D && D.fact ? `<p class="aa-disc-fact">${escapeHtml(D.fact)}</p>` : ''}
-      <p class="aa-best">${isBest ? (prev ? `New best time! Previous ${fmtTime(prev.t, true)}.` : 'First clear. That is your time to beat.') : `Your best: ${fmtTime(prev.t, true)}.`}</p>
-      ${last ? '' : adaptNote(learn, `Level ${levelNo(nj)}`)}
       <div class="aa-actions">
         ${last || state.daily ? '' : `<button type="button" class="aa-btn aa-btn--primary" data-act="next">Next: Level ${levelNo(nj)} · ${DIFF_OF(TIER_OF())}</button>`}
         <button type="button" class="aa-btn" data-act="again">Play again</button>
