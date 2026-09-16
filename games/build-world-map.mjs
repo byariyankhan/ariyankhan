@@ -29,9 +29,11 @@ const countries = feats.map(f => {
   const [cx, cy] = path.centroid(mainPoly(f));
   // a state too small to show at this size becomes a small dot at its centre, so it can still be tapped and marked
   const [[x0, y0], [x1, y1]] = d ? path.bounds(f) : [[0, 0], [0, 0]];
-  if (!d || (x1 - x0 < 3 && y1 - y0 < 3)) { const r = 2.2; d = `M${r1(cx - r)} ${r1(cy)}a${r} ${r} 0 1 0 ${2 * r} 0a${r} ${r} 0 1 0 ${-2 * r} 0Z`; }
+  // the small states from the 10m file are always dots: some of their multipolygons (Kiribati, Maldives, Nauru…)
+  // straddle the antimeridian or project to world-spanning slivers
+  if (!d || SMALL.includes(f.properties.name) || (x1 - x0 < 3 && y1 - y0 < 3)) { const r = 2.2; d = `M${r1(cx - r)} ${r1(cy)}a${r} ${r} 0 1 0 ${2 * r} 0a${r} ${r} 0 1 0 ${-2 * r} 0Z`; }
   d = d.replace(/-?\d+\.\d+/g, m => String(r1(+m)));
   return { id: idOf(f), n: f.properties.name, d, cx: r1(cx), cy: r1(cy) };
 }).filter(c => c.d);
-fs.writeFileSync(OUT, JSON.stringify({ version: 2, w: W, h: H, countries }));
+fs.writeFileSync(OUT, JSON.stringify({ version: 3, w: W, h: H, countries }));
 console.log(countries.length, 'countries, bytes', fs.statSync(OUT).size);
