@@ -929,15 +929,14 @@
     el.card.innerHTML = `
       <p class="aa-card-kicker">${milestone ? `Milestone · level ${n}` : streak >= 2 ? `${streak} in a row · ` : ''}${D ? 'You cleared' : quizRight ? 'Correct!' : 'It was'}</p>
       <h3>${escapeHtml(L.name)}</h3>
+      <p class="aa-facts">${facts}</p>
       <p class="aa-stars" aria-label="${s} of 3 stars">${'★'.repeat(s)}${'☆'.repeat(3 - s)}</p>
       <div class="aa-stats"><span><b>${fmtTime(t, true)}</b>time</span><span><b>${state.livesMax - state.lives}</b>hearts lost</span><span><b>${state.hintsUsed}</b>hints</span><span><b>x${state.bestCombo}</b>best combo</span></div>
-      <p class="aa-facts">${facts}</p>
       ${D && D.fact ? `<p class="aa-disc-fact">${escapeHtml(D.fact)}</p>` : ''}
       <div class="aa-actions">
         ${last || state.daily ? '' : `<button type="button" class="aa-btn aa-btn--primary" data-act="next">Next: Level ${levelNo(nj)} · ${DIFF_OF(TIER_OF())}</button>`}
         <button type="button" class="aa-btn" data-act="again">Play again</button>
         <button type="button" class="aa-btn" data-act="share">Share</button>
-        <button type="button" class="aa-btn" data-act="levels">World Tour</button>
       </div>
       <p class="aa-flash" hidden></p>
       <p class="aa-yt">Curious about ${escapeHtml(C.name)}? I make geography, history and economy videos: <a href="https://www.youtube.com/@ariyankhan" target="_blank" rel="noopener">youtube.com/@ariyankhan</a></p>`;
