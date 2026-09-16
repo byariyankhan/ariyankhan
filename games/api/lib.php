@@ -6,6 +6,7 @@
 declare(strict_types=1);
 
 const AA_COOKIE = 'aa_session';
+const AA_SIGNUP_GOLD = 10000;   // what a new player starts with, once, when the account is created
 const AA_SESSION_DAYS = 180;
 
 function aa_json($data, int $code = 200): void {
@@ -30,7 +31,10 @@ function aa_db(): PDO {
     ]);
     $db->exec('PRAGMA journal_mode=WAL');
     $db->exec('PRAGMA busy_timeout=4000');
-    $db->exec('CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, provider TEXT NOT NULL, sub TEXT NOT NULL, name TEXT NOT NULL DEFAULT \'\', created INTEGER NOT NULL, seen INTEGER NOT NULL, UNIQUE(provider, sub))');
+    $db->exec('CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, provider TEXT NOT NULL, sub TEXT NOT NULL, name TEXT NOT NULL DEFAULT \'\', gold INTEGER NOT NULL DEFAULT ' . AA_SIGNUP_GOLD . ', created INTEGER NOT NULL, seen INTEGER NOT NULL, UNIQUE(provider, sub))');
+    // gold arrived after the first accounts did: the column default hands the same welcome purse to those rows
+    $cols = array_column($db->query('PRAGMA table_info(users)')->fetchAll(), 'name');
+    if (!in_array('gold', $cols, true)) $db->exec('ALTER TABLE users ADD COLUMN gold INTEGER NOT NULL DEFAULT ' . AA_SIGNUP_GOLD);
     $db->exec('CREATE TABLE IF NOT EXISTS sessions (hash TEXT PRIMARY KEY, user_id INTEGER NOT NULL, created INTEGER NOT NULL, expires INTEGER NOT NULL)');
     $db->exec('CREATE INDEX IF NOT EXISTS sessions_user ON sessions(user_id)');
     return $db;
@@ -53,12 +57,12 @@ function aa_providers(): array {
 function aa_current_user(PDO $db): ?array {
     $token = $_COOKIE[AA_COOKIE] ?? '';
     if (!is_string($token) || strlen($token) < 20) return null;
-    $st = $db->prepare('SELECT u.id, u.name, u.provider, s.expires FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.hash = ?');
+    $st = $db->prepare('SELECT u.id, u.name, u.provider, u.gold, s.expires FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.hash = ?');
     $st->execute([aa_hash($token)]);
     $row = $st->fetch();
     if (!$row) return null;
     if ((int)$row['expires'] < time()) { $db->prepare('DELETE FROM sessions WHERE hash = ?')->execute([aa_hash($token)]); return null; }
-    return ['id' => (int)$row['id'], 'name' => (string)$row['name'], 'provider' => (string)$row['provider']];
+    return ['id' => (int)$row['id'], 'name' => (string)$row['name'], 'provider' => (string)$row['provider'], 'gold' => (int)$row['gold']];
 }
 
 function aa_start_session(PDO $db, int $userId): void {
@@ -120,9 +124,11 @@ function aa_google_verify(string $idToken, string $clientId, ?callable $fetch = 
     return ['sub' => $sub, 'name' => aa_name((string)($d['name'] ?? ''))];
 }
 
-// One account per provider id. Returns the user id, creating the row the first time someone signs in.
-function aa_upsert_user(PDO $db, string $provider, string $sub, string $name): int {
+// One account per provider id. Returns the user id, creating the row the first time someone signs in; a new
+// account starts with AA_SIGNUP_GOLD (the column default), and signing in again never tops it up.
+function aa_upsert_user(PDO $db, string $provider, string $sub, string $name, ?bool &$created = null): int {
     $now = time();
+    $created = false;
     $st = $db->prepare('SELECT id FROM users WHERE provider = ? AND sub = ?');
     $st->execute([$provider, $sub]);
     $id = $st->fetchColumn();
@@ -131,5 +137,6 @@ function aa_upsert_user(PDO $db, string $provider, string $sub, string $name): i
         return (int)$id;
     }
     $db->prepare('INSERT INTO users (provider, sub, name, created, seen) VALUES (?, ?, ?, ?, ?)')->execute([$provider, $sub, $name, $now, $now]);
+    $created = true;   // the welcome gold comes from the column default, so it lands once and only here
     return (int)$db->lastInsertId();
 }

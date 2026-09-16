@@ -1070,8 +1070,13 @@
     try {
       const d = await authApi('google', { credential: res?.credential || '' });
       auth.user = d.user || null;
+      const fresh = !!d.user && d.gold_granted;
       closeSheets();
-      if (auth.user) { openDash(); toast(`Signed in as ${auth.user.name}`, 'good'); if (typeof gtag === 'function') gtag('event', 'login', { method: 'google', game: 'arrow_atlas' }); }
+      if (auth.user) {
+        openDash();
+        toast(fresh ? `Welcome, ${auth.user.name}. ${Number(auth.user.gold || 0).toLocaleString('en-US')} gold to start you off.` : `Signed in as ${auth.user.name}`, 'good', fresh ? 5000 : 2800);
+        if (typeof gtag === 'function') gtag('event', 'login', { method: 'google', game: 'arrow_atlas' });
+      }
     } catch (e) {
       signInNote(e.code === 'google_not_configured' ? 'Google sign-in is not switched on yet.' : 'That sign-in did not go through. Please try again.');
     }
@@ -1083,7 +1088,7 @@
     const boards = DATA ? DATA.levels.filter((_, i) => cleared(i)).length : 0;
     const countries = DATA ? DATA.levels.filter((L, i) => !L.disc && cleared(i)).length : 0;
     el.dash.innerHTML = `
-      <div class="aa-me"><span class="aa-me-face" aria-hidden="true">${escapeHtml((u.name || '?').trim().charAt(0).toUpperCase() || '?')}</span><span><span class="aa-me-name">${escapeHtml(u.name || 'Player')}</span><br><span class="aa-me-sub">Signed in with ${escapeHtml(u.provider || 'Google')}</span></span></div>
+      <div class="aa-me"><span class="aa-me-face" aria-hidden="true">${escapeHtml((u.name || '?').trim().charAt(0).toUpperCase() || '?')}</span><span><span class="aa-me-name">${escapeHtml(u.name || 'Player')}</span><br><span class="aa-me-sub">Signed in with ${escapeHtml((u.provider || 'google').replace(/^./, c => c.toUpperCase()))}</span></span><span class="aa-gold" title="Your gold"><span aria-hidden="true">🪙</span>${Number(u.gold || 0).toLocaleString('en-US')}</span></div>
       <div class="aa-stats"><span><b>${countries}</b>countries</span><span><b>${boards}</b>boards cleared</span><span><b>${DIFF_OF(TIER_OF())}</b>difficulty</span></div>
       <div class="aa-group">
         <button type="button" class="aa-row aa-row--link" data-dash="challenge"><span class="aa-row-ico">🏁</span><span class="aa-row-label">Challenge a friend<small>Play a board, then send it. Whoever clears it faster wins.</small></span><span class="aa-row-chev">›</span></button>
