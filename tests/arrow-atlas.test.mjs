@@ -96,6 +96,11 @@ test('every level has a unique ISO code and a centroid (home-country ordering)',
   for (const L of data.levels) { assert.match(L.a2, /^[A-Z]{2}$/, `${L.name} has no ISO code`); assert.ok(Array.isArray(L.c) && L.c.length === 2, `${L.name} has no centroid`); }
   assert.equal(new Set(data.levels.map(L => L.a2)).size, data.levels.length, 'ISO codes are unique');
 });
+test('discover.json holds an animal, a bird, a place and a dish for every country', () => {
+  const disc = JSON.parse(fs.readFileSync(path.join(root, 'games/data/discover.json'), 'utf8'));
+  for (const L of data.levels) { const d = disc.items[L.a2]; assert.ok(d, `${L.name} has no discoveries`); for (const k of ['a', 'b', 'p', 'f']) assert.ok(typeof d[k] === 'string' && d[k].length >= 3 && d[k].length <= 80, `${L.name}: ${k} missing or odd`); }
+  assert.equal(Object.keys(disc.items).length, data.levels.length, 'no stray entries');
+});
 test('data file stays under 200 KB', () => assert.ok(fs.statSync(path.join(root, 'games/data/arrow-atlas.json')).size < 200 * 1024));
 test('page copy quotes the level count and keeps the no-inline-style rule', () => { assert.ok(html.includes(`${data.levels.length} countries`)); assert.ok(!/\b70 (countries|levels)\b/.test(html)); assert.ok(!/<[a-z][^>]*\sstyle="/i.test(html)); });
 console.log(process.exitCode ? `\nsome of ${tests} tests failed` : `\nall ${tests} tests passed`);
