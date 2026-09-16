@@ -118,10 +118,10 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-status-mid b{ color:var(--ink); }
 .aa-hintbtn{ width:auto; padding:0 12px; border-radius:22px; font-size:16px; background:var(--bg2); }
 .aa-hintbtn:disabled{ opacity:.4; }
-.aa-board-wrap{ position:relative; flex:1; min-height:0; display:flex; align-items:center; justify-content:center; padding:6px 0; }
+.aa-board-wrap{ position:relative; flex:1; min-height:0; display:flex; align-items:center; justify-content:center; padding:6px 0; overflow:hidden; touch-action:none; }
 .aa-board-track{ position:absolute; left:0; right:0; top:0; height:4px; background:var(--bg2); border-radius:4px; }
 .aa-board-bar{ height:100%; width:0; background:var(--accent); border-radius:4px; transition:width .3s; }
-.aa-board{ display:block; width:100%; height:auto; max-height:calc(100dvh - 210px); touch-action:manipulation; user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; }
+.aa-board{ display:block; width:100%; height:auto; max-height:calc(100dvh - 210px); touch-action:none; transform-origin:0 0; will-change:transform; user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; }
 .aa-board--tall{ max-height:calc(100dvh - 190px); }
 .aa-outline{ fill:var(--accent); fill-opacity:0; stroke:none; transition:fill-opacity .35s; pointer-events:none; }
 .aa-guides{ display:none; }
@@ -165,6 +165,11 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-confetti{ position:absolute; inset:0; width:100%; height:100%; pointer-events:none; z-index:3; }
 
 /* Toast + overlay card */
+/* pinch to zoom the board (two fingers), drag to pan when zoomed; the buttons do the same for one thumb */
+.aa-zoom{ position:absolute; right:4px; top:8px; z-index:4; display:flex; gap:4px; }   /* top right: the toast lives at the bottom */
+.aa-zoom-btn{ width:36px; height:36px; border-radius:12px; border:none; background:var(--bg2); color:var(--ink); font:inherit; font-weight:900; font-size:20px; line-height:1; cursor:pointer; box-shadow:var(--shadow); opacity:.9; }
+.aa-zoom-btn:active{ transform:scale(.94); }
+.aa-zoom-fit{ font-size:16px; }
 .aa-toast{ position:absolute; left:50%; bottom:10px; transform:translateX(-50%); z-index:4; max-width:min(92%,460px); background:var(--ink); color:var(--bg); font-size:14px; font-weight:800; padding:10px 16px; border-radius:30px; text-align:center; pointer-events:none; box-shadow:var(--shadow); }
 .aa-toast--bad{ background:var(--bad); color:#fff; }
 .aa-toast--hint{ background:var(--accent); color:var(--accent-ink); }

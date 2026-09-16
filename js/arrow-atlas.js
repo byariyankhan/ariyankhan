@@ -721,7 +721,7 @@
     scrollToGame();
     const diff = DIFF_OF(state.tier);
     state.diff = diff;
-    renderBoard(); renderHud();
+    resetZoom(); renderBoard(); renderHud();
     if (i === 0 && !cleared(0) && !daily) toast('Tap an arrow to shoot it off the board. If another arrow is in its way, you lose a heart.', 'hint');
     else if (state.tier >= 2) toast(`${diff.toUpperCase()} LEVEL · ${state.pieces.length} arrows${daily ? '' : ' · you earned this'}`, 'hard');
     else toast(`${daily ? 'Daily board' : 'Level ' + (i + 1)} · ${state.pieces.length} arrows · ${state.board === 'flags' ? 'whose flag is this?' : 'which country is this?'}`);
@@ -1051,6 +1051,60 @@
     else setHome(v);
     toast(v === 'auto' ? 'Tour order follows where you are.' : v ? `Your tour now starts from ${DATA.levels[0].name}.` : 'Tour in world order.', 'hint');
   });
+  // ── Board zoom: pinch with two fingers, drag to pan while zoomed, or the − ⤢ + buttons ──
+  // On a Master board of 180 arrows a cell is ~9 px on a phone: zooming is how a tap lands on the arrow meant.
+  const zoom = { s: 1, x: 0, y: 0, MIN: 1, MAX: 4, ptrs: new Map(), pinch: null, pan: null };
+  function applyZoom() {
+    const wrap = el.boardWrap, svg = el.board; if (!wrap || !svg) return;
+    const bw = svg.clientWidth, bh = svg.clientHeight, ww = wrap.clientWidth, wh = wrap.clientHeight;
+    void ww; void wh;
+    // the scaled board may never leave its own frame: its edges stay outside (or on) the frame of the unzoomed board
+    if (zoom.s <= 1.001) { zoom.s = 1; zoom.x = 0; zoom.y = 0; }
+    else { zoom.x = Math.max(bw * (1 - zoom.s), Math.min(0, zoom.x)); zoom.y = Math.max(bh * (1 - zoom.s), Math.min(0, zoom.y)); }
+    svg.style.transform = zoom.s === 1 ? '' : `translate(${zoom.x}px, ${zoom.y}px) scale(${zoom.s})`;
+    el.zoomBtns?.forEach(b => { b.disabled = (b.dataset.zoom === 'out' || b.dataset.zoom === 'fit') ? zoom.s === 1 : zoom.s >= zoom.MAX; });
+  }
+  // zoom by a factor around a point (in wrap coordinates, relative to the board's unscaled top-left)
+  function zoomAt(factor, px, py) {
+    const s0 = zoom.s, s1 = Math.max(zoom.MIN, Math.min(zoom.MAX, s0 * factor)); if (s1 === s0) return;
+    zoom.x = px - (px - zoom.x) * (s1 / s0); zoom.y = py - (py - zoom.y) * (s1 / s0); zoom.s = s1; applyZoom();
+  }
+  function resetZoom() { zoom.s = 1; zoom.x = 0; zoom.y = 0; zoom.ptrs.clear(); zoom.pinch = null; zoom.pan = null; applyZoom(); }
+  el.zoomBtns = $$('#aaZoom [data-zoom]');
+  el.zoomBtns.forEach(b => b.addEventListener('click', () => {
+    const svg = el.board; const cx = svg.clientWidth / 2, cy = svg.clientHeight / 2;   // around the centre of the board's frame
+    if (b.dataset.zoom === 'fit') resetZoom(); else zoomAt(b.dataset.zoom === 'in' ? 1.6 : 1 / 1.6, cx, cy);
+  }));
+  if (el.boardWrap) {
+    const wrap = el.boardWrap;
+    wrap.addEventListener('pointerdown', e => {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      zoom.ptrs.set(e.pointerId, [e.clientX, e.clientY]);
+      if (zoom.ptrs.size === 2) {
+        // remember the board point under the pinch centre (board-local, unscaled) and the frame's origin on screen
+        const [a, b] = [...zoom.ptrs.values()]; const r = el.board.getBoundingClientRect(); const mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2;
+        zoom.pinch = { d: Math.hypot(a[0] - b[0], a[1] - b[1]), s: zoom.s, left0: r.left - zoom.x, top0: r.top - zoom.y, qx: (mx - r.left) / zoom.s, qy: (my - r.top) / zoom.s }; zoom.pan = null;
+      }
+      else if (zoom.ptrs.size === 1 && zoom.s > 1) zoom.pan = { x0: e.clientX, y0: e.clientY, zx: zoom.x, zy: zoom.y, moved: false };
+    });
+    wrap.addEventListener('pointermove', e => {
+      if (!zoom.ptrs.has(e.pointerId)) return;
+      zoom.ptrs.set(e.pointerId, [e.clientX, e.clientY]);
+      if (zoom.pinch && zoom.ptrs.size === 2) {
+        const [a, b] = [...zoom.ptrs.values()]; const d = Math.hypot(a[0] - b[0], a[1] - b[1]); const mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2;
+        const s1 = Math.max(zoom.MIN, Math.min(zoom.MAX, zoom.pinch.s * d / Math.max(1, zoom.pinch.d)));
+        // keep the board point under the pinch centre where the fingers are: screen = origin + x + q * s
+        zoom.s = s1; zoom.x = (mx - zoom.pinch.left0) - zoom.pinch.qx * s1; zoom.y = (my - zoom.pinch.top0) - zoom.pinch.qy * s1; applyZoom();
+      } else if (zoom.pan && zoom.ptrs.size === 1) {
+        const dx = e.clientX - zoom.pan.x0, dy = e.clientY - zoom.pan.y0;
+        if (!zoom.pan.moved && Math.hypot(dx, dy) < 12) return;   // a tap on an arrow is still a tap
+        zoom.pan.moved = true; zoom.x = zoom.pan.zx + dx; zoom.y = zoom.pan.zy + dy; applyZoom();
+      }
+    });
+    const up = e => { zoom.ptrs.delete(e.pointerId); if (zoom.ptrs.size < 2) zoom.pinch = null; if (!zoom.ptrs.size) zoom.pan = null; };
+    wrap.addEventListener('pointerup', up); wrap.addEventListener('pointercancel', up);
+    wrap.addEventListener('wheel', e => { if (!el.game || el.game.hidden) return; e.preventDefault(); const r = el.board.getBoundingClientRect(); zoomAt(e.deltaY < 0 ? 1.2 : 1 / 1.2, e.clientX - r.left + zoom.x, e.clientY - r.top + zoom.y); }, { passive: false });
+  }
   // ── Wiring ──
   el.btnHint.addEventListener('click', hint);
   el.play.addEventListener('click', () => startLevel(+el.play.dataset.level || 0));
