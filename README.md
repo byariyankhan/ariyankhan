@@ -588,10 +588,16 @@ unlock (skip allowed after two fails), stars, best times and progress in
   landmark says more and `LABEL` names for place boards (the glyph shows one
   landmark, the text often names two). 59 shapes for 197 countries, 55 KB.
   In the game a discovery level is `{ id: 'd:<id>', name, kind, hex, d, k,
-  country, disc: true }` and sits in the one numbered tour list right after its
-  country (`tourFor`: 197 countries → 394 levels; more kinds of board later mean
-  more levels), so it unlocks, numbers, seeds, saves (`lv:d:<id>`) and deep-links
-  (`#level-n`) exactly like a country. The boards file is loaded with the level
+  country, disc: true }` and sits in the one tour list right after its country
+  (`tourFor`: 197 countries → 394 levels; more kinds of board later mean more
+  levels), so it unlocks, seeds, saves (`lv:d:<id>`) and deep-links (`#b-<id>`)
+  exactly like a country. **Level numbers are the player's own progress**
+  (`levelNo`): cleared boards ranked by clear time, then the board in hand is
+  cleared-count + 1. The list only decides what comes next; a player who cleared
+  63 countries before the discovery boards existed is on level 65, not back on
+  level 4 because Bhutan's animal sits fourth in their list. Milestones (every
+  10th) and the share text use that number; `#level-n` (position in the list)
+  is still read for old links. The boards file is loaded with the level
   data, not in the background. The HUD says only `Level n`; the start toast
   ("Bangladesh's animal · 104 arrows · what is it?") is the one hint. The quiz asks
   "Which animal did you just clear?" with two other countries' finds of the same
