@@ -599,8 +599,10 @@ unlock (skip allowed after two fails), stars, best times and progress in
   level 4 because Bhutan's animal sits fourth in their list. Milestones (every
   10th) and the share text use that number; `#level-n` (position in the list)
   is still read for old links. The win card is deliberately short: kicker, name,
-  stars, the four stats, what the find is (discovery boards) or capital,
-  population and region (countries), then the buttons. The best-time line and
+  the subtitle under it (what the find is, or capital, population and region for
+  a country), stars, the four stats, the fact box on discovery boards, then Next,
+  Play again and Share. No World Tour button: the back arrow in the HUD already
+  leads there. The best-time line and
   the paragraph explaining what the player's form did to the next tier were both
   dropped as noise; the record is still kept and the tier still shows on the
   Next button. The result card's Next button and Skip go to the
