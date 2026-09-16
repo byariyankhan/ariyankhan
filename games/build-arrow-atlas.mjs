@@ -133,7 +133,9 @@ for (const name of order) {
   const d = d3.geoPath(proj)(main).replace(/-?\d+\.\d+/g, m => String(r1(+m)));
   const masks = TARGETS.map((t, tier) => scaleFor(d, t, tier));
   const cont = props.CONTINENT === 'Seven seas (open ocean)' ? (/Asia/.test(props.SUBREGION) ? 'Asia' : 'Africa') : props.CONTINENT || '';   // Maldives, Mauritius, Seychelles: quiz pools by continent
-  levels.push({ id: idOf(f), name, cap: CAPITALS[name], pop: props.POP_EST || null, cont, sub: props.SUBREGION || '', d, k: masks.map(m => m.k), _masks: masks });
+  const a2 = (props.ISO_A2_EH && props.ISO_A2_EH !== '-99' ? props.ISO_A2_EH : props.ISO_A2 !== '-99' ? props.ISO_A2 : '') || '';   // ISO 3166-1 alpha-2: flags, home-country detection
+  if (!a2) throw new Error('no ISO2 for ' + name);
+  levels.push({ id: idOf(f), name, a2, cap: CAPITALS[name], pop: props.POP_EST || null, cont, sub: props.SUBREGION || '', c: [r1(centre[0]), r1(centre[1])], d, k: masks.map(m => m.k), _masks: masks });
 }
 fs.writeFileSync(OUT, JSON.stringify({ version: 2, targets: TARGETS, ref: REF, levels: levels.map(({ _masks, ...L }) => L) }));
 console.table(levels.map(l => ({ name: l.name, cont: l.cont, t0: `${l._masks[0].count} ${l._masks[0].w}x${l._masks[0].h}`, t2: `${l._masks[2].count} ${l._masks[2].w}x${l._masks[2].h}`, t4: `${l._masks[4].count} ${l._masks[4].w}x${l._masks[4].h}` })));

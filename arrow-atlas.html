@@ -63,8 +63,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="css/arrow-atlas.css?v=24" />
-    <link rel="preload" href="games/data/arrow-atlas.json?v=10" as="fetch" crossorigin="anonymous" />
+    <link rel="stylesheet" href="css/arrow-atlas.css?v=25" />
+    <link rel="preload" href="games/data/arrow-atlas.json?v=11" as="fetch" crossorigin="anonymous" />
 
     <!-- SCHEMA -->
     <script type="application/ld+json">
@@ -197,7 +197,11 @@
 
         <div class="aa-hero">
           <h1 class="aa-title">Arrow Atlas</h1>
-          <p class="aa-tagline">Clear the arrows. Reveal the country.</p>
+          <p class="aa-tagline" id="aaTagline">Clear the arrows. Reveal the country.</p>
+        </div>
+        <div class="aa-seg" role="group" aria-label="Board kind">
+          <button type="button" class="aa-seg-btn is-on" data-board="map" aria-pressed="true">🗺️ Maps</button>
+          <button type="button" class="aa-seg-btn" data-board="flags" aria-pressed="false">🚩 Flags</button>
         </div>
 
         <div class="aa-world" id="aaWorld">
@@ -209,7 +213,7 @@
         <div class="aa-minis">
           <div class="aa-mini-slot" id="aaDaily"></div>
           <button type="button" class="aa-mini aa-mini--tour" id="aaLevelsBtn">
-            <span class="aa-mini-kicker">World Tour</span>
+            <span class="aa-mini-kicker" id="aaTourKicker">World Tour</span>
             <span class="aa-mini-big" id="aaProgress">0/197</span>
             <span class="aa-mini-sub">All levels</span>
           </button>
@@ -396,7 +400,7 @@
     <div class="aa-sheet" id="aaLevelsSheet" hidden>
       <div class="aa-sheet-panel" role="dialog" aria-label="World Tour levels">
         <div class="aa-sheet-head"><h2>World Tour</h2><button type="button" class="aa-icon" data-close-sheet aria-label="Close">✕</button></div>
-        <p class="aa-sheet-note">Levels unlock in order. The difficulty follows you: Easy, Normal, Hard, Expert, Master. Every 10th level is a milestone.</p>
+        <p class="aa-sheet-note">Levels unlock in order, starting from your own country and spreading out. Maps and Flags keep separate progress. The difficulty follows you: Easy, Normal, Hard, Expert, Master. Every 10th level is a milestone.</p>
         <div class="aa-levels" id="aaLevels"></div>
       </div>
     </div>
@@ -426,12 +430,13 @@
           <a class="aa-row aa-row--link" href="#aaAbout" data-close-sheet><span class="aa-row-ico">ℹ️</span><span class="aa-row-label">About Arrow Atlas</span><span class="aa-row-chev">›</span></a>
         </div>
         <div class="aa-group">
+          <label class="aa-row aa-row--select" for="aaHome"><span class="aa-row-ico">🏠</span><span class="aa-row-label">Home country<small>Your tour starts here and spreads out</small></span><select class="aa-select" id="aaHome" aria-label="Home country"></select></label>
           <button type="button" class="aa-row aa-row--link aa-row--danger" id="aaReset"><span class="aa-row-ico">🗑️</span><span class="aa-row-label">Reset progress</span><span class="aa-row-chev">›</span></button>
         </div>
         <p class="aa-credit">Arrow Atlas · made by <a href="https://www.youtube.com/@ariyankhan" target="_blank" rel="noopener">Ariyan Khan</a></p>
       </div>
     </div>
 
-    <script src="js/arrow-atlas.js?v=34"></script>
+    <script src="js/arrow-atlas.js?v=35"></script>
   </body>
 </html>
