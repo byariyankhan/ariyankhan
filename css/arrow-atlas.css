@@ -96,7 +96,6 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-gbar{ display:flex; align-items:center; gap:6px; padding-bottom:8px; border-bottom:2px solid var(--bg2); }
 .aa-gtitle{ flex:1; display:flex; flex-direction:column; align-items:center; line-height:1.05; }
 .aa-glevel{ font-size:26px; font-weight:900; color:var(--accent); white-space:nowrap; }
-.aa-glevel.is-disc{ font-size:20px; }   /* “Level 12 · Animal” on a discovery board */
 .aa-hud-diff{ font-size:15px; font-weight:900; color:var(--muted); }
 .aa-hud-diff--hard{ color:var(--hard); }
 .aa-hud-diff--expert{ color:var(--expert); }
@@ -214,9 +213,6 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-facts{ font-size:14px; color:var(--muted); margin:0 0 6px; line-height:1.6; }
 .aa-facts b{ color:var(--ink); }
 /* discoveries: four finds per cleared country */
-/* Discovery boards in the level list: green silhouette once cleared, a question mark before */
-.aa-level--disc svg path{ fill:var(--good); }
-.aa-disc-q{ font-size:70px; font-weight:900; fill:var(--line-soft); text-anchor:middle; dominant-baseline:central; }
 .aa-seo-credit{ font-size:12px; color:var(--muted); }
 .aa-best{ font-size:14px; color:var(--muted); margin:0 0 14px; }
 .aa-adapt{ font-size:13px; font-weight:800; color:var(--muted); margin:-6px 0 14px; }
@@ -253,17 +249,6 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-sheet-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; }
 .aa-sheet-head h2{ margin:0; font-size:22px; font-weight:900; }
 .aa-sheet-note{ font-size:13px; color:var(--muted); margin:0 0 12px; }
-.aa-levels{ display:grid; gap:8px; grid-template-columns:repeat(auto-fill,minmax(78px,1fr)); }
-.aa-level{ display:flex; flex-direction:column; align-items:center; gap:3px; padding:10px 4px 8px; background:var(--card); border:none; border-radius:16px; color:var(--ink); cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,.06); transition:transform .15s; }
-.aa-level:hover:not(:disabled){ transform:translateY(-2px); }
-.aa-level svg{ width:40px; height:40px; }
-.aa-level svg path{ fill:var(--line-soft); }
-.aa-level.is-done svg path{ fill:var(--good); }
-.aa-level.is-locked{ opacity:.4; cursor:default; }
-.aa-level.is-milestone{ box-shadow:0 0 0 2px var(--accent); }
-.aa-level.is-milestone .aa-level-num::after{ content:' 🏆'; font-size:11px; }
-.aa-level-num{ font-size:18px; font-weight:900; line-height:1; }
-.aa-level-sub{ font-size:10px; color:var(--muted); text-align:center; line-height:1.25; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .aa-setting{ display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 0; border-top:1px solid var(--bg2); font-size:15px; }
 .aa-setting--col{ flex-direction:column; align-items:stretch; }
 .aa-setting > span:first-child{ font-weight:900; }

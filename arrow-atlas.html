@@ -63,7 +63,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="css/arrow-atlas.css?v=33" />
+    <link rel="stylesheet" href="css/arrow-atlas.css?v=34" />
     <link rel="preload" href="games/data/arrow-atlas.json?v=11" as="fetch" crossorigin="anonymous" />
 
     <!-- SCHEMA -->
@@ -387,14 +387,6 @@
       <p class="aa-seo-cta"><a class="aa-btn aa-btn--primary" href="#top">Play Arrow Atlas</a></p>
       <p class="aa-seo-credit">Country outlines from Natural Earth (public domain). Discovery board shapes are silhouettes traced from <a href="https://github.com/twitter/twemoji" target="_blank" rel="noopener">Twemoji</a> graphics by Twitter and contributors, licensed <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC-BY 4.0</a>.</p>
     </section>
-    <!-- ── LEVELS SHEET ── -->
-    <div class="aa-sheet" id="aaLevelsSheet" hidden>
-      <div class="aa-sheet-panel" role="dialog" aria-label="World Tour levels">
-        <div class="aa-sheet-head"><h2>World Tour</h2><button type="button" class="aa-icon" data-close-sheet aria-label="Close">✕</button></div>
-        <p class="aa-sheet-note">Levels unlock in order, starting from your own country and spreading out. Every country is followed by a board shaped like something you would find there: its animal, its bird or a landmark, kept secret until you clear it. The difficulty follows you: Easy, Normal, Hard, Expert, Master. Every 10th level is a milestone.</p>
-        <div class="aa-levels" id="aaLevels"></div>
-      </div>
-    </div>
 
     <!-- ── SETTINGS PAGE ── -->
     <div class="aa-sheet aa-sheet--page" id="aaSheet" hidden>
@@ -410,7 +402,6 @@
           <div class="aa-row aa-row--col"><span class="aa-row-label">Colours</span><div class="aa-themes" id="aaThemes"></div></div>
         </div>
         <div class="aa-group">
-          <button type="button" class="aa-row aa-row--link" id="aaLevelsBtn"><span class="aa-row-ico">🌍</span><span class="aa-row-label">All levels<small id="aaProgress">0 cleared</small></span><span class="aa-row-chev">›</span></button>
           <button type="button" class="aa-row aa-row--link" id="aaDailyRow"><span class="aa-row-ico">📅</span><span class="aa-row-label">Today's Country<small id="aaDaily">Mystery</small></span><span class="aa-row-chev">›</span></button>
           <button type="button" class="aa-row aa-row--link" id="aaHowTo"><span class="aa-row-ico">❓</span><span class="aa-row-label">How to play</span><span class="aa-row-chev">›</span></button>
           <a class="aa-row aa-row--link" href="/#contact"><span class="aa-row-ico">💬</span><span class="aa-row-label">Feedback</span><span class="aa-row-chev">›</span></a>
@@ -430,6 +421,6 @@
       </div>
     </div>
 
-    <script src="js/arrow-atlas.js?v=45"></script>
+    <script src="js/arrow-atlas.js?v=46"></script>
   </body>
 </html>
