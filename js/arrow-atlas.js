@@ -82,7 +82,7 @@
   const PALETTE = ['#FFED54', '#5CD6FF', '#8CFF7A', '#FF9AD5', '#C79BFF', '#FFB347', '#6EE7B7', '#FDBA74', '#F97373', '#38BDF8'];
 
   const el = {
-    select: $('#aaSelect'), tagline: $('#aaTagline'), tourKicker: $('#aaTourKicker'), homeSel: $('#aaHome'), levels: $('#aaLevels'), progress: $('#aaProgress'), streak: $('#aaStreak'), daily: $('#aaDaily'), hudDiff: $('#aaHudDiff'), play: $('#aaPlay'), playSub: $('#aaPlaySub'), path: $('#aaPath'), btnVibe: $('#aaVibe'), btnGuides: $('#aaGuides'), btnMusic: $('#aaMusic'), howTo: $('#aaHowTo'),
+    select: $('#aaSelect'), tagline: $('#aaTagline'), dailyRow: $('#aaDailyRow'), homeSel: $('#aaHome'), levels: $('#aaLevels'), progress: $('#aaProgress'), streak: $('#aaStreak'), daily: $('#aaDaily'), hudDiff: $('#aaHudDiff'), play: $('#aaPlay'), playSub: $('#aaPlaySub'), path: $('#aaPath'), btnVibe: $('#aaVibe'), btnGuides: $('#aaGuides'), btnMusic: $('#aaMusic'), howTo: $('#aaHowTo'),
     sheet: $('#aaSheet'), levelsSheet: $('#aaLevelsSheet'), levelsBtn: $('#aaLevelsBtn'), settingsBtns: $$('#aaSettings, #aaSettingsG'), themeBtn: $('#aaTheme'), themes: $('#aaThemes'),
     game: $('#aaGame'), boardWrap: $('#aaBoardWrap'), board: $('#aaBoard'), toast: $('#aaToast'), confetti: $('#aaConfetti'),
     hudLevel: $('#aaHudLevel'), hudMode: $('#aaHudMode'), hudTime: $('#aaHudTime'), hudLeft: $('#aaHudLeft'), hudLives: $('#aaHudLives'), hudLivesWrap: $('#aaHudLivesWrap'), hudPct: $('#aaHudPct'), boardBar: $('#aaBoardBar'),
@@ -288,8 +288,7 @@
     const n = DATA.levels.length;
     const done = DATA.levels.filter((_, i) => cleared(i)).length;
     const learned = DATA.levels.filter((_, i) => cleared(i)?.quiz).length;
-    el.progress.textContent = `${done}/${n}`;
-    el.progress.setAttribute('aria-label', `${done} of ${n} countries cleared, ${learned} named correctly`);
+    if (el.progress) { el.progress.textContent = `${done}/${n} cleared · ${learned} named`; el.progress.setAttribute('aria-label', `${done} of ${n} countries cleared, ${learned} named correctly`); }
     const streak = store.get('streak', 0), dStreak = store.get('dailyStreak', { count: 0, last: '' });
     el.streak.textContent = streak >= 2 ? `🔥 ${streak} in a row` : dStreak.count >= 2 ? `🔥 ${dStreak.count}-day daily streak` : '';
     renderDaily();
@@ -329,13 +328,10 @@
   function renderDaily() {
     const d = dailyPick(), L = DATA.levels[d.idx], rec = store.get(`daily:${d.key}`);
     const date = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    el.daily.innerHTML = `
-      <button type="button" class="aa-mini aa-mini--daily" data-daily aria-label="Today's Country, ${rec ? 'cleared, replay' : 'play'}">
-        <span class="aa-mini-kicker">Today's Country</span>
-        <span class="aa-mini-big">${rec ? L.name : 'Mystery'} · ${DIFF_OF(d.tier)}</span>
-        <span class="aa-mini-sub">${rec ? `Cleared ${'★'.repeat(rec.stars)} · replay` : `${date} · play`}</span>
-      </button>`;
-    $('[data-daily]', el.daily).addEventListener('click', () => startLevel(d.idx, false, d));
+    // Settings → Today's Country: the same board for everyone today (label and handler live on the row)
+    if (!el.daily) return;
+    el.daily.textContent = `${rec ? L.name : 'Mystery'} · ${DIFF_OF(d.tier)} · ${rec ? `cleared ${'★'.repeat(rec.stars)}, replay` : `${date}, play`}`;
+    el.dailyRow.onclick = () => { closeSheets(); startLevel(d.idx, false, d); };
   }
 
   // ── Board masks ──
@@ -1063,7 +1059,7 @@
   const openSheet = sh => { sh.hidden = false; document.body.style.overflow = 'hidden'; };
   const closeSheets = () => { el.sheet.hidden = true; el.levelsSheet.hidden = true; document.body.style.overflow = ''; };
   el.settingsBtns.forEach(b => b.addEventListener('click', () => openSheet(el.sheet)));
-  el.levelsBtn.addEventListener('click', () => { renderSelect(); openSheet(el.levelsSheet); });
+  el.levelsBtn?.addEventListener('click', () => { closeSheets(); renderSelect(); openSheet(el.levelsSheet); });
   $$('[data-close-sheet]').forEach(b => b.addEventListener('click', closeSheets));
   $$('.aa-sheet').forEach(sh => sh.addEventListener('click', e => { if (e.target === sh) closeSheets(); }));
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSheets(); });

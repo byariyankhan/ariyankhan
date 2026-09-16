@@ -80,7 +80,7 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-flagcell.is-open{ opacity:1; }
 .aa-flag-thumb{ display:block; width:min(60%,180px); margin:6px auto 10px; border-radius:6px; box-shadow:var(--shadow); }
 .aa-row--select{ cursor:default; }
-.aa-row--select .aa-row-label small{ display:block; font-size:12px; font-weight:600; color:var(--muted); }
+.aa-row-label small{ display:block; font-size:12px; font-weight:600; color:var(--muted); }
 .aa-select{ font:inherit; font-weight:700; font-size:14px; color:var(--ink); background:var(--bg2); border:none; border-radius:12px; padding:8px 10px; max-width:46%; }
 .aa-mini-slot{ display:contents; }
 .aa-mini{ display:flex; flex-direction:column; align-items:flex-start; gap:2px; min-height:64px; padding:10px 14px; border-radius:16px; border:none; text-align:left; color:#fff; cursor:pointer; box-shadow:var(--shadow); font-family:inherit; transition:transform .15s; }
