@@ -28,4 +28,11 @@ file_put_contents("/var/www/html/mail-config.local.php", "<?php\nreturn " . var_
 chown www-data:www-data "$ROOT"/mail-config.local.php
 chmod 600 "$ROOT"/mail-config.local.php
 
+# Arrow Atlas accounts: the SQLite file lives in a Docker volume so a deploy cannot wipe it. The volume arrives
+# owned by root, and Apache runs as www-data, so hand it over here or the game cannot open its database.
+DATA_DIR="${AA_DATA_DIR:-/var/lib/arrow-atlas}"
+mkdir -p "$DATA_DIR"
+chown -R www-data:www-data "$DATA_DIR"
+chmod 750 "$DATA_DIR"
+
 exec apache2-foreground
