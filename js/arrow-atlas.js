@@ -274,12 +274,8 @@
       const rec = cleared(i), isNext = i === nextIdx, open = unlocked(i);
       p.classList.toggle('is-done', !!rec); p.classList.toggle('is-next', isNext); p.classList.toggle('is-locked', !open);
       p.setAttribute('aria-label', rec ? `Level ${i + 1}, ${DATA.levels[i].name}, cleared, replay` : isNext ? `Level ${i + 1}, next, play` : open ? `Level ${i + 1}, play` : `Level ${i + 1}, locked`);
-      if (rec || isNext) {
-        const g = svgEl('g', { class: isNext ? 'is-next' : '' });
-        g.appendChild(svgEl('circle', { cx: c.cx, cy: c.cy, r: 16 }));
-        const t = svgEl('text', { x: c.cx, y: c.cy }); t.textContent = String(i + 1); g.appendChild(t);
-        labels.appendChild(g);
-      }
+      // no numbers on the map: cleared countries are simply coloured in, only the next one gets a marker
+      if (isNext) { const g = svgEl('g', { class: 'is-next' }); g.appendChild(svgEl('circle', { cx: c.cx, cy: c.cy, r: 9 })); labels.appendChild(g); }
     }
     el.worldCap.textContent = done ? `${done} of ${n} countries collected · tap a country to play it` : 'Your world tour starts here · tap the highlighted country';
 
