@@ -633,7 +633,11 @@ unlock (skip allowed after two fails), stars, best times and progress in
   JavaScript origins** must list `https://ariyankhan.com`, or Google's library
   refuses to show the button on the live site. `arrow-atlas.html` gets its own
   slightly wider CSP in `.htaccess` for Google's sign-in library. Deleting the
-  account is in the dashboard because Google Play requires it.
+  account is in the dashboard because Google Play requires it. A new account is
+  created with `AA_SIGNUP_GOLD` (10,000) as the `gold` column's default, so the
+  welcome purse lands exactly once: signing out and back in never tops it up,
+  and the column default also covers accounts made before gold existed. The
+  balance rides along in every `user` object and shows on the dashboard.
   `tests/auth.test.php` covers the security-critical half without the network:
   which ID tokens are accepted (audience, issuer, expiry, unverified accounts,
   junk answers), that one Google account makes exactly one player, that session

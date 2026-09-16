@@ -38,13 +38,27 @@ ok(mb_strlen(aa_google_verify('tok', $CLIENT, $fake(['name' => str_repeat('অ',
 
 echo "\nAccounts\n";
 $db = aa_db();
-$id = aa_upsert_user($db, 'google', 'sub-1', 'Ariyan');
+$id = aa_upsert_user($db, 'google', 'sub-1', 'Ariyan', $madeFirst);
+ok($madeFirst === true, 'the server reports that the account was created just now');
 ok($id > 0, 'the first sign-in creates the account');
 ok(aa_upsert_user($db, 'google', 'sub-1', 'Ariyan') === $id, 'signing in again reuses the same account');
 ok(aa_upsert_user($db, 'google', 'sub-2', 'Someone') !== $id, 'a different Google account is a different player');
 ok((int)$db->query('SELECT COUNT(*) FROM users')->fetchColumn() === 2, 'two accounts exist');
 $cols = array_column($db->query('PRAGMA table_info(users)')->fetchAll(), 'name');
 ok(!in_array('email', $cols, true) && !in_array('password', $cols, true), 'no email and no password column exists at all');
+
+echo "\nWelcome gold\n";
+$gold = fn(int $u) => (int)$db->query("SELECT gold FROM users WHERE id = $u")->fetchColumn();
+ok($gold($id) === 10000, 'a new account starts with 10,000 gold');
+ok(AA_SIGNUP_GOLD === 10000, 'the welcome purse is 10,000');
+$db->prepare('UPDATE users SET gold = ? WHERE id = ?')->execute([250, $id]);
+$again = aa_upsert_user($db, 'google', 'sub-1', 'Ariyan', $madeAgain);
+ok($again === $id && $madeAgain === false, 'signing in again does not make a second account');
+ok($gold($id) === 250, 'and does not top the gold back up');
+$fresh = aa_upsert_user($db, 'google', 'sub-3', 'Newcomer', $madeNew);
+ok($madeNew === true && $gold($fresh) === 10000, 'the next new player gets their own 10,000');
+$db->prepare('DELETE FROM users WHERE id = ?')->execute([$fresh]);
+$db->prepare('UPDATE users SET gold = ? WHERE id = ?')->execute([10000, $id]);
 
 echo "\nSessions\n";
 $_COOKIE = [];
@@ -54,6 +68,7 @@ ok((string)$db->query('SELECT hash FROM sessions')->fetchColumn() !== $token, 't
 $_COOKIE[AA_COOKIE] = $token;
 $me = aa_current_user($db);
 ok($me !== null && $me['id'] === $id && $me['name'] === 'Ariyan', 'the cookie identifies the player');
+ok(($me['gold'] ?? null) === 10000, 'and carries the gold balance');
 $_COOKIE[AA_COOKIE] = bin2hex(random_bytes(32));
 ok(aa_current_user($db) === null, 'a made-up cookie identifies nobody');
 $_COOKIE[AA_COOKIE] = 'short';
