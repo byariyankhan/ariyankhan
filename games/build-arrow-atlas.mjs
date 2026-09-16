@@ -19,12 +19,12 @@ const js = fs.readFileSync(new URL('../js/arrow-atlas.js', import.meta.url), 'ut
 const grab = re => { const m = js.match(re); if (!m) throw new Error('could not find ' + re); return m[0]; };
 const { rasterise, REF } = new Function([grab(/const REF = \d+;/), grab(/function parsePath\(d\) \{[\s\S]*?\n  \}\n/), grab(/function insidePath\([\s\S]*?\n  \}\n/), grab(/function rasterise\([\s\S]*?\n  \}\n/)].join('\n') + '\nreturn { rasterise, REF };')();
 
-const TARGETS = [110, 240, 400, 540, 680]; // land cells per difficulty tier: boards ~28 cells across, like the reference apps (thick lines, long snakes)
+const TARGETS = [110, 240, 400, 700, 900]; // land cells per difficulty tier: boards ~28 cells across, like the reference apps (thick lines, long snakes)
 // Board caps per tier (cells). Easy to Hard keep ~12 px cells on a phone; Expert and Master may grow so their
 // targets are actually reached (with one cap for all, Master boards were no bigger than Hard ones).
-const MAX_DIM_OF = [32, 32, 32, 36, 40];     // widest/tallest board for roundish countries
-const MAX_TALL_OF = [46, 46, 46, 50, 54];    // long side for tall shapes (Chile, Norway)
-const MAX_WIDE_OF = [38, 38, 38, 42, 46];    // long side for wide shapes (Cuba, Malaysia)
+const MAX_DIM_OF = [32, 32, 32, 40, 44];     // widest/tallest board for roundish countries
+const MAX_TALL_OF = [46, 46, 46, 54, 58];    // long side for tall shapes (Chile, Norway)
+const MAX_WIDE_OF = [38, 38, 38, 46, 50];    // long side for wide shapes (Cuba, Malaysia)
 
 // World Tour order: the original 70 (recognisable shapes first, then by area), then every other country by population.
 const TOUR = [

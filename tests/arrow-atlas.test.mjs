@@ -35,8 +35,8 @@ test('168 levels with name, capital, outline and 5 tier scales', () => {
   for (const L of data.levels) { assert.ok(L.name && L.cap && L.d.startsWith('M'), L.name); assert.equal(L.k.length, 5); assert.ok(L.k.every(k => k > 0), L.name); assert.ok(L.cont, `${L.name} has no continent`); }
 });
 test('every level id is unique', () => assert.equal(new Set(data.levels.map(l => l.id)).size, data.levels.length));
-test('rasterised tiers grow in cell count and stay within the per-tier caps (32/32/32/36/40, long side 46/46/46/50/54)', () => {
-  const DIM = [32, 32, 32, 36, 40], LONG = [46, 46, 46, 50, 54];
+test('rasterised tiers grow in cell count and stay within the per-tier caps (32/32/32/40/44, long side 46/46/46/54/58)', () => {
+  const DIM = [32, 32, 32, 40, 44], LONG = [46, 46, 46, 54, 58];
   for (const L of data.levels) {
     for (let t = 0; t < 5; t++) { const m = maskFor(L, t); assert.ok(m.count >= 20, `${L.name} tier ${t} has only ${m.count} cells`); assert.ok(Math.max(m.w, m.h) <= LONG[t] && Math.min(m.w, m.h) <= DIM[t], `${L.name} tier ${t} is ${m.w}x${m.h}`); assert.equal(m.rows.length, m.h); assert.ok(m.rows.every(r => r.length === m.w)); }
     for (let t = 1; t < 5; t++) assert.ok(maskFor(L, t).count >= maskFor(L, t - 1).count, `${L.name} tier ${t} smaller than tier ${t - 1}`);
