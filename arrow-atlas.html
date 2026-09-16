@@ -63,7 +63,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="css/arrow-atlas.css?v=27" />
+    <link rel="stylesheet" href="css/arrow-atlas.css?v=28" />
     <link rel="preload" href="games/data/arrow-atlas.json?v=11" as="fetch" crossorigin="anonymous" />
 
     <!-- SCHEMA -->
@@ -231,6 +231,7 @@
           <svg id="aaBoard" class="aa-board" viewBox="0 0 10 10" role="group" aria-label="Puzzle board. Tap an arrow to shoot it off the board."></svg>
           <canvas class="aa-confetti" id="aaConfetti" hidden></canvas>
           <div class="aa-toast" id="aaToast" role="status" aria-live="polite" hidden></div>
+          <div class="aa-zoom" id="aaZoom" role="group" aria-label="Zoom"><button type="button" class="aa-zoom-btn" data-zoom="out" aria-label="Zoom out">−</button><button type="button" class="aa-zoom-btn aa-zoom-fit" data-zoom="fit" aria-label="Fit board to screen">⤢</button><button type="button" class="aa-zoom-btn" data-zoom="in" aria-label="Zoom in">+</button></div>
           <div class="aa-overlay" id="aaOverlay" hidden>
             <div class="aa-card" id="aaCard" role="dialog" aria-live="polite"></div>
           </div>
@@ -428,6 +429,6 @@
       </div>
     </div>
 
-    <script src="js/arrow-atlas.js?v=39"></script>
+    <script src="js/arrow-atlas.js?v=40"></script>
   </body>
 </html>
