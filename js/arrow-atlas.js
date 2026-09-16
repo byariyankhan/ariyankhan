@@ -14,7 +14,7 @@
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
   const SVG_NS = 'http://www.w3.org/2000/svg';
-  const DATA_VERSION = '8';
+  const DATA_VERSION = '9';
   const MAP_VERSION = '1';
   const STORE = 'aa:v1:';
   const store = {
@@ -32,9 +32,11 @@
   const MILESTONES = [25, 50, 75, 90];
   const RUSH_SECONDS = 90;
   const HINT_PENALTY_MS = 5000;
-  const HINTS_PER_LEVEL = 3;       // Classic and Rush; Deep Focus is unlimited
+  const HINTS_PER_LEVEL = 3;
+  const HINTS_OF = [3, 3, 3, 2, 1];   // hints per tier
+  const hintsFor = tier => HINTS_OF[tier] ?? HINTS_PER_LEVEL;
   const MODES = { classic: 'Classic' };  // one way to play: the tour ramps up, and the player's own form shifts it
-  const LIVES_OF = [4, 4, 4, 4, 3];   // hearts per tier: Master boards, as the reference apps' hard levels, give three
+  const LIVES_OF = [4, 4, 4, 3, 2];   // hearts per tier: Expert three, Master two
   const livesFor = tier => LIVES_OF[tier] ?? LIVES;
   // ── Adaptive difficulty ──
   // Difficulty follows the player, never the level number. One tier (0 Easy … 4 Master) lives on the device and
@@ -65,7 +67,7 @@
   const LANE_OF = [1, 2, 3, 3, 4];                 // longest lane (empty cells between an arrow and its blocker)
   // Tightening iterations per tier (see generate stage 3): a local search that turns arrows to face a blocker so a
   // simulated player has fewer free arrows to pick from at any moment. Hard and up.
-  const TIGHTEN_OF = [0, 0, 250, 350, 400];
+  const TIGHTEN_OF = [0, 0, 250, 300, 300];
   const GEN_OPTS = tier => ({ narrow: NARROW_OF[tier], far: FAR_OF[tier], rail: RAIL_OF[tier], holes: HOLE_OF[tier], lane: LANE_OF[tier], tighten: TIGHTEN_OF[tier] });
   const DIRS = { r: [0, 1], l: [0, -1], d: [1, 0], u: [-1, 0] };
   const PALETTE = ['#FFED54', '#5CD6FF', '#8CFF7A', '#FF9AD5', '#C79BFF', '#FFB347', '#6EE7B7', '#FDBA74', '#F97373', '#38BDF8'];
@@ -537,7 +539,7 @@
 
   // Generate a few candidate boards from the seed and keep the narrowest (fewest arrows free at the start), so the
   // difficulty a tier promises does not depend on the luck of one seed. Candidates per tier: CANDIDATES_OF.
-  const CANDIDATES_OF = [4, 6, 8, 8, 6];
+  const CANDIDATES_OF = [4, 6, 8, 6, 5];
   function freeAtStart(b) { const { W, H, occ } = b; return b.pieces.filter(p => { const [dr, dc] = DIRS[p.dir]; let [y, x] = p.cells[0]; y += dr; x += dc; while (y >= 0 && y < H && x >= 0 && x < W) { if (occ[y][x] >= 0) return false; y += dr; x += dc; } return true; }).length; }
   // Lower is better. A quick simulated player who always takes the free arrow nearest the one just tapped (the
   // way people actually play) measures how many arrows are free at any moment and how often the arrow freed by
@@ -652,9 +654,10 @@
     el.hudLevel.textContent = daily ? 'Daily' : `Level ${i + 1}`; el.hudLeft.textContent = 'Drawing the board…';
     await new Promise(r => setTimeout(r, 20));   // let the game screen paint before the (up to ~1 s on phones) generation
     state.maskInfo = maskFor(state.level, state.tier);
-    const gen = bestBoard(state.maskInfo, state.tier, (daily ? daily.seed : (i + 1) * 1000) + state.seedBump);
+    const seed = (daily ? daily.seed : (i + 1) * 1000) + state.seedBump;
+    const gen = bestBoard(state.maskInfo, state.tier, seed);
     const livesMax = livesFor(state.tier);
-    Object.assign(state, { W: gen.W, H: gen.H, pieces: gen.pieces, occ: gen.occ, land: gen.land, left: gen.pieces.length, lives: livesMax, livesMax, elapsed: 0, startedAt: 0, finished: false, hintsUsed: 0, wrong: 0, busy: false, combo: 0, bestCombo: 0, lastShot: 0, cheerHold: 0, shown: new Set(), armed: new Set() });
+    Object.assign(state, { W: gen.W, H: gen.H, pieces: gen.pieces, occ: gen.occ, land: gen.land, left: gen.pieces.length, hintsMax: hintsFor(state.tier), lives: livesMax, livesMax, elapsed: 0, startedAt: 0, finished: false, hintsUsed: 0, wrong: 0, busy: false, combo: 0, bestCombo: 0, lastShot: 0, cheerHold: 0, shown: new Set(), armed: new Set() });
     el.error.hidden = true; el.loading.hidden = true;
     if (daily) { if (history.replaceState) history.replaceState(null, '', location.pathname + location.search + '#daily'); } else setHash(i);
     scrollToGame();
@@ -671,7 +674,7 @@
     const diffLabel = state.diff || DIFF_OF(state.tier);
     el.hudDiff.textContent = diffLabel;
     el.hudDiff.className = 'aa-hud-diff aa-hud-diff--' + diffLabel.toLowerCase().replace(' ', '-');
-    const hintsLeft = HINTS_PER_LEVEL - state.hintsUsed;
+    const hintsLeft = (state.hintsMax ?? HINTS_PER_LEVEL) - state.hintsUsed;
     el.btnHint.textContent = `💡 ${Math.max(0, hintsLeft)}`;
     el.btnHint.disabled = state.finished || hintsLeft <= 0;
     const pct = state.pieces.length ? Math.round(((state.pieces.length - state.left) / state.pieces.length) * 100) : 0;
@@ -796,7 +799,7 @@
   }
   function hint() {
     if (state.finished) return;
-    if (state.hintsUsed >= HINTS_PER_LEVEL) { toast('No hints left on this level.', 'bad'); return; }
+    if (state.hintsUsed >= (state.hintsMax ?? HINTS_PER_LEVEL)) { toast('No hints left on this level.', 'bad'); return; }
     const p = state.pieces.find(q => !q.gone && !blockerOf(q));
     if (!p) return;
     startTimer();
@@ -804,7 +807,7 @@
     $$('.aa-piece.is-hint', el.board).forEach(g => g.classList.remove('is-hint'));
     p.el.classList.add('is-hint');
     setTimeout(() => p.el.classList.remove('is-hint'), 2500);
-    toast(`Hint: the glowing arrow is free. ${HINTS_PER_LEVEL - state.hintsUsed} left.`, 'hint');
+    toast(`Hint: the glowing arrow is free. ${(state.hintsMax ?? HINTS_PER_LEVEL) - state.hintsUsed} left.`, 'hint');
     renderHud();
   }
 

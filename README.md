@@ -470,7 +470,7 @@ G6, low-passed, delayed, ~0.11 gain) — no audio file, no licence, works
 offline; it starts on the first tap and stops when the tab is hidden. This is the
 same shell we will wrap for Android/iOS (TWA / Capacitor). Each level is a
 country's outline filled with arrows; tap an arrow to shoot it off the board if its
-run to the edge is clear, a blocked tap costs one heart, no clock (time is still recorded for the result card), 4 hearts (3 on Master, `LIVES_OF`) and 3 hints per
+run to the edge is clear, a blocked tap costs one heart, no clock (time is still recorded for the result card), 4 hearts (3 on Expert, 2 on Master: `LIVES_OF`) and 3 hints (2 / 1: `HINTS_OF`) per
 level, difficulty that follows the player and never the level number (one
 tier 0 Easy / 1 Normal / 2 Hard / 3 Expert / 4 Master lives in `aa:v1:form` as
 `{tier, wins, losses}`; `nextForm` moves it on form alone: a cleared board earns
@@ -558,6 +558,15 @@ unlock (skip allowed after two fails), stars, best times and progress in
 - **No zoom**: the viewport meta sets `maximum-scale=1, user-scalable=no` and
   `html, body, .aa-app` carry `touch-action: manipulation`, so fast double taps
   and stray pinches can no longer zoom the page and push the board off screen.
+- **Why not a "one or two free arrows" rule**: the geometry of a country board
+  leaves ~11 arrows free at the start and 3-4 at any moment, and no orientation
+  search moves that floor (annealing, locality objectives, straight snakes and
+  two rewritten generators were all measured against it). Freezing the excess
+  and thawing it on a schedule was built and rejected: a visible thaw reveals
+  the next free arrow, an invisible one just adds fruitless taps. The levers
+  that do add time are board size and hearts: Expert/Master boards grow to
+  700/900 cells (~105/135 arrows), Expert gives 3 hearts and 2 hints, Master
+  2 hearts and 1 hint (`LIVES_OF`, `HINTS_OF`).
 - **Tightening** (generate stage 3, Hard and up, `TIGHTEN_OF` iterations): a local
   search over head ends after signposting. Flip one arrow to its other end, or,
   when that closes a cycle, also one arrow on its new run, and keep the flip when
