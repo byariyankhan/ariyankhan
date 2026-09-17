@@ -2,8 +2,8 @@
 //
 // Point it at the API directly, or at nginx, with AA_TEST_BASE. Everything here is the outside view: what a
 // browser and a phone app can actually do, what they are refused, and what happens when Redis disappears.
-import Redis from 'ioredis';
 import { pool, query, tx } from '../backend/src/db.js';
+import { redis } from '../backend/src/redis.js';
 import { config } from '../backend/src/config.js';
 import { give, idem } from '../backend/src/gold.js';
 import { startSession } from '../backend/src/auth.js';
@@ -133,7 +133,7 @@ section('Rate limits bite, and say so properly');
 
 section('Losing Redis degrades the game; it does not stop it');
 {
-  const redis = new Redis({ host: config.redis.host, port: config.redis.port, ...(config.redis.password ? { password: config.redis.password } : {}) });
+  // The service's own client, so this suite imports nothing the backend does not already depend on.
   await redis.flushall();                                 // as if the cache had been restarted from nothing
   const me = await call('/auth/me', { token: a.token });
   eq(me.status, 200, 'signing in still works with an empty Redis');
@@ -142,7 +142,6 @@ section('Losing Redis degrades the game; it does not stop it');
   const code = (made.json.match as { code: string }).code;
   const got = await call(`/matches/${code}`, { token: a.token });
   eq((got.json.match as { code: string }).code, code, 'and reading it back still works');
-  await redis.quit();
   // And the things that must never have been in Redis are still in PostgreSQL.
   const still = await query<{ n: number }>(pool, 'SELECT COUNT(*)::int AS n FROM users WHERE id = $1', [a.id]);
   eq(still.rows[0]!.n, 1, 'the account is where it belongs: in PostgreSQL');

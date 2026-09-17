@@ -16,8 +16,6 @@ tests/fixtures/
 
 # Arrow Atlas backend
 node_modules/
-# the tests reach the backend's modules through a symlink of this name, which a trailing slash would miss
-games/arrow-atlas/tests/node_modules
 games/arrow-atlas/backend/dist/
 games/arrow-atlas/deploy/.env
 games/arrow-atlas/backend/.env.dev

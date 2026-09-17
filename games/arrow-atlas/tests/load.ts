@@ -4,7 +4,6 @@
 //   npx tsx ../tests/load.ts write 30 8     POST progress, the write path during a race
 //   npx tsx ../tests/load.ts ws    200      open N sockets, watch rooms, push progress, measure the fan-out
 import { readFileSync } from 'node:fs';
-import WebSocket from 'ws';
 
 const BASE = process.env.AA_TEST_BASE ?? 'http://127.0.0.1:8760';
 const V = `${BASE}/api/arrow-atlas/v1`;
@@ -102,12 +101,12 @@ if (mode === 'ws') {
     const ws = new WebSocket(`${WS_URL}?token=${encodeURIComponent(token)}`);
     sockets.push(ws);
     let asked = 0;
-    ws.on('open', () => { open++; connectMs.push(performance.now() - t0); asked = performance.now(); ws.send(JSON.stringify({ type: 'watch', code: r.code })); });
-    ws.on('message', raw => {
+    ws.addEventListener('open', () => { open++; connectMs.push(performance.now() - t0); asked = performance.now(); ws.send(JSON.stringify({ type: 'watch', code: r.code })); });
+    ws.addEventListener('message', e => {
       received++;
-      try { if (JSON.parse(String(raw)).type === 'state' && asked) { firstStateMs.push(performance.now() - asked); asked = 0; res(); } } catch { /* ignore */ }
+      try { if (JSON.parse(String(e.data)).type === 'state' && asked) { firstStateMs.push(performance.now() - asked); asked = 0; res(); } } catch { /* ignore */ }
     });
-    ws.on('error', () => { failed++; res(); });
+    ws.addEventListener('error', () => { failed++; res(); });
     setTimeout(res, 20_000);
   })));
   console.log(`sockets: ${open} open, ${failed} failed`);

@@ -142,13 +142,14 @@ docker compose logs -f arrow-atlas-api
 curl -s localhost:8760/health
 ```
 
-**A faster, reproducible alternative.** `.github/workflows/arrow-atlas-api.yml` builds the image, runs all four
-test suites against real PostgreSQL and Redis containers, and publishes to `ghcr.io`. It is not running yet:
-GitHub Actions has never run in this repository (zero workflow runs in its whole history), so it is presumably
-switched off under **Settings → Actions → General**. Turn it on and a deploy becomes a pull rather than a build:
-set `ARROW_ATLAS_IMAGE` in `.env`, replace the API service's `image:` line with `image: ${ARROW_ATLAS_IMAGE}`,
-and delete its `command:` block. Until then the fetch-and-build above is what works, and it is what the rest of
-this site already does.
+**A faster, reproducible alternative, once this lands on main.** `.github/workflows/arrow-atlas-api.yml` runs
+all four suites against real PostgreSQL and Redis service containers on every push and pull request, and on a
+push to `main` it also builds the image and publishes it to `ghcr.io`. The publish only runs on `main`, so the
+image does not exist until this merges — which is why the fetch-and-build above is what the cutover uses.
+
+Afterwards, switching is three things: set `ARROW_ATLAS_IMAGE` in `.env`, replace the API service's `image:` line
+with `image: ${ARROW_ATLAS_IMAGE}`, and delete its `command:` block. A deploy then becomes `docker compose pull`
+rather than a two-to-four minute build on a 2-vCPU box at every restart.
 
 nginx, once:
 
@@ -349,12 +350,17 @@ cp .env.example .env.dev       # point it at a local PostgreSQL and Redis
 npm run migrate
 npx tsx src/server.ts
 
-bash ../tests/run.sh                       # economy, migration, api
-bash ../tests/run.sh economy migration api ws
+bash ../tests/run.sh                       # all four
+bash ../tests/run.sh economy api           # or just some
 ```
 
 The suites need a real PostgreSQL and a real Redis, because what they test is transactions and expiry. CI runs
-them against service containers on every push.
+them against service containers on every push and pull request.
+
+They import Node's own built-ins and the backend's source, and nothing by bare package name: `tests/` has no
+`node_modules` of its own, so a bare import there would not resolve. The socket suites use Node's built-in
+`WebSocket`, which is the same API the browser client uses. CI has a step that fails on a bare import rather
+than letting it turn into a module-not-found error halfway through a run.
 
 | Suite | What it covers |
 |---|---|

@@ -74,13 +74,17 @@ jobs:
         working-directory: games/arrow-atlas/backend
         run: npx tsx src/migrate.ts
 
-      - name: Rules and economy
-        working-directory: games/arrow-atlas/backend
-        run: npx tsx ../tests/economy.test.ts
-
-      - name: Existing-data migration
-        working-directory: games/arrow-atlas/backend
-        run: npx tsx ../tests/migration.test.ts
+      # The suites live beside the backend, so they may import its source but nothing by bare package name:
+      # tests/ has no node_modules of its own and a bare import there fails to resolve. Saying so here beats
+      # finding out from a module-not-found error halfway through a run.
+      - name: No bare package imports in the suites
+        working-directory: games/arrow-atlas/tests
+        run: |
+          if grep -nE "^import .* from '[^.n]" *.ts | grep -v "from 'node:"; then
+            echo "::error::a test file imports a package by name; import it through ../backend/src instead, or use a Node built-in"
+            exit 1
+          fi
+          echo "none, as intended"
 
       - name: Start the API
         working-directory: games/arrow-atlas/backend
@@ -88,13 +92,8 @@ jobs:
           npx tsx src/server.ts & echo $! > /tmp/api.pid
           for i in $(seq 1 40); do curl -sf http://127.0.0.1:8760/health/live && break; sleep 0.5; done
 
-      - name: HTTP surface
-        working-directory: games/arrow-atlas/backend
-        run: npx tsx ../tests/api.test.ts
-
-      - name: Live socket
-        working-directory: games/arrow-atlas/backend
-        run: npx tsx ../tests/ws.test.ts
+      - name: Every suite
+        run: bash games/arrow-atlas/tests/run.sh
 
       - name: Stop the API
         if: always()

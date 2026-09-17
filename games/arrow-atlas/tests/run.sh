@@ -1,13 +1,17 @@
 #!/bin/bash
 # Run the Arrow Atlas test suites.
 #
-# The suites live beside the backend rather than inside it, so they need its node_modules on their resolution
-# path; a symlink is the least surprising way to give them one, and it is ignored by git.
+#   ./run.sh                      all of them
+#   ./run.sh economy api          just those
+#
+# The suites import nothing but Node's own built-ins and the backend's source, which is why they can sit beside
+# the backend rather than inside it and still resolve: a relative import into backend/src carries that package's
+# own dependencies with it. A bare `import x from 'some-package'` in a test file would not resolve, and CI has a
+# step that says so rather than failing later with a confusing module error.
 set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BE="$HERE/../backend"
 [ -d "$BE/node_modules" ] || { echo "run 'npm install' in $BE first"; exit 1; }
-[ -e "$HERE/node_modules" ] || ln -s "$BE/node_modules" "$HERE/node_modules"
 
 # Local runs read backend/.env.dev; CI and the container pass the same variables in the environment.
 if [ -f "$BE/.env.dev" ] && [ -z "${ARROW_ATLAS_PG_HOST:-}" ]; then set -a; . "$BE/.env.dev"; set +a; fi

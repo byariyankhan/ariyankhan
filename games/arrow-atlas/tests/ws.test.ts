@@ -1,6 +1,5 @@
 // The live layer: connecting, watching a room, the countdown the server owns, progress that only moves
 // forwards, what a stranger is not allowed to see, and what a reconnecting phone gets back.
-import WebSocket from 'ws';
 import { pool, query, tx } from '../backend/src/db.js';
 import { give, idem } from '../backend/src/gold.js';
 import { startSession } from '../backend/src/auth.js';
@@ -31,8 +30,11 @@ const api = async (path: string, token: string, body?: unknown) =>
 function open(token: string) {
   const ws = new WebSocket(`${WS_URL}?token=${encodeURIComponent(token)}`);
   const seen: Record<string, unknown>[] = [];
-  ws.on('message', raw => { try { seen.push(JSON.parse(String(raw))); } catch { /* not ours */ } });
-  const ready = new Promise<void>((res, rej) => { ws.once('open', () => res()); ws.once('error', rej); });
+  ws.addEventListener('message', e => { try { seen.push(JSON.parse(String(e.data))); } catch { /* not ours */ } });
+  const ready = new Promise<void>((res, rej) => {
+    ws.addEventListener('open', () => res());
+    ws.addEventListener('error', () => rej(new Error('the socket would not open')));
+  });
   const waitFor = async (type: string, ms = 8_000): Promise<Record<string, unknown>> => {
     const until = Date.now() + ms;
     while (Date.now() < until) {
@@ -53,8 +55,8 @@ section('A socket needs a real session');
 {
   const bad = new WebSocket(`${WS_URL}?token=${'0'.repeat(48)}`);
   const refused = await new Promise<boolean>(res => {
-    bad.once('error', () => res(true));
-    bad.once('open', () => { bad.close(); res(false); });
+    bad.addEventListener('error', () => res(true));
+    bad.addEventListener('open', () => { bad.close(); res(false); });
   });
   ok(refused, 'an unknown token is turned away at the upgrade');
 }
