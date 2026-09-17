@@ -4,7 +4,7 @@ import WebSocket from 'ws';
 import { pool, query, tx } from '../backend/src/db.js';
 import { give, idem } from '../backend/src/gold.js';
 import { startSession } from '../backend/src/auth.js';
-import { eq, finish, ok, section } from './helpers.js';
+import { eq, finish, ok, reset, section } from './helpers.js';
 
 const BASE = process.env.AA_TEST_BASE ?? 'http://127.0.0.1:8760';
 const WS_URL = BASE.replace(/^http/, 'ws') + '/ws/arrow-atlas';
@@ -44,6 +44,10 @@ function open(token: string) {
   };
   return { ws, seen, ready, waitFor, send: (o: unknown) => ws.send(JSON.stringify(o)), close: () => ws.close() };
 }
+
+// Same reason as the HTTP suite: a room left waiting at the same stake by another suite would be joined rather
+// than created, and the countdown test would be watching somebody else's clock.
+await reset();
 
 section('A socket needs a real session');
 {

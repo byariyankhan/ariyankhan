@@ -56,6 +56,7 @@ export async function importSqlite(file: string, opts: { fresh?: boolean } = {})
   if (opts.fresh) await query(pool, 'TRUNCATE gold_ledger, match_players, matches, sessions, users RESTART IDENTITY CASCADE');
 
   const userIds = new Set(users.map(u => asInt(u.id)));
+  const byId = new Map(users.map(u => [asInt(u.id), { name: String(u.name ?? '') }]));
   // Count the seats per room before any are dropped: the pot must stay the size of what was actually staked,
   // even where the account that staked it has since been deleted.
   const seatsPerCode = new Map<string, number>();
@@ -84,14 +85,21 @@ export async function importSqlite(file: string, opts: { fresh?: boolean } = {})
     for (const m of matches) {
       const host = asInt(m.host_id);
       if (host && !userIds.has(host)) report.skipped.matches_without_host++;
+      // A match the old service had already settled must arrive settled: paid_at and winner_name are what say so
+      // from here on, and unlike winner_id they survive the winner deleting their account later.
+      const winnerId = asInt(m.winner_id);
+      const hadWinner = winnerId > 0;
+      const winnerName = hadWinner ? String(byId.get(winnerId)?.name ?? '') : '';
       await query(c, `INSERT INTO matches (code, host_id, stake, board, tier, seed, state, winner_id,
-                        open_to_all, stakes_in, fills_at, created_at, started_at, settled_at)
-                      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
+                        open_to_all, stakes_in, fills_at, created_at, started_at, settled_at,
+                        paid_at, winner_name)
+                      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
         [String(m.code), userIds.has(host) ? host : null, asInt(m.stake), String(m.board ?? ''),
          Math.max(0, Math.min(4, asInt(m.tier, 2))), asInt(m.seed), String(m.state ?? 'void'),
-         userIds.has(asInt(m.winner_id)) ? asInt(m.winner_id) : null,
+         userIds.has(winnerId) ? winnerId : null,
          asInt(m.open_to_all) === 1, seatsPerCode.get(String(m.code)) ?? 0,
-         secs(m.fills_at), secs(m.created) ?? new Date(), secs(m.started), secs(m.settled)]);
+         secs(m.fills_at), secs(m.created) ?? new Date(), secs(m.started), secs(m.settled),
+         hadWinner ? (secs(m.settled) ?? secs(m.created) ?? new Date()) : null, winnerName]);
       report.written.matches++;
     }
 
@@ -142,6 +150,8 @@ export async function importSqlite(file: string, opts: { fresh?: boolean } = {})
   add('every match state is one the game knows', await one(
     `SELECT COUNT(*)::bigint AS n FROM matches WHERE state NOT IN ('open','playing','done','void')`) === 0);
   add('no balance is negative', await one('SELECT COUNT(*)::bigint AS n FROM users WHERE gold < 0') === 0);
+  add('every settled match arrived settled', await one(
+    'SELECT COUNT(*)::bigint AS n FROM matches WHERE winner_id IS NOT NULL AND paid_at IS NULL') === 0);
   add('the next sign-up will not collide', await one(
     `SELECT CASE WHEN last_value > COALESCE((SELECT MAX(id) FROM users),0) - 1 THEN 0 ELSE 1 END::bigint AS n
        FROM users_id_seq`) === 0);

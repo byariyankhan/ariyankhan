@@ -18,6 +18,7 @@ DIR="${ARROW_ATLAS_BACKUP_DIR:-/backups}"
 HOST_DIR="/backups-host"
 KEEP_DAYS="${ARROW_ATLAS_BACKUP_KEEP_DAYS:-14}"
 AT_HOUR="${ARROW_ATLAS_BACKUP_AT_HOUR:-3}"
+AT_HOUR="${AT_HOUR#0}"; [ -n "$AT_HOUR" ] || AT_HOUR=0   # "03" is an illegal octal number in POSIX arithmetic
 DB="${PGDATABASE:-arrow_atlas}"
 STATUS="$DIR/last-run.json"
 
@@ -82,10 +83,13 @@ case "${1:-once}" in
     # One on boot, so a fresh deployment has a backup within the minute rather than within the day.
     once || fail "the first backup failed; carrying on so the schedule still runs"
     while true; do
-      now_h="$(date -u +%H)"; now_m="$(date -u +%M)"
-      # seconds until the next AT_HOUR:00 UTC
-      secs=$(( ( (10#$AT_HOUR - 10#$now_h + 24) % 24 ) * 3600 - 10#$now_m * 60 ))
-      [ "$secs" -le 60 ] && secs=$((secs + 86400))
+      # Seconds until the next AT_HOUR:00 UTC, counted from the epoch rather than from the hour and minute.
+      # This container runs Alpine's /bin/sh, where bash's 10# base notation is a syntax error and a bare "08"
+      # is an illegal octal number — either one would kill the loop under set -e and leave Compose restarting
+      # it forever instead of backing anything up. Epoch seconds have no leading zero to trip over.
+      now=$(date -u +%s)
+      secs=$(( AT_HOUR * 3600 - now % 86400 ))
+      [ "$secs" -le 60 ] && secs=$(( secs + 86400 ))
       log "next backup in ${secs}s"
       sleep "$secs"
       once || fail "scheduled backup failed"

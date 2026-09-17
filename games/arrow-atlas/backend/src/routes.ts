@@ -268,16 +268,32 @@ export function registerRoutes(app: FastifyInstance): void {
     create: H.create, get: H.get, join: H.join, start: H.start,
     cancel: H.leave, progress: H.progress, result: H.result, lobby: H.lobby,
   };
-  const legacy = (table: Record<string, (req: Req, res: Res, me: Caller) => Promise<void>>, fallback: string) =>
-    async (req: Req, res: Res) => {
-      const a = String(((req.query ?? {}) as { a?: string }).a ?? fallback);
-      const fn = table[a];
-      if (!fn) { await noStore(res).code(404).send({ error: 'unknown_action' }); return; }
-      await fn(req, res, await caller(req));
-    };
+  // Which of them a GET may reach. The PHP service answered `post_only` with a 405 to everything else, and that
+  // 405 was not politeness: the session cookie is SameSite=Lax, which a browser still sends on a top-level
+  // cross-site GET, so `?a=delete` behind a link would have deleted the reader's account. Anything that changes
+  // something is POST-only here for exactly the same reason.
+  const legacyReads: Record<string, Set<string>> = {
+    auth: new Set(['me']),
+    match: new Set(['get', 'lobby']),
+  };
+
+  const legacy = (
+    surface: 'auth' | 'match',
+    table: Record<string, (req: Req, res: Res, me: Caller) => Promise<void>>,
+    fallback: string,
+  ) => async (req: Req, res: Res) => {
+    const a = String(((req.query ?? {}) as { a?: string }).a ?? fallback);
+    const fn = table[a];
+    if (!fn) { await noStore(res).code(404).send({ error: 'unknown_action' }); return; }
+    if (req.method !== 'POST' && !legacyReads[surface]!.has(a)) {
+      await noStore(res).code(405).send({ error: 'post_only' });
+      return;
+    }
+    await fn(req, res, await caller(req));
+  };
 
   for (const method of ['get', 'post'] as const) {
-    app[method]('/games/api/auth.php', legacy(legacyAuth, 'me'));
-    app[method]('/games/api/match.php', legacy(legacyMatch, 'get'));
+    app[method]('/games/api/auth.php', legacy('auth', legacyAuth, 'me'));
+    app[method]('/games/api/match.php', legacy('match', legacyMatch, 'get'));
   }
 }

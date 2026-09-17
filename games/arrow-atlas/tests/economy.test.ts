@@ -3,6 +3,7 @@ import { pool, query, tx } from '../backend/src/db.js';
 import { config } from '../backend/src/config.js';
 import * as R from '../backend/src/rooms.js';
 import { give, idem, move } from '../backend/src/gold.js';
+import { deleteUser } from '../backend/src/auth.js';
 import { eq, finish, goldOf, ok, player, reset, section, stake } from './helpers.js';
 
 
@@ -193,6 +194,62 @@ section('A room of one walks into an older room when one turns up');
   eq(moved, older.code, 'the newer room of one moves into the older one');
   eq((await R.matchRow(pool, younger))!.state, 'void', 'and the room left behind closes');
   eq((await R.room(pool, older.code)).length, 2, 'both players are now in the same room');
+}
+
+section('A winner who deletes their account does not hand the pot to somebody else');
+{
+  // Reported by a review bot on PR #82, and real: winner_id is a foreign key with ON DELETE SET NULL, and the
+  // payout's ledger row cascades away with the account. Together they made a settled match look unsettled, so
+  // the next player to clear it was paid the same pot a second time — gold created out of a deletion.
+  const a = await player('vera'), b = await player('wasim'), c2 = await player('yusuf');
+  const made = await R.createMatch(a, S, false, 2) as { ok: true; code: string };
+  await tx(t => R.joinRoomTx(t, b.id, made.code, 2));
+  await tx(t => R.joinRoomTx(t, c2.id, made.code, 2));
+  await tx(t => R.startRoom(t, made.code));
+
+  const goldA = await goldOf(a.id);
+  await tx(async t => { await R.submitResult(t, made.code, a.id, 2_000, true); await R.settleMatch(t, made.code); });
+  eq(await goldOf(a.id), goldA + S * 3, 'the first to clear it takes the pot of three');
+
+  const paidOut = (await query<{ n: number }>(pool,
+    `SELECT COALESCE(SUM(delta),0)::bigint AS n FROM gold_ledger WHERE match_code = $1 AND reason = 'payout'`,
+    [made.code])).rows[0]!.n;
+
+  // now the winner deletes their account while the other two are still racing
+  await deleteUser(a.id, R.releasePlayer);
+
+  const goldB = await goldOf(b.id);
+  await tx(async t => { await R.submitResult(t, made.code, b.id, 5_000, true); await R.settleMatch(t, made.code); });
+  eq(await goldOf(b.id), goldB, 'the second finisher is not paid a pot that is already gone');
+
+  const payoutRows = (await query<{ n: number }>(pool,
+    `SELECT COUNT(*)::int AS n FROM gold_ledger WHERE match_code = $1 AND reason = 'payout'`,
+    [made.code])).rows[0]!.n;
+  eq(payoutRows, 0, 'the only payout row went with the account that was deleted, and no new one replaced it');
+  ok(paidOut > 0, 'the pot really had been paid before the deletion');
+
+  // and the last player still going must not be handed a draw refund either
+  const goldC = await goldOf(c2.id);
+  await tx(async t => { await R.submitResult(t, made.code, c2.id, -1, false); await R.settleMatch(t, made.code); });
+  eq(await goldOf(c2.id), goldC, 'nor is the last one out refunded a stake that was won');
+  const end = (await R.matchRow(pool, made.code))!;
+  eq(end.state, 'done', 'the match still closes');
+  ok(end.paid_at !== null, 'and it still remembers that it was won, with the winner gone');
+}
+
+section('A finished match remembers who won it after they leave');
+{
+  const a = await player('zara'), b = await player('amin');
+  const made = await R.createMatch(a, S, false, 2) as { ok: true; code: string };
+  await tx(t => R.joinRoomTx(t, b.id, made.code, 2));
+  await tx(t => R.startRoom(t, made.code));
+  await tx(async t => { await R.submitResult(t, made.code, a.id, 1_500, true); await R.settleMatch(t, made.code); });
+  await tx(async t => { await R.submitResult(t, made.code, b.id, -1, false); await R.settleMatch(t, made.code); });
+  await deleteUser(a.id, R.releasePlayer);
+  const m = (await R.matchRow(pool, made.code))!;
+  const view = await R.matchView(pool, m, b.id);
+  eq(view.draw, false, 'the result is not rewritten as a draw');
+  eq(view.winner, 'zara', 'and it still names the winner');
 }
 
 await finish();

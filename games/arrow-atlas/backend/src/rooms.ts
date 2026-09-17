@@ -21,6 +21,8 @@ export interface MatchRow {
   code: string; host_id: number | null; stake: number; board: string; tier: number; seed: number;
   state: 'open' | 'playing' | 'done' | 'void'; winner_id: number | null; open_to_all: boolean;
   stakes_in: number; fills_at: Date | null; created_at: Date; started_at: Date | null; settled_at: Date | null;
+  // paid_at and winner_name survive the winner deleting their account; winner_id does not
+  paid_at: Date | null; winner_name: string;
 }
 export interface SeatRow {
   seat_id: number; code: string; user_id: number; tier: number; pct: number;
@@ -164,12 +166,14 @@ export async function matchView(sql: PoolClient | typeof pool, m: MatchRow, meId
     view.seed = m.seed;
     view.your_ms = players.find(p => p.you)?.ms ?? null;
   }
-  // the pot is paid the instant somebody clears it, so the winner is named long before the match closes
-  if (m.winner_id !== null) {
-    view.winner = await nameOf(sql, m.winner_id, seats);
-    view.you_won = mine && m.winner_id === meId;
+  // The pot is paid the instant somebody clears it, so the winner is named long before the match closes. The
+  // name is read from the snapshot taken at settlement, so a winner who has since deleted their account is still
+  // the winner rather than the match quietly becoming a draw.
+  if (m.paid_at !== null) {
+    view.winner = m.winner_name || await nameOf(sql, m.winner_id, seats);
+    view.you_won = mine && m.winner_id !== null && m.winner_id === meId;
   }
-  if (m.state === 'done') view.draw = m.winner_id === null;
+  if (m.state === 'done') view.draw = m.paid_at === null;
   return view;
 }
 
@@ -352,26 +356,31 @@ export async function settleMatch(c: PoolClient, code: string): Promise<MatchRow
     if (best === null || done < best) { best = done; first = p.user_id; }
   }
 
+  // paid_at is the guard, not winner_id: an account deletion nulls the foreign key and cascades the payout's
+  // ledger row away, which used to make a settled match look unsettled and pay the same pot twice.
+  let paid = m.paid_at !== null;
   let winner = m.winner_id;
-  if (winner === null && first !== null) {
+  if (!paid && first !== null) {
+    const name = seats.find(p => p.user_id === first)?.name ?? '';
     const upd = await query(c,
-      `UPDATE matches SET winner_id = $2, settled_at = now()
-        WHERE code = $1 AND state = 'playing' AND winner_id IS NULL`, [code, first]);
+      `UPDATE matches SET winner_id = $2, winner_name = $3, paid_at = now(), settled_at = now()
+        WHERE code = $1 AND state = 'playing' AND paid_at IS NULL`, [code, first, name]);
     if (upd.rowCount === 1) {
       await give(c, first, m.stake * Math.max(1, m.stakes_in), 'payout', idem.payout(code), code);
-      winner = first;
+      winner = first; paid = true;
       log.info('pot paid', { code, winner_id: first, pot: m.stake * Math.max(1, m.stakes_in) });
     }
   }
-  if (!everyoneIn) return { ...m, winner_id: winner };            // the rest are still playing for their place
+  if (!everyoneIn) return { ...m, winner_id: winner, paid_at: paid ? (m.paid_at ?? new Date()) : null };
 
   const closed = await query(c,
     `UPDATE matches SET state = 'done', settled_at = now() WHERE code = $1 AND state = 'playing'`, [code]);
-  if (closed.rowCount === 1 && winner === null) {
+  if (closed.rowCount === 1 && !paid) {
     // nobody cleared it: every stake goes back, one refund per player, each with its own key
     for (const p of seats) await give(c, p.user_id, m.stake, 'draw_refund', idem.drawRefund(code, p.user_id), code);
   }
-  return { ...m, state: closed.rowCount === 1 ? 'done' : m.state, winner_id: winner };
+  return { ...m, state: closed.rowCount === 1 ? 'done' : m.state, winner_id: winner,
+           paid_at: paid ? (m.paid_at ?? new Date()) : null };
 }
 
 /**

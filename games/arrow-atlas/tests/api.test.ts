@@ -7,7 +7,7 @@ import { pool, query, tx } from '../backend/src/db.js';
 import { config } from '../backend/src/config.js';
 import { give, idem } from '../backend/src/gold.js';
 import { startSession } from '../backend/src/auth.js';
-import { eq, finish, ok, section } from './helpers.js';
+import { eq, finish, ok, reset, section } from './helpers.js';
 
 const BASE = process.env.AA_TEST_BASE ?? 'http://127.0.0.1:8760';
 const V = `${BASE}/api/arrow-atlas/v1`;
@@ -34,6 +34,11 @@ async function call(path: string, opts: { token?: string; cookie?: string; body?
   });
   return { status: r.status, json: await r.json().catch(() => ({})) as Record<string, unknown>, headers: r.headers };
 }
+
+// Start from a clean database so this suite does not depend on what ran before it: a room another suite left
+// waiting at the same stake would be joined rather than created, and the test would be asking about a room it
+// does not host. The server keeps no state of its own that a truncate would confuse.
+await reset();
 
 section('Health says which part is unwell');
 {
@@ -166,6 +171,42 @@ section('A purse that cannot cover the stake is told so, not charged');
   eq(r.status, 400, 'the room is refused');
   eq(r.json.error, 'not_enough_gold', 'for the honest reason');
   eq((await call('/auth/me', { token: poor.token })).json.user && ((await call('/auth/me', { token: poor.token })).json.user as { gold: number }).gold, 100, 'and the purse is untouched');
+}
+
+section('A link cannot delete somebody\u2019s account');
+{
+  // Reported by a review bot on PR #82, and real: the legacy shim mounted every action for GET, so
+  // /games/api/auth.php?a=delete behind a cross-site link deleted the reader's account — the session cookie is
+  // SameSite=Lax, which a browser still sends on a top-level navigation. The PHP service answered 405 to any
+  // non-POST mutation, and so does this again.
+  const victim = await mint('apiVictim', 5_000);
+  const byLink = await call(`/games/api/auth.php?a=delete`, { cookie: `${config.auth.cookie}=${victim.token}`, base: BASE });
+  eq(byLink.status, 405, 'a GET to the delete action is refused');
+  eq(byLink.json.error, 'post_only', 'with the reason the old service gave');
+  const still = await query<{ n: number }>(pool, 'SELECT COUNT(*)::int AS n FROM users WHERE id = $1', [victim.id]);
+  eq(still.rows[0]!.n, 1, 'and the account is still there');
+
+  // every other mutation, the same way
+  for (const a of ['name', 'logout']) {
+    const r = await call(`/games/api/auth.php?a=${a}`, { cookie: `${config.auth.cookie}=${victim.token}`, base: BASE });
+    eq(r.status, 405, `a GET to ${a} is refused too`);
+  }
+  for (const a of ['create', 'join', 'start', 'cancel', 'progress', 'result']) {
+    const r = await call(`/games/api/match.php?a=${a}&code=ZZZZZZ`, { cookie: `${config.auth.cookie}=${victim.token}`, base: BASE });
+    eq(r.status, 405, `a GET to match ${a} is refused`);
+  }
+
+  // and the reads a cached client actually needs still work over GET
+  const readMe = await call('/games/api/auth.php?a=me', { cookie: `${config.auth.cookie}=${victim.token}`, base: BASE });
+  eq(readMe.status, 200, 'but reading the account over GET still works');
+  const lobby = await call('/games/api/match.php?a=lobby', { base: BASE });
+  eq(lobby.status, 200, 'and so does the lobby');
+
+  // POST still deletes, which is what the dashboard does
+  const byPost = await call('/games/api/auth.php?a=delete', { cookie: `${config.auth.cookie}=${victim.token}`, base: BASE, body: {} });
+  eq(byPost.status, 200, 'a POST from the dashboard still deletes the account');
+  const gone = await query<{ n: number }>(pool, 'SELECT COUNT(*)::int AS n FROM users WHERE id = $1', [victim.id]);
+  eq(gone.rows[0]!.n, 0, 'and it is really gone');
 }
 
 await finish();

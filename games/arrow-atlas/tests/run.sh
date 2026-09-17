@@ -13,7 +13,7 @@ BE="$HERE/../backend"
 if [ -f "$BE/.env.dev" ] && [ -z "${ARROW_ATLAS_PG_HOST:-}" ]; then set -a; . "$BE/.env.dev"; set +a; fi
 
 SUITES=("${@}")
-if [ ${#SUITES[@]} -eq 0 ]; then SUITES=(economy migration api); fi
+if [ ${#SUITES[@]} -eq 0 ]; then SUITES=(economy migration api ws); fi
 
 fail=0
 for s in "${SUITES[@]}"; do
