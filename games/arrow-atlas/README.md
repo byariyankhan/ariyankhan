@@ -168,6 +168,67 @@ them once.
 
 ---
 
+## What the numbers mean on this VPS
+
+The load tests below were run on a 4-core machine. This VPS is a Hostinger KVM 2: **2 vCPU, 8 GB RAM**, shared
+with the portfolio, ASR and Bookween. Expect roughly half the measured throughput here, and read the figures as
+what the service does per core rather than as a player count.
+
+The four new containers add about 1 GB of resident memory: PostgreSQL with its defaults, Redis capped at 256 MB,
+the Node service, and a backup container that sleeps between runs.
+
+What actually moves the needle is not throughput but how much the client asks for. With the socket up, a client
+watching a room polls every 15 seconds instead of every 2, and pushes its own progress over the socket rather
+than as a request each time — roughly a sixth of the HTTP traffic per player that the old service took.
+
+---
+
+## Cutting over
+
+In order, and not out of it. Steps 2 and 3 need a shell on the VPS (hPanel → VPS → Browser terminal).
+
+```bash
+# 0. A snapshot first, so there is a way back that does not depend on anything below working.
+#    hPanel → VPS → Snapshots → Create snapshot
+
+# 1. Bring the backend up. Nothing routes to it yet, so the live game is untouched either way.
+cd /var/www/ariyankhan-src/games/arrow-atlas/deploy    # or wherever the repo is checked out
+cp .env.example .env && $EDITOR .env                   # two passwords, GOOGLE_CLIENT_ID
+mkdir -p /var/backups/arrow-atlas
+docker compose up -d
+docker compose logs -f arrow-atlas-api                 # wait for "arrow-atlas-api listening"
+curl -s localhost:8760/health                          # postgres ok, redis ok
+
+# 2. Move the data. Back it up first, and keep the backup.
+mkdir -p /var/backups/arrow-atlas
+docker exec ariyankhan-web cat /var/lib/arrow-atlas/arrow-atlas.sqlite \
+  > /var/backups/arrow-atlas/pre-migration-$(date -u +%Y%m%dT%H%M%SZ).sqlite
+ls -lh /var/backups/arrow-atlas/                       # it must not be empty
+docker cp /var/backups/arrow-atlas/pre-migration-*.sqlite arrow-atlas-api:/tmp/legacy.sqlite
+docker exec arrow-atlas-api sh -c 'cd /srv/arrow-atlas/site/games/arrow-atlas/backend && node dist/import-sqlite.js /tmp/legacy.sqlite'
+#    It must end with "all checks passed". If it does not, stop here: nothing is routed yet, so nothing is broken.
+
+# 3. Route to it.
+mkdir -p /etc/nginx/snippets
+cp ../../../games/arrow-atlas/deploy/nginx-arrow-atlas.conf     /etc/nginx/snippets/arrow-atlas.conf
+cp ../../../games/arrow-atlas/deploy/nginx-arrow-atlas-map.conf /etc/nginx/conf.d/arrow-atlas-map.conf
+cp ../../../deploy/nginx-ariyankhan.conf /etc/nginx/sites-available/ariyankhan.conf
+nginx -t && systemctl reload nginx
+
+# 4. Check, from outside.
+curl -s https://ariyankhan.com/api/arrow-atlas/v1/auth/me      # {"user":null,...}
+curl -s https://ariyankhan.com/games/api/auth.php?a=me         # the same, through the old path
+```
+
+Then merge and redeploy the `ariyankhan` project so the new client ships. Not before: the new client asks for
+`/api/arrow-atlas/v1`, and until step 3 that path does not exist.
+
+**If anything looks wrong after step 4**, the fastest way back is one line — comment the
+`include /etc/nginx/snippets/arrow-atlas.conf;` out of `ariyankhan.conf`, `nginx -t && systemctl reload nginx`.
+The PHP service and its SQLite file are exactly as they were; the importer only ever read them.
+
+---
+
 ## Moving the existing SQLite data
 
 Do this once, at cutover, and never again — the importer refuses to run a second time into a database that
