@@ -1,0 +1,219 @@
+# Arrow Atlas, as its own Docker project.
+#
+# Nothing here is shared with anything else on the box: its own network, its own volumes, its own database and
+# credentials, its own backup schedule, its own logs. A second game gets its own copy of this file with its own
+# names, and the two cannot reach each other. Moving Arrow Atlas to a VPS of its own is this file, the image,
+# and a restored dump — see ../README.md.
+#
+#   docker compose -p arrow-atlas --env-file .env up -d
+#
+# Reachability, deliberately:
+#   * arrow-atlas-postgres and arrow-atlas-redis sit on an internal network. They publish no ports, and that
+#     network has no route out, so they are unreachable from the internet and cannot themselves call out.
+#   * arrow-atlas-api sits on both networks: the internal one to reach its data, the edge one for Google's
+#     token endpoint. It publishes to 127.0.0.1 only, so the host nginx is the single way in.
+name: arrow-atlas
+
+services:
+  arrow-atlas-postgres:
+    image: postgres:16-alpine
+    container_name: arrow-atlas-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${ARROW_ATLAS_PG_DATABASE:-arrow_atlas}
+      POSTGRES_USER: ${ARROW_ATLAS_PG_USER:-arrow_atlas}
+      POSTGRES_PASSWORD: ${ARROW_ATLAS_PG_PASSWORD:?set ARROW_ATLAS_PG_PASSWORD in .env}
+      POSTGRES_INITDB_ARGS: "--data-checksums"
+      TZ: UTC
+    volumes:
+      - arrow-atlas-postgres-data:/var/lib/postgresql/data
+    networks: [arrow-atlas-data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB} -q"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+    stop_grace_period: 30s
+    logging: { driver: json-file, options: { max-size: "10m", max-file: "5" } }
+
+  arrow-atlas-redis:
+    image: redis:7-alpine
+    container_name: arrow-atlas-redis
+    restart: unless-stopped
+    # Ephemeral by design, but appendonly keeps a restart from dropping presence mid-match for no reason.
+    command: >
+      redis-server
+      --requirepass ${ARROW_ATLAS_REDIS_PASSWORD:?set ARROW_ATLAS_REDIS_PASSWORD in .env}
+      --appendonly yes
+      --maxmemory ${ARROW_ATLAS_REDIS_MAXMEMORY:-256mb}
+      --maxmemory-policy allkeys-lru
+    volumes:
+      - arrow-atlas-redis-data:/data
+    networks: [arrow-atlas-data]
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
+    environment:
+      REDIS_PASSWORD: ${ARROW_ATLAS_REDIS_PASSWORD}
+    stop_grace_period: 15s
+    logging: { driver: json-file, options: { max-size: "10m", max-file: "3" } }
+
+  arrow-atlas-api:
+    # Fetches this repository at start, builds, and runs — the same pattern ariyankhan-web already uses on this
+    # VPS, and the reason it works here today: no registry, no credentials, and nothing to bind-mount, so the
+    # whole project can be handed over as raw YAML.
+    #
+    # Once GitHub Actions is enabled for the repository, .github/workflows/arrow-atlas-api.yml publishes a real
+    # image and this becomes faster and reproducible. To switch: set ARROW_ATLAS_IMAGE in .env, replace the
+    # `image:` line below with `image: ${ARROW_ATLAS_IMAGE}`, and delete the `command:` block.
+    image: node:22-alpine
+    container_name: arrow-atlas-api
+    restart: unless-stopped
+    depends_on:
+      arrow-atlas-postgres: { condition: service_healthy }
+      arrow-atlas-redis: { condition: service_healthy }
+    environment:
+      NODE_ENV: production
+      PORT: 8760
+      SITE_BRANCH: ${SITE_BRANCH:-main}
+      ARROW_ATLAS_VERSION: ${ARROW_ATLAS_VERSION:-main}
+      ARROW_ATLAS_BOARDS_FILE: /srv/arrow-atlas/site/games/data/arrow-atlas.json
+      ARROW_ATLAS_MIGRATIONS_DIR: /srv/arrow-atlas/site/games/arrow-atlas/migrations
+      ARROW_ATLAS_PG_HOST: arrow-atlas-postgres
+      ARROW_ATLAS_PG_DATABASE: ${ARROW_ATLAS_PG_DATABASE:-arrow_atlas}
+      ARROW_ATLAS_PG_USER: ${ARROW_ATLAS_PG_USER:-arrow_atlas}
+      ARROW_ATLAS_PG_PASSWORD: ${ARROW_ATLAS_PG_PASSWORD}
+      ARROW_ATLAS_REDIS_HOST: arrow-atlas-redis
+      ARROW_ATLAS_REDIS_PASSWORD: ${ARROW_ATLAS_REDIS_PASSWORD}
+      ARROW_ATLAS_REDIS_PREFIX: ${ARROW_ATLAS_REDIS_PREFIX:-arrow-atlas:}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      ARROW_ATLAS_ALLOWED_ORIGINS: ${ARROW_ATLAS_ALLOWED_ORIGINS:-}
+      ARROW_ATLAS_COOKIE_SECURE: ${ARROW_ATLAS_COOKIE_SECURE:-true}
+      ARROW_ATLAS_LOG_LEVEL: ${ARROW_ATLAS_LOG_LEVEL:-info}
+    working_dir: /srv/arrow-atlas
+    command:
+      - sh
+      - -c
+      - |
+        set -e
+        apk add --no-cache curl tar >/dev/null
+        echo "[arrow-atlas] fetching $$SITE_BRANCH"
+        # The checkout lives in a named volume, so arrow-atlas-backup can read the two shell scripts it needs
+        # without a network of its own. Clear the contents rather than the directory: it is a mount point.
+        mkdir -p /srv/arrow-atlas/site
+        find /srv/arrow-atlas/site -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+        curl -fsSL "https://codeload.github.com/byariyankhan/ariyankhan/tar.gz/refs/heads/$$SITE_BRANCH" \
+          | tar -xz --strip-components=1 -C /srv/arrow-atlas/site
+        cd /srv/arrow-atlas/site/games/arrow-atlas/backend
+        echo "[arrow-atlas] installing and building"
+        # --include=dev is not optional here: NODE_ENV is production, which makes npm ci skip
+        # devDependencies, and typescript is one of them. Without it the build dies on "sh: tsc: not found"
+        # and the container restarts forever. The prune afterwards takes the build tools back out, so what
+        # runs is still a production tree.
+        npm ci --include=dev --no-audit --no-fund
+        npm run build
+        npm prune --omit=dev
+        echo "[arrow-atlas] starting"
+        exec node dist/server.js
+    volumes:
+      # The fetched checkout, shared read-only with arrow-atlas-backup so that container needs no network of
+      # its own to get the two shell scripts it runs.
+      - arrow-atlas-site:/srv/arrow-atlas/site
+    ports:
+      # 127.0.0.1 only: the host nginx terminates TLS and is the single way in from outside.
+      - "127.0.0.1:${ARROW_ATLAS_PORT:-8760}:8760"
+    networks: [arrow-atlas-data, arrow-atlas-edge]
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:8760/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      # the first start fetches and builds, which takes a minute or two on a small VPS
+      start_period: 240s
+    stop_grace_period: 30s
+    logging: { driver: json-file, options: { max-size: "20m", max-file: "5" } }
+
+  arrow-atlas-backup:
+    # postgres:16-alpine is what actually carries pg_dump and pg_restore.
+    #
+    # It gets its two shell scripts from the checkout arrow-atlas-api already fetched, mounted read-only, and so
+    # reaches no network at all — which it could not do anyway: it sits only on arrow-atlas-data, which is
+    # internal, and this image ships no curl. An earlier version of this file tried to fetch them at start and
+    # would have failed on both counts. Nothing is bind-mounted from beside this file either, so the whole
+    # project still deploys as raw compose YAML.
+    image: postgres:16-alpine
+    container_name: arrow-atlas-backup
+    restart: unless-stopped
+    depends_on:
+      arrow-atlas-postgres: { condition: service_healthy }
+    environment:
+      PGHOST: arrow-atlas-postgres
+      PGDATABASE: ${ARROW_ATLAS_PG_DATABASE:-arrow_atlas}
+      PGUSER: ${ARROW_ATLAS_PG_USER:-arrow_atlas}
+      PGPASSWORD: ${ARROW_ATLAS_PG_PASSWORD}
+      ARROW_ATLAS_BACKUP_DIR: /backups
+      ARROW_ATLAS_BACKUP_KEEP_DAYS: ${ARROW_ATLAS_BACKUP_KEEP_DAYS:-14}
+      ARROW_ATLAS_BACKUP_AT_HOUR: ${ARROW_ATLAS_BACKUP_AT_HOUR:-3}
+      ARROW_ATLAS_SCRIPTS_DIR: /srv/arrow-atlas/site/games/arrow-atlas/deploy
+    volumes:
+      # A named volume so the dumps never sit in the live PostgreSQL data directory, plus a bind mount so the
+      # host (and whatever backs the host up) can see them without entering the container.
+      - arrow-atlas-backups:/backups
+      - ${ARROW_ATLAS_BACKUP_HOST_DIR:-/var/backups/arrow-atlas}:/backups-host
+      # read-only: this container reads the scripts and must never be able to change the deployed code
+      - arrow-atlas-site:/srv/arrow-atlas/site:ro
+    networks: [arrow-atlas-data]
+    user: root   # the dumps are written to a host directory this container does not own
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        # Wait for the checkout. On a first deploy the API is still fetching it, which takes seconds; on every
+        # later start it is already there and this returns at once. Invoked through sh, so the file mode in the
+        # tarball is not something backups depend on.
+        S="$${ARROW_ATLAS_SCRIPTS_DIR}"
+        i=0
+        while [ ! -f "$$S/backup.sh" ]; do
+          i=$$((i + 1))
+          [ $$((i % 6)) -eq 1 ] && echo "{\"product\":\"arrow-atlas\",\"component\":\"backup\",\"msg\":\"waiting for $$S/backup.sh\"}"
+          if [ "$$i" -gt 360 ]; then
+            echo "{\"product\":\"arrow-atlas\",\"component\":\"backup\",\"level\":\"error\",\"msg\":\"the checkout never appeared at $$S; is arrow-atlas-api running?\"}" >&2
+            exit 1
+          fi
+          sleep 5
+        done
+        exec /bin/sh "$$S/backup.sh" loop
+    healthcheck:
+      # Unhealthy when the newest dump is older than a day and a bit: a backup that quietly stopped is the
+      # failure this whole service exists to prevent.
+      test: ["CMD-SHELL", "find /backups -name 'arrow-atlas-*.dump' -mtime -1 | grep -q . || exit 1"]
+      interval: 1h
+      timeout: 10s
+      retries: 2
+      start_period: 5m
+    logging: { driver: json-file, options: { max-size: "10m", max-file: "3" } }
+
+networks:
+  # No route to or from the internet: only the containers attached to it can talk to each other.
+  arrow-atlas-data:
+    name: arrow-atlas-data
+    internal: true
+  arrow-atlas-edge:
+    name: arrow-atlas-edge
+
+volumes:
+  # The repository checkout arrow-atlas-api fetches at start. It is a volume rather than container-local storage
+  # for one reason: arrow-atlas-backup reads its two shell scripts from here, which is how that container gets
+  # them without a network — it sits only on the internal network and its image ships no curl.
+  arrow-atlas-site:
+    name: arrow-atlas-site
+  arrow-atlas-postgres-data:
+    name: arrow-atlas-postgres-data
+  arrow-atlas-redis-data:
+    name: arrow-atlas-redis-data
+  arrow-atlas-backups:
+    name: arrow-atlas-backups
