@@ -104,6 +104,16 @@ jobs:
           check "/deploy hidden -> 404"             404 "https://$DOMAIN/deploy/docker-compose.yml" "${RESOLVE[@]}" "${TLS[@]}"
 
           echo
+          echo "== Arrow Atlas, from off the machine"
+          # These four belong here rather than in the ops workflow's health mode, because each is about what
+          # the internet can reach. A check run on the VPS itself comes from 127.0.0.1 and gets a different,
+          # flattering answer: the health endpoint's allowlist admits the host on purpose.
+          check "the game's API answers"            200 "https://$DOMAIN/api/arrow-atlas/v1/lobby"  "${RESOLVE[@]}" "${TLS[@]}"
+          check "and its health is not public"      403 "https://$DOMAIN/api/arrow-atlas/health"    "${RESOLVE[@]}" "${TLS[@]}"
+          check "the old PHP API is gone"           404 "https://$DOMAIN/games/api/auth.php?a=me"   "${RESOLVE[@]}" "${TLS[@]}"
+          check "and so is its match endpoint"      404 "https://$DOMAIN/games/api/match.php"       "${RESOLVE[@]}" "${TLS[@]}"
+
+          echo
           echo "== www"
           curl -sS -m 25 -o /dev/null -w "  www -> %{http_code} %{redirect_url}\n" \
             "${RESOLVE[@]}" "${TLS[@]}" "https://www.$DOMAIN/" || true
