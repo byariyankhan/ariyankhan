@@ -201,6 +201,14 @@ echo "\nLeaving a room\n";
     aa_leave_room($db, $row($rm2), $lead);
     ok($row($rm2)['state'] === 'void' && $gold($lead) === $g2 + 500, 'the last one out closes the room and takes their stake');
     ok(aa_leave_room($db, $row($rm2), $lead) === null && $gold($lead) === $g2 + 500, 'and leaving a closed room a second time pays nothing');
+    // leaving hands back a stake, so it must only ever be a stake that was put in
+    $rm3 = $make($lead, 500); $join($rm3, $second);
+    $outsider = $l('leave-outsider');
+    $go = $gold($outsider); $gs = $gold($second);
+    aa_leave_room($db, $row($rm3), $outsider);
+    ok($gold($outsider) === $go, 'somebody who was never in the room is paid nothing for leaving it');
+    ok(count(aa_room($db, $rm3)) === 2 && $row($rm3)['state'] === 'open' && $gold($second) === $gs, 'and the room is untouched by them');
+    aa_leave_room($db, $row($rm3), $second); aa_leave_room($db, $row($rm3), $lead);
 
     // a clock left running over a room of one goes back to waiting rather than starting a match of one
     $p1 = $l('leave-p1'); $p2 = $l('leave-p2');
@@ -211,6 +219,40 @@ echo "\nLeaving a room\n";
     aa_autostart_matches($db);
     ok($row($pr)['state'] === 'open' && $row($pr)['fills_at'] === null, 'one of them leaving stops the clock instead of starting a match of one');
     ok((int)$row($pr)['created'] >= time() - 2, 'and the wait starts over for the one left behind');
+}
+
+echo "\nDeleting an account does not strand the room it was in\n";
+{
+    $d = fn(string $sub) => aa_upsert_user($db, 'google', $sub, ucfirst($sub));
+    $gone = $d('bye-1'); $stay = $d('bye-2'); $also = $d('bye-3');
+    $rd = $make($gone, 500); $join($rd, $stay); $join($rd, $also);
+    ok((int)$row($rd)['host_id'] === $gone && count(aa_room($db, $rd)) === 3, 'three in the room, the one about to leave in charge');
+    aa_release_player($db, $gone);
+    $db->prepare('DELETE FROM users WHERE id = ?')->execute([$gone]);
+    ok(count(aa_room($db, $rd)) === 2, 'the room is down to the two who stayed');
+    ok((int)$row($rd)['host_id'] === $stay, 'and the crown went to one of them, not to a deleted account');
+    ok((int)$db->query('SELECT COUNT(*) FROM match_players p WHERE NOT EXISTS (SELECT 1 FROM users u WHERE u.id = p.user_id)')->fetchColumn() === 0, 'no seat is left pointing at an account that is gone');
+    ok($start($rd, $stay) === true, 'and the room can still be started, which it could not if the host had vanished');
+
+    // deleted in the middle of a match: the seat stays, so the pot is still the size of what went in
+    $p1 = $d('mid-1'); $p2 = $d('mid-2');
+    $rp = $make($p1, 1000); $join($rp, $p2); $start($rp, $p1);
+    ok(aa_stakes_in($db, $rp) === 2, 'two stakes went in');
+    aa_release_player($db, $p1);
+    $db->prepare('DELETE FROM users WHERE id = ?')->execute([$p1]);
+    ok(aa_stakes_in($db, $rp) === 2, 'the seat of the account that went stays while the match is being played');
+    ok(count(aa_room($db, $rp)) === 1, 'even though the room can only name the one still there');
+    $gp = $gold($p2);
+    $result($rp, $p2, 30000, 5000);
+    ok($gold($p2) === $gp + 2000, 'so the winner takes the whole pot, not a pot short by the stake that was forfeited');
+
+    // and if every account in a match goes, the row is closed rather than swept for ever
+    $z1 = $d('zombie-1'); $z2 = $d('zombie-2');
+    $rz = $make($z1, 500); $join($rz, $z2); $start($rz, $z1);
+    foreach ([$z1, $z2] as $u) { aa_release_player($db, $u); $db->prepare('DELETE FROM users WHERE id = ?')->execute([$u]); }
+    $db->prepare('UPDATE matches SET created = ? WHERE code = ?')->execute([time() - (AA_MATCH_HOURS + 1) * 3600, $rz]);
+    aa_expire_matches($db);
+    ok($row($rz)['state'] === 'void', 'a match nobody is left to settle with is closed out');
 }
 
 echo "\nA room that fills itself is started by its clock, not by a hand\n";

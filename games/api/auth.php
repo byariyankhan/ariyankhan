@@ -53,6 +53,7 @@ if ($action === 'logout') {
 if ($action === 'delete') {
     if (!$post) aa_json(['error' => 'post_only'], 405);
     if (!$me) aa_json(['error' => 'signed_out'], 401);
+    aa_release_player($db, $me['id']);   // walk out of every room that has not started, before the row goes
     $db->prepare('DELETE FROM sessions WHERE user_id = ?')->execute([$me['id']]);
     $db->prepare('DELETE FROM users WHERE id = ?')->execute([$me['id']]);
     aa_end_session($db);
