@@ -84,7 +84,7 @@
   const PALETTE = ['#FFED54', '#5CD6FF', '#8CFF7A', '#FF9AD5', '#C79BFF', '#FFB347', '#6EE7B7', '#FDBA74', '#F97373', '#38BDF8'];
 
   const el = {
-    select: $('#aaSelect'), tagline: $('#aaTagline'), dailyRow: $('#aaDailyRow'), homeSel: $('#aaHome'), purse: $('#aaPurse'), purseNo: $('#aaPurseNo'), daily: $('#aaDaily'), hudDiff: $('#aaHudDiff'), play: $('#aaPlay'), path: $('#aaPath'), btnVibe: $('#aaVibe'), btnGuides: $('#aaGuides'), btnMusic: $('#aaMusic'), howTo: $('#aaHowTo'),
+    select: $('#aaSelect'), tagline: $('#aaTagline'), homeSel: $('#aaHome'), purse: $('#aaPurse'), purseNo: $('#aaPurseNo'), hudDiff: $('#aaHudDiff'), play: $('#aaPlay'), path: $('#aaPath'), btnVibe: $('#aaVibe'), btnGuides: $('#aaGuides'), btnMusic: $('#aaMusic'), howTo: $('#aaHowTo'),
     sheet: $('#aaSheet'), friends: $('#aaFriends'), signInSheet: $('#aaSignInSheet'), googleBtn: $('#aaGoogleBtn'), signInNote: $('#aaSignInNote'), ranks: $('#aaRanks'), matchSheet: $('#aaMatchSheet'), matchBody: $('#aaMatchBody'), matchTitle: $('#aaMatchTitle'), accountGroup: $('#aaAccountGroup'), accountCap: $('#aaAccountCap'), accountWho: $('#aaAccountWho'), accountGold: $('#aaAccountGold'), accountFace: $('#aaAccountFace'), sessionGroup: $('#aaSessionGroup'), sessionCap: $('#aaSessionCap'), signOutBtn: $('#aaSignOut'), deleteAccBtn: $('#aaDeleteAcc'), settingsBtns: $$('#aaSettings, #aaSettingsG'), themeBtn: $('#aaTheme'), themes: $('#aaThemes'),
     game: $('#aaGame'), boardWrap: $('#aaBoardWrap'), board: $('#aaBoard'), toast: $('#aaToast'), confetti: $('#aaConfetti'),
     hudLevel: $('#aaHudLevel'), hudMode: $('#aaHudMode'), hudTime: $('#aaHudTime'), hudLeft: $('#aaHudLeft'), hudLives: $('#aaHudLives'), hudLivesWrap: $('#aaHudLivesWrap'), hudPct: $('#aaHudPct'), boardBar: $('#aaBoardBar'),
@@ -283,7 +283,10 @@
       for (const c of MAP.countries) {
         const p = svgEl('path', { d: c.d, 'data-id': c.id });
         const i = byId.get(c.id);
-        if (i != null) { p.classList.add('is-tour'); p.setAttribute('tabindex', '0'); p.setAttribute('role', 'button'); p.addEventListener('click', () => { if (!unlocked(i)) { toast(`${DATA.levels[i].name} is locked. Clear the levels before it first.`, 'bad'); return; } const j = cleared(i) && DATA.levels[i + 1]?.disc && !cleared(i + 1) ? i + 1 : i; startLevel(j); }); p.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); p.click(); } }); }
+        // Every country in the tour is playable, in any order. The map used to refuse the ones further down
+        // the list and say so in a toast, which made a map of 197 countries a list with one usable entry on it.
+        // Play & Discover still picks the next one for anybody who would rather be led.
+        if (i != null) { p.classList.add('is-tour'); p.setAttribute('tabindex', '0'); p.setAttribute('role', 'button'); p.addEventListener('click', () => { const j = cleared(i) && DATA.levels[i + 1]?.disc && !cleared(i + 1) ? i + 1 : i; startLevel(j); }); p.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); p.click(); } }); }
         land.appendChild(p);
       }
     }
@@ -294,13 +297,13 @@
     for (const c of MAP.countries) {
       const i = byId.get(c.id); if (i == null) continue;
       const p = land.querySelector(`path[data-id="${c.id}"]`);
-      const rec = cleared(i), isNext = c.id === nextId, open = unlocked(i);
-      p.classList.toggle('is-done', !!rec); p.classList.toggle('is-next', isNext); p.classList.toggle('is-locked', !open);
-      p.setAttribute('aria-label', rec ? `${DATA.levels[i].name}, cleared, replay` : isNext ? `${DATA.levels[i].name}, next, play` : open ? `${DATA.levels[i].name}, play` : `${DATA.levels[i].name}, locked`);
+      const rec = cleared(i), isNext = c.id === nextId;
+      p.classList.toggle('is-done', !!rec); p.classList.toggle('is-next', isNext);
+      p.setAttribute('aria-label', rec ? `${DATA.levels[i].name}, cleared, replay` : isNext ? `${DATA.levels[i].name}, next, play` : `${DATA.levels[i].name}, play`);
       // no numbers on the map: cleared countries are simply coloured in, only the next one gets a marker
       if (isNext) { const g = svgEl('g', { class: 'is-next' }); g.appendChild(svgEl('circle', { cx: c.cx, cy: c.cy, r: 9 })); labels.appendChild(g); }
     }
-    el.worldCap.textContent = done ? `${done} of ${n} countries collected · tap a country to play it` : 'Your world tour starts here · tap the highlighted country';
+    el.worldCap.textContent = done ? `${done} of ${n} countries collected · tap any country to play it` : 'Your world tour starts here · tap any country to play it';
 
   }
 
@@ -310,7 +313,6 @@
     renderWorld();
     const n = DATA.levels.length;
     renderPurse();
-    renderDaily();
     const nextIdx = DATA.levels.findIndex((_, j) => !cleared(j) && unlocked(j));
     el.play.dataset.level = nextIdx < 0 ? 0 : nextIdx;
     // one button, one label: Play & Discover (no level number or tier: the game picks the next country and its difficulty)
@@ -327,14 +329,9 @@
     renderThemes();
   }
 
-  function renderDaily() {
-    const d = dailyPick(), L = DATA.levels[d.idx], rec = store.get(`daily:${d.key}`);
-    const date = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    // Settings → Today's Country: the same board for everyone today (label and handler live on the row)
-    if (!el.daily) return;
-    el.daily.textContent = `${rec ? L.name : 'Mystery'} · ${DIFF_OF(d.tier)} · ${rec ? `cleared ${'★'.repeat(rec.stars)}, replay` : `${date}, play`}`;
-    el.dailyRow.onclick = () => { closeSheets(); startLevel(d.idx, false, d); };
-  }
+  // Today's Country used to be a row in Settings. The board itself is still here — dailyPick() decides it,
+  // a #daily link still opens it, and a cleared one is still recorded and synced — it simply no longer sits in
+  // Settings, where a board to play was the odd thing among rows that change a setting.
 
   // ── Board masks ──
   // A level stores only its outline (`d`, absolute M/L/Z in a REF×REF box) and one scale per tier (`k`, cells per
@@ -722,7 +719,9 @@
   async function startLevel(i, bumpSeed = false, daily = null, keepTier = -1) {
     try { await loadData(); } catch (err) { el.error.textContent = `Could not load the levels (${err.message}).`; el.error.hidden = false; return; }
     if (i < 0 || i >= DATA.levels.length) i = 0;
-    if (!daily && !unlocked(i)) i = DATA.levels.findIndex((_, j) => !cleared(j) && unlocked(j));
+    // No lock redirect. This used to send a player who asked for a country further down the list to the next
+    // unlocked one instead, silently — so unlocking the map alone would have looked like it worked and then
+    // quietly started the wrong board. Any country in the tour may be played, in any order.
     if (i < 0) i = 0;
     stopTimer(); stopProgressPoll();
     if (el.ranks) el.ranks.hidden = true;
