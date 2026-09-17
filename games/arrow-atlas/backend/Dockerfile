@@ -5,7 +5,9 @@
 FROM node:22-alpine AS build
 WORKDIR /build
 COPY games/arrow-atlas/backend/package.json games/arrow-atlas/backend/package-lock.json* ./
-RUN npm ci --no-audit --no-fund
+# --include=dev, explicitly: typescript is a devDependency, and this stage would stop installing it the day
+# anyone sets NODE_ENV=production above. The runtime stage below copies the pruned tree, not this one.
+RUN npm ci --include=dev --no-audit --no-fund
 COPY games/arrow-atlas/backend/tsconfig.json ./
 COPY games/arrow-atlas/backend/src ./src
 RUN npm run build && npm prune --omit=dev

@@ -110,7 +110,11 @@ services:
           | tar -xz --strip-components=1 -C /srv/arrow-atlas/site
         cd /srv/arrow-atlas/site/games/arrow-atlas/backend
         echo "[arrow-atlas] installing and building"
-        npm ci --no-audit --no-fund
+        # --include=dev is not optional here: NODE_ENV is production, which makes npm ci skip
+        # devDependencies, and typescript is one of them. Without it the build dies on "sh: tsc: not found"
+        # and the container restarts forever. The prune afterwards takes the build tools back out, so what
+        # runs is still a production tree.
+        npm ci --include=dev --no-audit --no-fund
         npm run build
         npm prune --omit=dev
         echo "[arrow-atlas] starting"
