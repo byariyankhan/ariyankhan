@@ -1,0 +1,70 @@
+# Delete a branch that has already been merged, without a shell.
+#
+# It exists because deleting a ref is the one piece of repository housekeeping that cannot be done from this
+# repository's own tooling: a `git push origin --delete` is answered 403, while a workflow's own token has
+# `contents: write` and can do it through the API. Every `claude/*` branch needs this after its pull request
+# merges, so it is a mode rather than a one-off.
+#
+# It refuses to delete a branch that is not fully merged into the base, and it refuses to delete the base
+# itself. Those two guards are the whole reason it is safe to leave dispatchable.
+name: Prune a merged branch
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: "Branch to delete (must already be merged)"
+        required: true
+      base:
+        description: "Branch it must be merged into"
+        required: true
+        default: main
+
+permissions:
+  contents: write
+
+jobs:
+  prune:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Delete it, if it is really merged
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ inputs.branch }}
+          BASE: ${{ inputs.base }}
+        run: |
+          set -euo pipefail
+
+          if [ "$BRANCH" = "$BASE" ]; then
+            echo "::error::refusing to delete $BRANCH: it is the base branch"
+            exit 1
+          fi
+
+          git fetch origin "$BRANCH" "$BASE" --quiet
+          head=$(git rev-parse "origin/$BRANCH")
+          echo "$BRANCH is at $head"
+
+          # merge-base --is-ancestor is the question that matters: is every commit on this branch already on the
+          # base? A branch that merged cleanly answers yes. One with unmerged work answers no, and keeps its ref.
+          if ! git merge-base --is-ancestor "$head" "origin/$BASE"; then
+            echo "::error::refusing to delete $BRANCH: it has commits that are not in $BASE"
+            git log --oneline "origin/$BASE..origin/$BRANCH" | sed 's/^/  /'
+            exit 1
+          fi
+          echo "every commit on $BRANCH is already in $BASE"
+
+          gh api -X DELETE "repos/${{ github.repository }}/git/refs/heads/$BRANCH"
+          echo "deleted $BRANCH"
+
+      - name: And it is gone
+        run: |
+          set -euo pipefail
+          if git ls-remote --exit-code --heads origin "${{ inputs.branch }}" >/dev/null 2>&1; then
+            echo "::error::${{ inputs.branch }} is still there"
+            exit 1
+          fi
+          echo "confirmed: no ref named ${{ inputs.branch }} remains"
