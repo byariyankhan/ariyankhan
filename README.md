@@ -773,6 +773,15 @@ unlock (skip allowed after two fails), stars, best times and progress in
   switch silences the lot. The countdown is counted down on the device between
   polls and pulled back to the server's number whenever the two drift two seconds
   apart, which is what a backgrounded tab does to it.
+  **A time that cannot reach the server is not lost** (`sendResult`,
+  `flushResult`): the result is tried three times with a growing pause, and if it
+  still will not go it is kept on the device (`aa:v1:pendingResult`) and sent
+  again the moment the game is next opened, or when the player taps **Send it
+  again**. Only a straight refusal from the server stops the retrying, because
+  asking again cannot change that answer — and the card now names the real reason
+  (signed out, not your match, gone) instead of blaming the network for
+  everything. The server takes the first result per player and no other, so
+  sending it twice is safe.
   **Faces** (`faceInner`, `faceClass`, `wireFaces`): a player is their Google
   profile picture where there is one, and their initial on one of eight colours
   picked from a hash of their name where there is not — two players called Ariyan
