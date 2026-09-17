@@ -163,6 +163,10 @@ $db->prepare('UPDATE match_players SET pct = 30 WHERE code = ? AND user_id = ?')
 $db->prepare('UPDATE match_players SET pct = 70 WHERE code = ? AND user_id = ?')->execute([$c5, $guest]);
 $line = aa_match_players($db, $row($c5), ['id' => $host]);
 ok($line[0]['name'] === 'Rahim' && $line[0]['place'] === 1, 'the player further along the board is first');
+$db->prepare('UPDATE users SET pic = ? WHERE id = ?')->execute(['https://lh3.googleusercontent.com/a/face', $guest]);
+$faces = aa_match_players($db, $row($c5), null);
+ok($faces[0]['pic'] === 'https://lh3.googleusercontent.com/a/face', 'the line-up carries each face, so two players are told apart');
+ok($faces[1]['pic'] === '', 'and a player without one is simply blank');
 ok($line[1]['name'] === 'Ariyan' && $line[1]['you'] === true, 'and you are marked in the line-up');
 $db->prepare('UPDATE match_players SET pct = 95 WHERE code = ? AND user_id = ?')->execute([$c5, $host]);
 ok(aa_match_players($db, $row($c5), null)[0]['name'] === 'Ariyan', 'pulling ahead moves you to first');

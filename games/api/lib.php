@@ -39,10 +39,11 @@ function aa_db(): PDO {
     ]);
     $db->exec('PRAGMA journal_mode=WAL');
     $db->exec('PRAGMA busy_timeout=4000');
-    $db->exec('CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, provider TEXT NOT NULL, sub TEXT NOT NULL, name TEXT NOT NULL DEFAULT \'\', gold INTEGER NOT NULL DEFAULT ' . AA_SIGNUP_GOLD . ', created INTEGER NOT NULL, seen INTEGER NOT NULL, UNIQUE(provider, sub))');
-    // gold arrived after the first accounts did: the column default hands the same welcome purse to those rows
+    $db->exec('CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, provider TEXT NOT NULL, sub TEXT NOT NULL, name TEXT NOT NULL DEFAULT \'\', pic TEXT NOT NULL DEFAULT \'\', gold INTEGER NOT NULL DEFAULT ' . AA_SIGNUP_GOLD . ', created INTEGER NOT NULL, seen INTEGER NOT NULL, UNIQUE(provider, sub))');
+    // gold and the profile picture arrived after the first accounts did: the column defaults cover those rows
     $cols = array_column($db->query('PRAGMA table_info(users)')->fetchAll(), 'name');
     if (!in_array('gold', $cols, true)) $db->exec('ALTER TABLE users ADD COLUMN gold INTEGER NOT NULL DEFAULT ' . AA_SIGNUP_GOLD);
+    if (!in_array('pic', $cols, true)) $db->exec('ALTER TABLE users ADD COLUMN pic TEXT NOT NULL DEFAULT \'\'');
     $db->exec('CREATE TABLE IF NOT EXISTS sessions (hash TEXT PRIMARY KEY, user_id INTEGER NOT NULL, created INTEGER NOT NULL, expires INTEGER NOT NULL)');
     $db->exec('CREATE INDEX IF NOT EXISTS sessions_user ON sessions(user_id)');
     // A gold match: everyone in the room stakes the same, everyone plays the very same board, and the first to
@@ -71,6 +72,15 @@ function aa_name(string $raw): string {
 
 function aa_hash(string $token): string { return hash('sha256', $token); }
 
+// A profile picture is shown to the other players, so only Google's own host is ever stored: a token cannot
+// talk this game into displaying an image from anywhere else.
+function aa_pic(string $url): string {
+    if (strlen($url) > 512) return '';
+    $host = strtolower((string)parse_url($url, PHP_URL_HOST));
+    if (strtolower((string)parse_url($url, PHP_URL_SCHEME)) !== 'https') return '';
+    return $host !== '' && (str_ends_with($host, '.googleusercontent.com') || $host === 'googleusercontent.com') ? $url : '';
+}
+
 // Which providers this server can actually sign people in with (an id is set in the container's environment).
 function aa_providers(): array {
     $g = getenv('GOOGLE_CLIENT_ID');
@@ -80,12 +90,12 @@ function aa_providers(): array {
 function aa_current_user(PDO $db): ?array {
     $token = $_COOKIE[AA_COOKIE] ?? '';
     if (!is_string($token) || strlen($token) < 20) return null;
-    $st = $db->prepare('SELECT u.id, u.name, u.provider, u.gold, s.expires FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.hash = ?');
+    $st = $db->prepare('SELECT u.id, u.name, u.provider, u.pic, u.gold, s.expires FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.hash = ?');
     $st->execute([aa_hash($token)]);
     $row = $st->fetch();
     if (!$row) return null;
     if ((int)$row['expires'] < time()) { $db->prepare('DELETE FROM sessions WHERE hash = ?')->execute([aa_hash($token)]); return null; }
-    return ['id' => (int)$row['id'], 'name' => (string)$row['name'], 'provider' => (string)$row['provider'], 'gold' => (int)$row['gold']];
+    return ['id' => (int)$row['id'], 'name' => (string)$row['name'], 'provider' => (string)$row['provider'], 'pic' => (string)$row['pic'], 'gold' => (int)$row['gold']];
 }
 
 function aa_start_session(PDO $db, int $userId): void {
@@ -144,22 +154,23 @@ function aa_google_verify(string $idToken, string $clientId, ?callable $fetch = 
     if (array_key_exists('email_verified', $d) && ($d['email_verified'] === false || $d['email_verified'] === 'false')) return null;
     $sub = (string)($d['sub'] ?? '');
     if ($sub === '') return null;
-    return ['sub' => $sub, 'name' => aa_name((string)($d['name'] ?? ''))];
+    return ['sub' => $sub, 'name' => aa_name((string)($d['name'] ?? '')), 'pic' => aa_pic((string)($d['picture'] ?? ''))];
 }
 
 // One account per provider id. Returns the user id, creating the row the first time someone signs in; a new
 // account starts with AA_SIGNUP_GOLD (the column default), and signing in again never tops it up.
-function aa_upsert_user(PDO $db, string $provider, string $sub, string $name, ?bool &$created = null): int {
+function aa_upsert_user(PDO $db, string $provider, string $sub, string $name, ?bool &$created = null, string $pic = ''): int {
     $now = time();
     $created = false;
     $st = $db->prepare('SELECT id FROM users WHERE provider = ? AND sub = ?');
     $st->execute([$provider, $sub]);
     $id = $st->fetchColumn();
     if ($id !== false) {
-        $db->prepare('UPDATE users SET seen = ?, name = CASE WHEN name = \'\' THEN ? ELSE name END WHERE id = ?')->execute([$now, $name, (int)$id]);
+        // the name is theirs to change, the picture is not: it follows the Google account on every sign-in
+        $db->prepare('UPDATE users SET seen = ?, name = CASE WHEN name = \'\' THEN ? ELSE name END, pic = ? WHERE id = ?')->execute([$now, $name, $pic, (int)$id]);
         return (int)$id;
     }
-    $db->prepare('INSERT INTO users (provider, sub, name, created, seen) VALUES (?, ?, ?, ?, ?)')->execute([$provider, $sub, $name, $now, $now]);
+    $db->prepare('INSERT INTO users (provider, sub, name, pic, created, seen) VALUES (?, ?, ?, ?, ?, ?)')->execute([$provider, $sub, $name, $pic, $now, $now]);
     $created = true;   // the welcome gold comes from the column default, so it lands once and only here
     return (int)$db->lastInsertId();
 }
@@ -225,7 +236,7 @@ function aa_migrate_matches(PDO $db): void {
 }
 
 function aa_room(PDO $db, string $code): array {
-    $st = $db->prepare('SELECT mp.*, u.name FROM match_players mp JOIN users u ON u.id = mp.user_id WHERE mp.code = ? ORDER BY mp.joined');
+    $st = $db->prepare('SELECT mp.*, u.name, u.pic FROM match_players mp JOIN users u ON u.id = mp.user_id WHERE mp.code = ? ORDER BY mp.joined');
     $st->execute([$code]);
     return $st->fetchAll();
 }
@@ -336,6 +347,7 @@ function aa_match_players(PDO $db, array $m, ?array $me): array {
         $done = $p['done'] === null ? null : (int)$p['done'];
         $rows[] = [
             'name' => (string)$p['name'],
+            'pic' => (string)($p['pic'] ?? ''),
             'pct' => $ms !== null && $ms > 0 ? 100 : max(0, min(100, (int)$p['pct'])),
             'ms' => $ms,
             'race_ms' => $done !== null && $ms !== null && $ms > 0 && $m['started'] ? max(0, $done - (int)$m['started'] * 1000) : null,
