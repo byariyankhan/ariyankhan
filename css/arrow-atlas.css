@@ -54,6 +54,9 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-chip:empty{ display:none; }
 .aa-chip--purse{ display:inline-flex; align-items:center; gap:6px; color:var(--ink); font-weight:900; font-size:14px; font-variant-numeric:tabular-nums; }
 .aa-chip--purse.is-won{ animation:aapop .5s ease-out 2; color:var(--accent); }
+/* the badge follows the number rather than the number following the badge */
+.aa-chip--purse.is-big{ font-size:13px; padding:5px 11px; gap:5px; }
+.aa-chip--purse.is-vast{ font-size:11px; padding:5px 9px; gap:4px; }
 /* lobby world map: every country faint, tour countries outlined, cleared ones filled and numbered */
 /* the map fits the screen width (bleeding into the side gutters); the height left over in the lobby is split
    evenly above and below it */
@@ -97,7 +100,8 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-signin{ display:flex; justify-content:center; min-height:44px; margin:4px 0 12px; }
 .aa-signin:empty{ display:none; margin:0; min-height:0; }   /* no empty gap when Google's button could not load */
 .aa-signin-list{ margin:0 0 14px; padding:0 0 0 18px; color:var(--muted); font-size:14px; line-height:1.7; }
-.aa-me{ display:flex; align-items:center; gap:12px; margin:0 0 14px; }
+.aa-me{ display:flex; align-items:center; gap:12px; margin:0 0 14px; min-width:0; }
+.aa-me > span:nth-child(2){ min-width:0; overflow:hidden; }
 .aa-me-face{ position:relative; overflow:hidden; width:48px; height:48px; border-radius:50%; background:var(--accent); color:#fff; font-size:22px; font-weight:900; display:flex; align-items:center; justify-content:center; flex:0 0 auto; }
 /* A face is the Google picture when there is one, the initial when there is not. Two players whose names start
    with the same letter get different colours, so the line-up over the board is never a row of identical As. */
@@ -112,7 +116,7 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-rank.is-c5, .aa-me-face.is-c5{ background:#0E7C86; }
 .aa-rank.is-c6, .aa-me-face.is-c6{ background:#B5651D; }
 .aa-rank.is-c7, .aa-me-face.is-c7{ background:#8C2F6B; }
-.aa-me-name{ font-size:20px; font-weight:900; color:var(--ink); line-height:1.1; }
+.aa-me-name{ display:block; font-size:20px; font-weight:900; color:var(--ink); line-height:1.1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .aa-me-sub{ font-size:12px; color:var(--muted); }
 /* Who is ahead, over the top left of the board: first place first, and the order changes as they play */
 .aa-ranks{ position:absolute; top:6px; left:6px; z-index:4; display:flex; gap:6px; pointer-events:none; }
@@ -151,6 +155,8 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-vs-row{ display:flex; justify-content:space-between; align-items:center; gap:10px; background:var(--bg2); border-radius:12px; padding:9px 12px; font-weight:800; font-size:14px; color:var(--ink); }
 .aa-vs-row.is-win{ background:color-mix(in srgb, var(--good) 18%, var(--bg2)); }
 .aa-gold.is-won{ animation:aapop .5s ease-out 2; color:var(--accent); }
+.aa-gold.is-big{ font-size:13px; padding:6px 11px; gap:4px; }
+.aa-gold.is-vast{ font-size:11px; padding:5px 9px; gap:3px; }
 @keyframes aapop{ 0%{ transform:scale(1); } 40%{ transform:scale(1.18); } 100%{ transform:scale(1); } }
 .aa-vs-row b{ font-variant-numeric:tabular-nums; }
 .aa-play:active{ transform:translateY(3px); box-shadow:0 3px 0 color-mix(in srgb, var(--accent2) 70%, #000); }
@@ -304,7 +310,7 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-row--link{ cursor:pointer; }
 .aa-row--col{ flex-direction:column; align-items:stretch; gap:10px; }
 .aa-row-ico{ width:28px; text-align:center; font-size:20px; color:var(--muted); }
-.aa-row-label{ flex:1; }
+.aa-row-label{ flex:1; min-width:0; }
 .aa-row-chev{ color:var(--muted); font-size:22px; }
 .aa-switch{ width:56px; height:32px; border-radius:32px; border:none; background:#B8B3AA; position:relative; cursor:pointer; padding:0; transition:background .2s; flex:0 0 auto; }
 .aa-switch::after{ content:''; position:absolute; top:3px; left:3px; width:26px; height:26px; border-radius:50%; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.25); transition:transform .2s; }

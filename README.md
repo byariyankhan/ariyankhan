@@ -806,6 +806,11 @@ unlock (skip allowed after two fails), stars, best times and progress in
   `renderAccountRow` runs on the first paint and again whenever Settings opens,
   so the account section is there every time rather than only after the dashboard
   has been opened once.
+  **The gold badge follows the number, not the other way round** (`goldFit`): past
+  nine characters the type steps down, past twelve it steps down again, and the
+  name beside it is allowed to give way, so a purse of a billion sits in the lobby
+  chip, the dashboard strip and the Settings row without pushing anything off the
+  page. The count-up resizes as it climbs.
   The lobby chip (top left, where the daily streak used to be) is the **purse**:
   `renderPurse` fills it from `authLoad` on the first paint and from every
   `setGold`, and it is hidden when nobody is signed in.
