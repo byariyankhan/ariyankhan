@@ -453,6 +453,40 @@ mode_deploy() {
   fi
 }
 
+mode_deploy_site() {
+  echo "Arrow Atlas — ship the client  ($(date -u))"
+  # Only the portfolio container, which re-fetches main at start. The game's backend keeps running throughout:
+  # a change to the page, the stylesheet or the client has no business interrupting a match in progress.
+  have ariyankhan-web || { bad "ariyankhan-web is not here"; return; }
+
+  before=$(curl -sS -m 20 --resolve "$DOMAIN:443:127.0.0.1" "https://$DOMAIN/arrow-atlas.html" \
+    | grep -o 'js/arrow-atlas.js?v=[0-9]*' | head -1)
+  note "the page asks for ${before:-<nothing found>} right now"
+
+  docker restart ariyankhan-web >/dev/null && ok "restarting, which re-fetches main" || { bad "could not restart it"; return; }
+  h=""
+  for i in $(seq 1 36); do
+    h=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' ariyankhan-web 2>/dev/null)
+    [ "$h" = "healthy" ] && break
+    sleep 5
+  done
+  [ "$h" = "healthy" ] && ok "ariyankhan-web is healthy again" || { bad "ariyankhan-web is $h after three minutes"; return; }
+
+  after=$(curl -sS -m 20 --resolve "$DOMAIN:443:127.0.0.1" "https://$DOMAIN/arrow-atlas.html" \
+    | grep -o 'js/arrow-atlas.js?v=[0-9]*' | head -1)
+  note "and now ${after:-<nothing found>}"
+  [ -n "$after" ] || bad "the page no longer names a client at all"
+
+  # The game itself was not restarted, so it should not have noticed any of this.
+  s=$(docker inspect -f '{{.State.Status}}{{if .State.Health}}/{{.State.Health.Status}}{{end}}' arrow-atlas-api 2>/dev/null || echo absent)
+  case "$s" in
+    running/healthy|running) ok "arrow-atlas-api untouched and still $s" ;;
+    *)                       bad "arrow-atlas-api is $s" ;;
+  esac
+  hc_code=$(curl -sS -m 20 -o /dev/null -w '%{http_code}' --resolve "$DOMAIN:443:127.0.0.1" "https://$DOMAIN/api/arrow-atlas/v1/lobby" 2>/dev/null || echo 000)
+  [ "$hc_code" = "200" ] && ok "and the game's API still answers (200)" || bad "the game's API answered $hc_code"
+}
+
 mode_health() {
   echo "Arrow Atlas — health  ($(hostname), $(date -u))"
   R=(--resolve "$DOMAIN:443:127.0.0.1")
@@ -533,6 +567,7 @@ case "$MODE" in
   backup-verify) mode_backup_verify ;;
   cleanup)       mode_cleanup ;;
   deploy)        mode_deploy ;;
+  deploy-site)   mode_deploy_site ;;
   health)        mode_health ;;
   *) echo "::error::unknown mode: $MODE"; exit 2 ;;
 esac

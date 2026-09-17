@@ -12,6 +12,10 @@
 #   deploy         Recreates arrow-atlas-api (it re-fetches the repository at start) and installs the
 #                  nginx snippet from this checkout, after `nginx -t` accepts it and the current one is
 #                  backed up. Needs confirm=DEPLOY.
+#   deploy-site    Ships the page, the stylesheet and the client by restarting ariyankhan-web alone, which
+#                  re-fetches main. The game's backend, its routing and its socket are not touched — most
+#                  changes to this game are to its client, and those should not cost a rebuild of the API or
+#                  twenty seconds of nobody being able to play. Needs confirm=DEPLOY.
 #   health         Reads. The four containers, the API, the socket, the backup timer, and that no legacy
 #                  artifact is left anywhere.
 #
@@ -27,7 +31,7 @@ on:
         type: choice
         required: true
         default: inspect
-        options: [inspect, backup-verify, cleanup, deploy, health]
+        options: [inspect, backup-verify, cleanup, deploy, deploy-site, health]
       confirm:
         description: "Type DELETE for cleanup, DEPLOY for deploy. Ignored by the read-only modes."
         required: false
@@ -52,7 +56,7 @@ jobs:
           set -euo pipefail
           case "${{ inputs.mode }}" in
             cleanup) [ "${{ inputs.confirm }}" = "DELETE" ] || { echo "::error::cleanup needs confirm=DELETE"; exit 1; } ;;
-            deploy)  [ "${{ inputs.confirm }}" = "DEPLOY" ] || { echo "::error::deploy needs confirm=DEPLOY";  exit 1; } ;;
+            deploy|deploy-site) [ "${{ inputs.confirm }}" = "DEPLOY" ] || { echo "::error::${{ inputs.mode }} needs confirm=DEPLOY"; exit 1; } ;;
             *) echo "read-only mode, no confirmation needed" ;;
           esac
 
