@@ -304,7 +304,9 @@
       // no numbers on the map: cleared countries are simply coloured in, only the next one gets a marker
       if (isNext) { const g = svgEl('g', { class: 'is-next' }); g.appendChild(svgEl('circle', { cx: c.cx, cy: c.cy, r: 9 })); labels.appendChild(g); }
     }
-    el.worldCap.textContent = done ? `${done} of ${n} countries collected · tap one to play it again` : 'Your world tour starts here · tap the highlighted country';
+    // "discovered", which is what the game calls it everywhere else, and nothing after it: a player looking at
+    // their own map does not need to be told a second time that the countries on it can be tapped.
+    el.worldCap.textContent = done ? `${done} of ${n} countries discovered` : 'Your world tour starts here · tap the highlighted country';
 
   }
 
