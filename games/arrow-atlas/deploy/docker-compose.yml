@@ -63,12 +63,14 @@ services:
     logging: { driver: json-file, options: { max-size: "10m", max-file: "3" } }
 
   arrow-atlas-api:
-    # Built and published by .github/workflows/arrow-atlas-api.yml. To build it here instead (a new VPS, or a
-    # change you have not pushed yet), comment out `image:` and uncomment `build:`.
-    image: ${ARROW_ATLAS_IMAGE:-ghcr.io/byariyankhan/arrow-atlas-api:main}
-    # build:
-    #   context: ../../..
-    #   dockerfile: games/arrow-atlas/backend/Dockerfile
+    # Fetches this repository at start, builds, and runs — the same pattern ariyankhan-web already uses on this
+    # VPS, and the reason it works here today: no registry, no credentials, and nothing to bind-mount, so the
+    # whole project can be handed over as raw YAML.
+    #
+    # Once GitHub Actions is enabled for the repository, .github/workflows/arrow-atlas-api.yml publishes a real
+    # image and this becomes faster and reproducible. To switch: set ARROW_ATLAS_IMAGE in .env, replace the
+    # `image:` line below with `image: ${ARROW_ATLAS_IMAGE}`, and delete the `command:` block.
+    image: node:22-alpine
     container_name: arrow-atlas-api
     restart: unless-stopped
     depends_on:
@@ -77,7 +79,10 @@ services:
     environment:
       NODE_ENV: production
       PORT: 8760
+      SITE_BRANCH: ${SITE_BRANCH:-main}
       ARROW_ATLAS_VERSION: ${ARROW_ATLAS_VERSION:-main}
+      ARROW_ATLAS_BOARDS_FILE: /srv/arrow-atlas/site/games/data/arrow-atlas.json
+      ARROW_ATLAS_MIGRATIONS_DIR: /srv/arrow-atlas/site/games/arrow-atlas/migrations
       ARROW_ATLAS_PG_HOST: arrow-atlas-postgres
       ARROW_ATLAS_PG_DATABASE: ${ARROW_ATLAS_PG_DATABASE:-arrow_atlas}
       ARROW_ATLAS_PG_USER: ${ARROW_ATLAS_PG_USER:-arrow_atlas}
@@ -89,14 +94,42 @@ services:
       ARROW_ATLAS_ALLOWED_ORIGINS: ${ARROW_ATLAS_ALLOWED_ORIGINS:-}
       ARROW_ATLAS_COOKIE_SECURE: ${ARROW_ATLAS_COOKIE_SECURE:-true}
       ARROW_ATLAS_LOG_LEVEL: ${ARROW_ATLAS_LOG_LEVEL:-info}
+    working_dir: /srv/arrow-atlas
+    command:
+      - sh
+      - -c
+      - |
+        set -e
+        apk add --no-cache curl tar >/dev/null
+        echo "[arrow-atlas] fetching $$SITE_BRANCH"
+        rm -rf /srv/arrow-atlas/site && mkdir -p /srv/arrow-atlas/site
+        curl -fsSL "https://codeload.github.com/byariyankhan/ariyankhan/tar.gz/refs/heads/$$SITE_BRANCH" \
+          | tar -xz --strip-components=1 -C /srv/arrow-atlas/site
+        cd /srv/arrow-atlas/site/games/arrow-atlas/backend
+        echo "[arrow-atlas] installing and building"
+        npm ci --no-audit --no-fund
+        npm run build
+        npm prune --omit=dev
+        echo "[arrow-atlas] starting"
+        exec node dist/server.js
     ports:
       # 127.0.0.1 only: the host nginx terminates TLS and is the single way in from outside.
       - "127.0.0.1:${ARROW_ATLAS_PORT:-8760}:8760"
     networks: [arrow-atlas-data, arrow-atlas-edge]
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:8760/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      # the first start fetches and builds, which takes a minute or two on a small VPS
+      start_period: 240s
     stop_grace_period: 30s
     logging: { driver: json-file, options: { max-size: "20m", max-file: "5" } }
 
   arrow-atlas-backup:
+    # postgres:16-alpine is what actually carries pg_dump and pg_restore. The two scripts are fetched from the
+    # repository at start, the same way the API is, so this file bind-mounts nothing from beside itself and can
+    # be handed to a VPS as raw YAML.
     image: postgres:16-alpine
     container_name: arrow-atlas-backup
     restart: unless-stopped
@@ -110,15 +143,26 @@ services:
       ARROW_ATLAS_BACKUP_DIR: /backups
       ARROW_ATLAS_BACKUP_KEEP_DAYS: ${ARROW_ATLAS_BACKUP_KEEP_DAYS:-14}
       ARROW_ATLAS_BACKUP_AT_HOUR: ${ARROW_ATLAS_BACKUP_AT_HOUR:-3}
+      SITE_BRANCH: ${SITE_BRANCH:-main}
     volumes:
-      - ./backup.sh:/usr/local/bin/arrow-atlas-backup:ro
-      - ./restore.sh:/usr/local/bin/arrow-atlas-restore:ro
       # A named volume so the dumps never sit in the live PostgreSQL data directory, plus a bind mount so the
       # host (and whatever backs the host up) can see them without entering the container.
       - arrow-atlas-backups:/backups
       - ${ARROW_ATLAS_BACKUP_HOST_DIR:-/var/backups/arrow-atlas}:/backups-host
     networks: [arrow-atlas-data]
-    entrypoint: ["/bin/sh", "-c", "exec /usr/local/bin/arrow-atlas-backup loop"]
+    user: root   # the dumps are written to a host directory this container does not own
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -e
+        mkdir -p /opt/arrow-atlas
+        for f in backup.sh restore.sh; do
+          curl -fsSL "https://raw.githubusercontent.com/byariyankhan/ariyankhan/$$SITE_BRANCH/games/arrow-atlas/deploy/$$f" \
+            -o "/opt/arrow-atlas/$$f"
+          chmod +x "/opt/arrow-atlas/$$f"
+        done
+        exec /opt/arrow-atlas/backup.sh loop
     healthcheck:
       # Unhealthy when the newest dump is older than a day and a bit: a backup that quietly stopped is the
       # failure this whole service exists to prevent.

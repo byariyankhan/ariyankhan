@@ -11,7 +11,7 @@ own domain and its own server, moving it is a restore and a DNS change, not an u
 
 | Container | Image | Listens on | Reachable from |
 |---|---|---|---|
-| `arrow-atlas-api` | `ghcr.io/byariyankhan/arrow-atlas-api:main` | `127.0.0.1:8760` | the host nginx only |
+| `arrow-atlas-api` | `node:22-alpine`, builds this repo at start | `127.0.0.1:8760` | the host nginx only |
 | `arrow-atlas-postgres` | `postgres:16-alpine` | nothing published | `arrow-atlas-api`, `arrow-atlas-backup` |
 | `arrow-atlas-redis` | `redis:7-alpine` | nothing published | `arrow-atlas-api` |
 | `arrow-atlas-backup` | `postgres:16-alpine` | nothing published | — |
@@ -126,16 +126,29 @@ has turned a degraded service into an outage.
 
 ## Deploying
 
+Every container comes from a public image on Docker Hub, and the two that need this repository's code fetch it
+themselves at start — the same pattern `ariyankhan-web` already uses on this VPS. That means the whole project
+can be handed to Hostinger as raw compose YAML: no registry, no credentials, nothing to bind-mount, no build
+context on the server.
+
 ```bash
 cd games/arrow-atlas/deploy
 cp .env.example .env          # fill in the two passwords and GOOGLE_CLIENT_ID
 mkdir -p /var/backups/arrow-atlas
 
-docker compose pull
 docker compose up -d
-docker compose ps             # all four healthy
-curl -s localhost:8760/health | jq
+docker compose ps             # all four healthy — the API's first start builds, so give it a minute or two
+docker compose logs -f arrow-atlas-api
+curl -s localhost:8760/health
 ```
+
+**A faster, reproducible alternative.** `.github/workflows/arrow-atlas-api.yml` builds the image, runs all four
+test suites against real PostgreSQL and Redis containers, and publishes to `ghcr.io`. It is not running yet:
+GitHub Actions has never run in this repository (zero workflow runs in its whole history), so it is presumably
+switched off under **Settings → Actions → General**. Turn it on and a deploy becomes a pull rather than a build:
+set `ARROW_ATLAS_IMAGE` in `.env`, replace the API service's `image:` line with `image: ${ARROW_ATLAS_IMAGE}`,
+and delete its `command:` block. Until then the fetch-and-build above is what works, and it is what the rest of
+this site already does.
 
 nginx, once:
 
@@ -192,22 +205,22 @@ with `pg_dump -Fc`, **read back with `pg_restore --list` before it is accepted**
 than a day old, so a backup that has quietly stopped shows up as an unhealthy container.
 
 ```bash
-docker exec arrow-atlas-backup arrow-atlas-backup list     # what we have
-docker exec arrow-atlas-backup arrow-atlas-backup once     # take one now
+docker exec arrow-atlas-backup /srv/arrow-atlas/bin/backup.sh list     # what we have
+docker exec arrow-atlas-backup /srv/arrow-atlas/bin/backup.sh once     # take one now
 ```
 
 ### Restoring
 
 ```bash
 # Prove a dump is restorable, without touching the game. Run this occasionally.
-docker exec arrow-atlas-backup arrow-atlas-restore verify /backups/arrow-atlas-20260917T030000Z.dump
+docker exec arrow-atlas-backup /srv/arrow-atlas/bin/restore.sh verify /backups/arrow-atlas-20260917T030000Z.dump
 
 # Restore into a database you name, to look at it.
-docker exec arrow-atlas-backup arrow-atlas-restore into /backups/....dump arrow_atlas_yesterday
+docker exec arrow-atlas-backup /srv/arrow-atlas/bin/restore.sh into /backups/....dump arrow_atlas_yesterday
 
 # Replace the live database. Saves the current one first, to /backups/pre-restore-<stamp>.dump.
 docker compose stop arrow-atlas-api
-docker exec -e CONFIRM=yes arrow-atlas-backup arrow-atlas-restore live /backups/....dump
+docker exec -e CONFIRM=yes arrow-atlas-backup /srv/arrow-atlas/bin/restore.sh live /backups/....dump
 docker compose start arrow-atlas-api
 ```
 
@@ -246,8 +259,8 @@ The work this whole layout exists to make short:
 
 1. **Deploy the same project.** Copy `games/arrow-atlas/` to the new server, `cp .env.example .env`, fill in
    fresh passwords, `docker compose up -d`. The image comes from ghcr; nothing is built on the server.
-2. **Carry the data across.** On the old server `arrow-atlas-backup once`, copy the dump over, and on the new
-   one `arrow-atlas-restore live <dump>`. Verify it first with `arrow-atlas-restore verify`.
+2. **Carry the data across.** On the old server `backup.sh once`, copy the dump over, and on the new
+   one `restore.sh live <dump>`. Verify it first with `restore.sh verify`.
 3. **Persistent assets.** There are none beyond PostgreSQL: profile pictures are Google URLs, and boards are
    baked into the image.
 4. **Point the client at it.** Two meta tags in `arrow-atlas.html`:

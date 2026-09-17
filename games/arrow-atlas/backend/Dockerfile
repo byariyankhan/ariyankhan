@@ -13,7 +13,12 @@ RUN npm run build && npm prune --omit=dev
 FROM node:22-alpine AS run
 # dumb-init gives PID 1 proper signal handling, so a deploy drains connections instead of severing them.
 # postgresql-client is what the backup and restore scripts shell out to.
-RUN apk add --no-cache dumb-init postgresql16-client && \
+# The client package is named after the server version it ships, which moves with Alpine, so take the one that
+# matches our server and fall back to whatever the distribution calls current. A newer pg_dump reads an older
+# server quite happily; it is the other way round that fails.
+RUN apk add --no-cache dumb-init && \
+    (apk add --no-cache postgresql16-client || apk add --no-cache postgresql-client) && \
+    pg_dump --version && \
     addgroup -g 10001 arrowatlas && adduser -D -u 10001 -G arrowatlas arrowatlas
 WORKDIR /srv/arrow-atlas
 ENV NODE_ENV=production \
