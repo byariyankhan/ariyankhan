@@ -733,6 +733,7 @@
     const diff = DIFF_OF(state.tier);
     state.diff = diff;
     resetZoom(); renderBoard(); renderHud();
+    if (daily?.race && daily.match) { renderRanks(daily.match.players); startProgressPoll(); }   // back on a race board is back in the match
     if (i === 0 && !cleared(0) && !daily) toast('Tap an arrow to shoot it off the board. If another arrow is in its way, you lose a heart.', 'hint');
     else if (state.disc) toast(`${state.disc.country.name}'s ${KIND_WORD[state.disc.kind]} · ${state.pieces.length} arrows · what is it?`, state.tier >= 2 ? 'hard' : '');
     else if (state.tier >= 2) toast(`${diff.toUpperCase()} LEVEL · ${state.pieces.length} arrows${daily ? '' : ' · you earned this'}`, 'hard');
@@ -1331,7 +1332,7 @@
     state.pendingMatch = null;
     stopMatchPoll();
     startLevel(i, false, { key: 'match', race: true, match: m, board: m.board, tier: m.tier, seed: m.seed, hash: '#m=' + m.code })
-      .then(() => { renderRanks(m.players); startProgressPoll(); SFX.go(); vibe([0, 30, 60, 70]); });
+      .then(() => { SFX.go(); vibe([0, 30, 60, 70]); });   // startLevel puts the line-up and the poll back
     if (typeof gtag === 'function') gtag('event', 'match_play', { game: 'arrow_atlas', stake: m.stake });
   }
 

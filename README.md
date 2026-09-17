@@ -773,6 +773,12 @@ unlock (skip allowed after two fails), stars, best times and progress in
   switch silences the lot. The countdown is counted down on the device between
   polls and pulled back to the server's number whenever the two drift two seconds
   apart, which is what a backgrounded tab does to it.
+  **Coming back to a race board puts the player back in the match**, not just back
+  on the board: `startLevel` restores the line-up and the progress poll whenever
+  `daily.race` has a match on it. It has to live there rather than in `playMatch`,
+  because **Try again** after losing your hearts re-enters through `startLevel`
+  alone — and used to leave the player on the right board with the line-up hidden
+  and nothing reported to the server, which is a match in name only.
   **A time that cannot reach the server is not lost** (`sendResult`,
   `flushResult`): the result is tried three times with a growing pause, and if it
   still will not go it is kept on the device (`aa:v1:pendingResult`) and sent
