@@ -274,7 +274,7 @@ echo "\nA room that fills itself from online\n";
     ok($r2 === $r1, 'the next player walks into that room instead of opening a second one');
     ok(count(aa_room($db, $r1)) === 2 && $gold($b) === 9000, 'two are in it, both staked');
     $fills = (int)$row($r1)['fills_at'];
-    ok($fills > time() && $fills <= time() + AA_FILL_SECONDS, 'the second player starts the forty-second clock');
+    ok($fills > time() && $fills <= time() + AA_FILL_SECONDS, 'the second player starts the clock');
     ok($row($r1)['state'] === 'open', 'the match has not started yet');
     // a third joins: the clock is already running and is not pushed back
     $r3 = $make($c, 1000, 2, true);

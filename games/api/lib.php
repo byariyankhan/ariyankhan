@@ -13,7 +13,7 @@ const AA_MATCH_SEATS = 7;       // how many can be in one room
 // A public room fills itself from whoever is online. The clock starts the moment a second player sits down —
 // not when the room opens, or the host would not have time to send the link — and at nothing the match begins
 // with whoever turned up. A full room does not wait for it.
-const AA_FILL_SECONDS = 40;
+const AA_FILL_SECONDS = 63;
 const AA_LONELY_SECONDS = 120;  // a public room nobody joins is handed back this soon, not a day later
 const AA_SESSION_DAYS = 180;
 
@@ -246,7 +246,7 @@ function aa_seat(PDO $db, string $code, int $userId, int $tier = 2): void {
 }
 
 // A player has just sat down. Seven of them and the match begins there and then; in a room that fills itself
-// from online, the second of them starts the forty-second clock. An invite-only room still waits for its host.
+// from online, the second of them starts the clock. An invite-only room still waits for its host.
 function aa_room_joined(PDO $db, string $code): void {
     $m = aa_match_row_raw($db, $code);
     if (!$m || $m['state'] !== 'open') return;

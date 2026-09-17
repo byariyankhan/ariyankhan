@@ -1,7 +1,7 @@
 <?php
 // Gold matches. The host stakes gold and gets a room code; friends open the link and put the same stake in.
 // A room can also fill itself from whoever else is online at that stake, and then it starts on its own: at
-// seven players, or forty seconds after the second one sat down. Everyone plays the very same board and the
+// seven players, or AA_FILL_SECONDS after the second one sat down. Everyone plays the very same board and the
 // first to clear it takes the whole pot. The server holds the stakes, picks the board, times the finishes and pays out, so no
 // client can pick an easy country, improve a time on a second try or award itself gold.
 declare(strict_types=1);
