@@ -757,6 +757,14 @@ unlock (skip allowed after two fails), stars, best times and progress in
   upwards (`renderRanks`, polled every 2 s). `match_players` is a row per player,
   so three to seven in a room needs no new shape; `aa_migrate_matches` moved the
   first two-seat version over and refunded anything unfinished.
+  **The room answers back** (`SFX`): every button in the game plays a short `tap`
+  on `pointerdown` (one delegated listener; the board's arrows are not buttons,
+  so they keep their own shot), a player arriving plays `join` and a buzz, one
+  leaving plays `left`, the last three seconds of the clock `tick`, and the board
+  being dealt plays `go`. All of it goes through the same `beep`, so the sound
+  switch silences the lot. The countdown is counted down on the device between
+  polls and pulled back to the server's number whenever the two drift two seconds
+  apart, which is what a backgrounded tab does to it.
   **Faces** (`faceInner`, `faceClass`, `wireFaces`): a player is their Google
   profile picture where there is one, and their initial on one of eight colours
   picked from a hash of their name where there is not — two players called Ariyan

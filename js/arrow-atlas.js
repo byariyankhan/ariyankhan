@@ -182,7 +182,18 @@
     music.on = false; clearTimeout(music.timer);
     try { const t = music.ctx.currentTime; music.master.gain.setValueAtTime(music.master.gain.value, t); music.master.gain.exponentialRampToValueAtTime(0.0001, t + 1.5); setTimeout(() => { try { music.master.disconnect(); music.lfo.stop(); } catch { /* ignore */ } }, 1700); } catch { /* ignore */ }
   }
-  const SFX = { shoot: () => beep([[880, 0, 0.07], [1320, 0.04, 0.08]]), cheer: lv => { const f = 587 * Math.pow(2, lv * 3 / 12); beep([[f, 0, 0.09], [f * 1.26, 0.07, 0.1], [f * 1.5, 0.14, 0.14], [f * 2, 0.21, 0.22, 'sine', 0.06]]); }, block: () => beep([[220, 0, 0.06, 'square', 0.05], [110, 0.05, 0.22, 'triangle', 0.06]]), win: () => beep([[523, 0, 0.12], [659, 0.1, 0.12], [784, 0.2, 0.12], [1047, 0.3, 0.35]]), lose: () => beep([[300, 0, 0.2, 'triangle'], [220, 0.2, 0.35, 'triangle']]), taken: () => beep([[784, 0, 0.1], [523, 0.09, 0.18, 'triangle', 0.05]]) };
+  const SFX = { shoot: () => beep([[880, 0, 0.07], [1320, 0.04, 0.08]]), cheer: lv => { const f = 587 * Math.pow(2, lv * 3 / 12); beep([[f, 0, 0.09], [f * 1.26, 0.07, 0.1], [f * 1.5, 0.14, 0.14], [f * 2, 0.21, 0.22, 'sine', 0.06]]); }, block: () => beep([[220, 0, 0.06, 'square', 0.05], [110, 0.05, 0.22, 'triangle', 0.06]]), win: () => beep([[523, 0, 0.12], [659, 0.1, 0.12], [784, 0.2, 0.12], [1047, 0.3, 0.35]]), lose: () => beep([[300, 0, 0.2, 'triangle'], [220, 0.2, 0.35, 'triangle']]), taken: () => beep([[784, 0, 0.1], [523, 0.09, 0.18, 'triangle', 0.05]]),
+    // the room: a tap on anything, somebody arriving, somebody going, the last seconds, and the off
+    tap: () => beep([[520, 0, 0.03, 'sine', 0.03], [760, 0.018, 0.035, 'sine', 0.022]]),
+    join: () => beep([[523, 0, 0.08], [784, 0.07, 0.13]]),
+    left: () => beep([[622, 0, 0.08, 'triangle', 0.055], [392, 0.07, 0.16, 'triangle', 0.05]]),
+    tick: () => beep([[880, 0, 0.05, 'square', 0.035]]),
+    go: () => beep([[196, 0, 0.2, 'triangle', 0.07], [523, 0.05, 0.1], [784, 0.13, 0.12], [1047, 0.21, 0.26]]) };
+  // Every button in the game answers back. The board's own arrows are not buttons, so they keep their own shot.
+  document.addEventListener('pointerdown', e => {
+    const b = e.target.closest('button, .aa-fill');
+    if (b && !b.disabled && !b.closest('.aa-piece')) SFX.tap();
+  }, true);
   function vibe(ms) { if (state.vibe && navigator.vibrate) { try { navigator.vibrate(ms); } catch { /* ignore */ } } }
   function renderToggles() {
     el.btnMusic?.setAttribute('aria-checked', String(state.music));
@@ -1194,6 +1205,7 @@
       const n = $('#aaFillIn', el.card);
       if (!n) { clearInterval(state.fillTick); state.fillTick = 0; return; }
       n.textContent = Math.max(0, --left);
+      if (left > 0 && left <= 3) SFX.tick();   // the last three: here it comes
     }, 1000);
   }
   function startRoomPoll(code) {
@@ -1209,9 +1221,17 @@
           if (m.code !== code) { showRoom(m); return; }
           const before = state.pendingMatch;
           state.pendingMatch = m;
+          if (before && m.count > before.count) { SFX.join(); vibe(15); }
+          else if (before && m.count < before.count) { SFX.left(); }
           const moved = m.count !== before?.count || m.you !== before?.you
             || (typeof m.fills_in === 'number') !== (typeof before?.fills_in === 'number');
           if (!el.overlay.hidden && moved) { renderRoom(m); tickFill(m.fills_in); noteHandover(before, m); }
+          // the number is counted down on this device between polls, so pull it back to the server's whenever
+          // the two have drifted apart — a backgrounded tab, or a clock the server moved
+          else if (typeof m.fills_in === 'number') {
+            const shown = +($('#aaFillIn', el.card)?.textContent || NaN);
+            if (!Number.isNaN(shown) && Math.abs(shown - m.fills_in) >= 2) { $('#aaFillIn', el.card).textContent = m.fills_in; tickFill(m.fills_in); }
+          }
         }
         else { stopMatchPoll(); toast(m.state === 'void' ? 'That match was called off.' : 'That match is over.', 'hint'); goToLevels(); }
       } catch { /* a dropped poll is nothing: the next one will do */ }
@@ -1309,7 +1329,8 @@
     closeSheets();
     state.pendingMatch = null;
     stopMatchPoll();
-    startLevel(i, false, { key: 'match', race: true, match: m, board: m.board, tier: m.tier, seed: m.seed, hash: '#m=' + m.code }).then(() => { renderRanks(m.players); startProgressPoll(); });
+    startLevel(i, false, { key: 'match', race: true, match: m, board: m.board, tier: m.tier, seed: m.seed, hash: '#m=' + m.code })
+      .then(() => { renderRanks(m.players); startProgressPoll(); SFX.go(); vibe([0, 30, 60, 70]); });
     if (typeof gtag === 'function') gtag('event', 'match_play', { game: 'arrow_atlas', stake: m.stake });
   }
 
