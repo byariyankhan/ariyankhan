@@ -162,6 +162,27 @@ report_backups() {
   aabackup 'backup.sh list' | sed 's/^/  /' || bad "backup.sh list failed"
   d=$(newest_dump)
   if [ -n "$d" ]; then ok "newest dump: $d"; else bad "there is no dump at all"; fi
+
+  # Whether the automatic path works, asserted rather than eyeballed. The container's own healthcheck fails if
+  # the newest dump is more than a day old, so a healthy backup container and a dump younger than 25 hours are
+  # the same guarantee said twice — and neither of them is satisfied by a backup somebody took by hand once.
+  h=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' arrow-atlas-backup 2>/dev/null)
+  [ "$h" = "healthy" ] && ok "the backup container reports healthy, which is its own way of saying the newest dump is under a day old" \
+                       || bad "the backup container is $h"
+  if [ -n "$d" ]; then
+    mtime=$(docker exec arrow-atlas-backup stat -c %Y "$d" 2>/dev/null)
+    if [ -n "$mtime" ]; then
+      age=$(( ( $(date -u +%s) - mtime ) / 60 ))
+      if [ "$age" -lt 1500 ]; then ok "and it is $age minutes old, inside the 25-hour guarantee"
+      else bad "the newest dump is $age minutes old, which is outside it"; fi
+    else
+      bad "could not read the newest dump's age"
+    fi
+  fi
+  hour=$(docker exec arrow-atlas-backup sh -c 'echo "${ARROW_ATLAS_BACKUP_AT_HOUR:-3}"' 2>/dev/null)
+  keep=$(docker exec arrow-atlas-backup sh -c 'echo "${ARROW_ATLAS_BACKUP_KEEP_DAYS:-14}"' 2>/dev/null)
+  note "the schedule: daily at ${hour}:00 UTC, once more on every container start, keeping ${keep} days"
+  docker exec arrow-atlas-backup sh -c 'cat /backups/last-run.json' 2>/dev/null | sed 's/^/      last recorded run: /'
   echo
   note "and the copies kept on the host, outside Docker:"
   $SUDO ls -la "$HOST_BACKUPS"/*.dump 2>/dev/null | sed 's/^/    /' || note "    none on the host yet"
