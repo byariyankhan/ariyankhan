@@ -1154,9 +1154,9 @@
     scrollToGame();
     if (history.replaceState) history.replaceState(null, '', location.pathname + location.search + '#m=' + m.code);
     renderRoom(m);
-    tickFill(m.fills_in);
     el.overlay.hidden = false;
     startRoomPoll(m.code);
+    tickFill(m.fills_in);   // after the poll: starting it clears any tick already running, this one included
   }
   function renderRoom(m) {
     const host = m.you === 'host';
@@ -1175,7 +1175,7 @@
       <p class="aa-flash" hidden></p>`;
     wireFaces(el.card);
   }
-  // Forty seconds from the second player sitting down, or the moment the seventh does. Between polls the clock
+  // The room's own clock, counted from the second player sitting down, or the moment the seventh does. Between polls the clock
   // is counted down here so it does not tick in twos.
   function roomWait(m, host) {
     // one element, or the flex gap on .aa-wait would space the number out like a countdown clock

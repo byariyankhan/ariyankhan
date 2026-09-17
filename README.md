@@ -725,9 +725,9 @@ unlock (skip allowed after two fails), stars, best times and progress in
   the room left behind closes with nobody in it to refund, and the client follows
   the new code, link and all. Only ever towards an older room, so two of them
   cannot swap places forever.
-  **The clock is forty seconds from the second player sitting down**
-  (`AA_FILL_SECONDS`, `fills_at`), not from the room opening, or the host would
-  have no time to send the link; a third player joining does not push it back. A
+  **The clock (`AA_FILL_SECONDS`, 63 seconds) runs from the second player sitting
+  down** (`fills_at`), not from the room opening, or the host would have no time
+  to send the link; a third player joining does not push it back. A
   full room of seven does not wait for it at all. **In a room that fills itself
   there is no Start button**: the clock alone begins it (`clock_starts_it`), or a
   host could shut the door on everyone else the moment the second player sat
