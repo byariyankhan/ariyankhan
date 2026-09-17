@@ -255,7 +255,57 @@ mode_cleanup() {
     return
   fi
 
-  say "1. the old SQLite database, out of the portfolio container"
+  say "1. the last check that can only be made while the SQLite file still exists"
+  # Once this file is gone, so is any way of asking what it held. So ask now, and refuse to delete anything if
+  # the answer is wrong. Counts alone will not do: a match has been played since the cutover, so PostgreSQL
+  # legitimately holds more rows than SQLite, and gold legitimately moved. What must be true is that every
+  # account and every match that was in SQLite is in PostgreSQL — by id and by code, not by how many there are.
+  # The PHP container has the SQLite driver, because it is what the old service read this file with.
+  if have ariyankhan-web && docker exec ariyankhan-web sh -c 'test -f /var/lib/arrow-atlas/arrow-atlas.sqlite' 2>/dev/null; then
+    lite=$(docker exec ariyankhan-web php -r '
+      $d = new PDO("sqlite:/var/lib/arrow-atlas/arrow-atlas.sqlite");
+      $ids   = $d->query("SELECT id FROM users ORDER BY id")->fetchAll(PDO::FETCH_COLUMN);
+      $codes = $d->query("SELECT code FROM matches ORDER BY code")->fetchAll(PDO::FETCH_COLUMN);
+      $seats = (int) $d->query("SELECT COUNT(*) FROM match_players")->fetchColumn();
+      echo count($ids), "|", count($codes), "|", $seats, "|",
+           implode(",", array_map("intval", $ids)), "|",
+           implode(",", array_map(fn($c) => "\x27" . preg_replace("/[^A-Za-z0-9]/", "", $c) . "\x27", $codes));
+    ' 2>/dev/null) || lite=""
+    if [ -z "$lite" ]; then
+      bad "could not read the SQLite file to compare it; refusing to delete it unread"
+      return
+    fi
+    n_users=$(printf '%s' "$lite"  | cut -d'|' -f1)
+    n_codes=$(printf '%s' "$lite"  | cut -d'|' -f2)
+    n_seats=$(printf '%s' "$lite"  | cut -d'|' -f3)
+    ids=$(printf '%s' "$lite"      | cut -d'|' -f4)
+    codes=$(printf '%s' "$lite"    | cut -d'|' -f5)
+    note "SQLite held $n_users accounts, $n_codes matches and $n_seats seats"
+
+    # `in ()` is a syntax error, so an empty list is answered as zero found rather than asked about.
+    found_u=0; [ -n "$ids" ]   && found_u=$(psqlc "select count(*) from users   where id   in ($ids)")
+    found_m=0; [ -n "$codes" ] && found_m=$(psqlc "select count(*) from matches where code in ($codes)")
+    note "PostgreSQL holds $found_u of those accounts and $found_m of those matches"
+    if [ "$found_u" = "$n_users" ] && [ "$found_m" = "$n_codes" ]; then
+      ok "every account and every match that was in SQLite is in PostgreSQL, by id and by code"
+    else
+      bad "something that was in SQLite is not in PostgreSQL; refusing to delete the only copy of the source"
+      return
+    fi
+
+    # And nothing shrank: PostgreSQL has at least the rows SQLite did. It may have more, because people have
+    # been playing on it, which is the whole point of the cutover having happened.
+    for pair in "users:$n_users" "matches:$n_codes" "match_players:$n_seats"; do
+      t=${pair%%:*}; was=${pair##*:}
+      now=$(psqlc "select count(*) from $t")
+      if [ "$now" -ge "$was" ]; then ok "$(printf '%-14s %s in SQLite, %s now' "$t" "$was" "$now")"
+      else bad "$t went down: $was in SQLite, only $now now"; return; fi
+    done
+  else
+    note "there is no SQLite file left to compare"
+  fi
+
+  say "2. the old SQLite database, out of the portfolio container"
   if have ariyankhan-web; then
     docker exec ariyankhan-web sh -c 'ls -1 /var/lib/arrow-atlas/ 2>/dev/null' | sed 's/^/      was: /' || true
     docker exec ariyankhan-web sh -c 'rm -f /var/lib/arrow-atlas/arrow-atlas.sqlite /var/lib/arrow-atlas/arrow-atlas.sqlite-wal /var/lib/arrow-atlas/arrow-atlas.sqlite-shm' \
@@ -266,7 +316,7 @@ mode_cleanup() {
     note "ariyankhan-web is not here; nothing to do"
   fi
 
-  say "2. the legacy PHP API out of the live web root"
+  say "3. the legacy PHP API out of the live web root"
   # The next re-fetch would drop it anyway, since main no longer carries games/api — this makes it true now.
   if have ariyankhan-web && docker exec ariyankhan-web sh -c 'test -d /var/www/html/games/api' 2>/dev/null; then
     docker exec ariyankhan-web sh -c 'rm -rf /var/www/html/games/api' \
@@ -275,7 +325,7 @@ mode_cleanup() {
     note "already gone"
   fi
 
-  say "3. the pre-migration SQLite backups on the host"
+  say "4. the pre-migration SQLite backups on the host"
   n=0
   for f in "$HOST_BACKUPS"/pre-migration-*.sqlite "$HOST_BACKUPS"/*.sqlite; do
     [ -e "$f" ] || continue
@@ -283,7 +333,7 @@ mode_cleanup() {
   done
   [ "$n" = "0" ] && note "there were none left"
 
-  say "4. the temporary copies made during the cutover"
+  say "5. the temporary copies made during the cutover"
   for f in /tmp/legacy.sqlite /tmp/arrow-atlas.sqlite /tmp/aa.sqlite /tmp/pre-migration-*.sqlite; do
     [ -e "$f" ] && { $SUDO rm -f "$f" && gone "host $f"; }
   done
@@ -293,7 +343,7 @@ mode_cleanup() {
       && gone "$c:/tmp legacy copies"
   done
 
-  say "5. nginx: verify what is live, keep a backup of it in its final form, then drop the pre-cutover one"
+  say "6. nginx: verify what is live, keep a backup of it in its final form, then drop the pre-cutover one"
   if ! $SUDO nginx -t >/tmp/aa-nginx.log 2>&1; then
     bad "the live nginx config does not pass nginx -t; not touching any nginx backup"
     sed 's/^/      /' /tmp/aa-nginx.log
@@ -323,7 +373,7 @@ EOF
     [ "$n" = "0" ] && note "there was no pre-cutover nginx backup left to remove"
   fi
 
-  say "6. what was deliberately left alone"
+  say "7. what was deliberately left alone"
   kept "PostgreSQL, Redis, the Node API, the WebSocket route, the volumes and .env"
   kept "the PostgreSQL dumps and the backup/restore tooling"
   kept "$HOST_BACKUPS/*.dump"
