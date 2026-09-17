@@ -10,6 +10,7 @@ import * as R from './rooms.js';
 import { balance } from './gold.js';
 import { deleteUser, endSession, googleVerify, providers, startSession, upsertUser, cleanName } from './auth.js';
 import { publish } from './events.js';
+import { cleanLevels, cleanState, mergeLevels, mergeState, readAll } from './progress.js';
 import { liveProgress, roomPresence } from './presence.js';
 import { body, caller, clearSessionCookie, limited, noStore, setSessionCookie, shapeUser, type Caller } from './httpkit.js';
 import { log } from './log.js';
@@ -95,6 +96,34 @@ const H = {
   },
 
   // ── Rooms ──
+
+  // ── The tour ──
+  //
+  // A player's cleared boards belong to the account. The client keeps playing out of its own storage and syncs
+  // around it, so none of this is ever in the way of a board: a push that fails costs freshness, not progress.
+
+  async progressRead(req: Req, res: Res, me: Caller) {
+    if (!me.user) { await noStore(res).code(401).send({ error: 'signed_out' }); return; }
+    if (!(await limited('progress_read', req, res, me.user.id))) return;
+    await noStore(res).send(await readAll(pool, me.user.id));
+  },
+
+  // Push what this device has, get back the merged whole. One call rather than a read and a write, because a
+  // device that has just been handed the truth should adopt it in the same breath as it offers its own.
+  async progressPush(req: Req, res: Res, me: Caller) {
+    if (!me.user) { await noStore(res).code(401).send({ error: 'signed_out' }); return; }
+    if (!(await limited('progress_write', req, res, me.user.id))) return;
+    const b = body(req);
+    const levels = cleanLevels(b.levels);
+    const state = cleanState(b.state);
+    const userId = me.user.id;
+    const merged = await tx(async c => {
+      await mergeLevels(c, userId, levels);
+      if (state) await mergeState(c, userId, state);
+      return readAll(c, userId);
+    });
+    await noStore(res).send(merged);
+  },
 
   async lobby(req: Req, res: Res, me: Caller) {
     if (!(await limited('lobby_read', req, res, me.user?.id ?? null))) return;
@@ -245,6 +274,9 @@ export function registerRoutes(app: FastifyInstance): void {
   app.post(`${v1}/auth/name`, withCaller(H.rename));
   app.post(`${v1}/auth/logout`, withCaller(H.logout));
   app.post(`${v1}/auth/delete`, withCaller(H.destroy));
+
+  app.get(`${v1}/progress`, withCaller(H.progressRead));
+  app.post(`${v1}/progress`, withCaller(H.progressPush));
 
   app.get(`${v1}/lobby`, withCaller(H.lobby));
   app.post(`${v1}/matches`, withCaller(H.create));

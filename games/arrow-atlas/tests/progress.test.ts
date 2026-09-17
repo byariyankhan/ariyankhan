@@ -1,0 +1,178 @@
+// A player's tour, and the one property that makes syncing it safe: nothing a device pushes can ever take
+// something away. Two phones, opened in any order, converge on the better of what each has seen.
+import { pool, query } from '../backend/src/db.js';
+import { cleanLevels, cleanState, mergeLevels, mergeState, readAll, readLevels, readState } from '../backend/src/progress.js';
+import { deleteUser } from '../backend/src/auth.js';
+import { releasePlayer } from '../backend/src/rooms.js';
+import { eq, finish, ok, player, reset, section } from './helpers.js';
+
+await reset();
+
+const rec = (o: Record<string, unknown> = {}) => ({ cleared: true, stars: 2, ms: 60_000, tier: 1, arrows: 40, quiz: false, ...o });
+
+section('A board cleared on one device is on the account');
+{
+  const p = await player('progOne');
+  await mergeLevels(pool, p.id, cleanLevels({ bd: rec({ stars: 3, ms: 42_000 }) }));
+  const got = await readLevels(pool, p.id);
+  eq(Object.keys(got).length, 1, 'one board is stored');
+  eq(got.bd?.stars, 3, 'with its stars');
+  eq(got.bd?.ms, 42_000, 'and its time');
+  eq(got.bd?.cleared, true, 'marked cleared');
+}
+
+section('Pushing the same thing twice changes nothing the second time');
+{
+  const p = await player('progIdem');
+  const batch = cleanLevels({ np: rec(), lk: rec({ stars: 1 }) });
+  const first = await mergeLevels(pool, p.id, batch);
+  const second = await mergeLevels(pool, p.id, batch);
+  eq(first, 2, 'the first push moves both boards');
+  eq(second, 0, 'the second moves nothing');
+}
+
+section('The better run wins, whichever order the two devices sync in');
+{
+  // The same board, played well on one phone and badly on the other.
+  const good = { in: rec({ stars: 3, ms: 30_000, tier: 3 }) };
+  const poor = { in: rec({ stars: 1, ms: 90_000, tier: 0 }) };
+
+  const a = await player('progOrderA');
+  await mergeLevels(pool, a.id, cleanLevels(good));
+  await mergeLevels(pool, a.id, cleanLevels(poor));
+  const afterA = await readLevels(pool, a.id);
+
+  const b = await player('progOrderB');
+  await mergeLevels(pool, b.id, cleanLevels(poor));
+  await mergeLevels(pool, b.id, cleanLevels(good));
+  const afterB = await readLevels(pool, b.id);
+
+  eq(afterA.in?.stars, 3, 'good then poor keeps three stars');
+  eq(afterA.in?.ms, 30_000, 'and the faster time');
+  eq(afterB.in?.stars, 3, 'poor then good reaches three stars');
+  eq(afterB.in?.ms, 30_000, 'and the same faster time');
+  eq(afterA.in?.tier, afterB.in?.tier, 'both orders agree on the tier as well');
+  ok(JSON.stringify({ ...afterA.in, at: 0 }) === JSON.stringify({ ...afterB.in, at: 0 }), 'the two orders land on the same record');
+}
+
+section('A stale device cannot undo a better run');
+{
+  const p = await player('progStale');
+  await mergeLevels(pool, p.id, cleanLevels({ jp: rec({ stars: 3, ms: 25_000, quiz: true }) }));
+  // an old phone, opened a month later, still remembers the first clumsy attempt
+  const moved = await mergeLevels(pool, p.id, cleanLevels({ jp: rec({ stars: 0, ms: 300_000, quiz: false }) }));
+  const got = await readLevels(pool, p.id);
+  eq(moved, 0, 'the stale push reports that it moved nothing');
+  eq(got.jp?.stars, 3, 'the stars stand');
+  eq(got.jp?.ms, 25_000, 'the time stands');
+  eq(got.jp?.quiz, true, 'and the quiz stays answered');
+}
+
+section('At equal stars the faster time wins');
+{
+  const p = await player('progTie');
+  await mergeLevels(pool, p.id, cleanLevels({ fr: rec({ stars: 2, ms: 80_000 }) }));
+  await mergeLevels(pool, p.id, cleanLevels({ fr: rec({ stars: 2, ms: 55_000 }) }));
+  eq((await readLevels(pool, p.id)).fr?.ms, 55_000, 'the faster of two two-star runs');
+}
+
+section('More stars beats a faster time');
+{
+  // A three-star run that took longer is still the better result: stars are the goal, the clock is the tiebreak.
+  const p = await player('progStars');
+  await mergeLevels(pool, p.id, cleanLevels({ de: rec({ stars: 1, ms: 20_000 }) }));
+  await mergeLevels(pool, p.id, cleanLevels({ de: rec({ stars: 3, ms: 70_000 }) }));
+  const got = await readLevels(pool, p.id);
+  eq(got.de?.stars, 3, 'three stars');
+  eq(got.de?.ms, 70_000, 'and that run’s time, not the faster one-star time');
+}
+
+section('A skip unlocks without claiming a clear');
+{
+  const p = await player('progSkip');
+  await mergeLevels(pool, p.id, cleanLevels({ mn: { skipped: true, cleared: false } }));
+  const got = await readLevels(pool, p.id);
+  eq(got.mn?.skipped, true, 'the skip is recorded');
+  eq(got.mn?.cleared, false, 'and it does not say the board was cleared');
+  // clearing it later turns the flag on without losing the skip
+  await mergeLevels(pool, p.id, cleanLevels({ mn: rec({ stars: 2 }) }));
+  const after = await readLevels(pool, p.id);
+  eq(after.mn?.cleared, true, 'clearing it afterwards is recorded');
+  eq(after.mn?.skipped, true, 'and the skip is still true');
+}
+
+section('Playing signed out, then signing in, keeps the play');
+{
+  // Nothing on the server yet: the whole tour arrives in one push, which is the first-sign-in case.
+  const p = await player('progFirst');
+  const tour: Record<string, unknown> = {};
+  for (let i = 0; i < 84; i++) tour['c' + i] = rec({ stars: (i % 3) + 1, ms: 30_000 + i });
+  const moved = await mergeLevels(pool, p.id, cleanLevels(tour));
+  eq(moved, 84, 'all eighty-four boards go up');
+  eq(Object.keys(await readLevels(pool, p.id)).length, 84, 'and are all on the account');
+}
+
+section('The settings blob merges rather than replaces');
+{
+  const p = await player('progState');
+  await mergeState(pool, p.id, { home: 'bd', form: { tier: 2, wins: 1, losses: 0 } });
+  // a second device that has never heard of `form` pushes only what it knows
+  await mergeState(pool, p.id, { home: 'in' });
+  const st = await readState(pool, p.id) as Record<string, unknown>;
+  eq(st.home, 'in', 'the key it sent is updated');
+  ok(!!st.form, 'and the key it did not send survives');
+}
+
+section('What a client sends is not what gets stored');
+{
+  const p = await player('progClean');
+  const dirty = cleanLevels({
+    ok: rec({ stars: 3 }),
+    bad1: rec({ stars: 99 }),                                  // out of range
+    bad2: rec({ ms: -5 }),                                     // impossible time
+    bad3: rec({ ms: 9_000_000_000 }),                          // longer than a day on one board
+    bad4: 'not an object',
+    bad5: { cleared: false, skipped: false },                  // says nothing happened
+    ['x'.repeat(200)]: rec(),                                  // a level id nobody could have
+  });
+  eq(dirty.bad1?.stars, 0, 'ninety-nine stars becomes zero');
+  eq(dirty.bad2?.ms, null, 'a negative time becomes no time');
+  eq(dirty.bad3?.ms, null, 'and so does a time longer than a day');
+  ok(!('bad4' in dirty), 'a row that is not an object is dropped');
+  ok(!('bad5' in dirty), 'a row claiming nothing happened is dropped');
+  ok(!Object.keys(dirty).some(k => k.length > 64), 'an absurd level id is dropped');
+  ok('ok' in dirty, 'and the good row in the same batch survives');
+
+  await mergeLevels(pool, p.id, dirty);
+  const stored = await readLevels(pool, p.id);
+  ok(Object.values(stored).every(r => (r.stars ?? 0) <= 3 && (r.ms === null || (r.ms ?? 0) > 0)), 'nothing out of range reached the table');
+}
+
+section('The settings blob cannot become a filing cabinet');
+{
+  eq(cleanState({ a: 'x'.repeat(20_000) }), null, 'an oversized blob is refused');
+  eq(cleanState('not an object'), null, 'and so is something that is not an object');
+  ok(!!cleanState({ home: 'bd' }), 'an ordinary one is fine');
+}
+
+section('Deleting the account takes the tour with it');
+{
+  const p = await player('progGone');
+  await mergeLevels(pool, p.id, cleanLevels({ es: rec(), pt: rec() }));
+  eq(Object.keys(await readLevels(pool, p.id)).length, 2, 'two boards to start with');
+  await deleteUser(p.id, releasePlayer);   // the same call the delete route makes
+  const left = await query<{ n: number }>(pool, 'SELECT COUNT(*)::int AS n FROM progress WHERE user_id = $1', [p.id]);
+  eq(left.rows[0]!.n, 0, 'and none afterwards');
+}
+
+section('One read hands a device everything it needs');
+{
+  const p = await player('progAll');
+  await mergeLevels(pool, p.id, cleanLevels({ it: rec({ stars: 3 }) }));
+  await mergeState(pool, p.id, { home: 'bd' });
+  const all = await readAll(pool, p.id);
+  eq(all.levels.it?.stars, 3, 'the boards');
+  eq((all.state as Record<string, unknown>).home, 'bd', 'and the settings, in one answer');
+}
+
+await finish();

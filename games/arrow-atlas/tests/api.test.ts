@@ -160,6 +160,27 @@ section('A purse that cannot cover the stake is told so, not charged');
   eq((await call('/auth/me', { token: poor.token })).json.user && ((await call('/auth/me', { token: poor.token })).json.user as { gold: number }).gold, 100, 'and the purse is untouched');
 }
 
+section('The tour syncs over the wire, and only for the signed in');
+{
+  const out = await call('/progress', {});
+  eq(out.status, 401, 'a stranger cannot read a tour');
+
+  const p = await mint('apiProgress', 1_000);
+  const push = await call('/progress', { token: p.token, body: { levels: { bd: { cleared: true, stars: 3, ms: 41_000 } }, state: { home: 'bd' } } });
+  eq(push.status, 200, 'a push is accepted');
+  eq(((push.json.levels as Record<string, { stars: number }>).bd)?.stars, 3, 'and answers with the merged tour');
+  eq((push.json.state as { home: string })?.home, 'bd', 'settings included');
+
+  const read = await call('/progress', { token: p.token });
+  eq(read.status, 200, 'and it can be read back');
+  eq(((read.json.levels as Record<string, { ms: number }>).bd)?.ms, 41_000, 'with the time that was sent');
+
+  // the merge rule, through the routes rather than through the module
+  await call('/progress', { token: p.token, body: { levels: { bd: { cleared: true, stars: 1, ms: 300_000 } } } });
+  const after = await call('/progress', { token: p.token });
+  eq(((after.json.levels as Record<string, { stars: number }>).bd)?.stars, 3, 'a worse run sent afterwards does not win');
+}
+
 section('A link cannot delete somebody\u2019s account');
 {
   // Reported by a review bot on PR #82, and it was real: the compatibility shim mounted every action for GET
