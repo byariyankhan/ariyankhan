@@ -33,7 +33,7 @@ function aa_match_view(PDO $db, array $m, ?array $me): array {
         'players' => $players,
         'count' => count($players),
         'seats' => AA_MATCH_SEATS,
-        'pot' => (int)$m['stake'] * max(1, count($players)),
+        'pot' => (int)$m['stake'] * max(1, aa_stakes_in($db, $m['code'])),
         'host' => aa_player_name($db, (int)$m['host_id']),
         'you' => $mine ? ($isHost ? 'host' : 'guest') : '',
         'can_start' => $isHost && $m['state'] === 'open' && count($players) > 1 && !(int)$m['open_to_all'],

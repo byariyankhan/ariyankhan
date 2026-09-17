@@ -264,7 +264,11 @@ function aa_room_joined(PDO $db, string $code): void {
 // player left behind is not swept up a moment later for a wait somebody else did.
 function aa_leave_room(PDO $db, array $m, int $userId): void {
     if ($m['state'] !== 'open') return;
-    $rest = array_values(array_filter(aa_room($db, $m['code']), fn($p) => (int)$p['user_id'] !== $userId));
+    $room = aa_room($db, $m['code']);
+    $seated = false;
+    foreach ($room as $p) if ((int)$p['user_id'] === $userId) $seated = true;
+    if (!$seated) return;   // no seat in this room, so there is no stake of theirs to hand back
+    $rest = array_values(array_filter($room, fn($p) => (int)$p['user_id'] !== $userId));
     $db->beginTransaction();
     if (!$rest) {
         $upd = $db->prepare("UPDATE matches SET state = 'void', settled = ? WHERE code = ? AND state = 'open'");
@@ -280,6 +284,25 @@ function aa_leave_room(PDO $db, array $m, int $userId): void {
     $db->prepare('DELETE FROM match_players WHERE code = ? AND user_id = ?')->execute([$m['code'], $userId]);
     aa_give_gold($db, $userId, (int)$m['stake']);
     $db->commit();
+}
+
+// How many stakes actually went into this room. Not the same as how many players it can still name: an account
+// deleted mid-match takes its player row with it, and the pot must stay the size of what was put in.
+function aa_stakes_in(PDO $db, string $code): int {
+    $st = $db->prepare('SELECT COUNT(*) FROM match_players WHERE code = ?');
+    $st->execute([$code]);
+    return (int)$st->fetchColumn();
+}
+
+// Deleting an account must not strand the rooms it was sitting in. Every room that has not started is left
+// properly, which passes the crown on and hands the stake back; seats in matches already over are cleared out
+// so nothing is left pointing at an account that is gone. A match still being played keeps the seat, so the
+// pot stays the size of the stakes that went in and the finishing order still adds up.
+function aa_release_player(PDO $db, int $userId): void {
+    $st = $db->prepare("SELECT m.code FROM matches m JOIN match_players p ON p.code = m.code WHERE p.user_id = ? AND m.state = 'open'");
+    $st->execute([$userId]);
+    foreach ($st->fetchAll() as $r) aa_leave_room($db, aa_match_row_raw($db, (string)$r['code']), $userId);
+    $db->prepare("DELETE FROM match_players WHERE user_id = ? AND code IN (SELECT code FROM matches WHERE state IN ('done','void'))")->execute([$userId]);
 }
 
 // Deal the board to the players who actually turned up. Guarded on 'open', so the host's Start and the clock
@@ -410,6 +433,12 @@ function aa_expire_matches(PDO $db): void {
     $st = $db->prepare("SELECT code FROM matches WHERE state = 'playing' AND created < ? LIMIT 20");
     $st->execute([$cut]);
     foreach ($st->fetchAll() as $m) {
+        // every account that was in it has since been deleted: settling has nobody to settle with, so close the
+        // row rather than leave it to be swept again on every request from here to eternity
+        if (!aa_room($db, $m['code'])) {
+            $db->prepare("UPDATE matches SET state = 'void', settled = ? WHERE code = ? AND state = 'playing'")->execute([time(), $m['code']]);
+            continue;
+        }
         $db->prepare('UPDATE match_players SET ms = -1, done = ? WHERE code = ? AND ms IS NULL')->execute([time() * 1000, $m['code']]);
         aa_settle_match($db, aa_match_row_raw($db, $m['code']));
     }
@@ -439,7 +468,7 @@ function aa_settle_match(PDO $db, array $m): array {
         $db->beginTransaction();
         $upd = $db->prepare("UPDATE matches SET winner_id = ?, settled = ? WHERE code = ? AND state = 'playing' AND winner_id IS NULL");
         $upd->execute([$first, time(), $m['code']]);
-        if ($upd->rowCount() === 1) aa_give_gold($db, $first, $stake * count($room));
+        if ($upd->rowCount() === 1) aa_give_gold($db, $first, $stake * aa_stakes_in($db, $m['code']));
         $db->commit();
         $m['winner_id'] = aa_match_row_raw($db, $m['code'])['winner_id'] ?? null;   // whoever won the race to the row
     }

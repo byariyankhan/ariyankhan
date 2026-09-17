@@ -703,7 +703,9 @@ unlock (skip allowed after two fails), stars, best times and progress in
   is dealt only then (`get` hands out the country, tier and seed once the match
   is `playing`), so nobody can study it while the room fills up.
   **Leave** is everyone's, and it hands back your own stake and nothing else
-  (`aa_leave_room`). The room closes only behind the last one out, killing the
+  (`aa_leave_room`, which checks the caller actually holds a seat before paying
+  anybody — the endpoint checks too, but a helper that hands out gold must not
+  depend on every caller remembering). The room closes only behind the last one out, killing the
   link; if the host walks away from a room with people still in it, **the next of
   them by joining order takes the crown and the room carries on**, told by a
   toast rather than a Start button appearing out of nowhere. A room back down to
@@ -794,7 +796,14 @@ unlock (skip allowed after two fails), stars, best times and progress in
   counts up from the old balance, pops, and the coins rain over the whole page
   (`goldRain` lifts the canvas out of the hidden board and on to `document.body`
   for the duration).
-  `tests/match.test.php` (112 checks) covers the stakes, the room rules, a room of
+  **Deleting an account** releases what it was sitting in first
+  (`aa_release_player`): every room that has not started is left properly, so the
+  crown passes on and nothing is left pointing at an account that is gone; a seat
+  in a match still being played stays, so the pot keeps the size of the stakes
+  that went in (`aa_stakes_in`, which counts seats rather than players the room
+  can still name). A match whose every account has since gone is closed rather
+  than swept again on every request.
+  `tests/match.test.php` (124 checks) covers the stakes, the room rules, a room of
   seven, the finish-order rule against a shorter clock, the instant payout and
   that it never pays twice, that second place wins a place and no gold, that a 500
   room of beginners gets an easy board while a 7,000 room of strong players gets a
