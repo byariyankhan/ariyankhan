@@ -258,6 +258,30 @@ function aa_room_joined(PDO $db, string $code): void {
        ->execute([time() + AA_FILL_SECONDS, $code]);
 }
 
+// Walking out of a room takes your own stake with you and nothing else. Only the last one out closes the room:
+// if the host leaves with people still in it, the next of them by joining order takes the crown and the room
+// carries on without them. A room back down to one player stops its clock and starts its wait over, so the
+// player left behind is not swept up a moment later for a wait somebody else did.
+function aa_leave_room(PDO $db, array $m, int $userId): void {
+    if ($m['state'] !== 'open') return;
+    $rest = array_values(array_filter(aa_room($db, $m['code']), fn($p) => (int)$p['user_id'] !== $userId));
+    $db->beginTransaction();
+    if (!$rest) {
+        $upd = $db->prepare("UPDATE matches SET state = 'void', settled = ? WHERE code = ? AND state = 'open'");
+        $upd->execute([time(), $m['code']]);
+        if ($upd->rowCount() !== 1) { $db->rollBack(); return; }
+    } else {
+        $host = (int)$m['host_id'] === $userId ? (int)$rest[0]['user_id'] : (int)$m['host_id'];
+        $alone = count($rest) < 2;
+        $upd = $db->prepare("UPDATE matches SET host_id = ?, fills_at = CASE WHEN ? THEN NULL ELSE fills_at END, created = CASE WHEN ? THEN ? ELSE created END WHERE code = ? AND state = 'open'");
+        $upd->execute([$host, $alone ? 1 : 0, $alone ? 1 : 0, time(), $m['code']]);
+        if ($upd->rowCount() !== 1) { $db->rollBack(); return; }
+    }
+    $db->prepare('DELETE FROM match_players WHERE code = ? AND user_id = ?')->execute([$m['code'], $userId]);
+    aa_give_gold($db, $userId, (int)$m['stake']);
+    $db->commit();
+}
+
 // Deal the board to the players who actually turned up. Guarded on 'open', so the host's Start and the clock
 // running out cannot both begin the same match.
 function aa_start_room(PDO $db, string $code): bool {
@@ -270,6 +294,9 @@ function aa_start_room(PDO $db, string $code): bool {
 // to anyone still sitting alone rather than leaving them to wait out the day.
 function aa_autostart_matches(PDO $db): void {
     $now = time();
+    // somebody walked out and left a clock ticking over a room of one: it goes back to waiting
+    $db->exec("UPDATE matches SET fills_at = NULL WHERE state = 'open' AND fills_at IS NOT NULL
+        AND (SELECT COUNT(*) FROM match_players p WHERE p.code = matches.code) < 2");
     $st = $db->prepare("SELECT code FROM matches WHERE state = 'open' AND open_to_all = 1 AND fills_at IS NOT NULL AND fills_at <= ? LIMIT 20");
     $st->execute([$now]);
     foreach ($st->fetchAll() as $m) if (count(aa_room($db, $m['code'])) > 1) aa_start_room($db, $m['code']);

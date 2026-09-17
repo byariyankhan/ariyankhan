@@ -985,7 +985,7 @@
     else if (act === 'skip') { store.set(skipKey(state.idx + 1), true); startLevel(nextOpen(state.idx)); }
     else if (act === 'giveup') { el.card.innerHTML = '<h3>Sending…</h3>'; finishMatch(false, 0); }
     else if (act === 'minvite') sendInvite(state.pendingMatch);
-    else if (act === 'mcancel') cancelMatch();
+    else if (act === 'mcancel') leaveRoom();
     else if (act === 'mstart') startMatch();
     else if (act === 'levels') goToLevels();
     else if (act === 'share') share();
@@ -1168,9 +1168,9 @@
       <p class="aa-wait">${roomWait(m, host)}</p>
       <p class="aa-link-box">${escapeHtml(matchLink(m.code))}</p>
       <div class="aa-actions">
-        <button type="button" class="aa-btn${host ? '' : ' aa-btn--primary'}" data-act="minvite">Invite</button>
-        ${host ? `<button type="button" class="aa-btn aa-btn--primary" data-act="mstart"${m.count > 1 ? '' : ' disabled'}>Start</button>` : ''}
-        ${host ? '<button type="button" class="aa-btn" data-act="mcancel">Cancel</button>' : ''}
+        <button type="button" class="aa-btn${host && !m.open_to_all ? '' : ' aa-btn--primary'}" data-act="minvite">Invite</button>
+        ${host && !m.open_to_all ? `<button type="button" class="aa-btn aa-btn--primary" data-act="mstart"${m.count > 1 ? '' : ' disabled'}>Start</button>` : ''}
+        <button type="button" class="aa-btn" data-act="mcancel">Leave</button>
       </div>
       <p class="aa-flash" hidden></p>`;
     wireFaces(el.card);
@@ -1183,6 +1183,9 @@
     if (m.open_to_all) return host ? 'Looking for players. Send the link to bring a friend in too.' : 'Waiting for one more player.';
     return host ? (m.count > 1 ? 'Start when everyone is in.' : 'Waiting for your friends to join.') : `Waiting for ${escapeHtml(m.host)} to start.`;
   }
+  // The crown can change hands while you are looking at the room, so say so rather than letting a Start button
+  // appear out of nowhere.
+  const noteHandover = (before, m) => { if (before && before.you === 'guest' && m.you === 'host') toast('You are the leader now.', 'good'); };
   function tickFill(secs) {
     clearInterval(state.fillTick); state.fillTick = 0;
     if (typeof secs !== 'number') return;
@@ -1206,8 +1209,9 @@
           if (m.code !== code) { showRoom(m); return; }
           const before = state.pendingMatch;
           state.pendingMatch = m;
-          const moved = m.count !== before?.count || (typeof m.fills_in === 'number') !== (typeof before?.fills_in === 'number');
-          if (!el.overlay.hidden && moved) { renderRoom(m); tickFill(m.fills_in); }
+          const moved = m.count !== before?.count || m.you !== before?.you
+            || (typeof m.fills_in === 'number') !== (typeof before?.fills_in === 'number');
+          if (!el.overlay.hidden && moved) { renderRoom(m); tickFill(m.fills_in); noteHandover(before, m); }
         }
         else { stopMatchPoll(); toast(m.state === 'void' ? 'That match was called off.' : 'That match is over.', 'hint'); goToLevels(); }
       } catch { /* a dropped poll is nothing: the next one will do */ }
@@ -1219,14 +1223,19 @@
     if (!m) return;
     const btn = $('[data-act="mstart"]', el.card); if (btn) btn.disabled = true;
     try { const d = await matchApi('start', { code: m.code }); stopMatchPoll(); playMatch(d.match); }
-    catch (err) { if (btn) btn.disabled = false; toast(err.code === 'need_two' ? 'Nobody has joined yet.' : 'Could not start the match.', 'bad'); }
+    catch (err) { if (btn) btn.disabled = false; toast(err.code === 'need_two' ? 'Nobody has joined yet.' : err.code === 'clock_starts_it' ? 'This room starts on its own clock.' : 'Could not start the match.', 'bad'); }
   }
-  async function cancelMatch() {
+  // Leaving hands your own stake back. The room closes only if you were the last one in it; otherwise it plays
+  // on without you, with the next player in charge.
+  async function leaveRoom() {
     const m = state.pendingMatch;
     if (!m) return;
     stopMatchPoll();
-    try { const d = await matchApi('cancel', { code: m.code }); setGold(d.gold); toast(`Match called off. ${gfmt(m.stake)} gold back.`, 'good'); }
-    catch (err) { toast(err.code === 'taken' ? 'Too late, the match has started.' : 'Could not call that match off.', 'bad'); }
+    try {
+      const d = await matchApi('cancel', { code: m.code });
+      setGold(d.gold);
+      toast(d.closed ? `Match called off. ${gfmt(m.stake)} gold back.` : `You left. ${gfmt(m.stake)} gold back.`, 'good');
+    } catch (err) { toast(err.code === 'taken' ? 'Too late, the match has started.' : 'Could not leave that room.', 'bad'); }
     state.pendingMatch = null;
     goToLevels();
   }
@@ -1666,7 +1675,7 @@
   loadData().then(() => {
     el.loading.hidden = true;
     renderSelect();
-    authLoad().then(renderPurse);   // the chip shows the purse as soon as the page knows who is playing
+    authLoad().then(renderPurse).catch(() => {});   // the chip shows the purse as soon as the page knows who is playing
     const m = /^#level-(\d+)$/.exec(location.hash), mb = /^#b-([\w:]+)$/.exec(location.hash), mm = matchHash();
     if (mm) openMatchLink(mm);
     else if (mb) { const j = DATA.levels.findIndex(L => L.id === mb[1]); startLevel(j < 0 ? 0 : j); }
