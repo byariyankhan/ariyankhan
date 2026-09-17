@@ -70,8 +70,19 @@ jobs:
           install -d -m 700 ~/.ssh
           printf '%s\n' "$VPS_SSH_PRIVATE_KEY" > ~/.ssh/vps
           chmod 600 ~/.ssh/vps
-          ssh-keyscan -T 10 -H "$VPS_HOST" > ~/.ssh/known_hosts 2>/dev/null || true
-          [ -s ~/.ssh/known_hosts ] || { echo "::error::no host key from $VPS_HOST:22"; exit 1; }
+          # A single keyscan is not a reliable way to open this: it timed out once from a runner while the
+          # same command had worked from another minutes earlier, and a host that takes a moment to answer a
+          # new address is not a reason to abandon a run. Four tries, widening, and it says which one worked.
+          for try in 1 2 3 4; do
+            ssh-keyscan -T 20 -H "$VPS_HOST" > ~/.ssh/known_hosts 2>/dev/null || true
+            if [ -s ~/.ssh/known_hosts ]; then
+              [ "$try" = "1" ] || echo "  (the host key came back on attempt $try)"
+              break
+            fi
+            echo "  no host key yet (attempt $try)"
+            sleep $(( try * 5 ))
+          done
+          [ -s ~/.ssh/known_hosts ] || { echo "::error::no host key from the VPS on port 22 after four tries — is SSH reachable from GitHub's runners?"; exit 1; }
           ssh-keygen -lf ~/.ssh/known_hosts | sed 's/^/  host key  /'
 
       - name: ${{ inputs.mode }}
