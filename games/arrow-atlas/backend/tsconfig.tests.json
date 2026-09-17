@@ -1,0 +1,11 @@
+{
+  // The suites, typechecked with exactly the settings the service is built with.
+  //
+  // They are run by tsx, which strips types without checking them, so nothing was checking these files at all:
+  // a call with the wrong arguments reached a test run and only failed once the line actually executed. This
+  // emits nothing — it is a check, not a build.
+  "extends": "./tsconfig.json",
+  // rootDir is dropped: nothing is emitted, so the one thing it would enforce does not apply here.
+  "compilerOptions": { "noEmit": true, "rootDir": ".." },
+  "include": ["src/**/*.ts", "../tests/**/*.ts"]
+}

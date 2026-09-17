@@ -532,7 +532,9 @@ the start toast), combo counter (taps within 1.8 s), win streak, milestones ever
 bonus board (date-seeded, same for everyone, `#daily`), and clearing the board reveals the country for a
 3-option quiz plus capital/population/region. 197-country World Tour (every UN member state, plus Palestine, the Vatican, Kosovo and Taiwan: world-atlas 110m plus the 29 small states from the 10m file, minus dependencies and disputed areas) with sequential
 unlock (skip allowed after two fails), stars, best times and progress in
-`localStorage` (`aa:v1:*`), share text, `#level-N` deep links.
+`localStorage` (`aa:v1:*`) and, once signed in, on the account as well, so a new
+phone picks the tour up where the last one left it; share text, `#level-N` deep
+links.
 
 - **Engine**: `js/arrow-atlas.js` (no libraries), styles in `css/arrow-atlas.css`
   (`.aa-` prefix). Puzzles are generated in the browser from a fixed seed per level
@@ -891,8 +893,9 @@ unlock (skip allowed after two fails), stars, best times and progress in
   L peeks. Lanes live in the `.aa-lanes` group above the pieces.
 - **Legal**: the game has its own `arrow-atlas-privacy.html` and
   `arrow-atlas-terms.html` (what is stored on the device, Google Analytics, fonts,
-  permissions, children, no account), linked from the welcome gate and Settings;
-  Settings → Reset progress wipes every `aa:v1:*` key.
+  permissions, children, playing without an account), linked from the welcome gate
+  and Settings. Clearing the site data wipes every `aa:v1:*` key; Settings →
+  Delete account removes the account copy.
 - **First open / launch**: `#aaGate` (welcome, Terms + Privacy links, Accept,
   stored in `aa:v1:welcomed`), then `#aaSplash` (logo + one line from `QUOTES`,
   rotating per launch in `aa:v1:launches`, tap or 2.4 s to dismiss, skipped for

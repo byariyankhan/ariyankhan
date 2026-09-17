@@ -44,6 +44,26 @@ containers racing — all of them write the second attempt into a unique-violati
 `users.gold` is the running total; the ledger is what it is made of. The two must always agree, and every test
 suite checks that before it is allowed to pass.
 
+### The tour
+
+A player's cleared boards belong to the account, not to the phone they were cleared on. Two devices sync in
+whatever order they happen to be opened, so the merge has to be commutative, and it is done by the database in
+one `ON CONFLICT` clause rather than read-modify-written by the service:
+
+* a flag (`cleared`, `skipped`, `quiz`) only ever goes from false to true;
+* more stars wins; at equal stars the faster time wins;
+* so pushing A then B lands where B then A lands, and pushing the same thing twice changes nothing the second
+  time. An old phone opened after a month uploads a worse run and moves nothing.
+
+`users.state` carries the small things a device needs before it can draw the right tour at all — the home
+country, the difficulty ladder, the daily boards — shallow-merged for the same reason, so a device that has
+never heard of a key cannot delete it by pushing without it. The client keeps playing out of its own storage
+and syncs around it: a push that fails costs freshness, not progress.
+
+One rule lives in the client rather than the server, and only because the server cannot know it: a home
+country **guessed** from the connection is not the player's answer, so it never travels. Only one chosen in
+Settings does.
+
 ---
 
 ## Public URLs
@@ -68,6 +88,8 @@ in the path.
 | POST | `/auth/name` | rename |
 | POST | `/auth/logout` | end this session |
 | POST | `/auth/delete` | delete the account and everything attached |
+| GET | `/progress` | the whole tour this account has played |
+| POST | `/progress` | push what a device has; the merged whole comes back |
 | GET | `/lobby` | how many are waiting, per stake |
 | POST | `/matches` | open a room (`stake`, `open_to_all`, `tier`) |
 | GET | `/matches/:code` | the room as you may see it |
@@ -121,6 +143,8 @@ has turned a degraded service into an outage.
 | `match_progress` | 120 / min | account |
 | `match_result` | 20 / min | account |
 | `lobby_read` | 120 / min | IP |
+| `progress_read` | 60 / min | account |
+| `progress_write` | 60 / min | account |
 | `ws_connect` | 60 / min | IP |
 
 `ARROW_ATLAS_RATE_MULTIPLIER` scales all of them. Production leaves it at 1.
@@ -304,7 +328,7 @@ cp .env.example .env.dev       # point it at a local PostgreSQL and Redis
 npm run migrate
 npx tsx src/server.ts
 
-bash ../tests/run.sh                       # all three
+bash ../tests/run.sh                       # all four
 bash ../tests/run.sh economy api           # or just some
 ```
 
@@ -319,6 +343,7 @@ than letting it turn into a module-not-found error halfway through a run.
 | Suite | What it covers |
 |---|---|
 | `economy` | stakes, pots, payouts, draws, leaving, the crown, requeue, idempotency, overdrafts |
+| `progress` | the merge rule: convergence in either order, a stale device undoing nothing, first sign-in, what a client sends being cleaned |
 | `api` | both transports, rate limits, a Redis flush, that a link cannot reach anything that changes state, claims the client may not make |
 | `ws` | connect, authorisation, the countdown, clamped progress, reconnect resync, finish events |
 

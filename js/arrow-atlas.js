@@ -252,7 +252,9 @@
     try { const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), 2500); const r = await fetch('games/geo.php', { signal: ctrl.signal, cache: 'no-store' }); clearTimeout(t); if (r.ok) c = ((await r.json()).c || '').toUpperCase(); } catch { /* offline or local: fall back */ }
     if (!c) { const m = /-([A-Za-z]{2})$/.exec(navigator.language || ''); if (m) c = m[1].toUpperCase(); }
     if (!d.canon.some(L => L.a2 === c)) c = '';
-    if (c) store.set('home', c);
+    // A guess, not a choice. The distinction matters now that this travels: a new phone that guessed
+    // Bangladesh must not overwrite an account whose owner deliberately chose India.
+    if (c) { store.set('home', c); store.set('homeAuto', true); }
     return c;
   }
   const kmBetween = (a, b) => { const R = Math.PI / 180, dl = (b[0] - a[0]) * R, dp = (b[1] - a[1]) * R, h = Math.sin(dp / 2) ** 2 + Math.cos(a[1] * R) * Math.cos(b[1] * R) * Math.sin(dl / 2) ** 2; return 12742 * Math.asin(Math.sqrt(h)); };
@@ -261,7 +263,7 @@
     if (!H) return d.canon.slice();
     return [H].concat(d.canon.filter(L => L !== H).sort((a, b) => kmBetween(H.c, a.c) - kmBetween(H.c, b.c)));
   }
-  function setHome(a2) { store.set('home', a2); DATA.levels = tourFor(DATA, a2); maskCache.clear(); forgetNums(); renderSelect(); }
+  function setHome(a2) { store.set('home', a2); store.set('homeAuto', false); DATA.levels = tourFor(DATA, a2); maskCache.clear(); forgetNums(); renderSelect(); }
 
   // ── Lobby world map ──
   // Every country faint; the tour countries outlined; cleared ones filled and numbered with their level;
@@ -948,7 +950,8 @@
       store.set(`daily:${state.daily.key}`, rec);
       const ds = store.get('dailyStreak', { count: 0, last: '' });
       if (ds.last !== state.daily.key) { const y = new Date(); y.setDate(y.getDate() - 1); const yk = `${y.getFullYear()}-${String(y.getMonth() + 1).padStart(2, '0')}-${String(y.getDate()).padStart(2, '0')}`; store.set('dailyStreak', { count: ds.last === yk ? ds.count + 1 : 1, last: state.daily.key }); }
-    } else { store.set(progressKey(i), rec); forgetNums(); }
+      syncTour({});   // the daily board lives in the state blob, which every push carries
+    } else { store.set(progressKey(i), rec); forgetNums(); pushOne(DATA.levels[i].id, rec); }
     if (R) {
       el.card.innerHTML = `<h3>Board cleared!</h3><p class="aa-card-lead">${fmtTime(t, true)}. Sending your time…</p>`;
       el.overlay.hidden = false;
@@ -1006,7 +1009,7 @@
     if (act === 'next') { const j = nextOpen(state.idx); if (j < 0) goToLevels(); else startLevel(j); }
     else if (act === 'again' || act === 'retry') startLevel(state.idx, false, state.daily, state.tier);
     else if (act === 'shuffle') startLevel(state.idx, true, state.daily);
-    else if (act === 'skip') { store.set(skipKey(state.idx + 1), true); startLevel(nextOpen(state.idx)); }
+    else if (act === 'skip') { const id = DATA.levels[state.idx + 1]?.id; store.set(skipKey(state.idx + 1), true); if (id) syncTour({ [id]: { cleared: false, skipped: true } }); startLevel(nextOpen(state.idx)); }
     else if (act === 'giveup') { el.card.innerHTML = '<h3>Sending…</h3>'; finishMatch(false, 0); }
     else if (act === 'resend') { const b = e.target.closest('[data-act]'); b.disabled = true; flushResult(true).then(ok => { if (!ok) b.disabled = false; }); }
     else if (act === 'minvite') sendInvite(state.pendingMatch);
@@ -1097,6 +1100,7 @@
       const fresh = !!d.user && d.gold_granted;
       closeSheets();
       renderAccountRow();
+      if (auth.user) syncTour();   // a new phone gets the tour back here; a player who played signed out gives theirs up
       if (auth.user) {
         if (state.pendingCode) { const c = state.pendingCode; state.pendingCode = null; openMatchLink(c); } else openStakes();
         toast(fresh ? `Welcome, ${auth.user.name}. ${Number(auth.user.gold || 0).toLocaleString('en-US')} gold to start you off.` : `Signed in as ${auth.user.name}`, 'good', fresh ? 5000 : 2800);
@@ -1106,6 +1110,107 @@
       signInNote(e.code === 'google_not_configured' ? 'Google sign-in is not switched on yet.' : 'That sign-in did not go through. Please try again.');
     }
   }
+  // ── The tour, kept by the account rather than by this phone ──
+  //
+  // Everything a player has cleared used to live in this browser and nowhere else: sign in on a new phone and
+  // the gold came across while the tour started again at level 1. It now syncs, and the rule that makes that
+  // safe is the server's: every field only improves, so whichever order two devices happen to sync in, neither
+  // can undo the other. Which means this side never has to be clever — it pushes what it has, takes back the
+  // merged answer, and applies it.
+  //
+  // None of it is ever in the way of playing. A push that fails costs freshness, not progress: the record is
+  // already in local storage and goes up with the next sync.
+  const progressApi = body =>
+    fetch(`${API_V1}/progress`, {
+      method: body ? 'POST' : 'GET', credentials: 'include', cache: 'no-store',
+      headers: body ? { 'Content-Type': 'application/json' } : {},
+      body: body ? JSON.stringify(body) : undefined,
+    }).then(async r => { const d = await r.json().catch(() => ({})); if (!r.ok) throw Object.assign(new Error(d.error || `HTTP ${r.status}`), { code: d.error }); return d; });
+
+  const STATE_KEYS = ['home', 'form', 'dailyStreak'];   // what a new device needs before it can show the right tour
+
+  /** Everything this device has played, in the shape the server stores. */
+  function localTour() {
+    const levels = {};
+    const touch = id => (levels[id] ||= { cleared: false, skipped: false });
+    try {
+      for (const k of Object.keys(localStorage)) {
+        if (!k.startsWith(STORE)) continue;
+        const key = k.slice(STORE.length);
+        if (key.startsWith('lv:')) {
+          const r = store.get(key); if (!r) continue;
+          const e = touch(key.slice(3));
+          e.cleared = true;
+          e.ms = typeof r.t === 'number' ? r.t : null;
+          e.stars = r.stars || 0; e.quiz = !!r.quiz; e.tier = r.tier || 0; e.arrows = r.arrows || 0;
+        } else if (key.startsWith('skip:')) {
+          if (store.get(key)) touch(key.slice(5)).skipped = true;
+        }
+      }
+    } catch { /* storage can be unreadable in a private window; syncing is optional, playing is not */ }
+    return levels;
+  }
+  function localState() {
+    const out = {};
+    for (const k of STATE_KEYS) { const v = store.get(k, null); if (v !== null && v !== undefined) out[k] = v; }
+    // A home country this device guessed from the connection is not the player's answer, so it stays here.
+    // Only a home they picked in Settings is worth telling the account about.
+    if (store.get('homeAuto', false)) delete out.home;
+    const daily = {};
+    try {
+      for (const k of Object.keys(localStorage)) {
+        if (!k.startsWith(STORE + 'daily:')) continue;
+        const key = k.slice(STORE.length); const v = store.get(key); if (v) daily[key.slice(6)] = v;
+      }
+    } catch { /* as above */ }
+    if (Object.keys(daily).length) out.daily = daily;
+    return out;
+  }
+
+  // The same rule the server applies, applied here too — not for the server's benefit but for the race: a board
+  // cleared while the request was in the air must not be undone by an answer that predates it.
+  const betterRun = (a, b) => !b ? true : (a.stars || 0) !== (b.stars || 0) ? (a.stars || 0) > (b.stars || 0)
+    : typeof a.t === 'number' && typeof b.t === 'number' ? a.t < b.t : typeof a.t === 'number';
+
+  function adoptTour(server) {
+    let changed = false;
+    for (const [id, r] of Object.entries(server?.levels || {})) {
+      if (r.cleared) {
+        const next = { t: r.ms ?? 0, stars: r.stars || 0, quiz: !!r.quiz, tier: r.tier || 0, arrows: r.arrows || 0, at: r.at || Date.now() };
+        if (betterRun(next, store.get('lv:' + id))) { store.set('lv:' + id, next); changed = true; }
+      }
+      if (r.skipped && !store.get('skip:' + id)) { store.set('skip:' + id, true); changed = true; }
+    }
+    const st = server?.state || {};
+    for (const k of STATE_KEYS) if (st[k] !== undefined && JSON.stringify(st[k]) !== JSON.stringify(store.get(k, null))) { store.set(k, st[k]); changed = true; }
+    if (st.home !== undefined) store.set('homeAuto', false);   // the account's home is a choice, however this device came by its own
+    for (const [day, rec] of Object.entries(st.daily || {})) if (!store.get('daily:' + day)) { store.set('daily:' + day, rec); changed = true; }
+    if (!changed) return false;
+    // The home country may have moved, which reorders the whole tour, so rebuild it rather than only repainting.
+    DATA.levels = tourFor(DATA, store.get('home', null));
+    maskCache.clear(); forgetNums();
+    if (!el.select.hidden) renderSelect();
+    return true;
+  }
+
+  let syncing = null;
+  /** Push what this device has, adopt what comes back. Safe to call as often as it is useful to. */
+  function syncTour(levels) {
+    if (!auth.user) return Promise.resolve(false);
+    if (syncing) return syncing;
+    const body = levels ? { levels, state: localState() } : { levels: localTour(), state: localState() };
+    syncing = progressApi(body)
+      .then(d => adoptTour(d))
+      .catch(() => false)
+      .finally(() => { syncing = null; });
+    return syncing;
+  }
+  /** One board, the moment it is cleared. The full sync would do the same thing, more slowly and less often. */
+  function pushOne(id, rec) {
+    if (!auth.user || !id) return;
+    syncTour({ [id]: { cleared: true, ms: rec.t ?? null, stars: rec.stars || 0, quiz: !!rec.quiz, tier: rec.tier || 0, arrows: rec.arrows || 0 } });
+  }
+
   // ── Gold matches: stake, invite, play the same board, winner takes the pot ──
   // The server holds both stakes, picks the board and decides the winner; the game only shows what it says.
   // Three stakes, and the bigger the stake the harder the board.
@@ -1585,7 +1690,7 @@
     // top where it is the first thing under a player's own name. It still comes and goes with the account.
     if (el.sessionGroup) el.sessionGroup.hidden = !auth.user;
     if (el.sessionCap) el.sessionCap.hidden = !auth.user;
-    if (el.deleteAccBtn) el.deleteAccBtn.hidden = !auth.user;   // it sits with Reset progress now, not in the account group
+    if (el.deleteAccBtn) el.deleteAccBtn.hidden = !auth.user;   // it sits under Leaving, beneath Sign out
     if (!auth.user) return;
     // The player's own picture, the same one the line-up over the board uses, so the row shows who is signed in
     // rather than a face that is the same for everybody. No picture, or one whose link has expired: their initial.
@@ -1762,7 +1867,7 @@
   }
   el.homeSel?.addEventListener('change', async () => {
     const v = el.homeSel.value;
-    if (v === 'auto') { try { localStorage.removeItem(STORE + 'home'); } catch { /* ignore */ } const c = await homeCountry(DATA); DATA.levels = orderFor(DATA, c); maskCache.clear(); renderSelect(); }
+    if (v === 'auto') { try { localStorage.removeItem(STORE + 'home'); localStorage.removeItem(STORE + 'homeAuto'); } catch { /* ignore */ } const c = await homeCountry(DATA); DATA.levels = orderFor(DATA, c); maskCache.clear(); renderSelect(); }
     else setHome(v);
     toast(v === 'auto' ? 'Tour order follows where you are.' : v ? `Your tour now starts from ${DATA.levels[0].name}.` : 'Tour in world order.', 'hint');
   });
@@ -1829,7 +1934,7 @@
   el.settingsBtns.forEach(b => b.addEventListener('click', () => {
     openSheet(el.sheet);
     renderAccountRow();                                   // with what the page already knows, at once
-    authLoad(true).then(() => { renderAccountRow(); renderPurse(); }).catch(() => {});   // then with the server's answer
+    authLoad(true).then(() => { renderAccountRow(); renderPurse(); syncTour(); }).catch(() => {});   // then with the server's answer, tour included
   }));
   el.friends?.addEventListener('click', openFriends);
   $$('[data-close-sheet]').forEach(b => b.addEventListener('click', closeSheets));
@@ -1860,12 +1965,9 @@
   el.btnGuides?.addEventListener('click', () => { state.guides = !state.guides; store.set('guides', state.guides); renderToggles(); });
   const goAbout = () => { closeSheets(); if (!el.game.hidden) goToLevels(); document.getElementById('aaAbout')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); };
   el.howTo?.addEventListener('click', goAbout);
-  // Reset progress: wipes everything the game stored on this device (progress, streaks, form, settings, launches)
-  document.getElementById('aaReset')?.addEventListener('click', () => {
-    if (!confirm('Delete all Arrow Atlas progress and settings on this device? This cannot be undone.')) return;
-    try { Object.keys(localStorage).filter(k => k.startsWith(STORE)).forEach(k => localStorage.removeItem(k)); } catch { /* ignore */ }
-    location.replace(location.pathname);
-  });
+  // Reset progress used to be here. It wiped this device, which made sense when this device was the only place
+  // a tour existed. It is not any more: the account holds it, so clearing local storage would have deleted
+  // nothing and then re-downloaded it on the next sync — a button that looks destructive and does nothing.
   $$('a[href="#aaAbout"]').forEach(a => a.addEventListener('click', e => { e.preventDefault(); goAbout(); }));
   renderToggles();
   document.addEventListener('keydown', e => { if (!el.game.hidden && !state.finished && (e.key === 'h' || e.key === 'H') && !/input|textarea/i.test(document.activeElement?.tagName || '')) hint(); });
@@ -1914,7 +2016,7 @@
     renderSelect();
     // the purse and the account row from the first paint, not only once Play with Friends has been tapped, and
     // a time from last time that never got through goes now
-    authLoad().then(() => { renderPurse(); renderAccountRow(); return flushResult(false); }).catch(() => {});
+    authLoad().then(() => { renderPurse(); renderAccountRow(); syncTour(); return flushResult(false); }).catch(() => {});
     const m = /^#level-(\d+)$/.exec(location.hash), mb = /^#b-([\w:]+)$/.exec(location.hash), mm = matchHash();
     if (mm) openMatchLink(mm);
     else if (mb) { const j = DATA.levels.findIndex(L => L.id === mb[1]); startLevel(j < 0 ? 0 : j); }

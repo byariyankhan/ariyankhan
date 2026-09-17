@@ -70,7 +70,10 @@ jobs:
 
       - name: Typecheck
         working-directory: games/arrow-atlas/backend
-        run: npm run typecheck
+        # The suites are included. tsx runs them by stripping types without checking any of them, so nothing
+        # was checking those files at all — a call with the wrong arguments reached a test run and only failed
+        # once that line executed.
+        run: npm run typecheck && npx tsc -p tsconfig.tests.json
 
       - name: Migrate
         working-directory: games/arrow-atlas/backend
