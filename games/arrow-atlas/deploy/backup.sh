@@ -90,8 +90,23 @@ case "${1:-once}" in
     ;;
   loop)
     log "backup loop started: daily at ${AT_HOUR}:00 UTC, keeping ${KEEP_DAYS} days"
+
     # One on boot, so a fresh deployment has a backup within the minute rather than within the day.
-    once || fail "the first backup failed; carrying on so the schedule still runs"
+    #
+    # On a first deploy this container is usually ready before the API has finished building and running its
+    # migrations, so the database is empty and the first attempt is correctly refused for having no tables in
+    # it. Waiting until tomorrow for the next one would leave the healthcheck red for a day over nothing, so
+    # keep trying every minute until one succeeds. After that the daily schedule takes over.
+    tries=0
+    until once; do
+      tries=$(( tries + 1 ))
+      if [ "$tries" -ge 60 ]; then
+        fail "no backup has succeeded in an hour of trying; leaving it to the schedule"
+        break
+      fi
+      log "retrying in 60s (attempt $tries) — on a fresh deploy the schema may not exist yet"
+      sleep 60
+    done
     while true; do
       # Seconds until the next AT_HOUR:00 UTC, counted from the epoch rather than from the hour and minute.
       # This container runs Alpine's /bin/sh, where bash's 10# base notation is a syntax error and a bare "08"
