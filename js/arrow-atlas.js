@@ -1094,6 +1094,9 @@
   // shows what it says. Three stakes, and the bigger the stake the harder the board.
   const STAKES = [500, 1000, 7000];
   const gfmt = n => Number(n || 0).toLocaleString('en-US');
+  // A purse holds anything from nothing to a number with a dozen digits in it, so the badge is not a fixed box:
+  // the longer the number, the smaller the type, and it never spills over the name beside it or off the page.
+  const goldFit = v => { const w = gfmt(v).length; return w > 12 ? ' is-vast' : w > 9 ? ' is-big' : ''; };
   const matchApi = (a, body, query = '') => fetch(`games/api/match.php?a=${a}${query}`, { method: body ? 'POST' : 'GET', credentials: 'same-origin', cache: 'no-store', headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined })
     .then(async r => { const d = await r.json().catch(() => ({})); if (!r.ok) throw Object.assign(new Error(d.error || `HTTP ${r.status}`), { code: d.error, gold: d.gold }); return d; });
   const matchLink = code => `${location.origin}${location.pathname}#m=${code}`;
@@ -1122,7 +1125,7 @@
   function meStrip() {
     const u = auth.user;
     if (!u) return '';
-    return `<div class="aa-me"><span class="aa-me-face${faceClass(u)}">${faceInner(u)}</span><span><span class="aa-me-name">${escapeHtml(u.name || 'Player')}</span><br><span class="aa-me-sub">Signed in with ${escapeHtml((u.provider || 'google').replace(/^./, c => c.toUpperCase()))}</span></span><span class="aa-gold" title="Your gold"><span aria-hidden="true">🪙</span>${gfmt(u.gold)}</span></div>`;
+    return `<div class="aa-me"><span class="aa-me-face${faceClass(u)}">${faceInner(u)}</span><span><span class="aa-me-name">${escapeHtml(u.name || 'Player')}</span><br><span class="aa-me-sub">Signed in with ${escapeHtml((u.provider || 'google').replace(/^./, c => c.toUpperCase()))}</span></span><span class="aa-gold${goldFit(u.gold)}" title="Your gold"><span aria-hidden="true">🪙</span>${gfmt(u.gold)}</span></div>`;
   }
 
   // On means the room takes whoever else is online at that stake and starts itself; off means only the people
@@ -1283,7 +1286,7 @@
     const purse = m.you_won ? `You won ${gfmt(m.pot)}` : m.winner ? `You lost ${gfmt(m.stake)}` : m.draw ? 'Every stake came back' : 'Your stake is held';
     el.matchBody.innerHTML = `
       <div class="aa-vs">${(m.players || []).map(row).join('')}</div>
-      <p class="aa-purse"><span>${purse}</span><span class="aa-gold${m.you_won ? ' is-won' : ''}"><span aria-hidden="true">🪙</span><span id="aaPurseCount">${gfmt(auth.user?.gold ?? 0)}</span></span></p>
+      <p class="aa-purse"><span>${purse}</span><span class="aa-gold${m.you_won ? ' is-won' : ''}${goldFit(auth.user?.gold ?? 0)}"><span aria-hidden="true">🪙</span><span id="aaPurseCount">${gfmt(auth.user?.gold ?? 0)}</span></span></p>
       ${m.state === 'done' ? '' : '<p class="aa-sheet-note">The others are still playing for their place.</p>'}
       <div class="aa-actions"><button type="button" class="aa-btn aa-btn--primary" data-mact="stakes">Play another</button><button type="button" class="aa-btn" data-mact="close">Close</button></div>`;
     openSheet(el.matchSheet);
@@ -1411,6 +1414,7 @@
     const gold = auth.user.gold ?? 0;
     const win = purseWin && purseWin.to === gold ? purseWin : null;
     purseWin = null;
+    el.purse.className = 'aa-chip aa-chip--purse' + goldFit(gold);
     el.purseNo.textContent = gfmt(win ? win.from : gold);
     if (!win) { el.purse.classList.remove('is-won'); return; }
     el.purse.classList.add('is-won');
@@ -1439,6 +1443,7 @@
     if (el.deleteAccBtn) el.deleteAccBtn.hidden = !auth.user;   // it sits with Reset progress now, not in the account group
     if (!auth.user) return;
     el.accountWho.textContent = `${auth.user.name} · ${(auth.user.provider || 'google').replace(/^./, c => c.toUpperCase())}`;   // the caption above already says Account
+    el.accountGold.className = 'aa-gold' + goldFit(auth.user.gold);
     el.accountGold.innerHTML = `<span aria-hidden="true">🪙</span>${gfmt(auth.user.gold)}`;
   }
   el.signOutBtn?.addEventListener('click', async () => {
@@ -1538,10 +1543,13 @@
   }
   function countTo(node, from, to, ms = 1100) {
     if (!node) return;
+    const box = node.closest('.aa-gold, .aa-chip--purse');
     const t0 = performance.now(), span = to - from;
     const step = now => {
       const k = Math.min(1, (now - t0) / ms), eased = 1 - Math.pow(1 - k, 3);
-      node.textContent = gfmt(Math.round(from + span * eased));
+      const v = Math.round(from + span * eased);
+      node.textContent = gfmt(v);
+      if (box) box.className = box.className.replace(/ is-(big|vast)\b/g, '') + goldFit(v);   // it grows as it counts
       if (k < 1) requestAnimationFrame(step);
     };
     requestAnimationFrame(step);
