@@ -75,7 +75,7 @@
 
   const el = {
     select: $('#aaSelect'), tagline: $('#aaTagline'), dailyRow: $('#aaDailyRow'), homeSel: $('#aaHome'), purse: $('#aaPurse'), purseNo: $('#aaPurseNo'), daily: $('#aaDaily'), hudDiff: $('#aaHudDiff'), play: $('#aaPlay'), path: $('#aaPath'), btnVibe: $('#aaVibe'), btnGuides: $('#aaGuides'), btnMusic: $('#aaMusic'), howTo: $('#aaHowTo'),
-    sheet: $('#aaSheet'), friends: $('#aaFriends'), signInSheet: $('#aaSignInSheet'), googleBtn: $('#aaGoogleBtn'), signInNote: $('#aaSignInNote'), ranks: $('#aaRanks'), matchSheet: $('#aaMatchSheet'), matchBody: $('#aaMatchBody'), matchTitle: $('#aaMatchTitle'), accountGroup: $('#aaAccountGroup'), accountWho: $('#aaAccountWho'), accountGold: $('#aaAccountGold'), signOutBtn: $('#aaSignOut'), deleteAccBtn: $('#aaDeleteAcc'), settingsBtns: $$('#aaSettings, #aaSettingsG'), themeBtn: $('#aaTheme'), themes: $('#aaThemes'),
+    sheet: $('#aaSheet'), friends: $('#aaFriends'), signInSheet: $('#aaSignInSheet'), googleBtn: $('#aaGoogleBtn'), signInNote: $('#aaSignInNote'), ranks: $('#aaRanks'), matchSheet: $('#aaMatchSheet'), matchBody: $('#aaMatchBody'), matchTitle: $('#aaMatchTitle'), accountGroup: $('#aaAccountGroup'), accountCap: $('#aaAccountCap'), accountWho: $('#aaAccountWho'), accountGold: $('#aaAccountGold'), signOutBtn: $('#aaSignOut'), deleteAccBtn: $('#aaDeleteAcc'), settingsBtns: $$('#aaSettings, #aaSettingsG'), themeBtn: $('#aaTheme'), themes: $('#aaThemes'),
     game: $('#aaGame'), boardWrap: $('#aaBoardWrap'), board: $('#aaBoard'), toast: $('#aaToast'), confetti: $('#aaConfetti'),
     hudLevel: $('#aaHudLevel'), hudMode: $('#aaHudMode'), hudTime: $('#aaHudTime'), hudLeft: $('#aaHudLeft'), hudLives: $('#aaHudLives'), hudLivesWrap: $('#aaHudLivesWrap'), hudPct: $('#aaHudPct'), boardBar: $('#aaBoardBar'),
     btnHint: $('#aaHint'), btnLevels: $('#aaBackToLevels'), btnSound: $('#aaSound'),
@@ -1433,8 +1433,10 @@
   function renderAccountRow() {
     if (!el.accountGroup) return;
     el.accountGroup.hidden = !auth.user;
+    if (el.accountCap) el.accountCap.hidden = !auth.user;
+    if (el.deleteAccBtn) el.deleteAccBtn.hidden = !auth.user;   // it sits with Reset progress now, not in the account group
     if (!auth.user) return;
-    el.accountWho.textContent = `${auth.user.name} · signed in with ${(auth.user.provider || 'google').replace(/^./, c => c.toUpperCase())}`;
+    el.accountWho.textContent = `${auth.user.name} · ${(auth.user.provider || 'google').replace(/^./, c => c.toUpperCase())}`;   // the caption above already says Account
     el.accountGold.innerHTML = `<span aria-hidden="true">🪙</span>${gfmt(auth.user.gold)}`;
   }
   el.signOutBtn?.addEventListener('click', async () => {
@@ -1614,7 +1616,11 @@
   // Sheets
   const openSheet = sh => { sh.hidden = false; document.body.style.overflow = 'hidden'; };
   const closeSheets = () => { el.sheet.hidden = true; if (el.signInSheet) el.signInSheet.hidden = true; if (el.matchSheet) el.matchSheet.hidden = true; document.body.style.overflow = ''; };
-  el.settingsBtns.forEach(b => b.addEventListener('click', () => openSheet(el.sheet)));
+  el.settingsBtns.forEach(b => b.addEventListener('click', () => {
+    openSheet(el.sheet);
+    renderAccountRow();                                   // with what the page already knows, at once
+    authLoad(true).then(() => { renderAccountRow(); renderPurse(); }).catch(() => {});   // then with the server's answer
+  }));
   el.friends?.addEventListener('click', openFriends);
   $$('[data-close-sheet]').forEach(b => b.addEventListener('click', closeSheets));
   $$('.aa-sheet').forEach(sh => sh.addEventListener('click', e => { if (e.target === sh) closeSheets(); }));
@@ -1696,7 +1702,7 @@
   loadData().then(() => {
     el.loading.hidden = true;
     renderSelect();
-    authLoad().then(renderPurse).catch(() => {});   // the chip shows the purse as soon as the page knows who is playing
+    authLoad().then(() => { renderPurse(); renderAccountRow(); }).catch(() => {});   // the purse and the account row from the first paint, not only once Play with Friends has been tapped
     const m = /^#level-(\d+)$/.exec(location.hash), mb = /^#b-([\w:]+)$/.exec(location.hash), mm = matchHash();
     if (mm) openMatchLink(mm);
     else if (mb) { const j = DATA.levels.findIndex(L => L.id === mb[1]); startLevel(j < 0 ? 0 : j); }

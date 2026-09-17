@@ -65,7 +65,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="css/arrow-atlas.css?v=53" />
+    <link rel="stylesheet" href="css/arrow-atlas.css?v=54" />
     <link rel="preload" href="games/data/arrow-atlas.json?v=11" as="fetch" crossorigin="anonymous" />
 
     <!-- SCHEMA -->
@@ -420,40 +420,54 @@
     <div class="aa-sheet aa-sheet--page" id="aaSheet" hidden>
       <div class="aa-sheet-panel" role="dialog" aria-label="Settings">
         <div class="aa-sheet-head"><button type="button" class="aa-icon" data-close-sheet aria-label="Back"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H6M11 6l-6 6 6 6"/></svg></button><h2>Settings</h2></div>
-        <div class="aa-group">
-          <div class="aa-row"><span class="aa-row-ico">🔊</span><span class="aa-row-label">Sound</span><button type="button" class="aa-switch" id="aaSound" role="switch" aria-checked="true" aria-label="Sound"></button></div>
-          <div class="aa-row"><span class="aa-row-ico">📳</span><span class="aa-row-label">Vibration</span><button type="button" class="aa-switch" id="aaVibe" role="switch" aria-checked="true" aria-label="Vibration"></button></div>
-          <div class="aa-row"><span class="aa-row-ico">🎵</span><span class="aa-row-label">Music</span><button type="button" class="aa-switch" id="aaMusic" role="switch" aria-checked="true" aria-label="Background music"></button></div>
-          <div class="aa-row"><span class="aa-row-ico">▦</span><span class="aa-row-label">Guideline</span><button type="button" class="aa-switch" id="aaGuides" role="switch" aria-checked="false" aria-label="Guideline dots on the board"></button></div>
-        </div>
-        <div class="aa-group">
-          <div class="aa-row aa-row--col"><span class="aa-row-label">Colours</span><div class="aa-themes" id="aaThemes"></div></div>
-        </div>
-        <div class="aa-group">
-          <button type="button" class="aa-row aa-row--link" id="aaDailyRow"><span class="aa-row-ico">📅</span><span class="aa-row-label">Today's Country<small id="aaDaily">Mystery</small></span><span class="aa-row-chev">›</span></button>
-          <button type="button" class="aa-row aa-row--link" id="aaHowTo"><span class="aa-row-ico">❓</span><span class="aa-row-label">How to play</span><span class="aa-row-chev">›</span></button>
-          <a class="aa-row aa-row--link" href="/#contact"><span class="aa-row-ico">💬</span><span class="aa-row-label">Feedback</span><span class="aa-row-chev">›</span></a>
-        </div>
+        <p class="aa-cap" id="aaAccountCap" hidden>Account</p>
         <div class="aa-group" id="aaAccountGroup" hidden>
           <div class="aa-row"><span class="aa-row-ico">🙂</span><span class="aa-row-label">Account<small id="aaAccountWho">Signed in</small></span><span class="aa-gold" id="aaAccountGold"></span></div>
           <button type="button" class="aa-row aa-row--link" id="aaSignOut"><span class="aa-row-ico">🚪</span><span class="aa-row-label">Sign out</span><span class="aa-row-chev">›</span></button>
-          <button type="button" class="aa-row aa-row--link aa-row--danger" id="aaDeleteAcc"><span class="aa-row-ico">🗑️</span><span class="aa-row-label">Delete account<small>Removes it from our server for good</small></span><span class="aa-row-chev">›</span></button>
         </div>
+
+        <p class="aa-cap">Game</p>
         <div class="aa-group">
+          <label class="aa-row aa-row--select" for="aaHome"><span class="aa-row-ico">🏠</span><span class="aa-row-label">Home country<small>Your tour starts here and spreads out</small></span><select class="aa-select" id="aaHome" aria-label="Home country"></select></label>
+          <button type="button" class="aa-row aa-row--link" id="aaDailyRow"><span class="aa-row-ico">📅</span><span class="aa-row-label">Today's Country<small id="aaDaily">Mystery</small></span><span class="aa-row-chev">›</span></button>
+          <div class="aa-row"><span class="aa-row-ico">▦</span><span class="aa-row-label">Guideline<small>Dots on the board to aim along</small></span><button type="button" class="aa-switch" id="aaGuides" role="switch" aria-checked="false" aria-label="Guideline dots on the board"></button></div>
+        </div>
+
+        <p class="aa-cap">Sound</p>
+        <div class="aa-group">
+          <div class="aa-row"><span class="aa-row-ico">🔊</span><span class="aa-row-label">Sound</span><button type="button" class="aa-switch" id="aaSound" role="switch" aria-checked="true" aria-label="Sound"></button></div>
+          <div class="aa-row"><span class="aa-row-ico">🎵</span><span class="aa-row-label">Music</span><button type="button" class="aa-switch" id="aaMusic" role="switch" aria-checked="true" aria-label="Background music"></button></div>
+          <div class="aa-row"><span class="aa-row-ico">📳</span><span class="aa-row-label">Vibration</span><button type="button" class="aa-switch" id="aaVibe" role="switch" aria-checked="true" aria-label="Vibration"></button></div>
+        </div>
+
+        <p class="aa-cap">Colours</p>
+        <div class="aa-group">
+          <div class="aa-row aa-row--col"><div class="aa-themes" id="aaThemes"></div></div>
+        </div>
+
+        <p class="aa-cap">Help</p>
+        <div class="aa-group">
+          <button type="button" class="aa-row aa-row--link" id="aaHowTo"><span class="aa-row-ico">❓</span><span class="aa-row-label">How to play</span><span class="aa-row-chev">›</span></button>
+          <a class="aa-row aa-row--link" href="/#contact"><span class="aa-row-ico">💬</span><span class="aa-row-label">Feedback</span><span class="aa-row-chev">›</span></a>
+        </div>
+
+        <p class="aa-cap">About</p>
+        <div class="aa-group">
+          <a class="aa-row aa-row--link" href="#aaAbout" data-close-sheet><span class="aa-row-ico">ℹ️</span><span class="aa-row-label">About Arrow Atlas</span><span class="aa-row-chev">›</span></a>
           <a class="aa-row aa-row--link" href="arrow-atlas-privacy.html"><span class="aa-row-ico">🔒</span><span class="aa-row-label">Privacy Policy</span><span class="aa-row-chev">›</span></a>
           <a class="aa-row aa-row--link" href="arrow-atlas-terms.html"><span class="aa-row-ico">📄</span><span class="aa-row-label">Terms of Service</span><span class="aa-row-chev">›</span></a>
         </div>
+
+        <p class="aa-cap">Starting over</p>
         <div class="aa-group">
-          <a class="aa-row aa-row--link" href="#aaAbout" data-close-sheet><span class="aa-row-ico">ℹ️</span><span class="aa-row-label">About Arrow Atlas</span><span class="aa-row-chev">›</span></a>
+          <button type="button" class="aa-row aa-row--link aa-row--danger" id="aaReset"><span class="aa-row-ico">🗑️</span><span class="aa-row-label">Reset progress<small>Clears this device only</small></span><span class="aa-row-chev">›</span></button>
+          <button type="button" class="aa-row aa-row--link aa-row--danger" id="aaDeleteAcc" hidden><span class="aa-row-ico">⚠️</span><span class="aa-row-label">Delete account<small>Removes it from our server for good</small></span><span class="aa-row-chev">›</span></button>
         </div>
-        <div class="aa-group">
-          <label class="aa-row aa-row--select" for="aaHome"><span class="aa-row-ico">🏠</span><span class="aa-row-label">Home country<small>Your tour starts here and spreads out</small></span><select class="aa-select" id="aaHome" aria-label="Home country"></select></label>
-          <button type="button" class="aa-row aa-row--link aa-row--danger" id="aaReset"><span class="aa-row-ico">🗑️</span><span class="aa-row-label">Reset progress</span><span class="aa-row-chev">›</span></button>
-        </div>
+
         <p class="aa-credit">Arrow Atlas · made by <a href="https://www.youtube.com/@ariyankhan" target="_blank" rel="noopener">Ariyan Khan</a></p>
       </div>
     </div>
 
-    <script src="js/arrow-atlas.js?v=66"></script>
+    <script src="js/arrow-atlas.js?v=67"></script>
   </body>
 </html>
