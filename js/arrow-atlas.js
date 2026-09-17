@@ -16,7 +16,7 @@
   const SVG_NS = 'http://www.w3.org/2000/svg';
   const DATA_VERSION = '11';
   const MAP_VERSION = '3';
-  const DISCB_VERSION = '2';  // games/data/discover-boards.json: the board shaped like each country's animal, bird or landmark
+  const DISCB_VERSION = '3';  // games/data/discover-boards.json: the board shaped like each country's animal, bird or landmark
   const STORE = 'aa:v1:';
 
   // ── Where the backend lives ──
