@@ -995,6 +995,7 @@
     else if (act === 'shuffle') startLevel(state.idx, true, state.daily);
     else if (act === 'skip') { store.set(skipKey(state.idx + 1), true); startLevel(nextOpen(state.idx)); }
     else if (act === 'giveup') { el.card.innerHTML = '<h3>Sending…</h3>'; finishMatch(false, 0); }
+    else if (act === 'resend') { const b = e.target.closest('[data-act]'); b.disabled = true; flushResult(true).then(ok => { if (!ok) b.disabled = false; }); }
     else if (act === 'minvite') sendInvite(state.pendingMatch);
     else if (act === 'mcancel') leaveRoom();
     else if (act === 'mstart') startMatch();
@@ -1451,20 +1452,68 @@
 
   // The board is over: tell the server, then show where the gold went. Clearing it first pays the whole pot on
   // the spot; anyone finishing after that is playing for a place on the list, not for gold.
+  //
+  // A phone on a bad connection must not cost somebody the pot for a blink of a dropped request, so the result
+  // is tried a few times, kept on the device if it still will not go, and sent again on the next visit. Only a
+  // straight refusal from the server stops the retrying: asking again cannot change that answer.
+  const PENDING = 'pendingResult';
+  async function sendResult(code, ms, cleared) {
+    let last;
+    for (let i = 0; i < 3; i++) {
+      try { return await matchApi('result', { code, ms, cleared }); }
+      catch (err) {
+        last = err;
+        if (err.code) break;
+        await new Promise(r => setTimeout(r, 500 * (i + 1)));
+      }
+    }
+    throw last;
+  }
+  const resultTrouble = err =>
+    err?.code === 'signed_out' ? 'This device is signed out, so your time was not counted. Sign in and send it again.'
+    : err?.code === 'not_yours' ? 'This match is not yours to report a time for.'
+    : err?.code === 'no_match' ? 'That match is not there any more.'
+    : `Your time has not reached the server yet${/^HTTP \d+$/.test(err?.message || '') ? ` (${err.message})` : ''}. It is kept on this device and sent again on your next visit.`;
+
   async function finishMatch(cleared, ms) {
     const R = state.daily;
     if (!R?.match) return;
+    stopProgressPoll();
+    const before = auth.user?.gold ?? 0;
+    const sent = { code: R.match.code, ms: Math.max(0, Math.round(ms) || 0), cleared: !!cleared };
     try {
-      stopProgressPoll();
-      const before = auth.user?.gold ?? 0;
-      const d = await matchApi('result', { code: R.match.code, ms: Math.round(ms), cleared: !!cleared });
+      const d = await sendResult(sent.code, sent.ms, sent.cleared);
+      store.set(PENDING, null);
       setGold(d.gold);
       renderRanks(d.match.players);
       el.overlay.hidden = true;
       showMatchState(d.match, before);
     } catch (err) {
-      el.card.innerHTML = `<h3>${cleared ? 'Board cleared!' : 'Out of hearts'}</h3><p class="aa-card-lead">Your time could not reach the server. Open the invitation link again when you are back online.</p><div class="aa-actions"><button type="button" class="aa-btn aa-btn--primary" data-act="levels">World Tour</button></div>`;
+      store.set(PENDING, sent);   // it goes with the device until it gets through
+      el.card.innerHTML = `<h3>${cleared ? 'Board cleared!' : 'Out of hearts'}</h3>
+        <p class="aa-card-lead">${cleared ? `${fmtTime(sent.ms, true)}. ` : ''}${resultTrouble(err)}</p>
+        <div class="aa-actions">
+          <button type="button" class="aa-btn aa-btn--primary" data-act="resend">Send it again</button>
+          <button type="button" class="aa-btn" data-act="levels">World Tour</button>
+        </div>`;
       el.overlay.hidden = false;
+    }
+  }
+
+  // A time that never got through, tried again: on the next visit, or when the player asks.
+  async function flushResult(loud) {
+    const p = store.get(PENDING, null);
+    if (!p?.code) return false;
+    try {
+      const d = await sendResult(p.code, p.ms, p.cleared);
+      store.set(PENDING, null);
+      if (typeof d.gold === 'number') setGold(d.gold);
+      if (loud) { el.overlay.hidden = true; showMatchState(d.match, (auth.user?.gold ?? 0) - (d.match?.you_won ? d.match.pot : 0)); }
+      else if (d.match?.you_won) toast(`Your time got through. You won ${gfmt(d.match.pot)} gold.`, 'good', 5000);
+      return true;
+    } catch (err) {
+      if (loud) { const n = $('.aa-card-lead', el.card); if (n) n.textContent = resultTrouble(err); }
+      return false;
     }
   }
 
@@ -1702,7 +1751,9 @@
   loadData().then(() => {
     el.loading.hidden = true;
     renderSelect();
-    authLoad().then(() => { renderPurse(); renderAccountRow(); }).catch(() => {});   // the purse and the account row from the first paint, not only once Play with Friends has been tapped
+    // the purse and the account row from the first paint, not only once Play with Friends has been tapped, and
+    // a time from last time that never got through goes now
+    authLoad().then(() => { renderPurse(); renderAccountRow(); return flushResult(false); }).catch(() => {});
     const m = /^#level-(\d+)$/.exec(location.hash), mb = /^#b-([\w:]+)$/.exec(location.hash), mm = matchHash();
     if (mm) openMatchLink(mm);
     else if (mb) { const j = DATA.levels.findIndex(L => L.id === mb[1]); startLevel(j < 0 ? 0 : j); }
