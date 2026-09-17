@@ -1,6 +1,18 @@
-# Manual smoke test: hits the VPS directly (by IP + Host header) so a deploy
-# can be verified before DNS is pointed at it. Fails if the site does not
-# answer 200 through the host nginx -> ariyankhan-web container path.
+# Manual smoke test against the VPS itself, bypassing DNS and Cloudflare.
+#
+# Two things it proves, and they need two different connections:
+#
+#   * Plain HTTP is redirected to HTTPS. Tested over http:// with a Host header.
+#   * The origin actually serves the site. Tested over real TLS with
+#     `--resolve ariyankhan.com:443:<ip>`, so curl sends the true SNI and Host
+#     and verifies the certificate, but connects to the VPS rather than to
+#     whatever DNS says.
+#
+# The old version sent `X-Forwarded-Proto: https` over port 80 and expected the
+# origin to answer. That stopped working the moment certbot rewrote the nginx
+# port-80 block to `return 301`: the redirect happens before any header is
+# looked at, so every check got a 301 and the run failed. A forwarded-proto
+# header cannot talk a server out of a redirect it performs first.
 name: VPS smoke test
 
 on:
@@ -11,40 +23,149 @@ on:
         required: true
         default: "187.52.122.99"
       domain:
-        description: "Host header to send"
+        description: "Domain to send as SNI and Host"
         required: true
         default: "ariyankhan.com"
+      allow_untrusted_origin_cert:
+        description: "Accept an untrusted origin certificate (set this if the origin uses a Cloudflare Origin CA cert, which is not publicly trusted)"
+        type: boolean
+        required: false
+        default: false
+      ssh_check:
+        description: "Also check SSH connectivity (read-only: hostname, whoami, uptime)"
+        type: boolean
+        required: false
+        default: true
 
 jobs:
-  smoke:
+  http:
+    name: HTTP and TLS
     runs-on: ubuntu-latest
     steps:
-      - name: Probe VPS
+      - name: Probe the origin
         env:
           IP: ${{ inputs.host_ip }}
           DOMAIN: ${{ inputs.domain }}
+          INSECURE: ${{ inputs.allow_untrusted_origin_cert }}
         run: |
           set -u
           fail=0
-          check() { # label, expected_code, url, extra curl args...
-            local label="$1" want="$2" url="$3"; shift 3
-            local code
-            code=$(curl -sS -m 20 -o /tmp/body -w "%{http_code}" -H "Host: $DOMAIN" "$@" "$url" || echo "000")
-            local redir; redir=$(curl -sS -m 20 -o /dev/null -w "%{redirect_url}" -H "Host: $DOMAIN" "$@" "$url" || true)
-            if [ "$code" = "$want" ]; then echo "PASS  $label -> $code ${redir:+(-> $redir)}"; else echo "FAIL  $label -> $code (want $want) ${redir:+(-> $redir)}"; head -c 300 /tmp/body; echo; fail=1; fi
+
+          # Every HTTPS check goes to the VPS by IP while presenting the real name, so SNI, Host and the
+          # certificate are all the ones a visitor would get.
+          RESOLVE=(--resolve "$DOMAIN:443:$IP" --resolve "www.$DOMAIN:443:$IP")
+          TLS=()
+          if [ "$INSECURE" = "true" ]; then
+            TLS=(--insecure)
+            echo "NOTE  certificate verification is off for this run (allow_untrusted_origin_cert)"
+          fi
+
+          # check <label> <expected code> <url> [extra curl args...]
+          check() {
+            label="$1"; want="$2"; url="$3"; shift 3
+            out=$(curl -sS -m 25 -o /tmp/body -w '%{http_code} %{redirect_url}' "$@" "$url" 2>/tmp/err || echo "000 ")
+            code=${out%% *}; redir=${out#* }
+            if [ "$code" = "$want" ]; then
+              printf 'PASS  %-46s %s%s\n' "$label" "$code" "${redir:+  -> $redir}"
+            else
+              printf 'FAIL  %-46s %s (want %s)%s\n' "$label" "$code" "$want" "${redir:+  -> $redir}"
+              sed 's/^/        /' /tmp/err 2>/dev/null | head -3
+              head -c 300 /tmp/body 2>/dev/null | sed 's/^/        /'; echo
+              fail=1
+            fi
           }
-          echo "== response headers"
-          curl -sS -m 20 -I -H "Host: $DOMAIN" -H "X-Forwarded-Proto: https" "http://$IP/" | grep -iE "^(HTTP|server|content-security|strict-transport|x-frame)" || true
-          echo "== checks"
-          check "plain http -> https redirect"      301 "http://$IP/"
-          check "home (forwarded https)"            200 "http://$IP/"                          -H "X-Forwarded-Proto: https"
-          check "ai-metadata-remover page"          200 "http://$IP/ai-metadata-remover.html"  -H "X-Forwarded-Proto: https"
-          check "static js"                         200 "http://$IP/js/ai-metadata-remover.js" -H "X-Forwarded-Proto: https"
-          check "php runs (contact endpoint rejects GET)" 405 "http://$IP/send-mail.php" -H "X-Forwarded-Proto: https"
-          check "missing page -> 404"               404 "http://$IP/nope-123.html"             -H "X-Forwarded-Proto: https"
-          check "/deploy hidden -> 404"             404 "http://$IP/deploy/docker-compose.yml" -H "X-Forwarded-Proto: https"
-          echo "== www redirect"
-          curl -sS -m 20 -o /dev/null -w "www -> %{http_code} %{redirect_url}\n" -H "Host: www.$DOMAIN" -H "X-Forwarded-Proto: https" "http://$IP/" || true
+
+          echo "== the origin certificate"
+          echo | openssl s_client -connect "$IP:443" -servername "$DOMAIN" 2>/dev/null \
+            | openssl x509 -noout -subject -issuer -dates 2>/dev/null \
+            | sed 's/^/  /' || echo "  could not read a certificate from $IP:443"
+
+          echo
+          echo "== response headers over TLS"
+          curl -sS -m 25 -I "${RESOLVE[@]}" "${TLS[@]}" "https://$DOMAIN/" \
+            | grep -iE '^(HTTP|server|content-security|strict-transport|x-frame|referrer)' | sed 's/^/  /' || true
+
+          echo
+          echo "== plain HTTP must be redirected, not served"
+          check "http -> 301" 301 "http://$IP/" -H "Host: $DOMAIN"
+          loc=$(curl -sS -m 25 -o /dev/null -w '%{redirect_url}' -H "Host: $DOMAIN" "http://$IP/" || true)
+          case "$loc" in
+            https://*) printf 'PASS  %-46s %s\n' "and it points at https" "$loc" ;;
+            *)         printf 'FAIL  %-46s %s\n' "and it points at https" "${loc:-<none>}"; fail=1 ;;
+          esac
+
+          echo
+          echo "== the origin, over real TLS"
+          check "home"                              200 "https://$DOMAIN/"                          "${RESOLVE[@]}" "${TLS[@]}"
+          check "ai-metadata-remover page"          200 "https://$DOMAIN/ai-metadata-remover.html"  "${RESOLVE[@]}" "${TLS[@]}"
+          check "static js"                         200 "https://$DOMAIN/js/ai-metadata-remover.js" "${RESOLVE[@]}" "${TLS[@]}"
+          check "php runs (send-mail rejects GET)"  405 "https://$DOMAIN/send-mail.php"             "${RESOLVE[@]}" "${TLS[@]}"
+          check "missing page -> 404"               404 "https://$DOMAIN/nope-123.html"             "${RESOLVE[@]}" "${TLS[@]}"
+          check "/deploy hidden -> 404"             404 "https://$DOMAIN/deploy/docker-compose.yml" "${RESOLVE[@]}" "${TLS[@]}"
+
+          echo
+          echo "== www"
+          curl -sS -m 25 -o /dev/null -w "  www -> %{http_code} %{redirect_url}\n" \
+            "${RESOLVE[@]}" "${TLS[@]}" "https://www.$DOMAIN/" || true
+
           echo "== title"
-          curl -sS -m 20 -H "Host: $DOMAIN" -H "X-Forwarded-Proto: https" "http://$IP/" | grep -o "<title>[^<]*</title>" | head -1 || true
+          curl -sS -m 25 "${RESOLVE[@]}" "${TLS[@]}" "https://$DOMAIN/" \
+            | grep -o '<title>[^<]*</title>' | head -1 | sed 's/^/  /' || true
+
+          echo
+          [ "$fail" = "0" ] && echo "every check passed" || echo "some checks failed"
           exit $fail
+
+  ssh:
+    name: SSH connectivity
+    if: ${{ inputs.ssh_check }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Read-only login
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_SSH_PRIVATE_KEY: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
+        run: |
+          # -e and pipefail both matter here. Without them `ssh ... | sed` reports sed's exit status, so a
+          # refused key printed "Permission denied" and the job still went green — a connectivity check that
+          # cannot fail is not a check. The HTTP job deliberately does not use -e: it runs every probe and
+          # adds up the failures itself.
+          set -euo pipefail
+          for name in VPS_HOST VPS_USER VPS_SSH_PRIVATE_KEY; do
+            eval "v=\${$name}"
+            if [ -z "$v" ]; then
+              echo "::error::$name is not set. Add it under Settings -> Secrets and variables -> Actions."
+              exit 1
+            fi
+          done
+
+          # The key exists only for this step, only readable by this user, and is removed again below.
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_PRIVATE_KEY" > ~/.ssh/vps
+          chmod 600 ~/.ssh/vps
+
+          # Record the host key rather than blindly trusting it: the fingerprint is in the log, so a host key
+          # that changes between runs is visible instead of silent.
+          ssh-keyscan -T 10 -H "$VPS_HOST" > ~/.ssh/known_hosts 2>/dev/null || true
+          if [ ! -s ~/.ssh/known_hosts ]; then
+            echo "::error::could not read a host key from the VPS over port 22 — is SSH reachable from GitHub's runners?"
+            exit 1
+          fi
+          echo "host key fingerprints:"
+          ssh-keygen -lf ~/.ssh/known_hosts | sed 's/^/  /'
+
+          echo
+          echo "read-only login, and nothing else:"
+          ssh -i ~/.ssh/vps \
+              -o IdentitiesOnly=yes \
+              -o UserKnownHostsFile=~/.ssh/known_hosts \
+              -o StrictHostKeyChecking=yes \
+              -o BatchMode=yes \
+              -o ConnectTimeout=15 \
+              "$VPS_USER@$VPS_HOST" \
+              'hostname; whoami; uptime' | sed 's/^/  /'
+
+      - name: Remove the key
+        if: always()
+        run: rm -f ~/.ssh/vps ~/.ssh/known_hosts
