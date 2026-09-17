@@ -101,6 +101,8 @@ if ($action === 'create') {
 if ($action === 'get') {
     $m = aa_match_row($db, (string)($_GET['code'] ?? ''));
     if (!$m) aa_json(['error' => 'no_match'], 404);
+    // still sitting alone in a room that fills itself? walk into an older one if one has turned up since
+    if ($me) { $moved = aa_requeue($db, $m, $me['id']); if ($moved !== null) aa_reply($db, $moved, $me); }
     aa_reply($db, $m['code'], $me);
 }
 

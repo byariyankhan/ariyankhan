@@ -244,6 +244,23 @@ echo "\nA room that fills itself from online\n";
     aa_autostart_matches($db);
     ok($row($r5)['state'] === 'void' && $gold($lone) === 10000, 'nobody came, so the gold is handed straight back');
 
+    // two of them tapped the same coin in the same second and each opened a room: they must still meet
+    $t1 = $pub('tie-a'); $t2 = $pub('tie-b');
+    $q1 = $make($t1, 500, 2, true);
+    $db->prepare('UPDATE matches SET created = ? WHERE code = ?')->execute([time() - 5, $q1]);   // the older of the two
+    // a dead heat: both looked, neither saw the other, so both opened a room of their own
+    $q2 = $make($t2, 500);
+    $db->prepare('UPDATE matches SET open_to_all = 1 WHERE code = ?')->execute([$q2]);
+    ok($q2 !== $q1, 'each of them opened their own room');
+    ok(aa_requeue($db, $row($q1), $t1) === null, 'the older room stays put: there is nothing older to move to');
+    $moved = aa_requeue($db, $row($q2), $t2);
+    ok($moved === $q1, 'the newer one walks into the older room on its next poll');
+    ok($row($q2)['state'] === 'void' && count(aa_room($db, $q2)) === 0, 'and the room it left is closed and empty');
+    ok($gold($t2) === 9500, 'the stake moved with the player: taken once, never handed back');
+    ok(count(aa_room($db, $q1)) === 2 && $row($q1)['fills_at'] !== null, 'two are in the older room now, with the clock running');
+    ok(aa_requeue($db, $row($q1), $t1) === null, 'and nobody who has company is moved anywhere');
+    aa_start_room($db, $q1);   // out of the pool, so the checks below are about their own rooms
+
     // and with the switch off nothing moves without the host
     $d1 = $pub('private-a'); $d2 = $pub('private-b');
     $r6 = $make($d1, 500);
