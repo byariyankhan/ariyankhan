@@ -459,11 +459,15 @@ mode_health() {
   hc "the Arrow Atlas page"       200 "https://$DOMAIN/arrow-atlas.html"
   hc "the client itself"          200 "https://$DOMAIN/js/arrow-atlas.js"
   hc "v1 auth/me"                 200 "https://$DOMAIN/api/arrow-atlas/v1/auth/me"
-  hc "v1 lobby"                   200 "https://$DOMAIN/api/arrow-atlas/v1/match/lobby"
+  hc "v1 lobby"                   200 "https://$DOMAIN/api/arrow-atlas/v1/lobby"
   hc "the legacy PHP path is gone" 404 "https://$DOMAIN/games/api/auth.php?a=me"
   hc "and so is the PHP file"     404 "https://$DOMAIN/games/api/match.php"
   hc "other PHP still runs"       405 "https://$DOMAIN/send-mail.php"
-  hc "health is not public"       403 "https://$DOMAIN/api/arrow-atlas/health"
+  # 200, not 403. These requests come from the VPS over loopback, and the health location allows 127.0.0.1
+  # and denies everything else on the real peer address — so being served here is the allowlist working. That
+  # it is refused from off the machine is a different question, asked from a GitHub runner by vps-smoke.yml,
+  # because only a request that actually crosses the internet can answer it.
+  hc "health answers the host"    200 "https://$DOMAIN/api/arrow-atlas/health"
 
   say "the client the page actually asks for"
   curl -sS -m 20 "${R[@]}" "https://$DOMAIN/arrow-atlas.html" | grep -o 'js/arrow-atlas.js?v=[0-9]*' | head -1 | sed 's/^/  /'
