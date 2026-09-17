@@ -1,0 +1,104 @@
+# Arrow Atlas operations on the VPS, over SSH, one mode at a time.
+#
+# This exists so the post-migration work is done by something reviewable and repeatable rather than by
+# pasted shell. Every mode is explicit about what it touches, and nothing here names a container, path or
+# volume that is not Arrow Atlas's: ASR, Bookween and the portfolio are never addressed by any command below.
+#
+#   inspect        Reads. Containers, PostgreSQL row counts, gold and ledger agreement, where the legacy
+#                  SQLite data still is, what backups exist, what nginx currently serves. Changes nothing.
+#   backup-verify  Takes one fresh pg_dump and restores it into a scratch database to prove it works.
+#                  This is the gate: no deletion happens until it passes.
+#   cleanup        Deletes the legacy artifacts, and only those. Needs confirm=DELETE.
+#   deploy         Recreates arrow-atlas-api (it re-fetches the repository at start) and installs the
+#                  nginx snippet from this checkout, after `nginx -t` accepts it and the current one is
+#                  backed up. Needs confirm=DEPLOY.
+#   health         Reads. The four containers, the API, the socket, the backup timer, and that no legacy
+#                  artifact is left anywhere.
+#
+# No secret is ever printed: the PostgreSQL password is read inside the container from its own environment
+# and passed to psql through PGPASSWORD, which never reaches a log line.
+name: Arrow Atlas ops
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "What to do"
+        type: choice
+        required: true
+        default: inspect
+        options: [inspect, backup-verify, cleanup, deploy, health]
+      confirm:
+        description: "Type DELETE for cleanup, DEPLOY for deploy. Ignored by the read-only modes."
+        required: false
+        default: ""
+      domain:
+        description: "Domain to check from the VPS itself"
+        required: false
+        default: "ariyankhan.com"
+
+permissions:
+  contents: read
+
+jobs:
+  ops:
+    name: ${{ inputs.mode }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Refuse an unconfirmed destructive mode
+        run: |
+          set -euo pipefail
+          case "${{ inputs.mode }}" in
+            cleanup) [ "${{ inputs.confirm }}" = "DELETE" ] || { echo "::error::cleanup needs confirm=DELETE"; exit 1; } ;;
+            deploy)  [ "${{ inputs.confirm }}" = "DEPLOY" ] || { echo "::error::deploy needs confirm=DEPLOY";  exit 1; } ;;
+            *) echo "read-only mode, no confirmation needed" ;;
+          esac
+
+      - name: Open the connection
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_SSH_PRIVATE_KEY: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          for name in VPS_HOST VPS_USER VPS_SSH_PRIVATE_KEY; do
+            eval "v=\${$name:-}"
+            [ -n "${v:-}" ] || { echo "::error::$name is not set (Settings -> Secrets and variables -> Actions)"; exit 1; }
+          done
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_PRIVATE_KEY" > ~/.ssh/vps
+          chmod 600 ~/.ssh/vps
+          ssh-keyscan -T 10 -H "$VPS_HOST" > ~/.ssh/known_hosts 2>/dev/null || true
+          [ -s ~/.ssh/known_hosts ] || { echo "::error::no host key from $VPS_HOST:22"; exit 1; }
+          ssh-keygen -lf ~/.ssh/known_hosts | sed 's/^/  host key  /'
+
+      - name: ${{ inputs.mode }}
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          MODE: ${{ inputs.mode }}
+          DOMAIN: ${{ inputs.domain }}
+        run: |
+          # -e and pipefail both matter: without them `ssh ... | tee` reports tee's status and a failed remote
+          # command leaves the job green. A check that cannot fail is not a check.
+          set -euo pipefail
+          SSH=(ssh -i ~/.ssh/vps -o IdentitiesOnly=yes -o UserKnownHostsFile="$HOME/.ssh/known_hosts"
+               -o StrictHostKeyChecking=yes -o BatchMode=yes -o ConnectTimeout=20)
+
+          # The nginx snippet from this checkout travels with the deploy so the VPS never has to hold a
+          # git clone for it. Other modes send an empty file and never read it.
+          SNIPPET=/dev/null
+          if [ "$MODE" = "deploy" ]; then SNIPPET=games/arrow-atlas/deploy/nginx-arrow-atlas.conf; fi
+          base64 -w0 < "$SNIPPET" > /tmp/snippet.b64
+
+          # The variables are set on the remote side of the connection: an `env:` block here would only
+          # reach the runner. base64 keeps the snippet on one line and out of the shell's way.
+          "${SSH[@]}" "$VPS_USER@$VPS_HOST" \
+            "MODE='$MODE' DOMAIN='$DOMAIN' SNIPPET_B64='$(cat /tmp/snippet.b64)' bash -s" \
+            < .github/scripts/arrow-atlas-vps.sh
+
+      - name: Remove the key
+        if: always()
+        run: rm -f ~/.ssh/vps ~/.ssh/known_hosts
