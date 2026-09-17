@@ -16,6 +16,9 @@ own domain and its own server, moving it is a restore and a DNS change, not an u
 | `arrow-atlas-redis` | `redis:7-alpine` | nothing published | `arrow-atlas-api` |
 | `arrow-atlas-backup` | `postgres:16-alpine` | nothing published | — |
 
+Volumes: `arrow-atlas-postgres-data`, `arrow-atlas-redis-data`, `arrow-atlas-backups`, and `arrow-atlas-site` —
+the checkout the API fetches, which the backup container reads its two scripts from.
+
 Two networks. `arrow-atlas-data` is `internal: true`, so the database and the cache have no route to or from the
 internet at all. `arrow-atlas-edge` exists only so the API can reach Google to verify a sign-in token. The API
 sits on both; nothing else sits on the edge.
@@ -241,7 +244,7 @@ docker exec ariyankhan-web sh -c 'cat /var/lib/arrow-atlas/arrow-atlas.sqlite' >
 
 # 2. Put it where the API can read it and import.
 docker cp /var/backups/arrow-atlas/pre-migration-*.sqlite arrow-atlas-api:/tmp/legacy.sqlite
-docker exec arrow-atlas-api node dist/import-sqlite.js /tmp/legacy.sqlite
+docker exec arrow-atlas-api sh -c 'cd /srv/arrow-atlas/site/games/arrow-atlas/backend && node dist/import-sqlite.js /tmp/legacy.sqlite'
 
 # 3. Read the report. It must end with "all checks passed".
 ```
@@ -260,29 +263,35 @@ negative balances, and that the next sign-up will not collide with a migrated id
 
 ## Backups
 
-`arrow-atlas-backup` takes one on boot and then daily at `ARROW_ATLAS_BACKUP_AT_HOUR` UTC. Each dump is written
-with `pg_dump -Fc`, **read back with `pg_restore --list` before it is accepted**, and copied to
+`arrow-atlas-backup` runs `backup.sh` from the repository checkout that `arrow-atlas-api` fetches, mounted
+read-only from the `arrow-atlas-site` volume. That is how it gets the script without a network of its own: it
+sits only on the internal network, and `postgres:16-alpine` ships no `curl`. On a first deploy it waits for the
+checkout to appear, which takes seconds, and logs while it waits.
+
+It takes a backup on boot and then daily at `ARROW_ATLAS_BACKUP_AT_HOUR` UTC. Each dump is written
+with `pg_dump -Fc`, **read back with `pg_restore --list` before it is accepted** — by name, so a dump missing
+`users`, `sessions`, `matches`, `match_players` or `gold_ledger` is refused and says which — and copied to
 `/var/backups/arrow-atlas` on the host so losing the Docker volume does not lose the history. Dumps older than
 `ARROW_ATLAS_BACKUP_KEEP_DAYS` are removed. The container's healthcheck goes red if the newest dump is more
 than a day old, so a backup that has quietly stopped shows up as an unhealthy container.
 
 ```bash
-docker exec arrow-atlas-backup /srv/arrow-atlas/bin/backup.sh list     # what we have
-docker exec arrow-atlas-backup /srv/arrow-atlas/bin/backup.sh once     # take one now
+docker exec arrow-atlas-backup sh -c 'sh $ARROW_ATLAS_SCRIPTS_DIR/backup.sh list'   # what we have
+docker exec arrow-atlas-backup sh -c 'sh $ARROW_ATLAS_SCRIPTS_DIR/backup.sh once'   # take one now
 ```
 
 ### Restoring
 
 ```bash
 # Prove a dump is restorable, without touching the game. Run this occasionally.
-docker exec arrow-atlas-backup /srv/arrow-atlas/bin/restore.sh verify /backups/arrow-atlas-20260917T030000Z.dump
+docker exec arrow-atlas-backup sh -c 'sh $ARROW_ATLAS_SCRIPTS_DIR/restore.sh verify /backups/arrow-atlas-20260917T030000Z.dump'
 
 # Restore into a database you name, to look at it.
-docker exec arrow-atlas-backup /srv/arrow-atlas/bin/restore.sh into /backups/....dump arrow_atlas_yesterday
+docker exec arrow-atlas-backup sh -c 'sh $ARROW_ATLAS_SCRIPTS_DIR/restore.sh into /backups/....dump arrow_atlas_yesterday'
 
 # Replace the live database. Saves the current one first, to /backups/pre-restore-<stamp>.dump.
 docker compose stop arrow-atlas-api
-docker exec -e CONFIRM=yes arrow-atlas-backup /srv/arrow-atlas/bin/restore.sh live /backups/....dump
+docker exec -e CONFIRM=yes arrow-atlas-backup sh -c 'sh $ARROW_ATLAS_SCRIPTS_DIR/restore.sh live /backups/....dump'
 docker compose start arrow-atlas-api
 ```
 

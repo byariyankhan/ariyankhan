@@ -102,7 +102,10 @@ services:
         set -e
         apk add --no-cache curl tar >/dev/null
         echo "[arrow-atlas] fetching $$SITE_BRANCH"
-        rm -rf /srv/arrow-atlas/site && mkdir -p /srv/arrow-atlas/site
+        # The checkout lives in a named volume, so arrow-atlas-backup can read the two shell scripts it needs
+        # without a network of its own. Clear the contents rather than the directory: it is a mount point.
+        mkdir -p /srv/arrow-atlas/site
+        find /srv/arrow-atlas/site -mindepth 1 -maxdepth 1 -exec rm -rf {} +
         curl -fsSL "https://codeload.github.com/byariyankhan/ariyankhan/tar.gz/refs/heads/$$SITE_BRANCH" \
           | tar -xz --strip-components=1 -C /srv/arrow-atlas/site
         cd /srv/arrow-atlas/site/games/arrow-atlas/backend
@@ -112,6 +115,10 @@ services:
         npm prune --omit=dev
         echo "[arrow-atlas] starting"
         exec node dist/server.js
+    volumes:
+      # The fetched checkout, shared read-only with arrow-atlas-backup so that container needs no network of
+      # its own to get the two shell scripts it runs.
+      - arrow-atlas-site:/srv/arrow-atlas/site
     ports:
       # 127.0.0.1 only: the host nginx terminates TLS and is the single way in from outside.
       - "127.0.0.1:${ARROW_ATLAS_PORT:-8760}:8760"
@@ -127,9 +134,13 @@ services:
     logging: { driver: json-file, options: { max-size: "20m", max-file: "5" } }
 
   arrow-atlas-backup:
-    # postgres:16-alpine is what actually carries pg_dump and pg_restore. The two scripts are fetched from the
-    # repository at start, the same way the API is, so this file bind-mounts nothing from beside itself and can
-    # be handed to a VPS as raw YAML.
+    # postgres:16-alpine is what actually carries pg_dump and pg_restore.
+    #
+    # It gets its two shell scripts from the checkout arrow-atlas-api already fetched, mounted read-only, and so
+    # reaches no network at all — which it could not do anyway: it sits only on arrow-atlas-data, which is
+    # internal, and this image ships no curl. An earlier version of this file tried to fetch them at start and
+    # would have failed on both counts. Nothing is bind-mounted from beside this file either, so the whole
+    # project still deploys as raw compose YAML.
     image: postgres:16-alpine
     container_name: arrow-atlas-backup
     restart: unless-stopped
@@ -143,26 +154,35 @@ services:
       ARROW_ATLAS_BACKUP_DIR: /backups
       ARROW_ATLAS_BACKUP_KEEP_DAYS: ${ARROW_ATLAS_BACKUP_KEEP_DAYS:-14}
       ARROW_ATLAS_BACKUP_AT_HOUR: ${ARROW_ATLAS_BACKUP_AT_HOUR:-3}
-      SITE_BRANCH: ${SITE_BRANCH:-main}
+      ARROW_ATLAS_SCRIPTS_DIR: /srv/arrow-atlas/site/games/arrow-atlas/deploy
     volumes:
       # A named volume so the dumps never sit in the live PostgreSQL data directory, plus a bind mount so the
       # host (and whatever backs the host up) can see them without entering the container.
       - arrow-atlas-backups:/backups
       - ${ARROW_ATLAS_BACKUP_HOST_DIR:-/var/backups/arrow-atlas}:/backups-host
+      # read-only: this container reads the scripts and must never be able to change the deployed code
+      - arrow-atlas-site:/srv/arrow-atlas/site:ro
     networks: [arrow-atlas-data]
     user: root   # the dumps are written to a host directory this container does not own
     entrypoint:
       - /bin/sh
       - -c
       - |
-        set -e
-        mkdir -p /opt/arrow-atlas
-        for f in backup.sh restore.sh; do
-          curl -fsSL "https://raw.githubusercontent.com/byariyankhan/ariyankhan/$$SITE_BRANCH/games/arrow-atlas/deploy/$$f" \
-            -o "/opt/arrow-atlas/$$f"
-          chmod +x "/opt/arrow-atlas/$$f"
+        # Wait for the checkout. On a first deploy the API is still fetching it, which takes seconds; on every
+        # later start it is already there and this returns at once. Invoked through sh, so the file mode in the
+        # tarball is not something backups depend on.
+        S="$${ARROW_ATLAS_SCRIPTS_DIR}"
+        i=0
+        while [ ! -f "$$S/backup.sh" ]; do
+          i=$$((i + 1))
+          [ $$((i % 6)) -eq 1 ] && echo "{\"product\":\"arrow-atlas\",\"component\":\"backup\",\"msg\":\"waiting for $$S/backup.sh\"}"
+          if [ "$$i" -gt 360 ]; then
+            echo "{\"product\":\"arrow-atlas\",\"component\":\"backup\",\"level\":\"error\",\"msg\":\"the checkout never appeared at $$S; is arrow-atlas-api running?\"}" >&2
+            exit 1
+          fi
+          sleep 5
         done
-        exec /opt/arrow-atlas/backup.sh loop
+        exec /bin/sh "$$S/backup.sh" loop
     healthcheck:
       # Unhealthy when the newest dump is older than a day and a bit: a backup that quietly stopped is the
       # failure this whole service exists to prevent.
@@ -182,6 +202,11 @@ networks:
     name: arrow-atlas-edge
 
 volumes:
+  # The repository checkout arrow-atlas-api fetches at start. It is a volume rather than container-local storage
+  # for one reason: arrow-atlas-backup reads its two shell scripts from here, which is how that container gets
+  # them without a network — it sits only on the internal network and its image ships no curl.
+  arrow-atlas-site:
+    name: arrow-atlas-site
   arrow-atlas-postgres-data:
     name: arrow-atlas-postgres-data
   arrow-atlas-redis-data:

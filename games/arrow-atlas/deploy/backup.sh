@@ -21,6 +21,9 @@ AT_HOUR="${ARROW_ATLAS_BACKUP_AT_HOUR:-3}"
 AT_HOUR="${AT_HOUR#0}"; [ -n "$AT_HOUR" ] || AT_HOUR=0   # "03" is an illegal octal number in POSIX arithmetic
 DB="${PGDATABASE:-arrow_atlas}"
 STATUS="$DIR/last-run.json"
+# The tables a dump of this game must contain. Checked by name, in both this script and restore.sh, so the two
+# never disagree about what a good backup looks like.
+CORE_TABLES="users sessions matches match_players gold_ledger"
 
 log() { printf '{"ts":"%s","product":"arrow-atlas","component":"backup","msg":"%s"}\n' "$(date -u +%FT%TZ)" "$1"; }
 fail() { printf '{"ts":"%s","product":"arrow-atlas","component":"backup","level":"error","msg":"%s"}\n' "$(date -u +%FT%TZ)" "$1" >&2; }
@@ -47,11 +50,18 @@ once() {
   if ! pg_restore --list "$tmp" > /dev/null 2>&1; then
     rm -f "$tmp"; fail "the dump did not verify"; status failed "" 0 "verify failed"; return 1
   fi
-  tables="$(pg_restore --list "$tmp" 2>/dev/null | grep -c 'TABLE DATA' || true)"
-  if [ "${tables:-0}" -lt 5 ]; then
-    rm -f "$tmp"; fail "the dump holds only ${tables:-0} tables; expected the full schema"
-    status failed "" 0 "only ${tables:-0} tables"; return 1
+  # Name the tables rather than counting them. A count cannot tell a dump that is missing the accounts from one
+  # that simply has a table fewer than it used to, and those are not the same news at all.
+  toc="$(pg_restore --list "$tmp" 2>/dev/null)"
+  missing=""
+  for t in $CORE_TABLES; do
+    printf '%s' "$toc" | grep -q "TABLE DATA public $t " || missing="$missing $t"
+  done
+  if [ -n "$missing" ]; then
+    rm -f "$tmp"; fail "the dump is missing:$missing"
+    status failed "" 0 "missing$missing"; return 1
   fi
+  tables="$(printf '%s' "$toc" | grep -c 'TABLE DATA' || true)"
 
   mv "$tmp" "$out"
   bytes="$(wc -c < "$out" | tr -d ' ')"

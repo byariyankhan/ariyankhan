@@ -12,6 +12,8 @@ log()  { printf '{"ts":"%s","product":"arrow-atlas","component":"restore","msg":
 fail() { printf '{"ts":"%s","product":"arrow-atlas","component":"restore","level":"error","msg":"%s"}\n' "$(date -u +%FT%TZ)" "$1" >&2; }
 
 LIVE_DB="${PGDATABASE:-arrow_atlas}"
+# The same list backup.sh checks, so a dump it accepted is a dump this will accept.
+CORE_TABLES="users sessions matches match_players gold_ledger"
 
 counts() {   # counts <database> — the numbers worth comparing after a restore
   psql -d "$1" -tAF' ' -c "
@@ -48,11 +50,17 @@ case "${1:-}" in
       SELECT COUNT(*) FROM (
         SELECT u.id FROM users u LEFT JOIN gold_ledger g ON g.user_id = u.id
          GROUP BY u.id, u.gold HAVING u.gold <> COALESCE(SUM(g.delta),0)) x")"
+    # By name, not by count: the point is that the accounts, the matches and the ledger came back.
+    missing=""
+    for t in $CORE_TABLES; do
+      found="$(psql -d "$scratch" -tAc "SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='$t'")"
+      [ "$found" = "1" ] || missing="$missing $t"
+    done
     tables="$(psql -d "$scratch" -tAc "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='public'")"
     psql -d postgres -qc "DROP DATABASE IF EXISTS \"$scratch\";"
-    [ "$tables" -ge 6 ] || { fail "the restored copy has only $tables tables"; exit 1; }
+    [ -z "$missing" ] || { fail "the restored copy is missing:$missing"; exit 1; }
     [ "$drift" = "0" ] || { fail "$drift accounts do not reconcile in the restored copy"; exit 1; }
-    log "verified: $tables tables, the ledger reconciles, and the scratch database has been dropped"
+    log "verified: every core table is present ($tables in all), the ledger reconciles, and the scratch database has been dropped"
     ;;
   into)
     restore_into "${2:?usage: $0 into <dump> <database>}" "${3:?usage: $0 into <dump> <database>}"
