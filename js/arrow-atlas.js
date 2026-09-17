@@ -1034,9 +1034,9 @@
   }
 
   // ── Accounts ──
-  // Only for playing with other people: the single-player game never asks. The server (games/api/auth.php) keeps
-  // the provider's opaque user id and the display name, nothing else, and the account can be deleted from the
-  // dashboard. Signed out, the button opens the sign-in sheet; signed in, it opens the dashboard.
+  // Only for playing with other people: the single-player game never asks. The server keeps the provider's
+  // opaque user id and the display name, nothing else, and the account can be deleted from the dashboard.
+  // Signed out, the button opens the sign-in sheet; signed in, it opens the dashboard.
   const auth = { user: null, providers: {}, ready: false };
   // me is a read; everything else changes something and is posted. The paths are the versioned ones, so a
   // later backend can add a v2 without this client noticing.
@@ -1105,8 +1105,8 @@
     }
   }
   // ── Gold matches: stake, invite, play the same board, winner takes the pot ──
-  // The server holds both stakes, picks the board and decides the winner (games/api/match.php); the game only
-  // shows what it says. Three stakes, and the bigger the stake the harder the board.
+  // The server holds both stakes, picks the board and decides the winner; the game only shows what it says.
+  // Three stakes, and the bigger the stake the harder the board.
   const STAKES = [500, 1000, 7000];
   const gfmt = n => Number(n || 0).toLocaleString('en-US');
   // A purse holds anything from nothing to a number with a dozen digits in it, so the badge is not a fixed box:

@@ -158,6 +158,7 @@ uploaded to that old name is not served.
 | `games/piece-the-world.webmanifest`, `piece-the-world-sw.js` | PWA manifest + service worker for both games (offline levels, installable) |
 | `arrow-atlas.html`, `js/arrow-atlas.js`, `css/arrow-atlas.css` | Tap-away arrow puzzle game on country maps — see "Arrow Atlas" section below |
 | `games/data/arrow-atlas.json`, `games/build-arrow-atlas.mjs`, `games/arrow-atlas.webmanifest` | Its level data (outlines + tier scales for 197 countries; masks are rasterised in the browser), build script and PWA manifest |
+| `games/arrow-atlas/` | Its backend service, which is a project of its own: Node 22 + TypeScript + Fastify, PostgreSQL, Redis and a WebSocket, with its migrations, test suites, compose file, backup and restore scripts and nginx snippet — see `games/arrow-atlas/README.md` |
 | `js/vendor/` | Local copies of d3-array, d3-geo, d3-geo-projection, topojson-client and Natural Earth country data (`countries-110m.json`, `countries-50m.json`); the site CSP forbids CDNs |
 
 ---
@@ -666,51 +667,53 @@ unlock (skip allowed after two fails), stars, best times and progress in
   discovery) is next and is the only level picker: the All levels sheet, the
   Discoveries collection and the "You discovered" facts list are all gone. The
   tour unlocks itself from the player's play and location.
-- **Accounts** (`games/api/auth.php`, `games/api/lib.php`, `auth` in the engine):
+- **Accounts** (`arrow-atlas-api`: `backend/src/auth.ts`, `auth` in the engine):
   the lobby's second button gates on sign-in. Signed out it opens the sign-in
   sheet, signed in it opens the dashboard (name, stats, Challenge a friend, the
   two live modes marked Soon, sign out, delete account). The server keeps only
-  the provider's opaque user id and the display name, in SQLite under
-  `AA_DATA_DIR` (a Docker volume, since every deploy wipes the web root);
-  sessions are random tokens stored hashed behind an HttpOnly, SameSite=Lax
-  cookie. `GET ?a=me` also reports which providers the server can actually use:
+  the provider's opaque user id and the display name, in the `users` table of the
+  game's own PostgreSQL database; sessions are random tokens stored hashed behind
+  an HttpOnly, SameSite=Lax cookie, or sent as `Authorization: Bearer` by a phone
+  app, which is the same session either way.
+  `GET /api/arrow-atlas/v1/auth/me` also reports which providers the server can actually use:
   Google sign-in is live only when `GOOGLE_CLIENT_ID` is set in the container's
   environment, otherwise the sheet says so. The OAuth client's **Authorized
   JavaScript origins** must list `https://ariyankhan.com`, or Google's library
   refuses to show the button on the live site. `arrow-atlas.html` gets its own
   slightly wider CSP in `.htaccess` for Google's sign-in library. Deleting the
   account is in the dashboard because Google Play requires it. A new account is
-  created with `AA_SIGNUP_GOLD` (10,000) as the `gold` column's default, so the
-  welcome purse lands exactly once: signing out and back in never tops it up,
-  and the column default also covers accounts made before gold existed. The
-  balance rides along in every `user` object and shows on the dashboard.
-  `tests/auth.test.php` covers the security-critical half without the network:
-  which ID tokens are accepted (audience, issuer, expiry, unverified accounts,
-  junk answers), that one Google account makes exactly one player, that session
-  tokens are stored hashed and expire, and that deleting an account takes its
-  sessions with it. The browser side is `aa-friends.mjs` and `aa-auth-full.mjs`
-  in the scratchpad; the one step no test can do is Google actually signing a
-  token, so a real sign-in has to be tried by hand once.
-- **Gold matches** (`games/api/match.php`, `openStakes`/`showRoom`/`showConfirm`,
-  `#m=<code>`): the lobby's second button asks for a sign-in, then shows the
+  created with `ARROW_ATLAS_SIGNUP_GOLD` (10,000), written as a `signup` row in
+  the gold ledger, so the welcome purse lands exactly once: signing out and back
+  in never tops it up. The balance rides along in every `user` object and shows
+  on the dashboard.
+  `games/arrow-atlas/tests/` covers the security-critical half against a real
+  PostgreSQL: which ID tokens are accepted (audience, issuer, expiry, unverified
+  accounts, junk answers), that one Google account makes exactly one player, that
+  session tokens are stored hashed and expire, that deleting an account takes its
+  sessions with it, and that a link cannot reach anything that changes state. The
+  one step no test can do is Google actually signing a token, so a real sign-in
+  has to be tried by hand once.
+- **Gold matches** (`arrow-atlas-api`: `backend/src/rooms.ts`,
+  `openStakes`/`showRoom`/`showConfirm`, `#m=<code>`): the lobby's second button asks for a sign-in, then shows the
   player's strip (name, provider, purse) and three coins side by side: 500,
   1,000 and 7,000, with nothing else on the screen. **The stake never touches the
   board.** Each player sends their own difficulty when they open or join a room,
-  and `aa_room_tier` sets the board to the middle of everyone's, at the moment
+  and `roomTier` sets the board to the middle of everyone's, at the moment
   the host starts, so gold buys a bigger pot and never an easier board.
   Under the coins sits one switch, **Fill from online** (on by default, kept in
   `aa:v1:fillOnline`), and under each coin the number of players waiting at that
-  stake (`lobby`), so nobody sits at an empty one.
+  stake (`lobbyCounts`, cached in Redis for a second so a busy lobby does not ask
+  PostgreSQL the same question a hundred times), so nobody sits at an empty one.
   Picking a coin holds the stake and opens a
   **room** on the game screen: how many of the seven seats are filled, the faces
   of who is in, the invitation link, **Invite**, **Start** (host only, dead until
   someone else is in) and **Cancel**. Friends open the link, confirm the stake
   and wait in the same room; the host starts when everyone is in, and the board
-  is dealt only then (`get` hands out the country, tier and seed once the match
-  is `playing`), so nobody can study it while the room fills up.
+  is dealt only then (`matchView` hands out the country, tier and seed once the
+  match is `playing`), so nobody can study it while the room fills up.
   **Leave** is everyone's, and it hands back your own stake and nothing else
-  (`aa_leave_room`, which checks the caller actually holds a seat before paying
-  anybody — the endpoint checks too, but a helper that hands out gold must not
+  (`leaveRoom`, which checks the caller actually holds a seat before paying
+  anybody — the route checks too, but a helper that hands out gold must not
   depend on every caller remembering). The room closes only behind the last one out, killing the
   link; if the host walks away from a room with people still in it, **the next of
   them by joining order takes the crown and the room carries on**, told by a
@@ -721,15 +724,16 @@ unlock (skip allowed after two fails), stars, best times and progress in
   which is the one mechanism behind all three ways to play: two friends and
   nobody else (switch off), two friends with the rest brought in from online, or
   no friends at all. Picking a coin then walks you into the room already waiting
-  at that stake (`aa_open_room`, longest-waiting first) instead of opening a
+  at that stake (`openRoom`, longest-waiting first) instead of opening a
   second one, so a queue and a room are the same object and there is no
   matchmaking service to run. The stake *is* the queue — 500, 1,000 and 7,000 are
-  three lines — and `aa_room_tier` already sets the board from whoever turned up,
+  three lines — and `roomTier` already sets the board from whoever turned up,
   so a room of strangers needs no rating system.
   Two players tapping the same coin in the same second would each open a room and
   sit in it alone, never meeting, so while a player is still the only one in a
-  room that fills itself, **every poll looks for an older room to walk into**
-  (`aa_requeue`, from `get`): the seat moves across with the stake already on it,
+  room that fills itself, **every read looks for an older room to walk into**
+  (`requeue`, from `matchView` — behind `requeueWorthTrying`, so the common case
+  opens no transaction at all): the seat moves across with the stake already on it,
   the room left behind closes with nobody in it to refund, and the client follows
   the new code, link and all. Only ever towards an older room, so two of them
   cannot swap places forever.
@@ -739,32 +743,37 @@ unlock (skip allowed after two fails), stars, best times and progress in
   full room of seven does not wait for it at all. **In a room that fills itself
   there is no Start button**: the clock alone begins it (`clock_starts_it`), or a
   host could shut the door on everyone else the moment the second player sat
-  down. The host's **Start** is only for an invite-only room. `aa_autostart_matches` runs on every request: it starts the
-  rooms whose clock has run out with more than one player in them, and hands the
-  stake back to anyone still sitting alone after two minutes
-  (`AA_LONELY_SECONDS`) rather than leaving them to wait out the day. With the
+  down. The host's **Start** is only for an invite-only room. `sweep` runs on a
+  timer in the service rather than on the back of somebody's request: it starts
+  the rooms whose clock has run out with more than one player in them, and hands
+  the stake back to anyone still sitting alone after two minutes
+  (`ARROW_ATLAS_LONELY_SECONDS`) rather than leaving them to wait out the day. With the
   switch off none of this applies: no clock, no strangers, nothing at all until
   the host says go.
   **The first player to clear the board takes the whole pot, and is paid the
   instant their result lands** — no waiting on anybody else. Not the shortest
   clock: the server stamps the moment each result arrives and ranks by that, so
-  finishing first is what wins. `aa_settle_match` pays that first clear straight
-  into the purse (once only: the `winner_id IS NULL` guard on the row is what
-  makes it a race) and leaves the match `playing`, because **the rest play on for
+  finishing first is what wins. `settleMatch` pays that first clear straight
+  into the purse (once only: the `paid_at IS NULL` guard on the row is what makes
+  it a race, and the payout's `idem_key` in the gold ledger is a unique index, so
+  paying twice is not a bug to find but a constraint violation) and leaves the
+  match `playing`, because **the rest play on for
   second, third, fourth place — the places are still theirs to win, the gold is
   not.** The match itself closes only when everyone has reported. A player who
   runs out of hearts loses to anyone who clears; a board nobody cleared refunds
   every stake. Everything
   about gold happens on the server, which also picks the country, the tier and
-  the seed; the client only shows what `match.php` says. A result can only be
+  the seed; the client only shows what the API says. A result can only be
   reported once, so a retry cannot improve a time. A room nobody joins, or one
   the host never starts, is refunded after a day, and a match where someone never
   finishes is closed out a day later with the missing run counted as a loss.
-  While they play, `progress` carries each player's percentage and returns the
-  line-up in order, drawn over the top left of the board as circles numbered 1
-  upwards (`renderRanks`, polled every 2 s). `match_players` is a row per player,
-  so three to seven in a room needs no new shape; `aa_migrate_matches` moved the
-  first two-seat version over and refunded anything unfinished.
+  While they play, each player's percentage goes up the WebSocket and the line-up
+  comes back in order, drawn over the top left of the board as circles numbered 1
+  upwards (`renderRanks`). With the socket up the client polls every 15 seconds
+  instead of every 2, and falls back to polling alone if the socket cannot be had
+  — which is why an unreliable network costs a player nothing but freshness.
+  `match_players` is a row per player, so three to seven in a room needs no new
+  shape.
   **The room answers back** (`SFX`): every button in the game plays a short `tap`
   on `pointerdown` (one delegated listener; the board's arrows are not buttons,
   so they keep their own shot), a player arriving plays `join` and a buzz, one
@@ -830,13 +839,13 @@ unlock (skip allowed after two fails), stars, best times and progress in
   (`goldRain` lifts the canvas out of the hidden board and on to `document.body`
   for the duration).
   **Deleting an account** releases what it was sitting in first
-  (`aa_release_player`): every room that has not started is left properly, so the
+  (`releasePlayer`): every room that has not started is left properly, so the
   crown passes on and nothing is left pointing at an account that is gone; a seat
   in a match still being played stays, so the pot keeps the size of the stakes
-  that went in (`aa_stakes_in`, which counts seats rather than players the room
-  can still name). A match whose every account has since gone is closed rather
-  than swept again on every request.
-  `tests/match.test.php` (124 checks) covers the stakes, the room rules, a room of
+  that went in (`matches.stakes_in`, stored when the match starts rather than
+  counted from the players it can still name). A match whose every account has
+  since gone is closed rather than swept again.
+  The suites in `games/arrow-atlas/tests/` cover the stakes, the room rules, a room of
   seven, the finish-order rule against a shorter clock, the instant payout and
   that it never pays twice, that second place wins a place and no gold, that a 500
   room of beginners gets an easy board while a 7,000 room of strong players gets a
@@ -846,7 +855,9 @@ unlock (skip allowed after two fails), stars, best times and progress in
   lonely refund, a dead heat between two players ending with one of them walking
   into the other's room, and an invite-only room being offered to nobody and
   moved by nothing, the handover when a leader walks out, and a room that fills
-  itself refusing to be started by hand. Signing out and deleting the account live in Settings.
+  itself refusing to be started by hand, and — because the ledger is checked
+  against every balance at the end of each suite — that no run of any of it makes
+  or loses a single gold. Signing out and deleting the account live in Settings.
 - **Home country first** (`homeCountry`, `orderFor`): `games/geo.php` passes on
   Cloudflare's `CF-IPCountry` (nothing stored); the browser language region is
   the fallback. The tour order is the player's country, then every other country
