@@ -67,7 +67,6 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-world-land path.is-tour{ fill:color-mix(in srgb, var(--line) 18%, var(--bg)); stroke:color-mix(in srgb, var(--line) 45%, var(--bg)); stroke-width:1; cursor:pointer; }
 .aa-world-land path.is-done{ fill:var(--good); stroke:var(--bg); }
 .aa-world-land path.is-next{ fill:var(--accent2); stroke:var(--bg); animation:aa-next 1.4s ease-in-out infinite alternate; }
-.aa-world-land path.is-locked{ cursor:default; }
 .aa-world-land path.is-tour:hover, .aa-world-land path.is-tour:focus-visible{ filter:brightness(1.12); outline:none; }
 .aa-world-labels text{ font-family:inherit; font-weight:900; font-size:22px; fill:#fff; text-anchor:middle; dominant-baseline:central; pointer-events:none; paint-order:stroke; stroke:rgba(0,0,0,.28); stroke-width:3px; stroke-linejoin:round; }
 .aa-world-labels circle{ fill:var(--good); pointer-events:none; }

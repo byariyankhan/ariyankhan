@@ -528,10 +528,11 @@ whatever hearts and hints were spent, 0 after a retry (resets); two lost boards
 in a row step it down;
 `TIER_OF()`; Try again keeps the same board, New layout takes the new tier; the
 tier is never explained on the win card, only shown on the Next button and in
-the start toast), combo counter (taps within 1.8 s), win streak, milestones every 10 levels, a Today's Country
-bonus board (date-seeded, same for everyone, `#daily`), and clearing the board reveals the country for a
-3-option quiz plus capital/population/region. 197-country World Tour (every UN member state, plus Palestine, the Vatican, Kosovo and Taiwan: world-atlas 110m plus the 29 small states from the 10m file, minus dependencies and disputed areas) with sequential
-unlock (skip allowed after two fails), stars, best times and progress in
+the start toast), combo counter (taps within 1.8 s), a win streak (still counted, no longer
+announced on the card), milestones every 10 levels, a Today's Country bonus board (date-seeded, same for
+everyone, reached by `#daily` rather than from Settings), and clearing the board reveals the country for a
+3-option quiz plus capital/population/region. 197-country World Tour (every UN member state, plus Palestine, the Vatican, Kosovo and Taiwan: world-atlas 110m plus the 29 small states from the 10m file, minus dependencies and disputed areas) played in any
+order from the lobby map, stars, best times and progress in
 `localStorage` (`aa:v1:*`) and, once signed in, on the account as well, so a new
 phone picks the tour up where the last one left it; share text, `#level-N` deep
 links.
@@ -574,9 +575,10 @@ links.
   Features world-atlas leaves without an id (Kosovo) get `n:<slug>` ids in both
   data files. Versioned with `MAP_VERSION`. There is no Restart button in the game any more (back out or
   fail and retry).
-- **Lobby layout**: title, the world map (fills the space), Continue, then two
-  compact buttons (Today's Country, World Tour n/197 · All levels). The old cards
-  carousel and the level-path dots are gone.
+- **Lobby layout**: purse, title, tagline, the world map (fills the space, and is
+  the level picker), its caption, then Play & Discover and Play with Friends. The
+  old cards carousel, the level-path dots and the compact Today's Country / All
+  levels buttons are all gone.
 - **SEO**: title/description/keywords around "Arrow Atlas", "arrow puzzle" and
   "arrow game"; Open Graph/Twitter card `images/arrow-atlas-og.jpg` (1200×630,
   rendered from `scratchpad/og/arrow-atlas-og.html`); schema.org WebPage +
@@ -665,10 +667,16 @@ links.
   country in the build script's `ABOUT` table and carried in the boards file as
   `rel` and `fact` ("Royal Bengal tiger · Bangladesh's national animal" / "The
   tigers of the Sundarbans swim between islands and drink slightly salty
-  water."). Only country boards keep the three-option quiz. The lobby map marks the country whose step (outline or
-  discovery) is next and is the only level picker: the All levels sheet, the
-  Discoveries collection and the "You discovered" facts list are all gone. The
-  tour unlocks itself from the player's play and location.
+  water."). Only country boards keep the three-option quiz. **The lobby map is the only level picker, and every country on it is
+  playable in any order.** It marks the country whose step (outline or discovery)
+  is next, which is what Play & Discover opens and all the tour order decides now
+  — a suggestion rather than a gate. It used to refuse anything further down the
+  list with a toast, which made a map of 197 countries a list with one usable
+  entry on it; `unlocked()` still exists and still shapes what the game *offers*
+  (that marker, Play & Discover, the Next button) but no longer what it permits.
+  The All levels sheet, the Discoveries collection and the "You discovered" facts
+  list are all gone. Level numbers count the boards a player has cleared in the
+  order they cleared them, so playing Bahrain first simply makes Bahrain level 1.
 - **Accounts** (`arrow-atlas-api`: `backend/src/auth.ts`, `auth` in the engine):
   the lobby's second button gates on sign-in. Signed out it opens the sign-in
   sheet, signed in it opens the dashboard (name, stats, Challenge a friend, the
