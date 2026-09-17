@@ -283,10 +283,11 @@
       for (const c of MAP.countries) {
         const p = svgEl('path', { d: c.d, 'data-id': c.id });
         const i = byId.get(c.id);
-        // Every country in the tour is playable, in any order. The map used to refuse the ones further down
-        // the list and say so in a toast, which made a map of 197 countries a list with one usable entry on it.
-        // Play & Discover still picks the next one for anybody who would rather be led.
-        if (i != null) { p.classList.add('is-tour'); p.setAttribute('tabindex', '0'); p.setAttribute('role', 'button'); p.addEventListener('click', () => { const j = cleared(i) && DATA.levels[i + 1]?.disc && !cleared(i + 1) ? i + 1 : i; startLevel(j); }); p.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); p.click(); } }); }
+        // Tapping a country starts that country's board. It used to send a player who tapped one they had
+        // already cleared to its discovery board instead, whenever that board was still open — so the tap
+        // opened a different board from the one under their finger. A country nobody has reached yet is still
+        // locked: the tour is how you get there, and Play & Discover is what walks you along it.
+        if (i != null) { p.classList.add('is-tour'); p.setAttribute('tabindex', '0'); p.setAttribute('role', 'button'); p.addEventListener('click', () => { if (!unlocked(i)) { toast(`${DATA.levels[i].name} is locked. Clear the levels before it first.`, 'bad'); return; } startLevel(i); }); p.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); p.click(); } }); }
         land.appendChild(p);
       }
     }
@@ -297,13 +298,13 @@
     for (const c of MAP.countries) {
       const i = byId.get(c.id); if (i == null) continue;
       const p = land.querySelector(`path[data-id="${c.id}"]`);
-      const rec = cleared(i), isNext = c.id === nextId;
-      p.classList.toggle('is-done', !!rec); p.classList.toggle('is-next', isNext);
-      p.setAttribute('aria-label', rec ? `${DATA.levels[i].name}, cleared, replay` : isNext ? `${DATA.levels[i].name}, next, play` : `${DATA.levels[i].name}, play`);
+      const rec = cleared(i), isNext = c.id === nextId, open = unlocked(i);
+      p.classList.toggle('is-done', !!rec); p.classList.toggle('is-next', isNext); p.classList.toggle('is-locked', !open);
+      p.setAttribute('aria-label', rec ? `${DATA.levels[i].name}, cleared, replay` : isNext ? `${DATA.levels[i].name}, next, play` : open ? `${DATA.levels[i].name}, play` : `${DATA.levels[i].name}, locked`);
       // no numbers on the map: cleared countries are simply coloured in, only the next one gets a marker
       if (isNext) { const g = svgEl('g', { class: 'is-next' }); g.appendChild(svgEl('circle', { cx: c.cx, cy: c.cy, r: 9 })); labels.appendChild(g); }
     }
-    el.worldCap.textContent = done ? `${done} of ${n} countries collected · tap any country to play it` : 'Your world tour starts here · tap any country to play it';
+    el.worldCap.textContent = done ? `${done} of ${n} countries collected · tap one to play it again` : 'Your world tour starts here · tap the highlighted country';
 
   }
 
@@ -719,9 +720,7 @@
   async function startLevel(i, bumpSeed = false, daily = null, keepTier = -1) {
     try { await loadData(); } catch (err) { el.error.textContent = `Could not load the levels (${err.message}).`; el.error.hidden = false; return; }
     if (i < 0 || i >= DATA.levels.length) i = 0;
-    // No lock redirect. This used to send a player who asked for a country further down the list to the next
-    // unlocked one instead, silently — so unlocking the map alone would have looked like it worked and then
-    // quietly started the wrong board. Any country in the tour may be played, in any order.
+    if (!daily && !unlocked(i)) i = DATA.levels.findIndex((_, j) => !cleared(j) && unlocked(j));
     if (i < 0) i = 0;
     stopTimer(); stopProgressPoll();
     if (el.ranks) el.ranks.hidden = true;
