@@ -77,6 +77,15 @@ report_data() {
   note "newest account:      $(psqlc 'select coalesce(max(created_at)::text,'"'"'none'"'"') from users')"
   note "matches settled:     $(psqlc 'select count(*) from matches where paid_at is not null')"
 
+  # Where the rows came from. An account or a match stamped before the cutover can only be in PostgreSQL
+  # because the importer carried it over — this instance was created on the day of the cutover, so a row older
+  # than that is the migration's own evidence, and it is worth reading before anything SQLite is deleted.
+  note "oldest match:        $(psqlc 'select coalesce(min(created_at)::text,'"'"'none'"'"') from matches')"
+  note "account ids:         $(psqlc 'select coalesce(min(id)::text || '"'"' to '"'"' || max(id)::text, '"'"'none'"'"') from users')"
+  note "and the ledger, by reason:"
+  psqlc "select '  ' || reason || ' ' || count(*) || ' rows, net ' || sum(delta)
+         from gold_ledger group by reason order by reason" | sed 's/^/      /'
+
   drift=$(psqlc "select count(*) from (
             select u.id from users u left join gold_ledger g on g.user_id = u.id
             group by u.id, u.gold having coalesce(sum(g.delta),0) <> u.gold) d")
@@ -175,6 +184,13 @@ mode_inspect() {
     [ -n "$wd" ] && { $SUDO ls -la "$wd" 2>/dev/null | sed 's/^/    /' || true; }
     note "mounts:"
     docker inspect -f '{{range .Mounts}}    {{.Type}} {{.Name}}{{.Source}} -> {{.Destination}}{{"\n"}}{{end}}' ariyankhan-web
+    # hPanel's Docker Manager keeps its own copy of this compose file, so an edit in the repository does not
+    # reach it. Saying which of the two settings are still there is more useful than assuming either way.
+    for v in AA_DATA_DIR GOOGLE_CLIENT_ID; do
+      if docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' ariyankhan-web | grep -q "^$v="; then
+        note "still set on the container: $v  (the repository no longer sets it; hPanel's own copy of the compose file does)"
+      fi
+    done
   fi
 
   say "and the Arrow Atlas project"

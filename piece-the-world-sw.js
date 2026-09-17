@@ -25,7 +25,7 @@ self.addEventListener('fetch', event => {
   const path = url.pathname;
   // The game's backend is never cached, and never touched by this worker: every answer it gives is about right
   // now. It falls outside GAME_FILES anyway, but saying so here keeps a later broad rule from swallowing it.
-  if (path.startsWith('/api/arrow-atlas/') || path.startsWith('/ws/arrow-atlas') || path.startsWith('/games/api/')) return;
+  if (path.startsWith('/api/arrow-atlas/') || path.startsWith('/ws/arrow-atlas')) return;
   if (isLevelData(path)) {
     // Level data is versioned by query string → cache first, forever.
     event.respondWith(caches.open(VERSION).then(async cache => {

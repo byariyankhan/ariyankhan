@@ -23,7 +23,6 @@ Two networks. `arrow-atlas-data` is `internal: true`, so the database and the ca
 internet at all. `arrow-atlas-edge` exists only so the API can reach Google to verify a sign-in token. The API
 sits on both; nothing else sits on the edge.
 
-Volumes: `arrow-atlas-postgres-data`, `arrow-atlas-redis-data`, `arrow-atlas-backups`.
 Database: `arrow_atlas`, owned by the role `arrow_atlas`.
 Every Redis key begins `arrow-atlas:`.
 
@@ -55,9 +54,10 @@ WebSocket  wss://ariyankhan.com/ws/arrow-atlas
 health     http://127.0.0.1/api/arrow-atlas/health   (host-only)
 ```
 
-The old `/games/api/auth.php` and `/games/api/match.php` paths still answer, with byte-identical responses, so a
-browser running a cached copy of the game keeps working through the changeover. They are a compatibility shim
-and nothing new should be added to them.
+There is one surface and it is versioned. The `/games/api/*.php` paths the PHP service answered were kept
+alive as a compatibility shim through the changeover and have been removed now that every client asks for
+`/v1`; a `/v2` would be mounted beside `/v1` rather than replacing it, which is the whole reason the version is
+in the path.
 
 ### REST
 
@@ -145,14 +145,20 @@ docker compose logs -f arrow-atlas-api
 curl -s localhost:8760/health
 ```
 
-**A faster, reproducible alternative, once this lands on main.** `.github/workflows/arrow-atlas-api.yml` runs
-all four suites against real PostgreSQL and Redis service containers on every push and pull request, and on a
-push to `main` it also builds the image and publishes it to `ghcr.io`. The publish only runs on `main`, so the
-image does not exist until this merges — which is why the fetch-and-build above is what the cutover uses.
+**The faster alternative, now that the image exists.** `.github/workflows/arrow-atlas-api.yml` runs every suite
+against real PostgreSQL and Redis service containers on each push and pull request, and on a push to `main` it
+builds the image and publishes it to `ghcr.io`. Switching to it is three things: set `ARROW_ATLAS_IMAGE` in
+`.env`, replace the API service's `image:` line with `image: ${ARROW_ATLAS_IMAGE}`, and delete its `command:`
+block. A deploy then becomes `docker compose pull` rather than a two-to-four minute build on a 2-vCPU box at
+every restart. Production still fetches and builds, because that is what it was cut over with and it works;
+this is the next thing to change, not an urgent one.
 
-Afterwards, switching is three things: set `ARROW_ATLAS_IMAGE` in `.env`, replace the API service's `image:` line
-with `image: ${ARROW_ATLAS_IMAGE}`, and delete its `command:` block. A deploy then becomes `docker compose pull`
-rather than a two-to-four minute build on a 2-vCPU box at every restart.
+**Or from GitHub, without a shell on the server.** `.github/workflows/arrow-atlas-ops.yml` is dispatch-only and
+has five modes: `inspect` and `health` read, `backup-verify` takes one dump and restores it into a scratch
+database, `cleanup` deletes legacy artifacts, and `deploy` installs the nginx snippet from the checkout (after
+`nginx -t` accepts it, keeping the previous one) and restarts the two containers that re-fetch this repository.
+`cleanup` and `deploy` each refuse to run without their confirmation word. Nothing in it names a container,
+path or volume outside Arrow Atlas and the portfolio's own web container.
 
 nginx, once:
 
@@ -187,77 +193,18 @@ than as a request each time — roughly a sixth of the HTTP traffic per player t
 
 ---
 
-## Cutting over
+## Where the data came from
 
-In order, and not out of it. Steps 2 and 3 need a shell on the VPS (hPanel → VPS → Browser terminal).
+Arrow Atlas ran on SQLite inside the portfolio's PHP container until September 2026. The cutover moved every
+account, session, match, seat and gold balance into PostgreSQL in one pass, with account ids and match codes
+preserved, live sessions carried over so nobody was signed out, and each balance written as an opening ledger
+entry so balances and the ledger agreed from the first minute. `matches.stakes_in` kept the number of stakes
+actually paid, which is why a match whose loser has since deleted their account still pays the winner the full
+pot.
 
-```bash
-# 0. A snapshot first, so there is a way back that does not depend on anything below working.
-#    hPanel → VPS → Snapshots → Create snapshot
-
-# 1. Bring the backend up. Nothing routes to it yet, so the live game is untouched either way.
-cd /var/www/ariyankhan-src/games/arrow-atlas/deploy    # or wherever the repo is checked out
-cp .env.example .env && $EDITOR .env                   # two passwords, GOOGLE_CLIENT_ID
-mkdir -p /var/backups/arrow-atlas
-docker compose up -d
-docker compose logs -f arrow-atlas-api                 # wait for "arrow-atlas-api listening"
-curl -s localhost:8760/health                          # postgres ok, redis ok
-
-# 2. Move the data. Back it up first, and keep the backup.
-mkdir -p /var/backups/arrow-atlas
-docker exec ariyankhan-web cat /var/lib/arrow-atlas/arrow-atlas.sqlite \
-  > /var/backups/arrow-atlas/pre-migration-$(date -u +%Y%m%dT%H%M%SZ).sqlite
-ls -lh /var/backups/arrow-atlas/                       # it must not be empty
-docker cp /var/backups/arrow-atlas/pre-migration-*.sqlite arrow-atlas-api:/tmp/legacy.sqlite
-docker exec arrow-atlas-api sh -c 'cd /srv/arrow-atlas/site/games/arrow-atlas/backend && node dist/import-sqlite.js /tmp/legacy.sqlite'
-#    It must end with "all checks passed". If it does not, stop here: nothing is routed yet, so nothing is broken.
-
-# 3. Route to it.
-mkdir -p /etc/nginx/snippets
-cp ../../../games/arrow-atlas/deploy/nginx-arrow-atlas.conf     /etc/nginx/snippets/arrow-atlas.conf
-cp ../../../games/arrow-atlas/deploy/nginx-arrow-atlas-map.conf /etc/nginx/conf.d/arrow-atlas-map.conf
-cp ../../../deploy/nginx-ariyankhan.conf /etc/nginx/sites-available/ariyankhan.conf
-nginx -t && systemctl reload nginx
-
-# 4. Check, from outside.
-curl -s https://ariyankhan.com/api/arrow-atlas/v1/auth/me      # {"user":null,...}
-curl -s https://ariyankhan.com/games/api/auth.php?a=me         # the same, through the old path
-```
-
-Then merge and redeploy the `ariyankhan` project so the new client ships. Not before: the new client asks for
-`/api/arrow-atlas/v1`, and until step 3 that path does not exist.
-
-**If anything looks wrong after step 4**, the fastest way back is one line — comment the
-`include /etc/nginx/snippets/arrow-atlas.conf;` out of `ariyankhan.conf`, `nginx -t && systemctl reload nginx`.
-The PHP service and its SQLite file are exactly as they were; the importer only ever read them.
-
----
-
-## Moving the existing SQLite data
-
-Do this once, at cutover, and never again — the importer refuses to run a second time into a database that
-already holds players.
-
-```bash
-# 1. Back up what exists, and keep it.
-docker exec ariyankhan-web sh -c 'cat /var/lib/arrow-atlas/arrow-atlas.sqlite' > /var/backups/arrow-atlas/pre-migration-$(date -u +%Y%m%dT%H%M%SZ).sqlite
-
-# 2. Put it where the API can read it and import.
-docker cp /var/backups/arrow-atlas/pre-migration-*.sqlite arrow-atlas-api:/tmp/legacy.sqlite
-docker exec arrow-atlas-api sh -c 'cd /srv/arrow-atlas/site/games/arrow-atlas/backend && node dist/import-sqlite.js /tmp/legacy.sqlite'
-
-# 3. Read the report. It must end with "all checks passed".
-```
-
-The importer preserves account ids and match codes, carries live sessions over (so nobody is signed out),
-writes each account's gold as an opening ledger entry (so balances and ledger agree from day one), and keeps
-`stakes_in` at the number of stakes actually paid — which is why a match whose loser has since deleted their
-account still pays the winner the full pot.
-
-Then it proves it: row counts, gold totals before and after, ledger reconciliation, referential integrity, no
-negative balances, and that the next sign-up will not collide with a migrated id.
-
-**Never delete the SQLite backup.**
+The importer, the SQLite file and its backups are all gone: they were deleted after a fresh PostgreSQL dump was
+taken and restored into a scratch database to prove it worked. What is left of that history is this paragraph,
+the `stakes_in` column, and the pre-2026-09-17 rows in `matches` — which are the point of the whole exercise.
 
 ---
 
@@ -311,16 +258,14 @@ ARROW_ATLAS_IMAGE=ghcr.io/byariyankhan/arrow-atlas-api:<previous-sha> docker com
 
 **The data is wrong** — restore the newest good dump, as above.
 
-**Back to the PHP service entirely** — possible until the old code is deleted, and the reason it is still in the
-repository:
+**The routing is wrong** — `deploy` keeps the snippet it replaced as
+`/var/backups/arrow-atlas/arrow-atlas.conf.before-<stamp>`, and it puts that file back itself if `nginx -t`
+refuses the new one. By hand it is a `cp` and a reload.
 
-1. `docker compose -p arrow-atlas stop arrow-atlas-api`
-2. Comment the `include /etc/nginx/snippets/arrow-atlas.conf;` line out of `ariyankhan.conf`, `nginx -t`,
-   `systemctl reload nginx`. `/games/api/*.php` goes back to the `ariyankhan-web` container.
-3. The SQLite file in the `aa-data` volume is exactly as it was: the importer only ever read it.
-
-What that loses: anything that happened after the cutover, because it happened in PostgreSQL. Decide quickly,
-or decide to go forward instead.
+There is no going back to the PHP service. It was deleted, with its SQLite file and the importer, once a
+PostgreSQL dump had been taken and proved restorable — and the accounts and gold created since the cutover
+exist only in PostgreSQL anyway, so that route stopped being a rollback the moment somebody played a match.
+The rollback that matters is the one above: a dump, verified, restored.
 
 ---
 
@@ -359,7 +304,7 @@ cp .env.example .env.dev       # point it at a local PostgreSQL and Redis
 npm run migrate
 npx tsx src/server.ts
 
-bash ../tests/run.sh                       # all four
+bash ../tests/run.sh                       # all three
 bash ../tests/run.sh economy api           # or just some
 ```
 
@@ -374,8 +319,7 @@ than letting it turn into a module-not-found error halfway through a run.
 | Suite | What it covers |
 |---|---|
 | `economy` | stakes, pots, payouts, draws, leaving, the crown, requeue, idempotency, overdrafts |
-| `migration` | the SQLite import: counts, ids, gold, sessions, pot sizes, refusal to run twice |
-| `api` | both transports, rate limits, legacy compatibility, a Redis flush, claims the client may not make |
+| `api` | both transports, rate limits, a Redis flush, that a link cannot reach anything that changes state, claims the client may not make |
 | `ws` | connect, authorisation, the countdown, clamped progress, reconnect resync, finish events |
 
 Every suite ends by checking that the ledger accounts for every balance.

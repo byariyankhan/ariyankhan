@@ -1,9 +1,8 @@
 // The Arrow Atlas HTTP surface.
 //
-// Every action is written once, as a handler over a Caller, and then mounted twice: at the versioned path a
-// phone app and the current web client use, and at the old PHP query-string paths so a browser running a cached
-// copy of the game keeps working through the changeover. The handlers are shared, so the two surfaces cannot
-// drift apart, and the legacy mount can be deleted one day without touching any logic.
+// Every action is written once, as a handler over a Caller, and mounted under the versioned prefix that both
+// the web client and a phone app ask for. Durable commands stay here even where the socket could carry them:
+// a request that changes gold should be something the client can retry and the server can answer once.
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { API_PREFIX, config } from './config.js';
 import { pool, tx } from './db.js';
@@ -255,45 +254,4 @@ export function registerRoutes(app: FastifyInstance): void {
   app.post(`${v1}/matches/:code/leave`, withCaller(H.leave));
   app.post(`${v1}/matches/:code/progress`, withCaller(H.progress));
   app.post(`${v1}/matches/:code/result`, withCaller(H.result));
-
-  // ── The old surface, kept alive for clients holding a cached copy of the game ──
-  //
-  // These are the exact paths and query strings the PHP service answered, returning the exact same shapes.
-  // Nothing new should be added here; it exists so the changeover is invisible, and it can be removed once the
-  // service worker has handed every player the new client.
-  const legacyAuth: Record<string, (req: Req, res: Res, me: Caller) => Promise<void>> = {
-    me: H.me, google: H.google, name: H.rename, logout: H.logout, delete: H.destroy,
-  };
-  const legacyMatch: Record<string, (req: Req, res: Res, me: Caller) => Promise<void>> = {
-    create: H.create, get: H.get, join: H.join, start: H.start,
-    cancel: H.leave, progress: H.progress, result: H.result, lobby: H.lobby,
-  };
-  // Which of them a GET may reach. The PHP service answered `post_only` with a 405 to everything else, and that
-  // 405 was not politeness: the session cookie is SameSite=Lax, which a browser still sends on a top-level
-  // cross-site GET, so `?a=delete` behind a link would have deleted the reader's account. Anything that changes
-  // something is POST-only here for exactly the same reason.
-  const legacyReads: Record<string, Set<string>> = {
-    auth: new Set(['me']),
-    match: new Set(['get', 'lobby']),
-  };
-
-  const legacy = (
-    surface: 'auth' | 'match',
-    table: Record<string, (req: Req, res: Res, me: Caller) => Promise<void>>,
-    fallback: string,
-  ) => async (req: Req, res: Res) => {
-    const a = String(((req.query ?? {}) as { a?: string }).a ?? fallback);
-    const fn = table[a];
-    if (!fn) { await noStore(res).code(404).send({ error: 'unknown_action' }); return; }
-    if (req.method !== 'POST' && !legacyReads[surface]!.has(a)) {
-      await noStore(res).code(405).send({ error: 'post_only' });
-      return;
-    }
-    await fn(req, res, await caller(req));
-  };
-
-  for (const method of ['get', 'post'] as const) {
-    app[method]('/games/api/auth.php', legacy('auth', legacyAuth, 'me'));
-    app[method]('/games/api/match.php', legacy('match', legacyMatch, 'get'));
-  }
 }

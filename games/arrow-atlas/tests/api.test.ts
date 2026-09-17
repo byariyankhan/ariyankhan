@@ -77,18 +77,6 @@ section('A bad stake is refused before any gold moves');
   eq(r.json.error, 'bad_stake', 'with the honest reason');
 }
 
-section('The old paths answer exactly as they used to');
-{
-  const mine = await call('/matches', { token: a.token, body: { stake: 500, open_to_all: false, tier: 2 } });
-  const code = ((mine.json.match as { code: string }).code);
-  const v1 = await call(`/matches/${code}`, { token: a.token });
-  const legacy = await call(`/games/api/match.php?a=get&code=${code}`, { token: a.token, base: BASE });
-  eq(legacy.status, v1.status, 'the legacy path returns the same status');
-  eq(JSON.stringify(legacy.json.match), JSON.stringify(v1.json.match), 'and byte for byte the same match');
-  const legacyMe = await call('/games/api/auth.php?a=me', { token: a.token, base: BASE });
-  eq(JSON.stringify(legacyMe.json), JSON.stringify((await call('/auth/me', { token: a.token })).json), 'and the same account');
-}
-
 section('A result sent twice is still one pot');
 {
   const made = await call('/matches', { token: a.token, body: { stake: 500, open_to_all: false, tier: 2 } });
@@ -174,35 +162,33 @@ section('A purse that cannot cover the stake is told so, not charged');
 
 section('A link cannot delete somebody\u2019s account');
 {
-  // Reported by a review bot on PR #82, and real: the legacy shim mounted every action for GET, so
-  // /games/api/auth.php?a=delete behind a cross-site link deleted the reader's account — the session cookie is
-  // SameSite=Lax, which a browser still sends on a top-level navigation. The PHP service answered 405 to any
-  // non-POST mutation, and so does this again.
+  // Reported by a review bot on PR #82, and it was real: the compatibility shim mounted every action for GET
+  // as well as POST, so /games/api/auth.php?a=delete behind a cross-site link deleted the reader's account —
+  // the session cookie is SameSite=Lax, which a browser still sends on a top-level navigation. The shim is
+  // gone now, and what replaces that 405 is stronger: on the versioned surface nothing that changes anything
+  // is registered for GET at all, so a link cannot reach it. This proves that rather than assuming it.
   const victim = await mint('apiVictim', 5_000);
-  const byLink = await call(`/games/api/auth.php?a=delete`, { cookie: `${config.auth.cookie}=${victim.token}`, base: BASE });
-  eq(byLink.status, 405, 'a GET to the delete action is refused');
-  eq(byLink.json.error, 'post_only', 'with the reason the old service gave');
+  const byLink = await call('/auth/delete', { cookie: `${config.auth.cookie}=${victim.token}` });
+  eq(byLink.status, 404, 'a GET to the delete route does not reach a handler');
   const still = await query<{ n: number }>(pool, 'SELECT COUNT(*)::int AS n FROM users WHERE id = $1', [victim.id]);
   eq(still.rows[0]!.n, 1, 'and the account is still there');
 
-  // every other mutation, the same way
-  for (const a of ['name', 'logout']) {
-    const r = await call(`/games/api/auth.php?a=${a}`, { cookie: `${config.auth.cookie}=${victim.token}`, base: BASE });
-    eq(r.status, 405, `a GET to ${a} is refused too`);
+  // every other route that changes something, the same way
+  for (const path of ['/auth/name', '/auth/logout', '/matches']) {
+    const r = await call(path, { cookie: `${config.auth.cookie}=${victim.token}` });
+    eq(r.status, 404, `a GET to ${path} does not reach a handler either`);
   }
-  for (const a of ['create', 'join', 'start', 'cancel', 'progress', 'result']) {
-    const r = await call(`/games/api/match.php?a=${a}&code=ZZZZZZ`, { cookie: `${config.auth.cookie}=${victim.token}`, base: BASE });
-    eq(r.status, 405, `a GET to match ${a} is refused`);
+  for (const verb of ['join', 'start', 'leave', 'progress', 'result']) {
+    const r = await call(`/matches/ZZZZZZ/${verb}`, { cookie: `${config.auth.cookie}=${victim.token}` });
+    eq(r.status, 404, `a GET to /matches/:code/${verb} does not reach a handler`);
   }
 
-  // and the reads a cached client actually needs still work over GET
-  const readMe = await call('/games/api/auth.php?a=me', { cookie: `${config.auth.cookie}=${victim.token}`, base: BASE });
-  eq(readMe.status, 200, 'but reading the account over GET still works');
-  const lobby = await call('/games/api/match.php?a=lobby', { base: BASE });
-  eq(lobby.status, 200, 'and so does the lobby');
+  // and the two reads the client actually does over GET still work
+  eq((await call('/auth/me', { cookie: `${config.auth.cookie}=${victim.token}` })).status, 200, 'reading the account over GET still works');
+  eq((await call('/lobby', {})).status, 200, 'and so does the lobby');
 
   // POST still deletes, which is what the dashboard does
-  const byPost = await call('/games/api/auth.php?a=delete', { cookie: `${config.auth.cookie}=${victim.token}`, base: BASE, body: {} });
+  const byPost = await call('/auth/delete', { cookie: `${config.auth.cookie}=${victim.token}`, body: {} });
   eq(byPost.status, 200, 'a POST from the dashboard still deletes the account');
   const gone = await query<{ n: number }>(pool, 'SELECT COUNT(*)::int AS n FROM users WHERE id = $1', [victim.id]);
   eq(gone.rows[0]!.n, 0, 'and it is really gone');
