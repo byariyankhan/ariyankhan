@@ -1086,11 +1086,30 @@
   const matchLink = code => `${location.origin}${location.pathname}#m=${code}`;
   const setGold = g => { if (auth.user && typeof g === 'number') auth.user.gold = g; renderAccountRow(); renderPurse(); };
 
+  // A player's face: the picture Google gave them, or their initial on a colour of their own. Two players whose
+  // names start with the same letter have to look different at a glance, or the line-up says nothing.
+  const FACE_COLOURS = 8;
+  const faceHue = name => { let h = 0; const n = name || '?'; for (let i = 0; i < n.length; i++) h = (h * 31 + n.charCodeAt(i)) >>> 0; return h % FACE_COLOURS; };
+  const initial = name => escapeHtml((name || '?').trim().charAt(0).toUpperCase() || '?');
+  // the picture comes from what the server stored, and the server only ever stores one on Google's own host
+  const faceInner = p => (p && p.pic)
+    ? `<img class="aa-face-img" src="${escapeHtml(p.pic)}" alt="" referrerpolicy="no-referrer" loading="lazy"><span class="aa-face-let" aria-hidden="true">${initial(p.name)}</span>`
+    : `<span class="aa-face-let" aria-hidden="true">${initial(p && p.name)}</span>`;
+  const faceClass = p => ` is-c${faceHue(p && p.name)}${p && p.pic ? ' has-pic' : ''}`;
+  // a picture that will not load (Google links do expire) drops back to the letter underneath it
+  function wireFaces(root) {
+    $$('.aa-face-img', root || document).forEach(img => {
+      if (img.dataset.wired) return;
+      img.dataset.wired = '1';
+      img.addEventListener('error', () => { img.closest('.aa-rank, .aa-me-face')?.classList.remove('has-pic'); img.remove(); });
+    });
+  }
+
   // the player's own strip, kept at the top of every match screen
   function meStrip() {
     const u = auth.user;
     if (!u) return '';
-    return `<div class="aa-me"><span class="aa-me-face" aria-hidden="true">${escapeHtml((u.name || '?').trim().charAt(0).toUpperCase() || '?')}</span><span><span class="aa-me-name">${escapeHtml(u.name || 'Player')}</span><br><span class="aa-me-sub">Signed in with ${escapeHtml((u.provider || 'google').replace(/^./, c => c.toUpperCase()))}</span></span><span class="aa-gold" title="Your gold"><span aria-hidden="true">🪙</span>${gfmt(u.gold)}</span></div>`;
+    return `<div class="aa-me"><span class="aa-me-face${faceClass(u)}">${faceInner(u)}</span><span><span class="aa-me-name">${escapeHtml(u.name || 'Player')}</span><br><span class="aa-me-sub">Signed in with ${escapeHtml((u.provider || 'google').replace(/^./, c => c.toUpperCase()))}</span></span><span class="aa-gold" title="Your gold"><span aria-hidden="true">🪙</span>${gfmt(u.gold)}</span></div>`;
   }
 
   // On means the room takes whoever else is online at that stake and starts itself; off means only the people
@@ -1106,6 +1125,7 @@
       </div>
       <label class="aa-fill"><input type="checkbox" id="aaFillOnline"${fill ? ' checked' : ''}><span>Fill from online</span></label>`;
     openSheet(el.matchSheet);
+    wireFaces(el.matchBody);
     refreshLobby();
   }
   // How many are sitting in a room at each stake. Shown under the coins so nobody waits at an empty one.
@@ -1123,7 +1143,7 @@
 
   // The room, on the game screen: who is in, an Invite button, and Start for the host. The board is not dealt
   // until the host starts, so nobody can study it while the room fills up.
-  const faces = players => (players || []).map(p => `<span class="aa-rank${p.you ? ' is-you' : ''}" title="${escapeHtml(p.name)}"><span aria-hidden="true">${escapeHtml((p.name || '?').trim().charAt(0).toUpperCase() || '?')}</span></span>`).join('');
+  const faces = players => (players || []).map(p => `<span class="aa-rank${p.you ? ' is-you' : ''}${faceClass(p)}" title="${escapeHtml(p.name)}">${faceInner(p)}</span>`).join('');
   function showRoom(m) {
     state.pendingMatch = m;
     closeSheets();
@@ -1153,6 +1173,7 @@
         ${host ? '<button type="button" class="aa-btn" data-act="mcancel">Cancel</button>' : ''}
       </div>
       <p class="aa-flash" hidden></p>`;
+    wireFaces(el.card);
   }
   // Forty seconds from the second player sitting down, or the moment the seventh does. Between polls the clock
   // is counted down here so it does not tick in twos.
@@ -1247,8 +1268,9 @@
   function renderRanks(players) {
     if (!el.ranks) return;
     if (!players?.length) { el.ranks.hidden = true; return; }
-    el.ranks.innerHTML = players.map(p => `<span class="aa-rank${p.you ? ' is-you' : ''}${p.won ? ' is-won' : ''}${p.ms === -1 ? ' is-out' : ''}" title="${escapeHtml(p.name)}"><span aria-hidden="true">${escapeHtml((p.name || '?').trim().charAt(0).toUpperCase() || '?')}</span><span class="aa-rank-no">${p.place}</span></span>`).join('');
+    el.ranks.innerHTML = players.map(p => `<span class="aa-rank${p.you ? ' is-you' : ''}${p.won ? ' is-won' : ''}${p.ms === -1 ? ' is-out' : ''}${faceClass(p)}" title="${escapeHtml(p.name)}">${faceInner(p)}<span class="aa-rank-no">${p.place}</span></span>`).join('');
     el.ranks.setAttribute('aria-label', players.map(p => `${p.place}. ${p.name}`).join(', '));
+    wireFaces(el.ranks);
     el.ranks.hidden = false;
   }
   function startProgressPoll() {

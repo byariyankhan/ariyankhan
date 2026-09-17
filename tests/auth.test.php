@@ -17,10 +17,11 @@ $CLIENT = '83384024830-f7bt8g5amgo21e6pmonr4ssjrq02vhg4.apps.googleusercontent.c
 $fake = function (array $claims): callable {
     return fn(string $t) => json_encode($claims);
 };
-$good = ['aud' => $CLIENT, 'iss' => 'https://accounts.google.com', 'exp' => time() + 3600, 'sub' => '1122334455', 'name' => 'Ariyan Khan', 'email_verified' => true];
+$PIC = 'https://lh3.googleusercontent.com/a/ACg8ocK_example=s96-c';
+$good = ['aud' => $CLIENT, 'iss' => 'https://accounts.google.com', 'exp' => time() + 3600, 'sub' => '1122334455', 'name' => 'Ariyan Khan', 'picture' => $PIC, 'email_verified' => true];
 
 echo "Google ID tokens\n";
-ok(aa_google_verify('tok', $CLIENT, $fake($good)) === ['sub' => '1122334455', 'name' => 'Ariyan Khan'], 'a valid token gives the id and the name');
+ok(aa_google_verify('tok', $CLIENT, $fake($good)) === ['sub' => '1122334455', 'name' => 'Ariyan Khan', 'pic' => $PIC], 'a valid token gives the id, the name and the picture');
 ok(aa_google_verify('tok', $CLIENT, $fake(['iss' => 'accounts.google.com'] + $good)) !== null, 'the issuer without a scheme is accepted too');
 ok(aa_google_verify('tok', $CLIENT, $fake(['aud' => 'someone-else.apps.googleusercontent.com'] + $good)) === null, 'a token for another site is refused');
 ok(aa_google_verify('tok', $CLIENT, $fake(['iss' => 'https://evil.example'] + $good)) === null, 'a token from another issuer is refused');
@@ -32,6 +33,18 @@ ok(aa_google_verify('tok', $CLIENT, fn($t) => null) === null, 'no answer at all 
 ok(aa_google_verify('', $CLIENT, $fake($good)) === null, 'an empty token is refused');
 ok(aa_google_verify(str_repeat('x', 5000), $CLIENT, $fake($good)) === null, 'an absurdly long token is refused without asking Google');
 ok(aa_google_verify('tok', '', $fake($good)) === null, 'nothing is accepted when no client id is configured');
+
+echo "\nThe profile picture is only ever Google's own\n";
+ok(aa_pic($PIC) === $PIC, 'a googleusercontent.com picture is kept');
+ok(aa_pic('https://lh6.googleusercontent.com/x') === 'https://lh6.googleusercontent.com/x', 'any of their picture hosts is kept');
+ok(aa_pic('https://evil.example/tracker.gif') === '', 'an image from anywhere else is dropped');
+ok(aa_pic('https://googleusercontent.com.evil.example/x') === '', 'and so is a host that only looks like theirs');
+ok(aa_pic('http://lh3.googleusercontent.com/x') === '', 'plain http is dropped');
+ok(aa_pic('javascript:alert(1)') === '' && aa_pic('data:image/png;base64,AAAA') === '', 'a script or data url is never a picture');
+ok(aa_pic('https://lh3.googleusercontent.com/' . str_repeat('x', 600)) === '', 'an absurdly long url is dropped');
+ok(aa_pic('') === '', 'no picture at all is no picture');
+ok(aa_google_verify('tok', $CLIENT, $fake(['picture' => 'https://evil.example/x.png'] + $good))['pic'] === '', 'a token cannot smuggle an image in from elsewhere');
+ok(aa_google_verify('tok', $CLIENT, $fake(array_diff_key($good, ['picture' => 1])))['pic'] === '', 'a Google account with no picture is fine');
 ok(aa_google_verify('tok', $CLIENT, $fake(['name' => "  Ariyan\tKhan  "] + $good))['name'] === 'Ariyan Khan', 'stray spaces and tabs are cleaned out of the name');
 ok(!str_contains(aa_google_verify('tok', $CLIENT, $fake(['name' => 'Ari~yan'] + $good))['name'], '~'), 'the tilde that separates fields in a challenge link cannot get into a name');
 ok(mb_strlen(aa_google_verify('tok', $CLIENT, $fake(['name' => str_repeat('অ', 80)] + $good))['name']) === 24, 'a very long name is cut to 24 characters');
@@ -46,6 +59,12 @@ ok(aa_upsert_user($db, 'google', 'sub-2', 'Someone') !== $id, 'a different Googl
 ok((int)$db->query('SELECT COUNT(*) FROM users')->fetchColumn() === 2, 'two accounts exist');
 $cols = array_column($db->query('PRAGMA table_info(users)')->fetchAll(), 'name');
 ok(!in_array('email', $cols, true) && !in_array('password', $cols, true), 'no email and no password column exists at all');
+$pic = fn(int $u) => (string)$db->query('SELECT pic FROM users WHERE id = ' . $u)->fetchColumn();
+$withPic = aa_upsert_user($db, 'google', 'sub-pic', 'Rahim', $x, $PIC);
+ok($pic($withPic) === $PIC, 'the picture from the token is stored with the account');
+ok($pic($id) === '', 'an account that signed in without one has none');
+aa_upsert_user($db, 'google', 'sub-pic', 'Rahim', $x, 'https://lh3.googleusercontent.com/new');
+ok($pic($withPic) === 'https://lh3.googleusercontent.com/new', 'and it follows the Google account on the next sign-in');
 
 echo "\nWelcome gold\n";
 $gold = fn(int $u) => (int)$db->query("SELECT gold FROM users WHERE id = $u")->fetchColumn();

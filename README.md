@@ -749,6 +749,17 @@ unlock (skip allowed after two fails), stars, best times and progress in
   upwards (`renderRanks`, polled every 2 s). `match_players` is a row per player,
   so three to seven in a room needs no new shape; `aa_migrate_matches` moved the
   first two-seat version over and refunded anything unfinished.
+  **Faces** (`faceInner`, `faceClass`, `wireFaces`): a player is their Google
+  profile picture where there is one, and their initial on one of eight colours
+  picked from a hash of their name where there is not — two players called Ariyan
+  and Anik cannot both be a grey A, or the line-up over the board says nothing.
+  The picture is stored as a URL only, never copied to us, and `aa_pic` keeps it
+  **only when the host is googleusercontent.com over https**, so a token cannot
+  talk the game into displaying an image from anywhere else; `img-src` on the
+  game page allows that host and no other new one. Google links do expire, so a
+  picture that fails to load removes itself and the letter underneath shows
+  through. The picture follows the Google account on every sign-in, while the
+  name stays the player's to change.
   The lobby chip (top left, where the daily streak used to be) is the **purse**:
   `renderPurse` fills it from `authLoad` on the first paint and from every
   `setGold`, and it is hidden when nobody is signed in.
@@ -767,7 +778,7 @@ unlock (skip allowed after two fails), stars, best times and progress in
   counts up from the old balance, pops, and the coins rain over the whole page
   (`goldRain` lifts the canvas out of the hidden board and on to `document.body`
   for the duration).
-  `tests/match.test.php` (91 checks) covers the stakes, the room rules, a room of
+  `tests/match.test.php` (93 checks) covers the stakes, the room rules, a room of
   seven, the finish-order rule against a shorter clock, the instant payout and
   that it never pays twice, that second place wins a place and no gold, that a 500
   room of beginners gets an easy board while a 7,000 room of strong players gets a

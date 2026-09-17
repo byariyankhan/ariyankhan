@@ -15,7 +15,7 @@ try {
 }
 $providers = aa_providers();
 $me = aa_current_user($db);
-$shape = fn(?array $u) => $u ? ['id' => (int)$u['id'], 'name' => (string)$u['name'], 'provider' => (string)$u['provider'], 'gold' => (int)($u['gold'] ?? 0)] : null;
+$shape = fn(?array $u) => $u ? ['id' => (int)$u['id'], 'name' => (string)$u['name'], 'provider' => (string)$u['provider'], 'pic' => (string)($u['pic'] ?? ''), 'gold' => (int)($u['gold'] ?? 0)] : null;
 
 if ($action === 'me') {
     aa_json(['user' => $shape($me), 'providers' => ['google' => $providers['google'] ?? null]]);
@@ -28,9 +28,9 @@ if ($action === 'google') {
     $token = (string)(aa_body()['credential'] ?? '');
     $claims = aa_google_verify($token, $clientId);
     if (!$claims) aa_json(['error' => 'bad_token'], 401);
-    $id = aa_upsert_user($db, 'google', $claims['sub'], $claims['name'], $created);
+    $id = aa_upsert_user($db, 'google', $claims['sub'], $claims['name'], $created, $claims['pic']);
     aa_start_session($db, $id);
-    $st = $db->prepare('SELECT id, name, provider, gold FROM users WHERE id = ?');
+    $st = $db->prepare('SELECT id, name, provider, pic, gold FROM users WHERE id = ?');
     $st->execute([$id]);
     aa_json(['user' => $shape($st->fetch() ?: null), 'gold_granted' => $created ? AA_SIGNUP_GOLD : 0]);
 }
@@ -41,7 +41,7 @@ if ($action === 'name') {
     $name = aa_name((string)(aa_body()['name'] ?? ''));
     if ($name === '') aa_json(['error' => 'empty_name'], 400);
     $db->prepare('UPDATE users SET name = ? WHERE id = ?')->execute([$name, $me['id']]);
-    aa_json(['user' => $shape(['id' => $me['id'], 'name' => $name, 'provider' => $me['provider'], 'gold' => $me['gold']])]);
+    aa_json(['user' => $shape(['id' => $me['id'], 'name' => $name, 'provider' => $me['provider'], 'pic' => $me['pic'], 'gold' => $me['gold']])]);
 }
 
 if ($action === 'logout') {
