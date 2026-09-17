@@ -1,0 +1,125 @@
+# Build, test and publish arrow-atlas-api.
+#
+# The tests run against a real PostgreSQL and a real Redis rather than stand-ins, because everything worth
+# testing here is about transactions and expiry. The image is published to GitHub's own registry, which needs
+# no credential beyond the token every workflow already has, and the VPS pulls it from there: a deploy becomes
+# `docker compose pull && up -d` rather than a build on the server.
+name: Arrow Atlas API
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'games/arrow-atlas/**'
+      - 'games/data/arrow-atlas.json'
+      - '.github/workflows/arrow-atlas-api.yml'
+  pull_request:
+    paths:
+      - 'games/arrow-atlas/**'
+      - '.github/workflows/arrow-atlas-api.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: arrow_atlas
+          POSTGRES_USER: arrow_atlas
+          POSTGRES_PASSWORD: ci-not-a-secret
+        options: >-
+          --health-cmd "pg_isready -U arrow_atlas -d arrow_atlas"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+        ports: ['5432:5432']
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 5s --health-retries 10
+        ports: ['6379:6379']
+    env:
+      ARROW_ATLAS_PG_HOST: 127.0.0.1
+      ARROW_ATLAS_PG_PORT: '5432'
+      ARROW_ATLAS_PG_DATABASE: arrow_atlas
+      ARROW_ATLAS_PG_USER: arrow_atlas
+      ARROW_ATLAS_PG_PASSWORD: ci-not-a-secret
+      ARROW_ATLAS_REDIS_HOST: 127.0.0.1
+      ARROW_ATLAS_REDIS_PORT: '6379'
+      ARROW_ATLAS_COOKIE_SECURE: 'false'
+      ARROW_ATLAS_LOG_LEVEL: warn
+      ARROW_ATLAS_BOARDS_FILE: ${{ github.workspace }}/games/data/arrow-atlas.json
+      NODE_ENV: development
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: games/arrow-atlas/backend/package-lock.json
+
+      - name: Install
+        working-directory: games/arrow-atlas/backend
+        run: npm ci --no-audit --no-fund
+
+      - name: Typecheck
+        working-directory: games/arrow-atlas/backend
+        run: npm run typecheck
+
+      - name: Migrate
+        working-directory: games/arrow-atlas/backend
+        run: npx tsx src/migrate.ts
+
+      - name: Rules and economy
+        working-directory: games/arrow-atlas/backend
+        run: npx tsx ../tests/economy.test.ts
+
+      - name: Existing-data migration
+        working-directory: games/arrow-atlas/backend
+        run: npx tsx ../tests/migration.test.ts
+
+      - name: Start the API
+        working-directory: games/arrow-atlas/backend
+        run: |
+          npx tsx src/server.ts & echo $! > /tmp/api.pid
+          for i in $(seq 1 40); do curl -sf http://127.0.0.1:8760/health/live && break; sleep 0.5; done
+
+      - name: HTTP surface
+        working-directory: games/arrow-atlas/backend
+        run: npx tsx ../tests/api.test.ts
+
+      - name: Live socket
+        working-directory: games/arrow-atlas/backend
+        run: npx tsx ../tests/ws.test.ts
+
+      - name: Stop the API
+        if: always()
+        run: kill "$(cat /tmp/api.pid)" 2>/dev/null || true
+
+  publish:
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          # The repository root: the Dockerfile copies the board list from games/data as well as the backend.
+          context: .
+          file: games/arrow-atlas/backend/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/arrow-atlas-api:main
+            ghcr.io/${{ github.repository_owner }}/arrow-atlas-api:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

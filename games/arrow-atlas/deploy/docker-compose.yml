@@ -1,0 +1,146 @@
+# Arrow Atlas, as its own Docker project.
+#
+# Nothing here is shared with anything else on the box: its own network, its own volumes, its own database and
+# credentials, its own backup schedule, its own logs. A second game gets its own copy of this file with its own
+# names, and the two cannot reach each other. Moving Arrow Atlas to a VPS of its own is this file, the image,
+# and a restored dump — see ../README.md.
+#
+#   docker compose -p arrow-atlas --env-file .env up -d
+#
+# Reachability, deliberately:
+#   * arrow-atlas-postgres and arrow-atlas-redis sit on an internal network. They publish no ports, and that
+#     network has no route out, so they are unreachable from the internet and cannot themselves call out.
+#   * arrow-atlas-api sits on both networks: the internal one to reach its data, the edge one for Google's
+#     token endpoint. It publishes to 127.0.0.1 only, so the host nginx is the single way in.
+name: arrow-atlas
+
+services:
+  arrow-atlas-postgres:
+    image: postgres:16-alpine
+    container_name: arrow-atlas-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${ARROW_ATLAS_PG_DATABASE:-arrow_atlas}
+      POSTGRES_USER: ${ARROW_ATLAS_PG_USER:-arrow_atlas}
+      POSTGRES_PASSWORD: ${ARROW_ATLAS_PG_PASSWORD:?set ARROW_ATLAS_PG_PASSWORD in .env}
+      POSTGRES_INITDB_ARGS: "--data-checksums"
+      TZ: UTC
+    volumes:
+      - arrow-atlas-postgres-data:/var/lib/postgresql/data
+    networks: [arrow-atlas-data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB} -q"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+    stop_grace_period: 30s
+    logging: { driver: json-file, options: { max-size: "10m", max-file: "5" } }
+
+  arrow-atlas-redis:
+    image: redis:7-alpine
+    container_name: arrow-atlas-redis
+    restart: unless-stopped
+    # Ephemeral by design, but appendonly keeps a restart from dropping presence mid-match for no reason.
+    command: >
+      redis-server
+      --requirepass ${ARROW_ATLAS_REDIS_PASSWORD:?set ARROW_ATLAS_REDIS_PASSWORD in .env}
+      --appendonly yes
+      --maxmemory ${ARROW_ATLAS_REDIS_MAXMEMORY:-256mb}
+      --maxmemory-policy allkeys-lru
+    volumes:
+      - arrow-atlas-redis-data:/data
+    networks: [arrow-atlas-data]
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
+    environment:
+      REDIS_PASSWORD: ${ARROW_ATLAS_REDIS_PASSWORD}
+    stop_grace_period: 15s
+    logging: { driver: json-file, options: { max-size: "10m", max-file: "3" } }
+
+  arrow-atlas-api:
+    # Built and published by .github/workflows/arrow-atlas-api.yml. To build it here instead (a new VPS, or a
+    # change you have not pushed yet), comment out `image:` and uncomment `build:`.
+    image: ${ARROW_ATLAS_IMAGE:-ghcr.io/byariyankhan/arrow-atlas-api:main}
+    # build:
+    #   context: ../../..
+    #   dockerfile: games/arrow-atlas/backend/Dockerfile
+    container_name: arrow-atlas-api
+    restart: unless-stopped
+    depends_on:
+      arrow-atlas-postgres: { condition: service_healthy }
+      arrow-atlas-redis: { condition: service_healthy }
+    environment:
+      NODE_ENV: production
+      PORT: 8760
+      ARROW_ATLAS_VERSION: ${ARROW_ATLAS_VERSION:-main}
+      ARROW_ATLAS_PG_HOST: arrow-atlas-postgres
+      ARROW_ATLAS_PG_DATABASE: ${ARROW_ATLAS_PG_DATABASE:-arrow_atlas}
+      ARROW_ATLAS_PG_USER: ${ARROW_ATLAS_PG_USER:-arrow_atlas}
+      ARROW_ATLAS_PG_PASSWORD: ${ARROW_ATLAS_PG_PASSWORD}
+      ARROW_ATLAS_REDIS_HOST: arrow-atlas-redis
+      ARROW_ATLAS_REDIS_PASSWORD: ${ARROW_ATLAS_REDIS_PASSWORD}
+      ARROW_ATLAS_REDIS_PREFIX: ${ARROW_ATLAS_REDIS_PREFIX:-arrow-atlas:}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      ARROW_ATLAS_ALLOWED_ORIGINS: ${ARROW_ATLAS_ALLOWED_ORIGINS:-}
+      ARROW_ATLAS_COOKIE_SECURE: ${ARROW_ATLAS_COOKIE_SECURE:-true}
+      ARROW_ATLAS_LOG_LEVEL: ${ARROW_ATLAS_LOG_LEVEL:-info}
+    ports:
+      # 127.0.0.1 only: the host nginx terminates TLS and is the single way in from outside.
+      - "127.0.0.1:${ARROW_ATLAS_PORT:-8760}:8760"
+    networks: [arrow-atlas-data, arrow-atlas-edge]
+    stop_grace_period: 30s
+    logging: { driver: json-file, options: { max-size: "20m", max-file: "5" } }
+
+  arrow-atlas-backup:
+    image: postgres:16-alpine
+    container_name: arrow-atlas-backup
+    restart: unless-stopped
+    depends_on:
+      arrow-atlas-postgres: { condition: service_healthy }
+    environment:
+      PGHOST: arrow-atlas-postgres
+      PGDATABASE: ${ARROW_ATLAS_PG_DATABASE:-arrow_atlas}
+      PGUSER: ${ARROW_ATLAS_PG_USER:-arrow_atlas}
+      PGPASSWORD: ${ARROW_ATLAS_PG_PASSWORD}
+      ARROW_ATLAS_BACKUP_DIR: /backups
+      ARROW_ATLAS_BACKUP_KEEP_DAYS: ${ARROW_ATLAS_BACKUP_KEEP_DAYS:-14}
+      ARROW_ATLAS_BACKUP_AT_HOUR: ${ARROW_ATLAS_BACKUP_AT_HOUR:-3}
+    volumes:
+      - ./backup.sh:/usr/local/bin/arrow-atlas-backup:ro
+      - ./restore.sh:/usr/local/bin/arrow-atlas-restore:ro
+      # A named volume so the dumps never sit in the live PostgreSQL data directory, plus a bind mount so the
+      # host (and whatever backs the host up) can see them without entering the container.
+      - arrow-atlas-backups:/backups
+      - ${ARROW_ATLAS_BACKUP_HOST_DIR:-/var/backups/arrow-atlas}:/backups-host
+    networks: [arrow-atlas-data]
+    entrypoint: ["/bin/sh", "-c", "exec /usr/local/bin/arrow-atlas-backup loop"]
+    healthcheck:
+      # Unhealthy when the newest dump is older than a day and a bit: a backup that quietly stopped is the
+      # failure this whole service exists to prevent.
+      test: ["CMD-SHELL", "find /backups -name 'arrow-atlas-*.dump' -mtime -1 | grep -q . || exit 1"]
+      interval: 1h
+      timeout: 10s
+      retries: 2
+      start_period: 5m
+    logging: { driver: json-file, options: { max-size: "10m", max-file: "3" } }
+
+networks:
+  # No route to or from the internet: only the containers attached to it can talk to each other.
+  arrow-atlas-data:
+    name: arrow-atlas-data
+    internal: true
+  arrow-atlas-edge:
+    name: arrow-atlas-edge
+
+volumes:
+  arrow-atlas-postgres-data:
+    name: arrow-atlas-postgres-data
+  arrow-atlas-redis-data:
+    name: arrow-atlas-redis-data
+  arrow-atlas-backups:
+    name: arrow-atlas-backups

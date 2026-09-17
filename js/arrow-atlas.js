@@ -18,6 +18,16 @@
   const MAP_VERSION = '3';
   const DISCB_VERSION = '2';  // games/data/discover-boards.json: the board shaped like each country's animal, bird or landmark
   const STORE = 'aa:v1:';
+
+  // ── Where the backend lives ──
+  // Arrow Atlas talks to its own service, which today answers on this origin and one day may answer on
+  // api.arrowatlas.com. Nothing below hardcodes a host: the bases come from a meta tag if the page sets one,
+  // so moving the backend is a deploy change and not a client rewrite.
+  const metaBase = n => document.querySelector(`meta[name="${n}"]`)?.content?.trim() || '';
+  const API_BASE = (metaBase('arrow-atlas-api') || location.origin).replace(/\/$/, '');
+  const WS_BASE = (metaBase('arrow-atlas-ws') || API_BASE.replace(/^http/, 'ws')).replace(/\/$/, '');
+  const API_V1 = `${API_BASE}/api/arrow-atlas/v1`;
+  const WS_URL = `${WS_BASE}/ws/arrow-atlas`;
   const store = {
     get(k, fb) { try { const v = localStorage.getItem(STORE + k); return v == null ? fb : JSON.parse(v); } catch { return fb; } },
     set(k, v) { try { localStorage.setItem(STORE + k, JSON.stringify(v)); } catch { /* ignore */ } },
@@ -1007,6 +1017,7 @@
 
   function goToLevels() {
     stopTimer(); stopMatchPoll(); stopProgressPoll();
+    live.close();   // back in the lobby: there is no room to watch, so let the socket go
     if (el.ranks) el.ranks.hidden = true; el.game.hidden = true; el.overlay.hidden = true; el.select.hidden = false; setHash(-1); renderSelect();
   }
   async function share() {
@@ -1027,8 +1038,12 @@
   // the provider's opaque user id and the display name, nothing else, and the account can be deleted from the
   // dashboard. Signed out, the button opens the sign-in sheet; signed in, it opens the dashboard.
   const auth = { user: null, providers: {}, ready: false };
+  // me is a read; everything else changes something and is posted. The paths are the versioned ones, so a
+  // later backend can add a v2 without this client noticing.
+  const AUTH_PATH = { me: '/auth/me', google: '/auth/google', name: '/auth/name', logout: '/auth/logout', delete: '/auth/delete' };
   function authApi(a, body) {
-    return fetch(`games/api/auth.php?a=${a}`, { method: body ? 'POST' : 'GET', credentials: 'same-origin', cache: 'no-store', headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined })
+    const method = a === 'me' ? 'GET' : 'POST';
+    return fetch(`${API_V1}${AUTH_PATH[a] || '/auth/me'}`, { method, credentials: 'include', cache: 'no-store', headers: method === 'POST' ? { 'Content-Type': 'application/json' } : {}, body: method === 'POST' ? JSON.stringify(body || {}) : undefined })
       .then(async r => { const d = await r.json().catch(() => ({})); if (!r.ok) throw Object.assign(new Error(d.error || `HTTP ${r.status}`), { code: d.error }); return d; });
   }
   async function authLoad(force) {
@@ -1097,8 +1112,86 @@
   // A purse holds anything from nothing to a number with a dozen digits in it, so the badge is not a fixed box:
   // the longer the number, the smaller the type, and it never spills over the name beside it or off the page.
   const goldFit = v => { const w = gfmt(v).length; return w > 12 ? ' is-vast' : w > 9 ? ' is-big' : ''; };
-  const matchApi = (a, body, query = '') => fetch(`games/api/match.php?a=${a}${query}`, { method: body ? 'POST' : 'GET', credentials: 'same-origin', cache: 'no-store', headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined })
-    .then(async r => { const d = await r.json().catch(() => ({})); if (!r.ok) throw Object.assign(new Error(d.error || `HTTP ${r.status}`), { code: d.error, gold: d.gold }); return d; });
+  // The old service took an action in the query string; the new one has a path per action. The call sites keep
+  // the shape they had — matchApi('join', { code }) — and this turns it into the right request.
+  function matchUrl(a, body, query) {
+    const code = String(body?.code || new URLSearchParams(query.replace(/^&/, '')).get('code') || '').toUpperCase();
+    switch (a) {
+      case 'lobby':    return { url: `${API_V1}/lobby`, method: 'GET' };
+      case 'get':      return { url: `${API_V1}/matches/${encodeURIComponent(code)}`, method: 'GET' };
+      case 'create':   return { url: `${API_V1}/matches`, method: 'POST' };
+      case 'cancel':   return { url: `${API_V1}/matches/${encodeURIComponent(code)}/leave`, method: 'POST' };
+      default:         return { url: `${API_V1}/matches/${encodeURIComponent(code)}/${a}`, method: 'POST' };
+    }
+  }
+  const matchApi = (a, body, query = '') => {
+    const { url, method } = matchUrl(a, body, query);
+    return fetch(url, { method, credentials: 'include', cache: 'no-store', headers: method === 'POST' ? { 'Content-Type': 'application/json' } : {}, body: method === 'POST' ? JSON.stringify(body || {}) : undefined })
+      .then(async r => { const d = await r.json().catch(() => ({})); if (!r.ok) throw Object.assign(new Error(d.error || `HTTP ${r.status}`), { code: d.error, gold: d.gold }); return d; });
+  };
+  // ── The live socket ──
+  //
+  // One socket, opened when there is a room to watch and closed when there is not. Everything it carries is
+  // something the server decided: who joined, how far along everyone is, the countdown, the start, the finish.
+  // Nothing about gold travels over it — a stake, a result and a payout are REST calls, because those have to
+  // survive a dropped connection and be safe to send twice.
+  //
+  // It is a speed-up, never a dependency. If the socket cannot open, or drops and cannot get back, the game
+  // falls back to asking over REST on the timer it always used, and the player notices nothing but latency.
+  const live = {
+    ws: null, code: null, tries: 0, retry: 0, onEvent: null, onTune: null,
+    get connected() { return this.ws && this.ws.readyState === 1; },
+
+    watch(code, onEvent) {
+      this.code = code; this.onEvent = onEvent;
+      if (this.connected) { this.send({ type: 'watch', code }); return; }
+      this.open();
+    },
+
+    open() {
+      if (this.ws && (this.ws.readyState === 0 || this.ws.readyState === 1)) return;
+      if (!auth.user) return;                       // the socket is for people playing together; it needs a session
+      let ws;
+      try { ws = new WebSocket(WS_URL); } catch { this.fallback(); return; }
+      this.ws = ws;
+      ws.onopen = () => {
+        this.tries = 0;
+        if (this.code) this.send({ type: 'watch', code: this.code });
+        this.onTune?.();
+      };
+      ws.onmessage = e => {
+        let ev; try { ev = JSON.parse(e.data); } catch { return; }
+        if (ev.type === 'hello') return;
+        this.onEvent?.(ev);
+      };
+      ws.onclose = () => { this.ws = null; this.onTune?.(); this.fallback(); };
+      ws.onerror = () => { /* onclose follows, and does the work */ };
+    },
+
+    // Back off and try again, but only while there is still something to watch, and give up after a few goes:
+    // a player on a network that blocks WebSockets should not spend their match reconnecting.
+    fallback() {
+      clearTimeout(this.retry);
+      if (!this.code || this.tries >= 4) return;
+      const wait = Math.min(8000, 500 * 2 ** this.tries++);
+      this.retry = setTimeout(() => this.open(), wait);
+    },
+
+    send(o) { if (this.connected) { try { this.ws.send(JSON.stringify(o)); } catch { /* the close handler tidies up */ } } },
+    progress(pct) { this.send({ type: 'progress', pct }); },
+    resync() { this.send({ type: 'resync' }); },
+
+    close() {
+      clearTimeout(this.retry);
+      this.code = null; this.onEvent = null; this.tries = 0;
+      const ws = this.ws; this.ws = null;
+      if (ws) { try { ws.close(); } catch { /* already gone */ } }
+    },
+  };
+  // While the socket is healthy the REST poll drops to a slow safety net; without it, it carries the game.
+  const POLL_LIVE_MS = 15000, POLL_REST_MS = 2000;
+  const pollEvery = () => (live.connected ? POLL_LIVE_MS : POLL_REST_MS);
+
   const matchLink = code => `${location.origin}${location.pathname}#m=${code}`;
   const setGold = g => { if (auth.user && typeof g === 'number') auth.user.gold = g; renderAccountRow(); renderPurse(); };
 
@@ -1215,7 +1308,8 @@
   }
   function startRoomPoll(code) {
     stopMatchPoll();
-    state.matchPoll = setInterval(async () => {
+    state.pollCode = code;
+    const refresh = async () => {
       try {
         const d = await matchApi('get', null, '&code=' + encodeURIComponent(code));
         if (typeof d.gold === 'number') setGold(d.gold);
@@ -1240,9 +1334,32 @@
         }
         else { stopMatchPoll(); toast(m.state === 'void' ? 'That match was called off.' : 'That match is over.', 'hint'); goToLevels(); }
       } catch { /* a dropped poll is nothing: the next one will do */ }
-    }, 2000);
+    };
+    // The poll period follows the socket: a slow safety net while it is up, the old two seconds when it is not.
+    const tune = () => {
+      if (!state.pollCode) return;
+      clearInterval(state.matchPoll);
+      state.matchPoll = setInterval(refresh, pollEvery());
+    };
+    live.onTune = tune;
+    live.watch(code, ev => {
+      if (ev.type === 'countdown_tick') {
+        // the countdown belongs to the server: stop counting locally and show the number it sent, so every
+        // player in the room sees the same one and a backgrounded tab cannot drift
+        clearInterval(state.fillTick); state.fillTick = 0;
+        const n = $('#aaFillIn', el.card);
+        if (n) n.textContent = Math.max(0, Number(ev.data?.fills_in ?? 0));
+        return;
+      }
+      refresh();   // somebody joined, left, or the match began: ask for the truth rather than patching a guess
+    });
+    state.matchPoll = setInterval(refresh, pollEvery());
   }
-  function stopMatchPoll() { clearInterval(state.matchPoll); state.matchPoll = 0; clearInterval(state.fillTick); state.fillTick = 0; }
+  function stopMatchPoll() {
+    clearInterval(state.matchPoll); state.matchPoll = 0;
+    clearInterval(state.fillTick); state.fillTick = 0;
+    state.pollCode = null; live.onTune = null;
+  }
   async function startMatch() {
     const m = state.pendingMatch;
     if (!m) return;
@@ -1311,21 +1428,44 @@
     stopProgressPoll();
     const R = state.daily;
     if (!R?.match) return;
+    const myPct = () => (state.pieces.length ? Math.round(((state.pieces.length - state.left) / state.pieces.length) * 100) : 0);
+    const notePot = m => {
+      if (m?.winner && !state.potGone && !state.finished) {   // the pot is gone; the places behind it are not
+        state.potGone = true;
+        SFX.taken(); toast(`${m.winner} cleared it first. Play on for second place.`);
+      }
+    };
+    // The REST call is what carries the race while there is no socket, and stays on as a slow safety net when
+    // there is one: it is also how the ranks come back, which is what the board beside the map is drawn from.
     const send = async () => {
       try {
-        const pct = state.pieces.length ? Math.round(((state.pieces.length - state.left) / state.pieces.length) * 100) : 0;
-        const d = await matchApi('progress', { code: R.match.code, pct });
+        const d = await matchApi('progress', { code: R.match.code, pct: myPct() });
         renderRanks(d.match.players);
-        if (d.match.winner && !state.potGone && !state.finished) {   // the pot is gone; the places behind it are not
-          state.potGone = true;
-          SFX.taken(); toast(`${d.match.winner} cleared it first. Play on for second place.`);
-        }
+        notePot(d.match);
       } catch { /* the next tick will try again */ }
     };
+    const tune = () => {
+      if (!state.progressPoll) return;
+      clearInterval(state.progressPoll);
+      state.progressPoll = setInterval(send, pollEvery());
+    };
+    live.onTune = tune;
+    live.watch(R.match.code, ev => {
+      // Somebody moved, finished, or the match ended. The state that comes with a start or a finish is the
+      // whole room; a bare progress event only needs the ranks redrawn, and the socket sends one per tap.
+      if (ev.type === 'state' && ev.match) { renderRanks(ev.match.players); notePot(ev.match); return; }
+      if (ev.type === 'progress_updated' || ev.type === 'player_finished' || ev.type === 'match_finished') live.resync();
+    });
+    // While the socket is up, our own progress goes over it — no request per tap, no waiting for a reply.
+    state.progressPush = setInterval(() => { if (live.connected) live.progress(myPct()); }, 1000);
     send();
-    state.progressPoll = setInterval(send, 2000);
+    state.progressPoll = setInterval(send, pollEvery());
   }
-  function stopProgressPoll() { clearInterval(state.progressPoll); state.progressPoll = 0; }
+  function stopProgressPoll() {
+    clearInterval(state.progressPoll); state.progressPoll = 0;
+    clearInterval(state.progressPush); state.progressPush = 0;
+    live.onTune = null;
+  }
 
   const matchBoardIndex = board => DATA.levels.findIndex(L => L.id === board);
   function playMatch(m) {
