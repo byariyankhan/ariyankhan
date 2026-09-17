@@ -784,6 +784,13 @@ unlock (skip allowed after two fails), stars, best times and progress in
   picture that fails to load removes itself and the letter underneath shows
   through. The picture follows the Google account on every sign-in, while the
   name stays the player's to change.
+  **Settings** is seven short captioned lists rather than one pile: Account
+  (name, purse, sign out — only when signed in), Game (home country, today's
+  country, guideline), Sound, Colours, Help, About (with the two legal pages),
+  and Starting over, where the two rows that throw something away sit together.
+  `renderAccountRow` runs on the first paint and again whenever Settings opens,
+  so the account section is there every time rather than only after the dashboard
+  has been opened once.
   The lobby chip (top left, where the daily streak used to be) is the **purse**:
   `renderPurse` fills it from `authLoad` on the first paint and from every
   `setGold`, and it is hidden when nobody is signed in.
