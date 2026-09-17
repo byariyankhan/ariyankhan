@@ -955,12 +955,14 @@
       finishMatch(true, t);
       return;
     }
-    const streak = store.get('streak', 0) + 1; store.set('streak', streak);
+    // The streak is still counted and still reset by a loss — it is a record of this device's play and throwing
+    // it away would throw away every player's, permanently. It is simply not announced on the card any more.
+    store.set('streak', store.get('streak', 0) + 1);
     const n = levelNo(i), milestone = !state.daily && n % 10 === 0;
     const facts = D ? escapeHtml(D.rel.charAt(0).toUpperCase() + D.rel.slice(1)) : [L.cap ? `Capital: <b>${L.cap}</b>` : '', L.pop ? `Population: <b>${fmtPop(L.pop)}</b>` : '', L.sub ? `Region: <b>${L.sub}</b>` : ''].filter(Boolean).join(' · ');
     const nj = nextOpen(i), last = nj < 0;
     el.card.innerHTML = `
-      <p class="aa-card-kicker">${milestone ? `Milestone · level ${n}` : streak >= 2 ? `${streak} in a row · ` : ''}${D ? 'You cleared' : quizRight ? 'Correct!' : 'It was'}</p>
+      <p class="aa-card-kicker">${milestone ? `Milestone · level ${n} · ` : ''}${D ? 'You cleared' : quizRight ? 'Correct!' : 'It was'}</p>
       <h3>${escapeHtml(L.name)}</h3>
       <p class="aa-facts">${facts}</p>
       <p class="aa-stars" aria-label="${s} of 3 stars">${'★'.repeat(s)}${'☆'.repeat(3 - s)}</p>
@@ -1275,7 +1277,6 @@
       <h3>${m.count} of ${m.seats} joined</h3>
       <div class="aa-ranks aa-ranks--card">${faces(m.players)}</div>
       <p class="aa-wait">${roomWait(m, host)}</p>
-      <p class="aa-link-box">${escapeHtml(matchLink(m.code))}</p>
       <div class="aa-actions">
         <button type="button" class="aa-btn${host && !m.open_to_all ? '' : ' aa-btn--primary'}" data-act="minvite">Invite</button>
         ${host && !m.open_to_all ? `<button type="button" class="aa-btn aa-btn--primary" data-act="mstart"${m.count > 1 ? '' : ' disabled'}>Start</button>` : ''}

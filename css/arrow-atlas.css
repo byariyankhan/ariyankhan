@@ -152,7 +152,6 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-fill input:checked::after{ transform:translateX(18px); }
 .aa-fill input:checked + span{ color:var(--ink); }
 .aa-purse{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin:0 0 12px; font-size:14px; font-weight:800; color:var(--muted); }
-.aa-link-box{ font-size:12px; word-break:break-all; background:var(--bg2); border-radius:12px; padding:10px 12px; margin:0 0 12px; color:var(--muted); }
 .aa-gold{ margin-left:auto; display:flex; align-items:center; gap:5px; font-size:15px; font-weight:900; color:var(--ink); background:var(--bg2); border-radius:999px; padding:7px 13px; flex:0 0 auto; font-variant-numeric:tabular-nums; }
 .aa-soon{ font-size:11px; font-weight:900; letter-spacing:1px; text-transform:uppercase; color:var(--muted); background:var(--bg2); border-radius:999px; padding:4px 10px; flex:0 0 auto; }
 .aa-input{ text-align:right; }
