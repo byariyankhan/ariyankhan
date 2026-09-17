@@ -10,6 +10,11 @@ const AA_SIGNUP_GOLD = 10000;   // what a new player starts with, once, when the
 const AA_STAKES = [500, 1000, 7000];        // the three stakes a player can pick; the stake never touches the board
 const AA_MATCH_HOURS = 24;      // an invitation nobody accepts is refunded after this
 const AA_MATCH_SEATS = 7;       // how many can be in one room
+// A public room fills itself from whoever is online. The clock starts the moment a second player sits down —
+// not when the room opens, or the host would not have time to send the link — and at nothing the match begins
+// with whoever turned up. A full room does not wait for it.
+const AA_FILL_SECONDS = 40;
+const AA_LONELY_SECONDS = 120;  // a public room nobody joins is handed back this soon, not a day later
 const AA_SESSION_DAYS = 180;
 
 function aa_json($data, int $code = 200): void {
@@ -42,7 +47,11 @@ function aa_db(): PDO {
     $db->exec('CREATE INDEX IF NOT EXISTS sessions_user ON sessions(user_id)');
     // A gold match: everyone in the room stakes the same, everyone plays the very same board, and the first to
     // clear it takes the pot. The room stays open until the host starts it.
-    $db->exec('CREATE TABLE IF NOT EXISTS matches (code TEXT PRIMARY KEY, host_id INTEGER NOT NULL, stake INTEGER NOT NULL, board TEXT NOT NULL, tier INTEGER NOT NULL, seed INTEGER NOT NULL, state TEXT NOT NULL, winner_id INTEGER, created INTEGER NOT NULL, started INTEGER, settled INTEGER)');
+    $db->exec('CREATE TABLE IF NOT EXISTS matches (code TEXT PRIMARY KEY, host_id INTEGER NOT NULL, stake INTEGER NOT NULL, board TEXT NOT NULL, tier INTEGER NOT NULL, seed INTEGER NOT NULL, state TEXT NOT NULL, winner_id INTEGER, created INTEGER NOT NULL, started INTEGER, settled INTEGER, open_to_all INTEGER NOT NULL DEFAULT 0, fills_at INTEGER)');
+    // rooms that fill themselves arrived after the invite-only ones: the columns are added to the older table
+    $mcols = array_column($db->query('PRAGMA table_info(matches)')->fetchAll(), 'name');
+    if ($mcols && !in_array('open_to_all', $mcols, true)) $db->exec('ALTER TABLE matches ADD COLUMN open_to_all INTEGER NOT NULL DEFAULT 0');
+    if ($mcols && !in_array('fills_at', $mcols, true)) $db->exec('ALTER TABLE matches ADD COLUMN fills_at INTEGER');
     // one row per player: pct is how far along they are, ms their own clock (-1 = out of hearts), done the moment
     // their result reached the server, which is what decides who finished first.
     $db->exec('CREATE TABLE IF NOT EXISTS match_players (code TEXT NOT NULL, user_id INTEGER NOT NULL, joined INTEGER NOT NULL, tier INTEGER NOT NULL DEFAULT 2, pct INTEGER NOT NULL DEFAULT 0, ms INTEGER, done INTEGER, PRIMARY KEY (code, user_id))');
@@ -210,7 +219,7 @@ function aa_migrate_matches(PDO $db): void {
         $db->prepare("UPDATE matches SET state = 'void', settled = ? WHERE code = ?")->execute([time(), $m['code']]);
     }
     $db->exec('ALTER TABLE matches RENAME TO matches_v1');
-    $db->exec('CREATE TABLE matches (code TEXT PRIMARY KEY, host_id INTEGER NOT NULL, stake INTEGER NOT NULL, board TEXT NOT NULL, tier INTEGER NOT NULL, seed INTEGER NOT NULL, state TEXT NOT NULL, winner_id INTEGER, created INTEGER NOT NULL, started INTEGER, settled INTEGER)');
+    $db->exec('CREATE TABLE matches (code TEXT PRIMARY KEY, host_id INTEGER NOT NULL, stake INTEGER NOT NULL, board TEXT NOT NULL, tier INTEGER NOT NULL, seed INTEGER NOT NULL, state TEXT NOT NULL, winner_id INTEGER, created INTEGER NOT NULL, started INTEGER, settled INTEGER, open_to_all INTEGER NOT NULL DEFAULT 0, fills_at INTEGER)');
     $db->exec('INSERT INTO matches (code, host_id, stake, board, tier, seed, state, winner_id, created, settled) SELECT code, host_id, stake, board, tier, seed, state, winner_id, created, settled FROM matches_v1');
     $db->exec('DROP TABLE matches_v1');
 }
@@ -223,6 +232,66 @@ function aa_room(PDO $db, string $code): array {
 
 function aa_seat(PDO $db, string $code, int $userId, int $tier = 2): void {
     $db->prepare('INSERT OR IGNORE INTO match_players (code, user_id, joined, tier) VALUES (?, ?, ?, ?)')->execute([$code, $userId, time(), max(0, min(4, $tier))]);
+}
+
+// A player has just sat down. Seven of them and the match begins there and then; in a room that fills itself
+// from online, the second of them starts the forty-second clock. An invite-only room still waits for its host.
+function aa_room_joined(PDO $db, string $code): void {
+    $m = aa_match_row_raw($db, $code);
+    if (!$m || $m['state'] !== 'open') return;
+    if (!(int)$m['open_to_all']) return;              // invite-only: nothing happens until the host says go
+    $n = count(aa_room($db, $code));
+    if ($n >= AA_MATCH_SEATS) { aa_start_room($db, $code); return; }
+    if ($n < 2 || $m['fills_at'] !== null) return;
+    $db->prepare("UPDATE matches SET fills_at = ? WHERE code = ? AND state = 'open' AND fills_at IS NULL")
+       ->execute([time() + AA_FILL_SECONDS, $code]);
+}
+
+// Deal the board to the players who actually turned up. Guarded on 'open', so the host's Start and the clock
+// running out cannot both begin the same match.
+function aa_start_room(PDO $db, string $code): bool {
+    $upd = $db->prepare("UPDATE matches SET state = 'playing', started = ?, tier = ? WHERE code = ? AND state = 'open'");
+    $upd->execute([time(), aa_room_tier($db, $code), $code]);
+    return $upd->rowCount() === 1;
+}
+
+// The clock has run out on rooms that fill themselves: start the ones that found company, hand the stake back
+// to anyone still sitting alone rather than leaving them to wait out the day.
+function aa_autostart_matches(PDO $db): void {
+    $now = time();
+    $st = $db->prepare("SELECT code FROM matches WHERE state = 'open' AND open_to_all = 1 AND fills_at IS NOT NULL AND fills_at <= ? LIMIT 20");
+    $st->execute([$now]);
+    foreach ($st->fetchAll() as $m) if (count(aa_room($db, $m['code'])) > 1) aa_start_room($db, $m['code']);
+    $st = $db->prepare("SELECT code, stake FROM matches WHERE state = 'open' AND open_to_all = 1 AND fills_at IS NULL AND created < ? LIMIT 20");
+    $st->execute([$now - AA_LONELY_SECONDS]);
+    foreach ($st->fetchAll() as $m) {
+        $db->beginTransaction();
+        $upd = $db->prepare("UPDATE matches SET state = 'void', settled = ? WHERE code = ? AND state = 'open' AND fills_at IS NULL");
+        $upd->execute([$now, $m['code']]);
+        if ($upd->rowCount() === 1) foreach (aa_room($db, $m['code']) as $p) aa_give_gold($db, (int)$p['user_id'], (int)$m['stake']);
+        $db->commit();
+    }
+}
+
+// The room to walk into at this stake: the one that has been waiting longest and still has a seat. Waiting
+// longest, not emptiest, so the player who has been sitting there gets their match first.
+function aa_open_room(PDO $db, int $stake, int $userId): ?string {
+    $st = $db->prepare("SELECT m.code FROM matches m WHERE m.state = 'open' AND m.open_to_all = 1 AND m.stake = ?
+        AND (SELECT COUNT(*) FROM match_players p WHERE p.code = m.code) < ?
+        AND NOT EXISTS (SELECT 1 FROM match_players p WHERE p.code = m.code AND p.user_id = ?)
+        ORDER BY m.created LIMIT 1");
+    $st->execute([$stake, AA_MATCH_SEATS, $userId]);
+    $code = $st->fetchColumn();
+    return $code === false ? null : (string)$code;
+}
+
+// How many are sitting in a room that fills itself, per stake, so the picker can say where the people are.
+function aa_lobby_counts(PDO $db): array {
+    $out = array_fill_keys(array_map('strval', AA_STAKES), 0);
+    $st = $db->query("SELECT m.stake, COUNT(*) n FROM match_players p JOIN matches m ON m.code = p.code
+        WHERE m.state = 'open' AND m.open_to_all = 1 GROUP BY m.stake");
+    foreach ($st->fetchAll() as $r) if (isset($out[(string)$r['stake']])) $out[(string)$r['stake']] = (int)$r['n'];
+    return $out;
 }
 
 // The board is as hard as the room deserves: the middle of everyone's own difficulty, never the size of the

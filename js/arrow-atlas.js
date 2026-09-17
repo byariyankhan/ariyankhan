@@ -1093,15 +1093,32 @@
     return `<div class="aa-me"><span class="aa-me-face" aria-hidden="true">${escapeHtml((u.name || '?').trim().charAt(0).toUpperCase() || '?')}</span><span><span class="aa-me-name">${escapeHtml(u.name || 'Player')}</span><br><span class="aa-me-sub">Signed in with ${escapeHtml((u.provider || 'google').replace(/^./, c => c.toUpperCase()))}</span></span><span class="aa-gold" title="Your gold"><span aria-hidden="true">🪙</span>${gfmt(u.gold)}</span></div>`;
   }
 
+  // On means the room takes whoever else is online at that stake and starts itself; off means only the people
+  // you send the link to, and only when you say go.
+  const fillOn = () => store.get('fillOnline', true) !== false;
   function openStakes() {
-    const gold = auth.user?.gold ?? 0;
+    const gold = auth.user?.gold ?? 0, fill = fillOn(), waiting = state.lobbyWaiting || {};
     el.matchTitle.textContent = 'Dashboard';
     el.matchBody.innerHTML = `
       ${meStrip()}
       <div class="aa-stakes">
-        ${STAKES.map(v => `<button type="button" class="aa-stake" data-stake="${v}"${gold < v ? ' disabled' : ''}><span class="aa-stake-coin" aria-hidden="true">🪙</span><span class="aa-stake-amt">${gfmt(v)}</span></button>`).join('')}
-      </div>`;
+        ${STAKES.map(v => `<button type="button" class="aa-stake" data-stake="${v}"${gold < v ? ' disabled' : ''}><span class="aa-stake-coin" aria-hidden="true">🪙</span><span class="aa-stake-amt">${gfmt(v)}</span><span class="aa-stake-live">${waiting[v] ? `${waiting[v]} waiting` : ''}</span></button>`).join('')}
+      </div>
+      <label class="aa-fill"><input type="checkbox" id="aaFillOnline"${fill ? ' checked' : ''}><span>Fill from online</span></label>`;
     openSheet(el.matchSheet);
+    refreshLobby();
+  }
+  // How many are sitting in a room at each stake. Shown under the coins so nobody waits at an empty one.
+  async function refreshLobby() {
+    try {
+      const d = await matchApi('lobby');
+      state.lobbyWaiting = d.waiting || {};
+      if (typeof d.gold === 'number') setGold(d.gold);
+      $$('.aa-stake', el.matchBody).forEach(b => {
+        const live = $('.aa-stake-live', b), n = state.lobbyWaiting[b.dataset.stake] || 0;
+        if (live) live.textContent = n ? `${n} waiting` : '';
+      });
+    } catch { /* the count is a nicety, not the flow */ }
   }
 
   // The room, on the game screen: who is in, an Invite button, and Start for the host. The board is not dealt
@@ -1117,6 +1134,7 @@
     scrollToGame();
     if (history.replaceState) history.replaceState(null, '', location.pathname + location.search + '#m=' + m.code);
     renderRoom(m);
+    tickFill(m.fills_in);
     el.overlay.hidden = false;
     startRoomPoll(m.code);
   }
@@ -1127,7 +1145,7 @@
       <p class="aa-card-kicker">Gold match · ${gfmt(m.stake)}</p>
       <h3>${m.count} of ${m.seats} joined</h3>
       <div class="aa-ranks aa-ranks--card">${faces(m.players)}</div>
-      <p class="aa-wait">${host ? (m.count > 1 ? 'Start when everyone is in.' : 'Waiting for your friends to join.') : `Waiting for ${escapeHtml(m.host)} to start.`}</p>
+      <p class="aa-wait">${roomWait(m, host)}</p>
       <p class="aa-link-box">${escapeHtml(matchLink(m.code))}</p>
       <div class="aa-actions">
         <button type="button" class="aa-btn${host ? '' : ' aa-btn--primary'}" data-act="minvite">Invite</button>
@@ -1135,6 +1153,24 @@
         ${host ? '<button type="button" class="aa-btn" data-act="mcancel">Cancel</button>' : ''}
       </div>
       <p class="aa-flash" hidden></p>`;
+  }
+  // Forty seconds from the second player sitting down, or the moment the seventh does. Between polls the clock
+  // is counted down here so it does not tick in twos.
+  function roomWait(m, host) {
+    // one element, or the flex gap on .aa-wait would space the number out like a countdown clock
+    if (typeof m.fills_in === 'number') return `<span>Starting in <b id="aaFillIn">${m.fills_in}</b>s</span>`;
+    if (m.open_to_all) return host ? 'Looking for players. Send the link to bring a friend in too.' : 'Waiting for one more player.';
+    return host ? (m.count > 1 ? 'Start when everyone is in.' : 'Waiting for your friends to join.') : `Waiting for ${escapeHtml(m.host)} to start.`;
+  }
+  function tickFill(secs) {
+    clearInterval(state.fillTick); state.fillTick = 0;
+    if (typeof secs !== 'number') return;
+    let left = secs;
+    state.fillTick = setInterval(() => {
+      const n = $('#aaFillIn', el.card);
+      if (!n) { clearInterval(state.fillTick); state.fillTick = 0; return; }
+      n.textContent = Math.max(0, --left);
+    }, 1000);
   }
   function startRoomPoll(code) {
     stopMatchPoll();
@@ -1144,12 +1180,17 @@
         if (typeof d.gold === 'number') setGold(d.gold);
         const m = d.match;
         if (m.state === 'playing') { stopMatchPoll(); playMatch(m); }
-        else if (m.state === 'open') { const was = state.pendingMatch?.count; state.pendingMatch = m; if (!el.overlay.hidden && m.count !== was) renderRoom(m); }
+        else if (m.state === 'open') {
+          const before = state.pendingMatch;
+          state.pendingMatch = m;
+          const moved = m.count !== before?.count || (typeof m.fills_in === 'number') !== (typeof before?.fills_in === 'number');
+          if (!el.overlay.hidden && moved) { renderRoom(m); tickFill(m.fills_in); }
+        }
         else { stopMatchPoll(); toast(m.state === 'void' ? 'That match was called off.' : 'That match is over.', 'hint'); goToLevels(); }
       } catch { /* a dropped poll is nothing: the next one will do */ }
     }, 2000);
   }
-  function stopMatchPoll() { clearInterval(state.matchPoll); state.matchPoll = 0; }
+  function stopMatchPoll() { clearInterval(state.matchPoll); state.matchPoll = 0; clearInterval(state.fillTick); state.fillTick = 0; }
   async function startMatch() {
     const m = state.pendingMatch;
     if (!m) return;
@@ -1253,12 +1294,16 @@
 
   const goldError = e => e.code === 'not_enough_gold' ? 'You do not have that much gold.' : e.code === 'taken' ? 'Someone already took that match.' : e.code === 'own_match' ? 'That is your own invitation.' : e.code === 'signed_out' ? 'Please sign in again.' : 'Something went wrong. Please try again.';
 
+  el.matchBody?.addEventListener('change', e => {
+    if (e.target.id !== 'aaFillOnline') return;
+    store.set('fillOnline', e.target.checked);
+  });
   el.matchBody?.addEventListener('click', async e => {
     const stake = e.target.closest('[data-stake]')?.dataset.stake;
     const act = e.target.closest('[data-mact]')?.dataset.mact;
     if (stake) {
       const btn = e.target.closest('[data-stake]'); btn.disabled = true;
-      try { const d = await matchApi('create', { stake: +stake, tier: TIER_OF() }); setGold(d.gold); showRoom(d.match); }
+      try { const d = await matchApi('create', { stake: +stake, tier: TIER_OF(), open_to_all: fillOn() }); setGold(d.gold); showRoom(d.match); }
       catch (err) { btn.disabled = false; toast(goldError(err), 'bad'); if (typeof err.gold === 'number') setGold(err.gold); }
       return;
     }

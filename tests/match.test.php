@@ -21,11 +21,21 @@ $gold = fn(int $u) => aa_gold($db, $u);
 $row = fn(string $code) => aa_match_row_raw($db, $code);
 
 // the pieces the endpoint puts together, exercised here without HTTP
-$make = function (int $uid, int $stake, int $tier = 2) use ($db) {
-    if (!in_array($stake, AA_STAKES, true) || !aa_take_gold($db, $uid, $stake)) return null;
+$make = function (int $uid, int $stake, int $tier = 2, bool $openToAll = false) use ($db) {
+    if (!in_array($stake, AA_STAKES, true)) return null;
+    if ($openToAll) {
+        $seat = aa_open_room($db, $stake, $uid);                       // walk into the room already waiting
+        if ($seat !== null) {
+            if (!aa_take_gold($db, $uid, $stake)) return null;
+            aa_seat($db, $seat, $uid, $tier);
+            aa_room_joined($db, $seat);
+            return $seat;
+        }
+    }
+    if (!aa_take_gold($db, $uid, $stake)) return null;
     $code = aa_match_code($db);
-    $db->prepare('INSERT INTO matches (code, host_id, stake, board, tier, seed, state, created) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
-       ->execute([$code, $uid, $stake, aa_pick_board() ?? '380', 2, 424242, 'open', time()]);
+    $db->prepare('INSERT INTO matches (code, host_id, stake, board, tier, seed, state, created, open_to_all) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+       ->execute([$code, $uid, $stake, aa_pick_board() ?? '380', 2, 424242, 'open', time(), $openToAll ? 1 : 0]);
     aa_seat($db, $code, $uid, $tier);
     return $code;
 };
@@ -35,6 +45,7 @@ $join = function (string $code, int $uid, int $tier = 2) use ($db) {
     foreach (aa_room($db, $code) as $p) if ((int)$p['user_id'] === $uid) return false;
     if (!aa_take_gold($db, $uid, (int)$m['stake'])) return false;
     aa_seat($db, $code, $uid, $tier);
+    aa_room_joined($db, $code);
     return true;
 };
 $start = function (string $code, int $uid) use ($db) {
@@ -190,6 +201,57 @@ $db->prepare('UPDATE matches SET created = ? WHERE code = ?')->execute([time() -
 aa_expire_matches($db);
 ok($row($c9)['state'] === 'done' && $row($c9)['winner_id'] === null, 'a board nobody ever finished is closed out');
 ok($gold($host) === $g9[0] + 500 && $gold($guest) === $g9[1] + 500, 'and every stake goes home');
+
+echo "\nA room that fills itself from online\n";
+{
+    $pub = fn(string $sub, int $tier = 2) => aa_upsert_user($db, 'google', $sub, ucfirst($sub));
+    $a = $pub('online-a'); $b = $pub('online-b'); $c = $pub('online-c');
+    $r1 = $make($a, 1000, 2, true);
+    ok(is_string($r1) && (int)$row($r1)['open_to_all'] === 1, 'the first player opens a room that takes anyone');
+    ok($row($r1)['fills_at'] === null, 'and nothing is on the clock while they sit there alone');
+    ok(aa_lobby_counts($db)[1000] === 1, 'the picker can see one player waiting at 1,000');
+    ok(aa_lobby_counts($db)[500] === 0, 'and nobody at 500');
+    $r2 = $make($b, 1000, 2, true);
+    ok($r2 === $r1, 'the next player walks into that room instead of opening a second one');
+    ok(count(aa_room($db, $r1)) === 2 && $gold($b) === 9000, 'two are in it, both staked');
+    $fills = (int)$row($r1)['fills_at'];
+    ok($fills > time() && $fills <= time() + AA_FILL_SECONDS, 'the second player starts the forty-second clock');
+    ok($row($r1)['state'] === 'open', 'the match has not started yet');
+    // a third joins: the clock is already running and is not pushed back
+    $r3 = $make($c, 1000, 2, true);
+    ok($r3 === $r1 && (int)$row($r1)['fills_at'] === $fills, 'a third player joins without resetting the clock');
+    $db->prepare('UPDATE matches SET fills_at = ? WHERE code = ?')->execute([time() - 1, $r1]);
+    aa_autostart_matches($db);
+    ok($row($r1)['state'] === 'playing', 'the clock runs out and the match begins on its own');
+    ok((int)$row($r1)['started'] > 0 && (int)$row($r1)['tier'] === 2, 'with the board set from the players who turned up');
+    ok(aa_lobby_counts($db)[1000] === 0, 'and the room is no longer on offer');
+    ok($make($a, 1000, 2, true) !== $r1, 'a started room does not take anyone else');
+
+    // seven of them do not wait for the clock at all
+    $seats = [];
+    $r4 = $make($pub('seatx0'), 500, 2, true);
+    for ($i = 1; $i < 7; $i++) { $u = $pub('seatx' . $i); $seats[] = $u; $got = $make($u, 500, 2, true); if ($i < 6) ok($got === $r4, 'online player ' . ($i + 1) . ' lands in the same room'); }
+    ok(count(aa_room($db, $r4)) === 7, 'seven of them are in it');
+    ok($row($r4)['state'] === 'playing', 'and a full room starts at once, without waiting out the clock');
+
+    // nobody turns up: the stake comes back in two minutes, not a day
+    $lone = $pub('online-lonely');
+    $r5 = $make($lone, 7000, 2, true);
+    ok($gold($lone) === 3000, 'the stake is held while they wait');
+    aa_autostart_matches($db);
+    ok($row($r5)['state'] === 'open', 'a room that has just opened is left alone');
+    $db->prepare('UPDATE matches SET created = ? WHERE code = ?')->execute([time() - AA_LONELY_SECONDS - 1, $r5]);
+    aa_autostart_matches($db);
+    ok($row($r5)['state'] === 'void' && $gold($lone) === 10000, 'nobody came, so the gold is handed straight back');
+
+    // and with the switch off nothing moves without the host
+    $d1 = $pub('private-a'); $d2 = $pub('private-b');
+    $r6 = $make($d1, 500);
+    ok((int)$row($r6)['open_to_all'] === 0, 'with the switch off the room is invite-only');
+    ok($make($d2, 500, 2, true) !== $r6, 'and an online player is never put into it');
+    ok($join($r6, $d2) === true && $row($r6)['fills_at'] === null && $row($r6)['state'] === 'open', 'a friend joining starts no clock: the host still says go');
+    ok(aa_lobby_counts($db)[500] === 1, 'and its players are not counted as a place to walk into: only the one open room at 500 is');
+}
 
 array_map('unlink', glob($tmp . '/*') ?: []); @rmdir($tmp);
 echo $bad ? "\n$bad of $tests failed\n" : "\nall $tests tests passed\n";

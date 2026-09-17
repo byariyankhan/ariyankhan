@@ -692,6 +692,9 @@ unlock (skip allowed after two fails), stars, best times and progress in
   board.** Each player sends their own difficulty when they open or join a room,
   and `aa_room_tier` sets the board to the middle of everyone's, at the moment
   the host starts, so gold buys a bigger pot and never an easier board.
+  Under the coins sits one switch, **Fill from online** (on by default, kept in
+  `aa:v1:fillOnline`), and under each coin the number of players waiting at that
+  stake (`lobby`), so nobody sits at an empty one.
   Picking a coin holds the stake and opens a
   **room** on the game screen: how many of the seven seats are filled, the faces
   of who is in, the invitation link, **Invite**, **Start** (host only, dead until
@@ -700,6 +703,25 @@ unlock (skip allowed after two fails), stars, best times and progress in
   is dealt only then (`get` hands out the country, tier and seed once the match
   is `playing`), so nobody can study it while the room fills up. Cancelling voids
   the room, hands every stake back and kills the link.
+  **With the switch on the room fills itself and starts itself** (`open_to_all`),
+  which is the one mechanism behind all three ways to play: two friends and
+  nobody else (switch off), two friends with the rest brought in from online, or
+  no friends at all. Picking a coin then walks you into the room already waiting
+  at that stake (`aa_open_room`, longest-waiting first) instead of opening a
+  second one, so a queue and a room are the same object and there is no
+  matchmaking service to run. The stake *is* the queue — 500, 1,000 and 7,000 are
+  three lines — and `aa_room_tier` already sets the board from whoever turned up,
+  so a room of strangers needs no rating system.
+  **The clock is forty seconds from the second player sitting down**
+  (`AA_FILL_SECONDS`, `fills_at`), not from the room opening, or the host would
+  have no time to send the link; a third player joining does not push it back. A
+  full room of seven does not wait for it at all, and the host's **Start** still
+  begins it early. `aa_autostart_matches` runs on every request: it starts the
+  rooms whose clock has run out with more than one player in them, and hands the
+  stake back to anyone still sitting alone after two minutes
+  (`AA_LONELY_SECONDS`) rather than leaving them to wait out the day. With the
+  switch off none of this applies: no clock, no strangers, nothing at all until
+  the host says go.
   **The first player to clear the board takes the whole pot, and is paid the
   instant their result lands** — no waiting on anybody else. Not the shortest
   clock: the server stamps the moment each result arrives and ranks by that, so
@@ -738,11 +760,15 @@ unlock (skip allowed after two fails), stars, best times and progress in
   counts up from the old balance, pops, and the coins rain over the whole page
   (`goldRain` lifts the canvas out of the hidden board and on to `document.body`
   for the duration).
-  `tests/match.test.php` (57 checks) covers the stakes, the room rules, a room of
+  `tests/match.test.php` (84 checks) covers the stakes, the room rules, a room of
   seven, the finish-order rule against a shorter clock, the instant payout and
   that it never pays twice, that second place wins a place and no gold, that a 500
   room of beginners gets an easy board while a 7,000 room of strong players gets a
-  master one, and that no gold is made or lost. Signing out and deleting the account live in Settings.
+  master one, that no gold is made or lost, and the whole of the
+  fills-itself path: the second player starting the clock and a third not
+  resetting it, seven starting at once, the clock running out into a match, the
+  lonely refund, and an invite-only room being offered to nobody and moved by
+  nothing. Signing out and deleting the account live in Settings.
 - **Home country first** (`homeCountry`, `orderFor`): `games/geo.php` passes on
   Cloudflare's `CF-IPCountry` (nothing stored); the browser language region is
   the fallback. The tour order is the player's country, then every other country
