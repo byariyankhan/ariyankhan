@@ -85,7 +85,7 @@
 
   const el = {
     select: $('#aaSelect'), tagline: $('#aaTagline'), dailyRow: $('#aaDailyRow'), homeSel: $('#aaHome'), purse: $('#aaPurse'), purseNo: $('#aaPurseNo'), daily: $('#aaDaily'), hudDiff: $('#aaHudDiff'), play: $('#aaPlay'), path: $('#aaPath'), btnVibe: $('#aaVibe'), btnGuides: $('#aaGuides'), btnMusic: $('#aaMusic'), howTo: $('#aaHowTo'),
-    sheet: $('#aaSheet'), friends: $('#aaFriends'), signInSheet: $('#aaSignInSheet'), googleBtn: $('#aaGoogleBtn'), signInNote: $('#aaSignInNote'), ranks: $('#aaRanks'), matchSheet: $('#aaMatchSheet'), matchBody: $('#aaMatchBody'), matchTitle: $('#aaMatchTitle'), accountGroup: $('#aaAccountGroup'), accountCap: $('#aaAccountCap'), accountWho: $('#aaAccountWho'), accountGold: $('#aaAccountGold'), signOutBtn: $('#aaSignOut'), deleteAccBtn: $('#aaDeleteAcc'), settingsBtns: $$('#aaSettings, #aaSettingsG'), themeBtn: $('#aaTheme'), themes: $('#aaThemes'),
+    sheet: $('#aaSheet'), friends: $('#aaFriends'), signInSheet: $('#aaSignInSheet'), googleBtn: $('#aaGoogleBtn'), signInNote: $('#aaSignInNote'), ranks: $('#aaRanks'), matchSheet: $('#aaMatchSheet'), matchBody: $('#aaMatchBody'), matchTitle: $('#aaMatchTitle'), accountGroup: $('#aaAccountGroup'), accountCap: $('#aaAccountCap'), accountWho: $('#aaAccountWho'), accountGold: $('#aaAccountGold'), accountFace: $('#aaAccountFace'), sessionGroup: $('#aaSessionGroup'), sessionCap: $('#aaSessionCap'), signOutBtn: $('#aaSignOut'), deleteAccBtn: $('#aaDeleteAcc'), settingsBtns: $$('#aaSettings, #aaSettingsG'), themeBtn: $('#aaTheme'), themes: $('#aaThemes'),
     game: $('#aaGame'), boardWrap: $('#aaBoardWrap'), board: $('#aaBoard'), toast: $('#aaToast'), confetti: $('#aaConfetti'),
     hudLevel: $('#aaHudLevel'), hudMode: $('#aaHudMode'), hudTime: $('#aaHudTime'), hudLeft: $('#aaHudLeft'), hudLives: $('#aaHudLives'), hudLivesWrap: $('#aaHudLivesWrap'), hudPct: $('#aaHudPct'), boardBar: $('#aaBoardBar'),
     btnHint: $('#aaHint'), btnLevels: $('#aaBackToLevels'), btnSound: $('#aaSound'),
@@ -955,12 +955,14 @@
       finishMatch(true, t);
       return;
     }
-    const streak = store.get('streak', 0) + 1; store.set('streak', streak);
+    // The streak is still counted and still reset by a loss — it is a record of this device's play and throwing
+    // it away would throw away every player's, permanently. It is simply not announced on the card any more.
+    store.set('streak', store.get('streak', 0) + 1);
     const n = levelNo(i), milestone = !state.daily && n % 10 === 0;
     const facts = D ? escapeHtml(D.rel.charAt(0).toUpperCase() + D.rel.slice(1)) : [L.cap ? `Capital: <b>${L.cap}</b>` : '', L.pop ? `Population: <b>${fmtPop(L.pop)}</b>` : '', L.sub ? `Region: <b>${L.sub}</b>` : ''].filter(Boolean).join(' · ');
     const nj = nextOpen(i), last = nj < 0;
     el.card.innerHTML = `
-      <p class="aa-card-kicker">${milestone ? `Milestone · level ${n}` : streak >= 2 ? `${streak} in a row · ` : ''}${D ? 'You cleared' : quizRight ? 'Correct!' : 'It was'}</p>
+      <p class="aa-card-kicker">${milestone ? `Milestone · level ${n} · ` : ''}${D ? 'You cleared' : quizRight ? 'Correct!' : 'It was'}</p>
       <h3>${escapeHtml(L.name)}</h3>
       <p class="aa-facts">${facts}</p>
       <p class="aa-stars" aria-label="${s} of 3 stars">${'★'.repeat(s)}${'☆'.repeat(3 - s)}</p>
@@ -1210,7 +1212,7 @@
     $$('.aa-face-img', root || document).forEach(img => {
       if (img.dataset.wired) return;
       img.dataset.wired = '1';
-      img.addEventListener('error', () => { img.closest('.aa-rank, .aa-me-face')?.classList.remove('has-pic'); img.remove(); });
+      img.addEventListener('error', () => { img.closest('.aa-rank, .aa-me-face, .aa-row-face')?.classList.remove('has-pic'); img.remove(); });
     });
   }
 
@@ -1275,7 +1277,6 @@
       <h3>${m.count} of ${m.seats} joined</h3>
       <div class="aa-ranks aa-ranks--card">${faces(m.players)}</div>
       <p class="aa-wait">${roomWait(m, host)}</p>
-      <p class="aa-link-box">${escapeHtml(matchLink(m.code))}</p>
       <div class="aa-actions">
         <button type="button" class="aa-btn${host && !m.open_to_all ? '' : ' aa-btn--primary'}" data-act="minvite">Invite</button>
         ${host && !m.open_to_all ? `<button type="button" class="aa-btn aa-btn--primary" data-act="mstart"${m.count > 1 ? '' : ' disabled'}>Start</button>` : ''}
@@ -1580,8 +1581,19 @@
     if (!el.accountGroup) return;
     el.accountGroup.hidden = !auth.user;
     if (el.accountCap) el.accountCap.hidden = !auth.user;
+    // Sign out lives at the bottom of the page now, next to the things that end an account rather than at the
+    // top where it is the first thing under a player's own name. It still comes and goes with the account.
+    if (el.sessionGroup) el.sessionGroup.hidden = !auth.user;
+    if (el.sessionCap) el.sessionCap.hidden = !auth.user;
     if (el.deleteAccBtn) el.deleteAccBtn.hidden = !auth.user;   // it sits with Reset progress now, not in the account group
     if (!auth.user) return;
+    // The player's own picture, the same one the line-up over the board uses, so the row shows who is signed in
+    // rather than a face that is the same for everybody. No picture, or one whose link has expired: their initial.
+    if (el.accountFace) {
+      el.accountFace.className = 'aa-row-ico aa-row-face' + faceClass(auth.user);
+      el.accountFace.innerHTML = faceInner(auth.user);
+      wireFaces(el.accountFace);
+    }
     el.accountWho.textContent = `${auth.user.name} · ${(auth.user.provider || 'google').replace(/^./, c => c.toUpperCase())}`;   // the caption above already says Account
     el.accountGold.className = 'aa-gold' + goldFit(auth.user.gold);
     el.accountGold.innerHTML = `<span aria-hidden="true">🪙</span>${gfmt(auth.user.gold)}`;

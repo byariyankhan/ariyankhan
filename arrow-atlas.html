@@ -69,7 +69,7 @@
          set these two when the backend moves to a host of its own and the client follows without a change:
          <meta name="arrow-atlas-api" content="https://api.arrowatlas.com" />
          <meta name="arrow-atlas-ws"  content="wss://api.arrowatlas.com" /> -->
-    <link rel="stylesheet" href="css/arrow-atlas.css?v=55" />
+    <link rel="stylesheet" href="css/arrow-atlas.css?v=56" />
     <link rel="preload" href="games/data/arrow-atlas.json?v=11" as="fetch" crossorigin="anonymous" />
 
     <!-- SCHEMA -->
@@ -426,8 +426,7 @@
         <div class="aa-sheet-head"><button type="button" class="aa-icon" data-close-sheet aria-label="Back"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H6M11 6l-6 6 6 6"/></svg></button><h2>Settings</h2></div>
         <p class="aa-cap" id="aaAccountCap" hidden>Account</p>
         <div class="aa-group" id="aaAccountGroup" hidden>
-          <div class="aa-row"><span class="aa-row-ico">🙂</span><span class="aa-row-label">Account<small id="aaAccountWho">Signed in</small></span><span class="aa-gold" id="aaAccountGold"></span></div>
-          <button type="button" class="aa-row aa-row--link" id="aaSignOut"><span class="aa-row-ico">🚪</span><span class="aa-row-label">Sign out</span><span class="aa-row-chev">›</span></button>
+          <div class="aa-row"><span class="aa-row-ico aa-row-face" id="aaAccountFace" aria-hidden="true"></span><span class="aa-row-label">Account<small id="aaAccountWho">Signed in</small></span><span class="aa-gold" id="aaAccountGold"></span></div>
         </div>
 
         <p class="aa-cap">Game</p>
@@ -462,6 +461,11 @@
           <a class="aa-row aa-row--link" href="arrow-atlas-terms.html"><span class="aa-row-ico">📄</span><span class="aa-row-label">Terms of Service</span><span class="aa-row-chev">›</span></a>
         </div>
 
+        <p class="aa-cap" id="aaSessionCap" hidden>Session</p>
+        <div class="aa-group" id="aaSessionGroup" hidden>
+          <button type="button" class="aa-row aa-row--link" id="aaSignOut"><span class="aa-row-ico">🚪</span><span class="aa-row-label">Sign out<small>The account stays; this device forgets it</small></span><span class="aa-row-chev">›</span></button>
+        </div>
+
         <p class="aa-cap">Starting over</p>
         <div class="aa-group">
           <button type="button" class="aa-row aa-row--link aa-row--danger" id="aaReset"><span class="aa-row-ico">🗑️</span><span class="aa-row-label">Reset progress<small>Clears this device only</small></span><span class="aa-row-chev">›</span></button>
@@ -472,6 +476,6 @@
       </div>
     </div>
 
-    <script src="js/arrow-atlas.js?v=71"></script>
+    <script src="js/arrow-atlas.js?v=72"></script>
   </body>
 </html>
