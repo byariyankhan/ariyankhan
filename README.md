@@ -712,6 +712,13 @@ unlock (skip allowed after two fails), stars, best times and progress in
   matchmaking service to run. The stake *is* the queue — 500, 1,000 and 7,000 are
   three lines — and `aa_room_tier` already sets the board from whoever turned up,
   so a room of strangers needs no rating system.
+  Two players tapping the same coin in the same second would each open a room and
+  sit in it alone, never meeting, so while a player is still the only one in a
+  room that fills itself, **every poll looks for an older room to walk into**
+  (`aa_requeue`, from `get`): the seat moves across with the stake already on it,
+  the room left behind closes with nobody in it to refund, and the client follows
+  the new code, link and all. Only ever towards an older room, so two of them
+  cannot swap places forever.
   **The clock is forty seconds from the second player sitting down**
   (`AA_FILL_SECONDS`, `fills_at`), not from the room opening, or the host would
   have no time to send the link; a third player joining does not push it back. A
@@ -760,15 +767,16 @@ unlock (skip allowed after two fails), stars, best times and progress in
   counts up from the old balance, pops, and the coins rain over the whole page
   (`goldRain` lifts the canvas out of the hidden board and on to `document.body`
   for the duration).
-  `tests/match.test.php` (84 checks) covers the stakes, the room rules, a room of
+  `tests/match.test.php` (91 checks) covers the stakes, the room rules, a room of
   seven, the finish-order rule against a shorter clock, the instant payout and
   that it never pays twice, that second place wins a place and no gold, that a 500
   room of beginners gets an easy board while a 7,000 room of strong players gets a
   master one, that no gold is made or lost, and the whole of the
   fills-itself path: the second player starting the clock and a third not
   resetting it, seven starting at once, the clock running out into a match, the
-  lonely refund, and an invite-only room being offered to nobody and moved by
-  nothing. Signing out and deleting the account live in Settings.
+  lonely refund, a dead heat between two players ending with one of them walking
+  into the other's room, and an invite-only room being offered to nobody and
+  moved by nothing. Signing out and deleting the account live in Settings.
 - **Home country first** (`homeCountry`, `orderFor`): `games/geo.php` passes on
   Cloudflare's `CF-IPCountry` (nothing stored); the browser language region is
   the fallback. The tour order is the player's country, then every other country

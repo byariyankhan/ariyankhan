@@ -1181,6 +1181,8 @@
         const m = d.match;
         if (m.state === 'playing') { stopMatchPoll(); playMatch(m); }
         else if (m.state === 'open') {
+          // the server can move a player sitting alone into an older room: follow it, link and all
+          if (m.code !== code) { showRoom(m); return; }
           const before = state.pendingMatch;
           state.pendingMatch = m;
           const moved = m.count !== before?.count || (typeof m.fills_in === 'number') !== (typeof before?.fills_in === 'number');

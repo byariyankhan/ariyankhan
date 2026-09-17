@@ -275,14 +275,38 @@ function aa_autostart_matches(PDO $db): void {
 
 // The room to walk into at this stake: the one that has been waiting longest and still has a seat. Waiting
 // longest, not emptiest, so the player who has been sitting there gets their match first.
-function aa_open_room(PDO $db, int $stake, int $userId): ?string {
+function aa_open_room(PDO $db, int $stake, int $userId, ?int $before = null): ?string {
     $st = $db->prepare("SELECT m.code FROM matches m WHERE m.state = 'open' AND m.open_to_all = 1 AND m.stake = ?
         AND (SELECT COUNT(*) FROM match_players p WHERE p.code = m.code) < ?
-        AND NOT EXISTS (SELECT 1 FROM match_players p WHERE p.code = m.code AND p.user_id = ?)
+        AND NOT EXISTS (SELECT 1 FROM match_players p WHERE p.code = m.code AND p.user_id = ?)"
+        . ($before === null ? '' : ' AND m.created < ' . (int)$before) . "
         ORDER BY m.created LIMIT 1");
     $st->execute([$stake, AA_MATCH_SEATS, $userId]);
     $code = $st->fetchColumn();
     return $code === false ? null : (string)$code;
+}
+
+// Two players tapping the same coin in the same second would each open a room and then sit in it alone, never
+// meeting. So for as long as a player is the only one in a room that fills itself, every poll looks for an
+// older one to walk into instead: the seat moves across with the stake already on it, and the room left behind
+// closes with nobody in it to hand anything back to. Only ever towards an older room, so two of them cannot
+// swap places forever.
+function aa_requeue(PDO $db, array $m, int $userId): ?string {
+    if ($m['state'] !== 'open' || !(int)$m['open_to_all']) return null;
+    $room = aa_room($db, $m['code']);
+    if (count($room) !== 1 || (int)$room[0]['user_id'] !== $userId) return null;
+    $older = aa_open_room($db, (int)$m['stake'], $userId, (int)$m['created']);
+    if ($older === null) return null;
+    $tier = (int)$room[0]['tier'];
+    $db->beginTransaction();
+    $upd = $db->prepare("UPDATE matches SET state = 'void', settled = ? WHERE code = ? AND state = 'open'");
+    $upd->execute([time(), $m['code']]);
+    if ($upd->rowCount() !== 1) { $db->rollBack(); return null; }
+    $db->prepare('DELETE FROM match_players WHERE code = ? AND user_id = ?')->execute([$m['code'], $userId]);
+    aa_seat($db, $older, $userId, $tier);
+    $db->commit();
+    aa_room_joined($db, $older);
+    return $older;
 }
 
 // How many are sitting in a room that fills itself, per stake, so the picker can say where the people are.
