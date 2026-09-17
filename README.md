@@ -91,13 +91,19 @@ The subdomain is **the same container as the main site**, not a second server.
 that hands a visitor to the YouTube app, `spain.php` is a page per video, plus
 that subdomain's own `robots.txt`, `sitemap.xml` and `assets/`.
 
-Three pieces have to line up, and all three are here except the DNS record:
+It is live. Three pieces line up:
 
 | Piece | Where | State |
 |-------|-------|-------|
-| DNS record `youtube` | **Cloudflare** (`algin`/`meiling.ns.cloudflare.com` are the domain's nameservers — the Hostinger zone for ariyankhan.com is not authoritative and editing it does nothing) | **the one manual step**: add `CNAME youtube → ariyankhan.com`, proxied |
-| `server_name` on the VPS | `deploy/nginx-ariyankhan.conf` | in the repo; copy it to the VPS and reload nginx |
-| Routing and headers | root `.htaccess` | done |
+| DNS record `youtube` | **Cloudflare** (`algin`/`meiling.ns.cloudflare.com` are the domain's nameservers — the Hostinger zone for ariyankhan.com is not authoritative and editing it does nothing) | `CNAME youtube → ariyankhan.com`, proxied |
+| Reaching the container | the VPS's nginx passes the Host through as it stands, so the extra `server_name` in `deploy/nginx-ariyankhan.conf` turned out not to be needed to bring it up; it is there for the day the host stops guessing | live |
+| Routing and headers | root `.htaccess` | live |
+
+Verified on the live subdomain: `/` and `/spain` answer 200, `/spain.php` and
+`/index.php` 301 to their canonical forms, the thumbnail, `robots.txt` and
+`sitemap.xml` resolve, anything else is a 404, `/youtube` on the main site is a
+404, exactly one of each security header comes back, and each page's nonce
+matches its own `Content-Security-Policy`.
 
 The `.htaccess` block does four things for any host starting `youtube.`:
 serves `/` from `/youtube/index.php`; serves a real file out of `/youtube` when
