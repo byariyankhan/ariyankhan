@@ -109,6 +109,7 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-ranks--card{ position:static; justify-content:center; margin:0 0 10px; }
 .aa-wait{ display:flex; align-items:center; justify-content:center; gap:10px; margin:0 0 14px; font-weight:800; color:var(--muted); }
 .aa-wait::before{ content:''; width:18px; height:18px; border-radius:50%; border:3px solid var(--line-soft); border-top-color:var(--accent); animation:aaspin 1s linear infinite; }
+.aa-wait b{ color:var(--ink); font-variant-numeric:tabular-nums; }
 @keyframes aaspin{ to{ transform:rotate(360deg); } }
 /* the three stakes side by side, each its own coin */
 .aa-stakes{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin:4px 0 2px; }
@@ -117,6 +118,14 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-stake:disabled{ opacity:.4; cursor:default; }
 .aa-stake-coin{ font-size:30px; line-height:1; }
 .aa-stake-amt{ font-size:19px; font-weight:900; font-variant-numeric:tabular-nums; }
+.aa-stake-live{ font-size:11px; font-weight:800; color:var(--good); min-height:14px; }
+/* one switch: does this room take players from online, or only the ones you send the link to */
+.aa-fill{ display:flex; align-items:center; gap:9px; margin:12px 2px 2px; font-size:14px; font-weight:800; color:var(--muted); cursor:pointer; }
+.aa-fill input{ appearance:none; width:42px; height:24px; border-radius:999px; background:var(--line-soft); position:relative; cursor:pointer; transition:background .15s; flex:0 0 auto; margin:0; }
+.aa-fill input::after{ content:""; position:absolute; top:3px; left:3px; width:18px; height:18px; border-radius:50%; background:var(--card); box-shadow:0 1px 3px rgba(0,0,0,.25); transition:transform .15s; }
+.aa-fill input:checked{ background:var(--good); }
+.aa-fill input:checked::after{ transform:translateX(18px); }
+.aa-fill input:checked + span{ color:var(--ink); }
 .aa-purse{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin:0 0 12px; font-size:14px; font-weight:800; color:var(--muted); }
 .aa-link-box{ font-size:12px; word-break:break-all; background:var(--bg2); border-radius:12px; padding:10px 12px; margin:0 0 12px; color:var(--muted); }
 .aa-gold{ margin-left:auto; display:flex; align-items:center; gap:5px; font-size:15px; font-weight:900; color:var(--ink); background:var(--bg2); border-radius:999px; padding:7px 13px; flex:0 0 auto; font-variant-numeric:tabular-nums; }
