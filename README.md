@@ -867,7 +867,13 @@ links.
   itself refusing to be started by hand, and — because the ledger is checked
   against every balance at the end of each suite — that no run of any of it makes
   or loses a single gold. Signing out and deleting the account live in Settings.
-- **Home country first** (`homeCountry`, `orderFor`): `games/geo.php` passes on
+- **Home country first** (`homeCountry`, `orderFor`): the first board is the
+  player's own country, so level 1 is the United States for somebody in the
+  United States and Bangladesh for somebody in Bangladesh, and the tour radiates
+  out from there by distance (US → Canada, Mexico, Bahamas…; Japan → South Korea,
+  North Korea, Taiwan…). The lobby map marks that first country and pulses it,
+  which is why its caption says only how many countries have been discovered and
+  nothing about where to tap. `games/geo.php` passes on
   Cloudflare's `CF-IPCountry` (nothing stored); the browser language region is
   the fallback. The tour order is the player's country, then every other country
   by great-circle distance from it (`c` = centroid per level, `a2` = ISO code).

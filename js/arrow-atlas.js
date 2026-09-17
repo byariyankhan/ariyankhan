@@ -305,8 +305,10 @@
       if (isNext) { const g = svgEl('g', { class: 'is-next' }); g.appendChild(svgEl('circle', { cx: c.cx, cy: c.cy, r: 9 })); labels.appendChild(g); }
     }
     // "discovered", which is what the game calls it everywhere else, and nothing after it: a player looking at
-    // their own map does not need to be told a second time that the countries on it can be tapped.
-    el.worldCap.textContent = done ? `${done} of ${n} countries discovered` : 'Your world tour starts here · tap the highlighted country';
+    // their own map does not need to be told a second time that the countries on it can be tapped. One
+    // sentence in both states, including the first run — the tour opens on the player's own country, marked
+    // and pulsing, so "tap the highlighted country" was explaining something the map already says.
+    el.worldCap.textContent = `${done} of ${n} countries discovered`;
 
   }
 
