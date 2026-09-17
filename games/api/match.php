@@ -36,7 +36,7 @@ function aa_match_view(PDO $db, array $m, ?array $me): array {
         'pot' => (int)$m['stake'] * max(1, count($players)),
         'host' => aa_player_name($db, (int)$m['host_id']),
         'you' => $mine ? ($isHost ? 'host' : 'guest') : '',
-        'can_start' => $isHost && $m['state'] === 'open' && count($players) > 1,
+        'can_start' => $isHost && $m['state'] === 'open' && count($players) > 1 && !(int)$m['open_to_all'],
         'open_to_all' => (bool)$m['open_to_all'],
         // seconds until it begins on its own; null in an invite-only room, or before the second player arrives
         'fills_in' => $m['fills_at'] === null || $m['state'] !== 'open' ? null : max(0, (int)$m['fills_at'] - time()),
@@ -120,25 +120,26 @@ if ($action === 'start') {
     if (!$m) aa_json(['error' => 'no_match'], 404);
     if ((int)$m['host_id'] !== $me['id']) aa_json(['error' => 'not_host'], 403);
     if ($m['state'] !== 'open') aa_json(['error' => 'taken'], 409);
+    if ((int)$m['open_to_all']) aa_json(['error' => 'clock_starts_it'], 409);
     if (count(aa_room($db, $m['code'])) < 2) aa_json(['error' => 'need_two'], 400);
     aa_start_room($db, $m['code']);   // the board is set now, from the players who actually turned up
     aa_reply($db, $m['code'], $me);
 }
 
+// Leaving the room. Anyone in it may go, and they take their own stake with them; the room itself only closes
+// behind the last one out, and the crown passes on if the one leaving was wearing it.
 if ($action === 'cancel') {
     if (!$post) aa_json(['error' => 'post_only'], 405);
     if (!$me) aa_json(['error' => 'signed_out'], 401);
     $m = aa_match_row($db, (string)(aa_body()['code'] ?? ''));
     if (!$m) aa_json(['error' => 'no_match'], 404);
-    if ((int)$m['host_id'] !== $me['id']) aa_json(['error' => 'not_host'], 403);
     if ($m['state'] !== 'open') aa_json(['error' => 'taken'], 409);
-    $db->beginTransaction();
-    $upd = $db->prepare("UPDATE matches SET state = 'void', settled = ? WHERE code = ? AND state = 'open'");
-    $upd->execute([time(), $m['code']]);
-    if ($upd->rowCount() !== 1) { $db->rollBack(); aa_json(['error' => 'taken'], 409); }
-    foreach (aa_room($db, $m['code']) as $p) aa_give_gold($db, (int)$p['user_id'], (int)$m['stake']);   // everyone gets their stake back
-    $db->commit();
-    aa_reply($db, $m['code'], $me);
+    $in = false;
+    foreach (aa_room($db, $m['code']) as $p) if ((int)$p['user_id'] === $me['id']) $in = true;
+    if (!$in) aa_json(['error' => 'not_yours'], 403);
+    aa_leave_room($db, $m, $me['id']);
+    $left = aa_match_row($db, $m['code']);
+    aa_json(['match' => aa_match_view($db, $left, $me), 'gold' => aa_gold($db, $me['id']), 'closed' => $left['state'] === 'void']);
 }
 
 if ($action === 'progress') {

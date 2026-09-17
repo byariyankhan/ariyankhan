@@ -50,7 +50,7 @@ $join = function (string $code, int $uid, int $tier = 2) use ($db) {
 };
 $start = function (string $code, int $uid) use ($db) {
     $m = aa_match_row_raw($db, $code);
-    if (!$m || $m['state'] !== 'open' || (int)$m['host_id'] !== $uid || count(aa_room($db, $code)) < 2) return false;
+    if (!$m || $m['state'] !== 'open' || (int)$m['host_id'] !== $uid || (int)$m['open_to_all'] || count(aa_room($db, $code)) < 2) return false;
     $db->prepare("UPDATE matches SET state = 'playing', started = ?, tier = ? WHERE code = ?")->execute([time(), aa_room_tier($db, $code), $code]);
     return true;
 };
@@ -175,14 +175,69 @@ $line = aa_match_players($db, $row($c5), null);
 ok($line[0]['name'] === 'Rahim' && $line[0]['pct'] === 100, 'a finished board goes in front of everyone still playing');
 $result($c5, $host, -1);
 
+echo "\nLeaving a room\n";
+{
+    $l = fn(string $sub) => aa_upsert_user($db, 'google', $sub, ucfirst($sub));
+    $lead = $l('leave-1'); $second = $l('leave-2'); $third = $l('leave-3');
+    $rm = $make($lead, 500);
+    $join($rm, $second); $join($rm, $third);
+    ok((int)$row($rm)['host_id'] === $lead && count(aa_room($db, $rm)) === 3, 'three of them, the first in charge');
+    $g = [$gold($lead), $gold($second), $gold($third)];
+    aa_leave_room($db, $row($rm), $lead);
+    ok($row($rm)['state'] === 'open', 'the leader walking out does not call the match off');
+    ok((int)$row($rm)['host_id'] === $second, 'the next one in becomes the leader');
+    ok(count(aa_room($db, $rm)) === 2, 'and two are still in the room');
+    ok($gold($lead) === $g[0] + 500, 'the one who left has their stake back');
+    ok($gold($second) === $g[1] && $gold($third) === $g[2], 'and nobody else was touched');
+    ok($start($rm, $lead) === false, 'the one who left cannot start it any more');
+    ok($start($rm, $second) === true && $row($rm)['state'] === 'playing', 'the new leader can');
+
+    // down to one, and then to none
+    $rm2 = $make($lead, 500); $join($rm2, $second);
+    aa_leave_room($db, $row($rm2), $second);
+    ok(count(aa_room($db, $rm2)) === 1 && $row($rm2)['state'] === 'open', 'a guest leaving a room of two leaves the host waiting');
+    ok((int)$row($rm2)['host_id'] === $lead, 'who is still the host');
+    $g2 = $gold($lead);
+    aa_leave_room($db, $row($rm2), $lead);
+    ok($row($rm2)['state'] === 'void' && $gold($lead) === $g2 + 500, 'the last one out closes the room and takes their stake');
+    ok(aa_leave_room($db, $row($rm2), $lead) === null && $gold($lead) === $g2 + 500, 'and leaving a closed room a second time pays nothing');
+
+    // a clock left running over a room of one goes back to waiting rather than starting a match of one
+    $p1 = $l('leave-p1'); $p2 = $l('leave-p2');
+    $pr = $make($p1, 1000, 2, true);
+    $make($p2, 1000, 2, true);
+    ok(count(aa_room($db, $pr)) === 2 && $row($pr)['fills_at'] !== null, 'a room that fills itself has its clock running at two');
+    aa_leave_room($db, $row($pr), $p2);
+    aa_autostart_matches($db);
+    ok($row($pr)['state'] === 'open' && $row($pr)['fills_at'] === null, 'one of them leaving stops the clock instead of starting a match of one');
+    ok((int)$row($pr)['created'] >= time() - 2, 'and the wait starts over for the one left behind');
+}
+
+echo "\nA room that fills itself is started by its clock, not by a hand\n";
+{
+    $h1 = aa_upsert_user($db, 'google', 'clock-1', 'Nadia');
+    $h2 = aa_upsert_user($db, 'google', 'clock-2', 'Sabbir');
+    $cr = $make($h1, 500, 2, true);
+    $make($h2, 500, 2, true);
+    ok(count(aa_room($db, $cr)) === 2 && $row($cr)['fills_at'] !== null, 'two are in, the clock is running');
+    ok($start($cr, $h1) === false && $row($cr)['state'] === 'open', 'the leader cannot start it early and shut the others out');
+    $db->prepare('UPDATE matches SET fills_at = ? WHERE code = ?')->execute([time() - 1, $cr]);
+    aa_autostart_matches($db);
+    ok($row($cr)['state'] === 'playing', 'only the clock running out starts it');
+    $inv = $make($h1, 500);
+    $join($inv, $h2);
+    ok($start($inv, $h1) === true, 'while an invite-only room is still the host\'s to start whenever they like');
+    // these two sections leave rooms open that take anyone: close them, or the section further down that counts
+    // who is waiting would be counting these
+    $db->exec("UPDATE matches SET state = 'void' WHERE state = 'open' AND open_to_all = 1");
+}
+
 echo "\nCalling the room off\n";
 $c6 = $make($host, 500); $join($c6, $guest);
 $g6 = [$gold($host), $gold($guest)];
-$db->beginTransaction();
-$db->prepare("UPDATE matches SET state = 'void', settled = ? WHERE code = ?")->execute([time(), $c6]);
-foreach (aa_room($db, $c6) as $p) aa_give_gold($db, (int)$p['user_id'], 500);
-$db->commit();
-ok($row($c6)['state'] === 'void' && $gold($host) === $g6[0] + 500 && $gold($guest) === $g6[1] + 500, 'cancelling hands every stake back');
+aa_leave_room($db, $row($c6), $guest);
+aa_leave_room($db, $row($c6), $host);
+ok($row($c6)['state'] === 'void' && $gold($host) === $g6[0] + 500 && $gold($guest) === $g6[1] + 500, 'everybody leaving hands every stake back and closes the room');
 ok($join($c6, $broke) === false, 'and the link is dead');
 
 echo "\nNobody turns up\n";
