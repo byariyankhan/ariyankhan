@@ -44,7 +44,7 @@ on:
         type: choice
         required: true
         default: inspect
-        options: [inspect, logs, backup-verify, cleanup, deploy, deploy-site, push-source, web-safe-fetch, health]
+        options: [inspect, logs, git-access, backup-verify, cleanup, deploy, deploy-site, push-source, web-safe-fetch, health]
       confirm:
         description: "Type DELETE for cleanup, DEPLOY for deploy. Ignored by the read-only modes."
         required: false
