@@ -72,6 +72,18 @@ export const config = {
     boardsFile: str('ARROW_ATLAS_BOARDS_FILE', '/srv/arrow-atlas/data/arrow-atlas.json'),
   },
 
+  // ── The league ──
+  //
+  // One week, and the ten who won the most gold at the tables are paid. Tenth place is the base and every
+  // place above it doubles, so 10th takes 10K and 1st takes 10K x 2^9 = 5.12M. All three are settings rather
+  // than constants because the right size for them is a question about the economy, not about the code: turn
+  // the base down and the whole ladder comes down with it, in proportion.
+  league: {
+    hours: num('ARROW_ATLAS_LEAGUE_HOURS', 168),      // 168 = one week
+    ranks: num('ARROW_ATLAS_LEAGUE_RANKS', 10),
+    baseGold: num('ARROW_ATLAS_LEAGUE_BASE_GOLD', 10_000),   // what last place in the prizes is paid
+  },
+
   // How often the housekeeping loop runs. The PHP service swept on every request, which is what made a busy
   // lobby slow; one timer in one process does the same work without taxing the players.
   sweepSeconds: num('ARROW_ATLAS_SWEEP_SECONDS', 2),

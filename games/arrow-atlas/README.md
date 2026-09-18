@@ -64,6 +64,38 @@ One rule lives in the client rather than the server, and only because the server
 country **guessed** from the connection is not the player's answer, so it never travels. Only one chosen in
 Settings does.
 
+### The league
+
+Every week the gold won at the gold tables is counted and the ten best are paid. Tenth place takes the base
+prize and every place above it doubles it, so with the defaults (`ARROW_ATLAS_LEAGUE_BASE_GOLD` 10,000 and
+`ARROW_ATLAS_LEAGUE_RANKS` 10): 10th 10K, 9th 20K, 8th 40K … 1st 5.12M, and the whole ladder comes to 10.23M
+gold a week.
+
+Three decisions hold it up:
+
+* **Earning is net.** A week's earning is every movement of gold a table caused — stakes paid, pots won,
+  refunds — added up. Counting gross winnings instead would reward two accounts passing the same gold back and
+  forth, because each pass would add to a total out of nothing; netting makes that pointless, since the pair
+  together always nets zero. Signup gold, admin corrections and last week's prize are excluded, so a prize
+  never feeds the next league. A week you lost on is a negative number and no placing at all.
+* **The standings are a query, not a counter.** `gold_ledger` already records every movement with its time, so
+  any week's table can be derived whenever it is asked for, and there is no second running total to drift away
+  from the balances. A partial index over the five play reasons serves the scan.
+* **A season is paid once.** The `league_seasons` row is taken with `FOR UPDATE SKIP LOCKED`, every prize is a
+  gold movement keyed `league:<season>:<user>`, and `settled_at` is stamped in the same transaction. Two
+  containers sweeping together, a restart mid-settlement or a plain retry all end with one payment. The
+  finished table is then frozen into `league_prizes`, names included, so a player deleting their account the
+  day after does not change what last week said.
+
+Seasons are counted from a fixed Monday, so a restart cannot produce a half-length week, and a service that was
+off for a fortnight comes back, fills in the weeks it missed and settles them oldest first.
+
+**On the size of the prizes.** The biggest pot a table can pay today is seven seats at 7,000 — 42,000 gold to
+the winner. First place in the league is 5.12M, which is around 120 of those. That is deliberate on the
+product's side, but it means the league, not the tables, is where most gold in the game now comes from; turn
+`ARROW_ATLAS_LEAGUE_BASE_GOLD` down and the whole ladder comes down with it, in proportion, without a deploy of
+anything but the environment.
+
 ---
 
 ## Public URLs
@@ -90,6 +122,7 @@ in the path.
 | POST | `/auth/delete` | delete the account and everything attached |
 | GET | `/progress` | the whole tour this account has played |
 | POST | `/progress` | push what a device has; the merged whole comes back |
+| GET | `/league` | this week's table, your place in it, the prizes, and last week's result |
 | GET | `/lobby` | how many are waiting, per stake |
 | POST | `/matches` | open a room (`stake`, `open_to_all`, `tier`) |
 | GET | `/matches/:code` | the room as you may see it |
@@ -143,6 +176,7 @@ has turned a degraded service into an outage.
 | `match_progress` | 120 / min | account |
 | `match_result` | 20 / min | account |
 | `lobby_read` | 120 / min | IP |
+| `league_read` | 90 / min | IP |
 | `progress_read` | 60 / min | account |
 | `progress_write` | 60 / min | account |
 | `ws_connect` | 60 / min | IP |

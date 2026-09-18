@@ -1,0 +1,233 @@
+// The league: who is ranked, what they are paid, and the promise that a season is paid exactly once.
+//
+// Every row these tests count is a real gold movement written by gold.move(), backdated into the week being
+// tested. That matters: the suite finishes by checking the ledger still accounts for every balance, so a
+// league that paid twice, or paid out of nowhere, fails here rather than in production.
+import { pool, query } from '../backend/src/db.js';
+import { config } from '../backend/src/config.js';
+import * as L from '../backend/src/league.js';
+import { give, idem, move } from '../backend/src/gold.js';
+import { eq, finish, goldOf, ok, player, reset, section } from './helpers.js';
+
+await reset();
+
+const HOUR = 3600_000;
+const now = new Date();
+const thisWeek = L.seasonAt(now);
+const lastWeek = L.previousSeason(thisWeek);
+
+/** A gold movement that happened at a particular moment. The balance moves now; the row is dated then. */
+async function moved(userId: number, delta: number, reason: Parameters<typeof move>[3], key: string, at: Date): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const r = await move(client, userId, delta, reason, key);
+    if (!r?.applied) throw new Error(`could not move ${delta} for ${userId}`);
+    await client.query('UPDATE gold_ledger SET created_at = $2 WHERE idem_key = $1', [key, at]);
+    await client.query('COMMIT');
+  } catch (e) { await client.query('ROLLBACK'); throw e; } finally { client.release(); }
+}
+
+/** What a week of play looks like in the ledger: a stake paid, and a pot won. */
+const played = (id: number, netGold: number, at: Date, tag: string) => Promise.all([
+  moved(id, -1_000, 'stake', `t-stake:${tag}`, at),
+  moved(id, 1_000 + netGold, 'payout', `t-payout:${tag}`, at),
+]);
+
+section('A season is a week, and it starts on a Monday');
+{
+  eq(thisWeek.endsAt.getTime() - thisWeek.startsAt.getTime(), config.league.hours * HOUR, 'a season is as long as the setting says');
+  eq(config.league.hours, 168, 'and the setting is one week');
+  eq(thisWeek.startsAt.getUTCDay(), 1, 'seasons open on a Monday');
+  eq(thisWeek.startsAt.getUTCHours(), 0, 'at midnight UTC');
+  eq(lastWeek.endsAt.getTime(), thisWeek.startsAt.getTime(), 'last week ends exactly where this one begins');
+  eq(thisWeek.key, thisWeek.startsAt.toISOString().slice(0, 10), 'the key is the day it opened');
+  ok(L.seasonAt(thisWeek.startsAt).key === thisWeek.key, 'the first instant of a season is inside it');
+  ok(L.seasonAt(new Date(thisWeek.endsAt.getTime() - 1)).key === thisWeek.key, 'and the last one is too');
+  ok(L.seasonAt(thisWeek.endsAt).key !== thisWeek.key, 'the instant it ends belongs to the next season');
+}
+
+section('The prize ladder doubles from tenth place to first');
+{
+  const ladder = L.prizeLadder();
+  eq(ladder.length, 10, 'ten places are paid');
+  eq(L.prizeFor(10), 10_000, 'tenth takes the base');
+  eq(L.prizeFor(9), 20_000, 'ninth takes twice that');
+  eq(L.prizeFor(8), 40_000, 'eighth twice again');
+  eq(L.prizeFor(1), 5_120_000, 'and first takes the base doubled nine times');
+  eq(ladder.reduce((a, b) => a + b, 0), 10_230_000, 'the whole ladder is 10.23M gold a week');
+  eq(L.prizeFor(11), 0, 'eleventh place is not a prize');
+  eq(L.prizeFor(0), 0, 'nor is a rank that does not exist');
+  eq(L.prizeFor(1.5), 0, 'nor half a rank');
+}
+
+section('Earning is what you won at the tables, netted');
+{
+  const a = await player('lea-net');
+  const before = await goldOf(a.id);
+  await played(a.id, 4_000, new Date(thisWeek.startsAt.getTime() + HOUR), 'net-a');
+  await moved(a.id, -1_000, 'stake', 't-stake:net-lost', new Date(thisWeek.startsAt.getTime() + 2 * HOUR));
+
+  const mine = await L.placeOf(pool, thisWeek, a.id);
+  eq(mine.earning, 3_000, 'a 4,000 win and a 1,000 stake lost is 3,000 earned');
+  eq(await goldOf(a.id), before + 3_000, 'and the purse agrees');
+}
+
+section('Gold that is not winnings is not earning');
+{
+  const a = await player('lea-gift');
+  // The signup grant, an admin correction and last season's league prize all land in the same week.
+  await moved(a.id, 50_000, 'admin', 't-admin:gift', new Date(thisWeek.startsAt.getTime() + HOUR));
+  await moved(a.id, 5_120_000, 'league', 't-league:gift', new Date(thisWeek.startsAt.getTime() + HOUR));
+  eq((await L.placeOf(pool, thisWeek, a.id)).earning, 0, 'given gold does not count towards the league');
+  eq((await L.placeOf(pool, thisWeek, a.id)).rank, null, 'so it is no place at all');
+
+  await played(a.id, 500, new Date(thisWeek.startsAt.getTime() + 3 * HOUR), 'gift-play');
+  eq((await L.placeOf(pool, thisWeek, a.id)).earning, 500, 'only what was won at a table counts');
+}
+
+section('Play outside the week is another week');
+{
+  const a = await player('lea-when');
+  await played(a.id, 9_000, new Date(lastWeek.startsAt.getTime() + HOUR), 'when-last');
+  eq((await L.placeOf(pool, thisWeek, a.id)).earning, 0, 'last week does not show up in this week');
+  eq((await L.placeOf(pool, lastWeek, a.id)).earning, 9_000, 'it shows up in its own');
+}
+
+section('The table is ordered by earning, and a tie goes to whoever got there first');
+{
+  await reset();
+  const mid = lastWeek.startsAt.getTime() + 24 * HOUR;
+  const big = await player('rank-big'), early = await player('rank-early'), late = await player('rank-late'), small = await player('rank-small');
+  await played(big.id, 30_000, new Date(mid), 'r-big');
+  await played(early.id, 20_000, new Date(mid), 'r-early');
+  await played(late.id, 20_000, new Date(mid + HOUR), 'r-late');
+  await played(small.id, 5_000, new Date(mid), 'r-small');
+  // A losing week, and a week that broke even: neither is a placing.
+  const lost = await player('rank-lost'), even = await player('rank-even');
+  await moved(lost.id, -1_000, 'stake', 't-stake:r-lost', new Date(mid));
+  await played(even.id, 0, new Date(mid), 'r-even');
+
+  const table = await L.standings(pool, lastWeek);
+  eq(table.map(r => r.name), ['rank-big', 'rank-early', 'rank-late', 'rank-small'], 'most won is first, and only players in front are ranked');
+  eq(table.map(r => r.earning), [30_000, 20_000, 20_000, 5_000], 'with what each of them won');
+  eq(table.map(r => r.rank), [1, 2, 3, 4], 'ranked from one');
+
+  eq((await L.placeOf(pool, lastWeek, late.id)).rank, 3, 'a tie is broken by who stopped earning first, not by chance');
+  eq((await L.placeOf(pool, lastWeek, lost.id)).rank, null, 'a losing week has no rank');
+  eq((await L.placeOf(pool, lastWeek, lost.id)).earning, -1_000, 'though it is still counted, and it is negative');
+  eq((await L.placeOf(pool, lastWeek, even.id)).rank, null, 'breaking even is not a placing either');
+}
+
+section('A finished season is ranked, paid and frozen');
+{
+  await reset();
+  const mid = lastWeek.startsAt.getTime() + 24 * HOUR;
+  const players = [];
+  for (let i = 0; i < 12; i++) {
+    const p = await player(`league-${String(i).padStart(2, '0')}`);
+    // i = 0 wins the most; the last two win nothing at all
+    if (i < 10) await played(p.id, (12 - i) * 1_000, new Date(mid + i * 60_000), `s-${i}`);
+    players.push(p);
+  }
+  const before = await Promise.all(players.map(p => goldOf(p.id)));
+
+  await L.ensureSeason(pool, lastWeek);
+  const done = await L.settleDue(now);
+  ok(!!done, 'the season that has ended is settled');
+  eq(done!.key, lastWeek.key, 'and it is last week, not this one');
+  eq(done!.paid.length, 10, 'ten places are paid');
+  eq(done!.paid.map(p => p.gold), L.prizeLadder(), 'each of them the ladder amount');
+  eq(done!.paid[0]!.name, 'league-00', 'the player who won the most takes first');
+
+  const after = await Promise.all(players.map(p => goldOf(p.id)));
+  eq(after[0]! - before[0]!, 5_120_000, 'first place is paid 5.12M');
+  eq(after[9]! - before[9]!, 10_000, 'tenth place is paid 10K');
+  eq(after[10]! - before[10]!, 0, 'eleventh place is paid nothing');
+  eq(after[11]! - before[11]!, 0, 'and so is everyone below');
+
+  section('  settling again pays nothing');
+  {
+    const again = await L.settleDue(now);
+    eq(again, null, 'there is nothing left due');
+    const twice = await Promise.all(players.map(p => goldOf(p.id)));
+    eq(twice, after, 'and no balance moved');
+    const rows = await query<{ n: number }>(pool,
+      `SELECT COUNT(*)::bigint AS n FROM gold_ledger WHERE reason = 'league'`);
+    eq(Number(rows.rows[0]!.n), 10, 'the ledger holds exactly ten prize rows');
+  }
+
+  section('  and the result reads the same afterwards');
+  {
+    const saved = await L.resultOf(pool, lastWeek.key);
+    eq(saved!.paid.length, 10, 'the finished table is kept');
+    eq(saved!.paid[0]!.name, 'league-00', 'with the names as they stood');
+    const last = await L.lastSettled(pool);
+    eq(last!.key, lastWeek.key, 'and it is the one the game shows as last week');
+
+    await query(pool, 'DELETE FROM users WHERE id = $1', [players[0]!.id]);
+    const afterGone = await L.resultOf(pool, lastWeek.key);
+    eq(afterGone!.paid[0]!.name, 'league-00', 'a winner who deletes their account does not erase the result');
+    eq(afterGone!.paid[0]!.user_id, null, 'the row simply stops pointing at an account');
+  }
+}
+
+section('A league nobody won pays nobody');
+{
+  await reset();
+  const a = await player('quiet');
+  await moved(a.id, -1_000, 'stake', 't-stake:quiet', new Date(lastWeek.startsAt.getTime() + HOUR));
+  await L.ensureSeason(pool, lastWeek);
+  const done = await L.settleDue(now);
+  ok(!!done, 'the season still closes');
+  eq(done!.paid.length, 0, 'but nothing is paid out');
+  const rows = await query<{ n: number }>(pool, `SELECT COUNT(*)::bigint AS n FROM gold_ledger WHERE reason = 'league'`);
+  eq(Number(rows.rows[0]!.n), 0, 'and no prize row is written');
+}
+
+section('Fewer players than places');
+{
+  await reset();
+  const mid = lastWeek.startsAt.getTime() + 12 * HOUR;
+  const a = await player('few-a'), b = await player('few-b');
+  await played(a.id, 8_000, new Date(mid), 'f-a');
+  await played(b.id, 3_000, new Date(mid + 60_000), 'f-b');
+  const before = [await goldOf(a.id), await goldOf(b.id)];
+
+  await L.ensureSeason(pool, lastWeek);
+  const done = await L.settleDue(now);
+  eq(done!.paid.map(p => p.rank), [1, 2], 'only the places that were played for are paid');
+  eq(await goldOf(a.id) - before[0]!, 5_120_000, 'first place is still first place');
+  eq(await goldOf(b.id) - before[1]!, 2_560_000, 'and second is second, however few turned up');
+}
+
+section('A gap in the seasons is filled rather than skipped');
+{
+  await reset();
+  const old = L.seasonAt(thisWeek.startsAt.getTime() - 4 * 168 * HOUR);
+  await L.ensureSeason(pool, old);
+  const made = await L.ensureSeasonsThrough(pool, now);
+  ok(made >= 4, 'the weeks between the last one on record and now are created');
+  const rows = await query<{ key: string }>(pool, 'SELECT key FROM league_seasons ORDER BY starts_at');
+  eq(rows.rows[0]!.key, old.key, 'starting where the record left off');
+  eq(rows.rows[rows.rows.length - 1]!.key, thisWeek.key, 'and ending with the week we are in');
+
+  // Every one of them has ended except this one, and they settle oldest first, paying nothing.
+  const settled = await L.leagueSweep(now);
+  eq(settled.length, rows.rowCount! - 1, 'every finished season is settled, and the running one is not');
+  eq(await L.leagueSweep(now), [], 'a second sweep finds nothing to do');
+}
+
+// One prize row must never be able to exist twice, whatever the caller does.
+section('The ledger refuses a second prize for the same season');
+{
+  await reset();
+  const a = await player('twice');
+  const before = await goldOf(a.id);
+  await give(pool as never, a.id, 1_000, 'league', idem.league('2026-01-05', a.id));
+  const second = await give(pool as never, a.id, 1_000, 'league', idem.league('2026-01-05', a.id));
+  eq(second?.applied, false, 'the same season and player cannot be paid twice');
+  eq(await goldOf(a.id), before + 1_000, 'and the purse only moved once');
+}
+
+await finish();

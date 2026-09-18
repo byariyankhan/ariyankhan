@@ -8,7 +8,7 @@
 import type { PoolClient } from 'pg';
 import { query } from './db.js';
 
-export type GoldReason = 'signup' | 'stake' | 'leave_refund' | 'expire_refund' | 'draw_refund' | 'payout' | 'admin';
+export type GoldReason = 'signup' | 'stake' | 'leave_refund' | 'expire_refund' | 'draw_refund' | 'payout' | 'league' | 'admin';
 
 /** Keys are deterministic, so the same real-world event always produces the same key. */
 export const idem = {
@@ -18,6 +18,7 @@ export const idem = {
   expireRefund: (code: string, userId: number) => `expire_refund:${code}:${userId}`,
   drawRefund: (code: string, userId: number) => `draw_refund:${code}:${userId}`,
   payout: (code: string) => `payout:${code}`,
+  league: (season: string, userId: number) => `league:${season}:${userId}`,
   admin: (ref: string) => `admin:${ref}`,
 };
 

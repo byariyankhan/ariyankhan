@@ -30,7 +30,7 @@ export async function finish(): Promise<never> {
 export async function reset(): Promise<void> {
   await migrate();
   // TRUNCATE rather than DROP: it keeps the schema the migrations built, which is what we mean to test against.
-  await query(pool, 'TRUNCATE progress, gold_ledger, match_players, matches, sessions, users RESTART IDENTITY CASCADE');
+  await query(pool, 'TRUNCATE league_prizes, league_seasons, progress, gold_ledger, match_players, matches, sessions, users RESTART IDENTITY CASCADE');
 }
 
 /** A signed-in player with gold to spend, without going anywhere near Google. */
