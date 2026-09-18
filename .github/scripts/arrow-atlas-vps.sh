@@ -200,6 +200,74 @@ report_backups() {
 # itself over a read-only deploy key, then rebuilding from that checkout. Nothing there fetches a tarball over
 # an unauthenticated URL, which is why nothing there broke when a repository went private. If this host can
 # already read this repository the same way, Arrow Atlas can work exactly like it.
+# Give this host a key of its own for this repository, and pull with it.
+#
+# This is the shape Bookween already deploys in: the host holds a read-only deploy key, pulls the repository
+# itself, and builds from that checkout — so nothing reaches for a tarball at container start and a repository
+# going private breaks nothing. Arrow Atlas was the odd one out.
+#
+# No token is involved anywhere. A token on a remote command line is readable in that host's process list, and
+# one that is pasted or stored outlives its usefulness; a key made here has its private half written once, by
+# ssh-keygen, into a file this script never reads. What is printed is the public half, which is not a secret
+# and is useless without the private one. Adding it to the repository is the single step only a person can do.
+#
+# Run it again after that, and it pulls.
+mode_git_sync() {
+  echo "Arrow Atlas — a key for this host, and a pull with it  ($(hostname), $(date -u))"
+  SRC=/var/www/ariyankhan-src
+  KEY="$HOME/.ssh/ariyankhan_repo_deploy"
+  ALIAS=ariyankhan-ssh
+
+  say "1. the checkout this host keeps"
+  $SUDO test -d "$SRC/.git" || { bad "$SRC is not a git checkout; leaving it alone"; return; }
+  note "at $($SUDO git -C "$SRC" rev-parse --short HEAD 2>/dev/null) on $($SUDO git -C "$SRC" rev-parse --abbrev-ref HEAD 2>/dev/null)"
+
+  say "2. the key"
+  if $SUDO test -f "$KEY"; then
+    note "it already has one: $($SUDO ssh-keygen -lf "$KEY" 2>/dev/null | awk '{print $1, $2}')"
+  else
+    $SUDO ssh-keygen -t ed25519 -N '' -C "ariyankhan-vps-$(hostname)" -f "$KEY" >/dev/null 2>&1 \
+      && ok "made: $($SUDO ssh-keygen -lf "$KEY" 2>/dev/null | awk '{print $1, $2}')  (the private half stays here and is never printed)" \
+      || { bad "ssh-keygen would not make one"; return; }
+  fi
+  # A host alias, so this repository's key is offered for this repository and Bookween's stays Bookween's.
+  if ! $SUDO grep -qs "^Host $ALIAS\$" "$HOME/.ssh/config"; then
+    $SUDO sh -c "printf '\nHost $ALIAS\n  HostName github.com\n  User git\n  IdentityFile %s\n  IdentitiesOnly yes\n' '$KEY' >> '$HOME/.ssh/config'" \
+      && ok "ssh knows it as $ALIAS" || bad "could not write the ssh config"
+  else
+    note "ssh already knows it as $ALIAS"
+  fi
+  $SUDO git -C "$SRC" remote add "$ALIAS" "git@$ALIAS:byariyankhan/ariyankhan.git" 2>/dev/null \
+    || $SUDO git -C "$SRC" remote set-url "$ALIAS" "git@$ALIAS:byariyankhan/ariyankhan.git"
+  note "and the checkout has a remote using it"
+
+  say "3. does GitHub know this key yet"
+  if ! $SUDO git -C "$SRC" ls-remote --heads "$ALIAS" main >/dev/null 2>&1; then
+    bad "not yet — which is expected the first time, and is the one step nobody but you can take"
+    echo
+    note "The public half (not a secret):"
+    echo
+    $SUDO cat "$KEY.pub" | sed 's/^/      /'
+    echo
+    note "Add it at  https://github.com/byariyankhan/ariyankhan/settings/keys/new"
+    note "  Title:  ariyankhan-vps"
+    note "  Key:    the line above, exactly"
+    note "  Allow write access: leave it UNCHECKED — this host only ever needs to read"
+    note "Then run this mode again and it will pull on its own."
+    return
+  fi
+  ok "GitHub accepts it"
+
+  say "4. the pull"
+  if $SUDO git -C "$SRC" fetch --prune "$ALIAS" main >/dev/null 2>&1 \
+     && $SUDO git -C "$SRC" reset --hard FETCH_HEAD >/dev/null 2>&1; then
+    ok "now at $($SUDO git -C "$SRC" rev-parse --short HEAD)  ($($SUDO git -C "$SRC" log -1 --format=%s | cut -c1-64))"
+    note "from here this host can fetch its own source, the way the Bookween project does"
+  else
+    bad "the key works but the pull did not"
+  fi
+}
+
 mode_git_access() {
   echo "Arrow Atlas — what this host can read from GitHub  ($(hostname), $(date -u))"
 
@@ -924,6 +992,7 @@ case "$MODE" in
   inspect)       mode_inspect ;;
   logs)          mode_logs ;;
   git-access)    mode_git_access ;;
+  git-sync)      mode_git_sync ;;
   push-source)   mode_push_source ;;
   web-safe-fetch) mode_web_safe_fetch ;;
   backup-verify) mode_backup_verify ;;
