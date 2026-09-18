@@ -214,6 +214,9 @@
   function renderSound() { el.btnSound.setAttribute('aria-checked', String(!state.muted)); el.btnSound.setAttribute('aria-label', state.muted ? 'Sound off' : 'Sound on'); }
 
   let toastTimer = 0;
+  // The coin itself lives in the page as one <symbol>; this is how every line of markup here names it.
+  const COIN = '<svg class="aa-coin" aria-hidden="true"><use href="#aaCoin"></use></svg>';
+
   function toast(msg, kind = '', ms = 2800) { el.toast.textContent = msg; el.toast.className = 'aa-toast' + (kind ? ' aa-toast--' + kind : ''); el.toast.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => { el.toast.hidden = true; }, ms); }
 
   // ── Data ──
@@ -1406,7 +1409,7 @@
       <span class="aa-me-face${faceClass(u)}">${faceInner(u)}</span>
       <span class="aa-me-id">
         <span class="aa-me-name">${escapeHtml(u.name || 'Player')}</span>
-        <span class="aa-gold${goldFit(u.gold)}" title="Your gold"><span aria-hidden="true">🪙</span>${gfmt(u.gold)}</span>
+        <span class="aa-gold${goldFit(u.gold)}" title="Your gold">${COIN}${gfmt(u.gold)}</span>
       </span>
     </div>`;
   }
@@ -1443,22 +1446,30 @@
     const d = Math.round(h / 24);
     return d === 1 ? 'yesterday' : `${d} days ago`;
   };
+  // Who the next table should invite. On the dashboard there is no room yet — an invitation has to point at a
+  // table — so a tap there marks somebody instead of sending, and the stake that opens the table sends them
+  // all. In a room the same button sends at once, because there is something to send.
+  const picks = new Map();
+
   // Three states, because "online" and "in a match" are different answers to "is it worth inviting them".
-  const playerRow = p => `
-    <div class="aa-pl" data-player="${p.id}">
+  const playerRow = (p, mode) => {
+    const picked = mode === 'pick' && picks.has(p.id);
+    return `
+    <div class="aa-pl${picked ? ' is-picked' : ''}" data-player="${p.id}">
       <span class="aa-rank aa-pl-face${faceClass(p)}" aria-hidden="true">${faceInner(p)}</span>
       <span class="aa-pl-who">
         <b>${escapeHtml(p.name || 'Player')}</b>
         <small class="aa-pl-when is-${p.status}">${p.status === 'playing' ? 'in a match' : p.status === 'online' ? 'online' : AGO(p.last_at)}</small>
       </span>
-      <button type="button" class="aa-btn aa-btn--small aa-pl-go" data-invite="${p.id}" data-name="${escapeHtml(p.name || 'Player')}">Invite</button>
+      <button type="button" class="aa-btn aa-btn--small aa-pl-go${picked ? ' is-on' : ''}" data-invite="${p.id}" data-name="${escapeHtml(p.name || 'Player')}"${mode === 'pick' ? ` aria-pressed="${picked}"` : ''}>${picked ? '\u2713 Picked' : 'Invite'}</button>
     </div>`;
+  };
 
-  function playersHtml(list) {
+  function playersHtml(list, mode) {
     if (!list.length) {
       return `<p class="aa-sheet-note">Nobody yet. Play one match with somebody — a link is enough the first time — and they will be here afterwards.</p>`;
     }
-    return `<div class="aa-group aa-pl-list">${list.map(playerRow).join('')}</div>`;
+    return `<div class="aa-group aa-pl-list">${list.map(p => playerRow(p, mode)).join('')}</div>`;
   }
 
   // The invite panel of an open room: who you have played with, then the link for everybody else.
@@ -1485,20 +1496,23 @@
 
   // Sending one. The room has to be open and theirs, which the server checks; this only has to say what
   // happened, and to be honest about somebody who is not online to hear it.
-  async function invitePlayer(id, name, btn) {
+  async function invitePlayer(id, name, btn, quiet) {
     const m = state.pendingMatch;
-    if (!m || !id) return;
+    if (!m || !id) return false;
     if (btn) { btn.disabled = true; btn.textContent = 'Inviting…'; }
     try {
       const d = await matchApi('invite', { code: m.code, user_id: Number(id) });
       if (btn) btn.textContent = d.delivered ? 'Invited' : 'Sent';
-      toast(d.delivered ? `${name} has been asked to join.` : `${name} is not online — send them the link instead.`, d.delivered ? 'good' : 'hint');
+      // A batch from the dashboard speaks once for all of them, so it asks for the answer and does the talking.
+      if (!quiet) toast(d.delivered ? `${name} has been asked to join.` : `${name} is not online — send them the link instead.`, d.delivered ? 'good' : 'hint');
+      return !!d.delivered;
     } catch (err) {
       if (btn) { btn.disabled = false; btn.textContent = 'Invite'; }
-      toast(err.code === 'not_played_together' ? 'You can only invite people you have played with.'
+      if (!quiet) toast(err.code === 'not_played_together' ? 'You can only invite people you have played with.'
         : err.code === 'taken' ? 'That room has already started.'
         : err.code === 'already_in' ? `${name} is already in this room.`
         : 'Could not send that invitation.', 'bad');
+      return false;
     }
   }
 
@@ -1521,6 +1535,7 @@
   // you send the link to, and only when you say go.
   const fillOn = () => store.get('fillOnline', true) !== false;
   function openStakes() {
+    picks.clear();                      // a mark is for the table chosen in this visit, not for a later one
     const gold = auth.user?.gold ?? 0, fill = fillOn(), waiting = state.lobbyWaiting || {};
     el.matchTitle.textContent = 'Dashboard';
     el.matchBody.innerHTML = `
@@ -1537,7 +1552,16 @@
   }
 
   // The dashboard's copy of the list. Inviting from here needs a table first — the room is what an invitation
-  // points at — so the tap remembers who, and the next table opened sends it.
+  // points at — so a tap marks somebody, the caption says how many are marked and what to do next, and the
+  // stake that opens the table sends every one of them.
+  function pickCaption() {
+    const cap = $('#aaRecentCap', el.matchBody);
+    if (!cap) return;
+    cap.textContent = picks.size
+      ? `${picks.size} picked · now choose a table above`
+      : 'Played with lately · tap to invite';
+    cap.classList.toggle('is-armed', picks.size > 0);
+  }
   async function refreshRecent() {
     const box = $('#aaRecentBox', el.matchBody);
     if (!box) return;
@@ -1545,11 +1569,15 @@
     const cap = $('#aaRecentCap', el.matchBody);
     if (!$('#aaRecentBox', el.matchBody)) return;         // the sheet changed under us
     if (cap) cap.hidden = !list.length;
-    box.innerHTML = list.length ? playersHtml(list) : '';
+    box.innerHTML = list.length ? playersHtml(list, 'pick') : '';
     wireFaces(box);
+    pickCaption();
   }
+  // Five tables in one row, small enough to take in at a glance. How many are sitting at each one rides in the
+  // corner as a badge rather than as a line of type: the number is the news, the word "waiting" is not.
+  const stakeLive = n => n ? `<span class="aa-stake-live" title="${n} waiting">${n}</span>` : '';
   const stakesHtml = (gold, waiting) => STAKES.map(v =>
-    `<button type="button" class="aa-stake" data-stake="${v}"${gold < v ? ' disabled' : ''}><span class="aa-stake-coin" aria-hidden="true">🪙</span><span class="aa-stake-amt">${gtiny(v)}</span><span class="aa-stake-live">${waiting[v] ? `${waiting[v]} waiting` : ''}</span></button>`).join('');
+    `<button type="button" class="aa-stake" data-stake="${v}"${gold < v ? ' disabled' : ''} aria-label="Play for ${gfmt(v)} gold"><span class="aa-stake-in"><svg class="aa-coin aa-stake-coin" aria-hidden="true"><use href="#aaCoin"></use></svg><span class="aa-stake-amt">${gtiny(v)}</span></span>${stakeLive(waiting[v])}</button>`).join('');
 
   // How many are sitting in a room at each stake. Shown under the coins so nobody waits at an empty one.
   // The same answer carries the server's list of tables, so a table added or retired there reaches the player
@@ -1567,8 +1595,10 @@
         return;
       }
       $$('.aa-stake', el.matchBody).forEach(b => {
-        const live = $('.aa-stake-live', b), n = state.lobbyWaiting[b.dataset.stake] || 0;
-        if (live) live.textContent = n ? `${n} waiting` : '';
+        const n = state.lobbyWaiting[b.dataset.stake] || 0, live = $('.aa-stake-live', b);
+        if (live && !n) live.remove();
+        else if (live) { live.textContent = n; live.title = `${n} waiting`; }
+        else if (n) b.insertAdjacentHTML('beforeend', stakeLive(n));
       });
     } catch { /* the count is a nicety, not the flow */ }
   }
@@ -1711,7 +1741,7 @@
         <span class="aa-rank aa-vs-face${faceClass({ name: m.host, pic: m.host_pic })}" aria-hidden="true">${faceInner({ name: m.host, pic: m.host_pic })}</span>
         <span class="aa-vs-who"><b>${escapeHtml(m.host)}</b> challenges you.</span>
       </div>
-      <p class="aa-purse"><span>Stake</span><span class="aa-gold"><span aria-hidden="true">🪙</span>${gfmt(m.stake)}</span></p>
+      <p class="aa-purse"><span>Stake</span><span class="aa-gold">${COIN}${gfmt(m.stake)}</span></p>
       <p class="aa-sheet-note">Everyone puts in ${gfmt(m.stake)} gold and plays the very same board. Clear it first and you take the lot.${short ? ` <b>You have only ${gfmt(gold)}.</b>` : ''}</p>
       <div class="aa-actions">
         <button type="button" class="aa-btn aa-btn--primary" data-mact="join"${short ? ' disabled' : ''}>Confirm game</button>
@@ -1741,7 +1771,7 @@
     const purse = m.you_won ? `You won ${gfmt(m.pot)}` : m.winner ? `You lost ${gfmt(m.stake)}` : m.draw ? 'Every stake came back' : 'Your stake is held';
     el.matchBody.innerHTML = `
       <div class="aa-vs">${(m.players || []).map(row).join('')}</div>
-      <p class="aa-purse"><span>${purse}</span><span class="aa-gold${m.you_won ? ' is-won' : ''}${goldFit(auth.user?.gold ?? 0)}"><span aria-hidden="true">🪙</span><span id="aaPurseCount">${gfmt(auth.user?.gold ?? 0)}</span></span></p>
+      <p class="aa-purse"><span>${purse}</span><span class="aa-gold${m.you_won ? ' is-won' : ''}${goldFit(auth.user?.gold ?? 0)}">${COIN}<span id="aaPurseCount">${gfmt(auth.user?.gold ?? 0)}</span></span></p>
       ${m.state === 'done' ? '' : '<p class="aa-sheet-note">The others are still playing for their place.</p>'}
       <div class="aa-actions"><button type="button" class="aa-btn aa-btn--primary" data-mact="stakes">Play another</button><button type="button" class="aa-btn" data-mact="close">Close</button></div>`;
     wireFaces(el.matchBody);
@@ -1861,8 +1891,19 @@
   el.matchBody?.addEventListener('click', async e => {
     const inv = e.target.closest('[data-invite]');
     if (inv) {
-      state.inviteAfter = { id: Number(inv.dataset.invite), name: inv.dataset.name };
-      toast(`Pick a table, and ${inv.dataset.name} will be invited to it.`, 'hint');
+      const id = Number(inv.dataset.invite), name = inv.dataset.name;
+      const row = inv.closest('.aa-pl');
+      if (picks.delete(id)) {
+        inv.textContent = 'Invite'; inv.classList.remove('is-on'); inv.setAttribute('aria-pressed', 'false');
+        row?.classList.remove('is-picked');
+      } else {
+        picks.set(id, name);
+        inv.textContent = '\u2713 Picked'; inv.classList.add('is-on'); inv.setAttribute('aria-pressed', 'true');
+        row?.classList.add('is-picked');
+        if (picks.size === 1) toast('Now choose a table, and they will be invited to it.', 'hint');
+      }
+      vibe(10);
+      pickCaption();
       return;
     }
     const stake = e.target.closest('[data-stake]')?.dataset.stake;
@@ -1873,9 +1914,19 @@
         const d = await matchApi('create', { stake: +stake, tier: TIER_OF(), open_to_all: fillOn() });
         setGold(d.gold);
         showRoom(d.match);
-        // Somebody was picked on the dashboard before the table was: now there is a room to point them at.
-        const who = state.inviteAfter; state.inviteAfter = null;
-        if (who) await invitePlayer(who.id, who.name, null);
+        // People were picked on the dashboard before the table was: now there is a room to point them at.
+        const who = [...picks]; picks.clear();
+        if (who.length) {
+          const here = [], away = [];
+          for (const [id, name] of who) (await invitePlayer(id, name, null, true) ? here : away).push(name);
+          // Everyone picked was sent an invitation; only the ones with the game open will see it now, and
+          // saying which is which is kinder than a cheerful line about somebody who is asleep.
+          const asked = here.length === 1 ? `${here[0]} has been asked to join.` : `${here.length} players have been asked to join.`;
+          const missed = away.length === 1 ? `${away[0]} is not online — share the link.` : `${away.length} of them are not online — share the link.`;
+          if (here.length && away.length) toast(`${asked} ${missed}`, 'hint', 4200);
+          else if (here.length) toast(asked, 'good');
+          else toast(missed, 'hint');
+        }
       } catch (err) { btn.disabled = false; toast(goldError(err), 'bad'); if (typeof err.gold === 'number') setGold(err.gold); }
       return;
     }
@@ -1969,7 +2020,7 @@
     }
     el.accountWho.textContent = `${auth.user.name} · ${(auth.user.provider || 'google').replace(/^./, c => c.toUpperCase())}`;   // the caption above already says Account
     el.accountGold.className = 'aa-gold' + goldFit(auth.user.gold);
-    el.accountGold.innerHTML = `<span aria-hidden="true">🪙</span>${gfmt(auth.user.gold)}`;
+    el.accountGold.innerHTML = `${COIN}${gfmt(auth.user.gold)}`;
   }
   el.signOutBtn?.addEventListener('click', async () => {
     try { await authApi('logout', {}); } catch { /* the cookie may already be gone */ }
@@ -2256,7 +2307,7 @@
       <span class="aa-lg-medal${prize ? MEDAL(r.rank) : ''}">${r.rank}</span>
       <span class="aa-rank${faceClass(r)}" aria-hidden="true">${faceInner(r)}</span>
       <span class="aa-lg-who"><b>${escapeHtml(r.name || 'Player')}</b>${prize ? `<small>${paid ? 'won' : 'wins'} ${gshort(prize)}</small>` : ''}</span>
-      <span class="aa-lg-earn${r.earning < 0 ? ' is-down' : ''}"><span aria-hidden="true">🪙</span>${gshort(r.earning)}</span>
+      <span class="aa-lg-earn${r.earning < 0 ? ' is-down' : ''}">${COIN}${gshort(r.earning)}</span>
     </div>`;
   // A prize belongs to a row only while that row is in front: the table holds everyone who played, so places
   // one to ten can be held by a player who is down on the week, and "wins 5.12M" under a losing line would be
@@ -2314,7 +2365,7 @@
         <p>When the week ends the top ten are paid, tenth place taking ${gshort(prizes[prizes.length - 1] || 0)} and every place above it doubling that, up to ${gshort(prizes[0] || 0)} for first. A week you end down on keeps your place on the board and pays nothing.</p>
         <p class="aa-cap aa-lg-cap">What the places pay</p>
         <div class="aa-lg-prizes">
-          ${prizes.map((g, i) => `<div class="aa-lg-prize"><span class="aa-lg-medal${MEDAL(i + 1)}">${i + 1}</span><span><span aria-hidden="true">🪙</span> ${gshort(g)}</span></div>`).join('')}
+          ${prizes.map((g, i) => `<div class="aa-lg-prize"><span class="aa-lg-medal${MEDAL(i + 1)}">${i + 1}</span><span>${COIN} ${gshort(g)}</span></div>`).join('')}
         </div>
       </div>
       ${meLine}
