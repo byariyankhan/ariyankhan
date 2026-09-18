@@ -172,6 +172,26 @@ section('A finished season is ranked, paid and frozen');
   }
 }
 
+section('The table is a hundred places long');
+{
+  await reset();
+  const mid = thisWeek.startsAt.getTime() + 6 * HOUR;
+  for (let i = 0; i < 105; i++) {
+    const p = await player(`deep-${String(i).padStart(3, '0')}`);
+    await played(p.id, (200 - i) * 100, new Date(mid + i * 1000), `d-${i}`);
+  }
+  const table = await L.standings(pool, thisWeek, L.TABLE_SIZE);
+  eq(table.length, 100, 'a hundred rows come back, not fifty');
+  eq(table[0]!.name, 'deep-000', 'the best week is first');
+  eq(table[99]!.rank, 100, 'and the last row is the hundredth place');
+
+  // and a player past the end of it is still told where they stand
+  const beyond = await L.placeOf(pool, thisWeek, (await query<{ id: number }>(pool,
+    `SELECT id FROM users WHERE name = 'deep-104'`)).rows[0]!.id);
+  eq(beyond.rank, 105, 'a player outside the hundred still has a rank of their own');
+  ok(beyond.earning > 0, 'and an earning to go with it');
+}
+
 section('A league nobody won pays nobody');
 {
   await reset();

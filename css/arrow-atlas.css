@@ -138,12 +138,13 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-wait b{ color:var(--ink); font-variant-numeric:tabular-nums; }
 @keyframes aaspin{ to{ transform:rotate(360deg); } }
 /* the three stakes side by side, each its own coin */
-.aa-stakes{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin:4px 0 2px; }
+/* Five tables now, so the row wraps rather than squeezing: three across a phone, all five on a wide panel. */
+.aa-stakes{ display:grid; grid-template-columns:repeat(auto-fit, minmax(96px, 1fr)); gap:10px; margin:4px 0 2px; }
 .aa-stake{ display:flex; flex-direction:column; align-items:center; gap:6px; padding:16px 6px 14px; border:none; border-radius:18px; background:var(--card); box-shadow:0 2px 8px rgba(0,0,0,.06); cursor:pointer; color:var(--ink); transition:transform .15s; }
 .aa-stake:hover:not(:disabled){ transform:translateY(-2px); }
 .aa-stake:disabled{ opacity:.4; cursor:default; }
 .aa-stake-coin{ font-size:30px; line-height:1; }
-.aa-stake-amt{ font-size:19px; font-weight:900; font-variant-numeric:tabular-nums; }
+.aa-stake-amt{ font-size:19px; font-weight:900; font-variant-numeric:tabular-nums; letter-spacing:.2px; }
 .aa-stake-live{ font-size:11px; font-weight:800; color:var(--good); min-height:14px; }
 /* one switch: does this room take players from online, or only the ones you send the link to */
 .aa-fill{ display:flex; align-items:center; gap:9px; margin:12px 2px 2px; font-size:14px; font-weight:800; color:var(--muted); cursor:pointer; }
@@ -194,6 +195,15 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-lg-who small{ display:block; font-size:11px; font-weight:800; color:var(--good); }
 .aa-lg-earn{ display:inline-flex; align-items:center; gap:4px; font-size:14px; font-weight:900;
   font-variant-numeric:tabular-nums; white-space:nowrap; }
+/* Your own row, following the scroll at the foot of the sheet. It sits inside the panel that scrolls, so
+   `sticky` holds it against the bottom edge rather than the window's. */
+/* Sticky offsets are measured from the scrollport, whose bottom edge is inside the panel's own padding — so
+   `bottom:0` would leave a strip of the table scrolling past underneath. The offset pays that padding back. */
+.aa-lg-pin{ position:sticky; bottom:calc(-24px - env(safe-area-inset-bottom, 0px)); z-index:3;
+  margin:0 -18px calc(-24px - env(safe-area-inset-bottom, 0px));
+  padding:8px 14px calc(14px + env(safe-area-inset-bottom, 0px));
+  background:var(--panel); box-shadow:0 -8px 20px color-mix(in srgb, var(--ink) 12%, transparent); }
+.aa-lg-pin .aa-lg-row{ background:color-mix(in srgb, var(--accent) 20%, var(--card)); padding:8px; }
 .aa-lg-prizes{ display:grid; grid-template-columns:repeat(auto-fit, minmax(110px, 1fr)); gap:2px 12px; padding:10px 14px; }
 .aa-lg-prize{ display:flex; align-items:center; gap:8px; padding:4px 0; font-size:13px; font-weight:900;
   font-variant-numeric:tabular-nums; }

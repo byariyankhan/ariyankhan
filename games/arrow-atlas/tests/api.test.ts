@@ -95,7 +95,7 @@ section('A result sent twice is still one pot');
 
 section('A room that fills itself cannot be started by hand');
 {
-  const made = await call('/matches', { token: a.token, body: { stake: 7000, open_to_all: true, tier: 2 } });
+  const made = await call('/matches', { token: a.token, body: { stake: config.game.stakes[1], open_to_all: true, tier: 2 } });
   const code = (made.json.match as { code: string }).code;
   const c = await mint('apiCarl');
   await call(`/matches/${code}/join`, { token: c.token, body: { tier: 2 } });
@@ -108,8 +108,15 @@ section('Rate limits bite, and say so properly');
 {
   const spammer = await mint('apiSpam', 5_000_000);
   let limited = 0, allowed = 0, retryAfter = '';
+  // The window is a fixed one, so a run that straddles its boundary is allowed up to twice the limit — by
+  // design, and not what this test is about. The remaining count going back up is that boundary passing, so
+  // the run starts over in the fresh window rather than failing for a reason that is not a bug.
+  let left = Infinity, restarts = 0;
   for (let i = 0; i < 26; i++) {                          // match_create allows 20 a minute
     const r = await call('/matches', { token: spammer.token, body: { stake: 500, open_to_all: false, tier: 2 } });
+    const now = Number(r.headers.get('x-ratelimit-remaining') ?? -1);
+    if (now > left && restarts < 3) { restarts++; limited = 0; allowed = 0; i = -1; left = Infinity; continue; }
+    left = now;
     if (r.status === 429) { limited++; retryAfter = r.headers.get('retry-after') ?? ''; } else allowed++;
   }
   ok(limited > 0, `the limit is enforced (${allowed} allowed, ${limited} refused)`);
@@ -213,6 +220,25 @@ section('A link cannot delete somebody\u2019s account');
   eq(byPost.status, 200, 'a POST from the dashboard still deletes the account');
   const gone = await query<{ n: number }>(pool, 'SELECT COUNT(*)::int AS n FROM users WHERE id = $1', [victim.id]);
   eq(gone.rows[0]!.n, 0, 'and it is really gone');
+}
+
+section('The tables are the five the server names, and nothing else');
+{
+  const lobby = await call('/lobby');
+  eq(lobby.json.stakes, [500, 1000, 10_000, 1_000_000, 10_000_000], 'the lobby names every table it will seat');
+  const rich = await mint('high-roller', 20_000_000);
+  const big = await call('/matches', { token: rich.token, body: { stake: 10_000_000, open_to_all: false } });
+  eq(big.status, 200, 'the biggest table opens for a purse that can cover it');
+  eq(big.json.gold, 10_000_000, 'and the stake has left the purse');
+  const gone = await call('/matches', { token: rich.token, body: { stake: 7000, open_to_all: false } });
+  eq(gone.status, 400, 'a table that no longer exists is refused');
+  eq(gone.json.error, 'bad_stake', 'and says why');
+  const poor = await mint('small-purse', 600);
+  const over = await call('/matches', { token: poor.token, body: { stake: 10_000_000, open_to_all: false } });
+  eq(over.status, 400, 'a purse that cannot cover the big table is refused');
+  eq(over.json.error, 'not_enough_gold', 'for the honest reason, not as an unknown table');
+  eq((await call('/matches', { token: poor.token, body: { stake: 500, open_to_all: false } })).status, 200,
+     'and the smallest table still seats them');
 }
 
 section('The league is readable signed out, and knows you when you are in');
