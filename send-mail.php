@@ -8,6 +8,18 @@ use PHPMailer\PHPMailer\PHPMailer;
 
 const DEFAULT_SITE_URL = 'https://ariyankhan.com';
 
+/* The subject line names the project type and who sent it — "Talking Head - Philippe Nesser" — because that is
+   what an inbox shows before anything is opened. The form's own wording is written to be read in a dropdown and
+   is too long for that, so each option has a short name here. The full one still goes in the body. */
+const SUBJECT_PROJECT_TYPE = [
+  'Talking Head Video Editing'           => 'Talking Head',
+  'Documentary Video Editing'            => 'Documentary',
+  'Short Form (TikTok / Reels / Shorts)' => 'Short Form',
+  'Map Animation & Geopolitical Visuals' => 'Map Animation',
+  'Color Grading Only'                   => 'Color Grading',
+  'Other'                                => 'Other',
+];
+
 header('Content-Type: application/json; charset=utf-8');
 set_time_limit(30);
 
@@ -114,6 +126,20 @@ function clean_message(string $value): string {
   $value = str_replace(["\r\n", "\r"], "\n", $value);
 
   return preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]+/u', '', $value) ?? '';
+}
+
+/**
+ * The subject for one enquiry.
+ *
+ * A project type this list has not heard of — an older form still in a cache, a payload posted by hand — is
+ * carried through as it arrived rather than dropped: a subject that says something unexpected is far easier to
+ * act on than one that quietly says nothing. When there is no project type at all, the sender's name is the
+ * whole subject, because "— - Philippe Nesser" reads as a bug.
+ */
+function subject_line(string $service, string $name): string {
+  $short = clean_line(SUBJECT_PROJECT_TYPE[$service] ?? $service);
+
+  return ($short === '' || $short === '—') ? $name : "{$short} - {$name}";
 }
 
 function normalize_whatsapp_digits(string $value): string {
@@ -359,7 +385,7 @@ try {
   $mail->addReplyTo($email, $name);
 
   $mail->isHTML(false);
-  $mail->Subject = "{$name} — {$service}";
+  $mail->Subject = subject_line($service, $name);
   $mail->Body =
     "New project inquiry via ariyankhan.com\n" .
     str_repeat('─', 48) . "\n\n" .
