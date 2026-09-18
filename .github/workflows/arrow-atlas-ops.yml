@@ -16,6 +16,13 @@
 #                  re-fetches main. The game's backend, its routing and its socket are not touched — most
 #                  changes to this game are to its client, and those should not cost a rebuild of the API or
 #                  twenty seconds of nobody being able to play. Needs confirm=DEPLOY.
+#   logs           Reads. What arrow-atlas-api says about itself: its state, its restart count and last exit
+#                  code, the tail of its log and its last health probes. For when inspect says "restarting"
+#                  and the reason is in a log nobody here can otherwise read.
+#   push-source    Sends this checkout to the VPS over the same connection, unpacks it into the volume the
+#                  API builds from, installs the compose file that came with it and starts the API from it.
+#                  What to run while the repository cannot be read without a key, since the API's own start
+#                  fetches from GitHub. Touches no .env and no other project. Needs confirm=DEPLOY.
 #   health         Reads. The four containers, the API, the socket, the backup timer, and that no legacy
 #                  artifact is left anywhere.
 #
@@ -31,7 +38,7 @@ on:
         type: choice
         required: true
         default: inspect
-        options: [inspect, logs, backup-verify, cleanup, deploy, deploy-site, health]
+        options: [inspect, logs, backup-verify, cleanup, deploy, deploy-site, push-source, health]
       confirm:
         description: "Type DELETE for cleanup, DEPLOY for deploy. Ignored by the read-only modes."
         required: false
@@ -56,7 +63,7 @@ jobs:
           set -euo pipefail
           case "${{ inputs.mode }}" in
             cleanup) [ "${{ inputs.confirm }}" = "DELETE" ] || { echo "::error::cleanup needs confirm=DELETE"; exit 1; } ;;
-            deploy|deploy-site) [ "${{ inputs.confirm }}" = "DEPLOY" ] || { echo "::error::${{ inputs.mode }} needs confirm=DEPLOY"; exit 1; } ;;
+            deploy|deploy-site|push-source) [ "${{ inputs.confirm }}" = "DEPLOY" ] || { echo "::error::${{ inputs.mode }} needs confirm=DEPLOY"; exit 1; } ;;
             *) echo "read-only mode, no confirmation needed" ;;
           esac
 
@@ -88,6 +95,24 @@ jobs:
           done
           [ -s ~/.ssh/known_hosts ] || { echo "::error::no host key from the VPS on port 22 after four tries — is SSH reachable from GitHub's runners?"; exit 1; }
           ssh-keygen -lf ~/.ssh/known_hosts | sed 's/^/  host key  /'
+
+      # push-source is the one mode that carries the repository itself. The API normally fetches its own
+      # source from GitHub when it starts, which needs the repository to be readable without a key; while it
+      # is not, this connection is the way in. Everything but the working tree is left behind, and .git most
+      # of all — the VPS has no business holding the history.
+      - name: Send this checkout
+        if: inputs.mode == 'push-source'
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: |
+          set -euo pipefail
+          tar -czf /tmp/arrow-atlas-site.tgz --exclude=./.git .
+          ls -lh /tmp/arrow-atlas-site.tgz | sed 's/^/  /'
+          scp -i ~/.ssh/vps -o IdentitiesOnly=yes -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \
+              -o StrictHostKeyChecking=yes -o BatchMode=yes -o ConnectTimeout=20 \
+              /tmp/arrow-atlas-site.tgz "$VPS_USER@$VPS_HOST:/tmp/arrow-atlas-site.tgz"
+          echo "  sent"
 
       - name: ${{ inputs.mode }}
         env:

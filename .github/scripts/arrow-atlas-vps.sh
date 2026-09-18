@@ -205,6 +205,57 @@ mode_logs() {
 {{end}}{{end}}' arrow-atlas-api 2>&1 | tail -6 | sed 's/^/      /'
 }
 
+# Put this checkout on the VPS and start the API from it.
+#
+# The API fetches its own source from GitHub when it starts, which works only while the repository can be read
+# without a key. It cannot: every start now answers 404, and because the old command emptied the volume before
+# fetching, there was nothing left to fall back on and the container restarted forever. This sends the source
+# down the connection the ops workflow already has — no token on the host, nothing secret in the repository —
+# installs the compose file that came with it, and starts the API from what was sent. Needs confirm=DEPLOY.
+mode_push_source() {
+  echo "Arrow Atlas — send this checkout and start the API from it  ($(hostname), $(date -u))"
+  TGZ=/tmp/arrow-atlas-site.tgz
+  [ -s "$TGZ" ] || { bad "no source arrived at $TGZ"; return; }
+  note "$(du -h "$TGZ" | cut -f1) arrived"
+  tar -tzf "$TGZ" ./games/arrow-atlas/backend/package.json >/dev/null 2>&1 \
+    || { bad "that tarball is not this repository"; return; }
+  ok "it carries the API's own package.json"
+
+  say "1. into the volume the API builds from"
+  if docker run --rm -v arrow-atlas-site:/site -v "$TGZ":/src.tgz:ro alpine:3.20 \
+       sh -c 'find /site -mindepth 1 -maxdepth 1 -exec rm -rf {} + && tar -xzf /src.tgz -C /site'; then
+    ok "the checkout is in arrow-atlas-site"
+  else
+    bad "could not write the volume"; return
+  fi
+
+  say "2. the compose file that came with it"
+  PROJ=$(docker inspect -f '{{index .Config.Labels "com.docker.compose.project.working_dir"}}' arrow-atlas-api 2>/dev/null)
+  [ -n "$PROJ" ] && $SUDO test -d "$PROJ" || { bad "cannot find the project directory of arrow-atlas-api"; return; }
+  note "$PROJ"
+  $SUDO cp -a "$PROJ/docker-compose.yml" "$HOST_BACKUPS/docker-compose.yml.before-$STAMP" 2>/dev/null \
+    && kept "$HOST_BACKUPS/docker-compose.yml.before-$STAMP  (the way back)"
+  # Only this one file, and only out of the tarball just verified: the project's .env, which holds every
+  # secret this deployment has, is never read, written or moved by any line here.
+  tar -xzf "$TGZ" -O ./games/arrow-atlas/deploy/docker-compose.yml > /tmp/aa-compose.yml 2>/dev/null
+  [ -s /tmp/aa-compose.yml ] || { bad "the tarball has no compose file"; return; }
+  $SUDO install -m 644 /tmp/aa-compose.yml "$PROJ/docker-compose.yml" && ok "installed" || { bad "could not install it"; return; }
+  rm -f /tmp/aa-compose.yml
+
+  say "3. and the API, started from what is now on disk"
+  ( cd "$PROJ" && $SUDO docker compose up -d --force-recreate arrow-atlas-api ) >/dev/null 2>&1 \
+    || { bad "docker compose refused to bring it up"; docker logs --tail 30 arrow-atlas-api 2>&1 | sed 's/^/      /'; return; }
+  note "it still installs and builds TypeScript, which takes a couple of minutes on 2 vCPU"
+  h=""
+  for i in $(seq 1 60); do
+    h=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' arrow-atlas-api 2>/dev/null)
+    [ "$h" = "healthy" ] && break
+    sleep 10
+  done
+  [ "$h" = "healthy" ] && ok "arrow-atlas-api is healthy" || bad "arrow-atlas-api is $h after ten minutes"
+  docker logs --tail 20 arrow-atlas-api 2>&1 | sed 's/^/      /'
+}
+
 mode_inspect() {
   echo "Arrow Atlas — inspect  ($(hostname), $(date -u))"
   report_containers
@@ -614,6 +665,7 @@ mode_health() {
 case "$MODE" in
   inspect)       mode_inspect ;;
   logs)          mode_logs ;;
+  push-source)   mode_push_source ;;
   backup-verify) mode_backup_verify ;;
   cleanup)       mode_cleanup ;;
   deploy)        mode_deploy ;;

@@ -26,6 +26,8 @@ services:
       - "127.0.0.1:${WEB_PORT:-8747}:80"
     environment:
       SITE_BRANCH: ${SITE_BRANCH:-main}
+      # Only needed while the repository is private; a read-only contents token, set in hPanel, never here.
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
       SITE_URL: ${SITE_URL:-https://ariyankhan.com}
       TO_EMAIL: ${TO_EMAIL:-}
       # The address the message is from, which is not the account the relay signs in as. It has to be one this
@@ -42,11 +44,32 @@ services:
       - -c
       - |
         set -e
+        # Two ways in, because the repository is not always readable without a key: with GITHUB_TOKEN set it
+        # is GitHub's API, without one the public tarball. The token lives in the environment this container
+        # is given, never in this file.
+        fetch() {
+          if [ -n "$${GITHUB_TOKEN:-}" ]; then
+            curl -fsSL -H "Authorization: Bearer $$GITHUB_TOKEN" \
+              "https://api.github.com/repos/byariyankhan/ariyankhan/tarball/$$SITE_BRANCH"
+          else
+            curl -fsSL "https://codeload.github.com/byariyankhan/ariyankhan/tar.gz/refs/heads/$$SITE_BRANCH"
+          fi
+        }
         echo "[deploy] fetching branch $$SITE_BRANCH"
-        find /var/www/html -mindepth 1 -maxdepth 1 -exec rm -rf {} +
-        curl -fsSL "https://codeload.github.com/byariyankhan/ariyankhan/tar.gz/refs/heads/$$SITE_BRANCH" \
-          | tar -xz --strip-components=1 -C /var/www/html
-        echo "[deploy] fetched $$(date -u)"
+        # Unpacked beside the site and swapped in whole. Emptying /var/www/html first and fetching afterwards
+        # means a bad minute at GitHub leaves the site with no files at all and the container restarting.
+        rm -rf /var/www/.next-site && mkdir -p /var/www/.next-site
+        if fetch | tar -xz --strip-components=1 -C /var/www/.next-site && [ -f /var/www/.next-site/index.html ]; then
+          find /var/www/html -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+          (cd /var/www/.next-site && tar -cf - .) | (cd /var/www/html && tar -xf -)
+          echo "[deploy] fetched $$(date -u)"
+        elif [ -f /var/www/html/index.html ]; then
+          echo "[deploy] could not fetch $$SITE_BRANCH; serving the copy already here"
+        else
+          echo "[deploy] could not fetch $$SITE_BRANCH and there is nothing here to serve"
+          exit 1
+        fi
+        rm -rf /var/www/.next-site
         exec bash /var/www/html/deploy/web-entrypoint.sh
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS -o /dev/null -H 'X-Forwarded-Proto: https' http://localhost/ || exit 1"]

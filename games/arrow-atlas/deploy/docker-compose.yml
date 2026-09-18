@@ -91,6 +91,9 @@ services:
       ARROW_ATLAS_REDIS_PASSWORD: ${ARROW_ATLAS_REDIS_PASSWORD}
       ARROW_ATLAS_REDIS_PREFIX: ${ARROW_ATLAS_REDIS_PREFIX:-arrow-atlas:}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      # Only needed while the repository is private, and only ever set in the project's .env on the host:
+      # a read-only token for contents. Empty, the start falls back to the public tarball.
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
       ARROW_ATLAS_ALLOWED_ORIGINS: ${ARROW_ATLAS_ALLOWED_ORIGINS:-}
       ARROW_ATLAS_COOKIE_SECURE: ${ARROW_ATLAS_COOKIE_SECURE:-true}
       ARROW_ATLAS_LOG_LEVEL: ${ARROW_ATLAS_LOG_LEVEL:-info}
@@ -101,14 +104,43 @@ services:
       - |
         set -e
         apk add --no-cache curl tar >/dev/null
+        SITE=/srv/arrow-atlas/site
+        NEXT=/srv/arrow-atlas/.next
+        # Two ways in, because the repository is not always readable without a key: with a token in the
+        # environment it is GitHub's API, and without one the public tarball. The token is never in this file
+        # or in the repository — it comes from the project's .env on the host, if it is there at all.
+        fetch() {
+          if [ -n "$$GITHUB_TOKEN" ]; then
+            curl -fsSL -H "Authorization: Bearer $$GITHUB_TOKEN" \
+              "https://api.github.com/repos/byariyankhan/ariyankhan/tarball/$$SITE_BRANCH"
+          else
+            curl -fsSL "https://codeload.github.com/byariyankhan/ariyankhan/tar.gz/refs/heads/$$SITE_BRANCH"
+          fi
+        }
         echo "[arrow-atlas] fetching $$SITE_BRANCH"
         # The checkout lives in a named volume, so arrow-atlas-backup can read the two shell scripts it needs
-        # without a network of its own. Clear the contents rather than the directory: it is a mount point.
-        mkdir -p /srv/arrow-atlas/site
-        find /srv/arrow-atlas/site -mindepth 1 -maxdepth 1 -exec rm -rf {} +
-        curl -fsSL "https://codeload.github.com/byariyankhan/ariyankhan/tar.gz/refs/heads/$$SITE_BRANCH" \
-          | tar -xz --strip-components=1 -C /srv/arrow-atlas/site
-        cd /srv/arrow-atlas/site/games/arrow-atlas/backend
+        # without a network of its own. It is unpacked beside the volume first and only swapped in once it is
+        # whole: clearing the volume and then fetching is how a 404 at GitHub turned into an API that could
+        # not start at all, with nothing left on disk to start from. The contents are cleared rather than the
+        # directory, which is a mount point.
+        mkdir -p "$$SITE"
+        rm -rf "$$NEXT" && mkdir -p "$$NEXT"
+        if fetch | tar -xz --strip-components=1 -C "$$NEXT" && [ -f "$$NEXT/games/arrow-atlas/backend/package.json" ]; then
+          find "$$SITE" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+          (cd "$$NEXT" && tar -cf - .) | (cd "$$SITE" && tar -xf -)
+          rm -rf "$$NEXT"
+          echo "[arrow-atlas] fetched"
+        elif [ -f "$$SITE/games/arrow-atlas/backend/package.json" ]; then
+          # An old version answering is better than none: the service comes up on what is already here and
+          # says so, rather than restarting forever over a network that will be back in a minute.
+          rm -rf "$$NEXT"
+          echo "[arrow-atlas] could not fetch $$SITE_BRANCH; starting from the checkout already in the volume"
+        else
+          rm -rf "$$NEXT"
+          echo "[arrow-atlas] could not fetch $$SITE_BRANCH and there is nothing here to fall back on"
+          exit 1
+        fi
+        cd "$$SITE/games/arrow-atlas/backend"
         echo "[arrow-atlas] installing and building"
         # --include=dev is not optional here: NODE_ENV is production, which makes npm ci skip
         # devDependencies, and typescript is one of them. Without it the build dies on "sh: tsc: not found"
