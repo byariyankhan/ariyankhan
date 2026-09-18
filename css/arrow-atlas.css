@@ -101,9 +101,10 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-signin{ display:flex; justify-content:center; min-height:44px; margin:4px 0 12px; }
 .aa-signin:empty{ display:none; margin:0; min-height:0; }   /* no empty gap when Google's button could not load */
 .aa-signin-list{ margin:0 0 14px; padding:0 0 0 18px; color:var(--muted); font-size:14px; line-height:1.7; }
-.aa-me{ display:flex; align-items:center; gap:12px; margin:0 0 14px; min-width:0; }
-.aa-me > span:nth-child(2){ min-width:0; overflow:hidden; }
-.aa-me-face{ position:relative; overflow:hidden; width:48px; height:48px; border-radius:50%; background:var(--accent); color:#fff; font-size:22px; font-weight:900; display:flex; align-items:center; justify-content:center; flex:0 0 auto; }
+/* The player's own header: face, name, and the purse right under the name rather than adrift at the far edge. */
+.aa-me{ display:flex; align-items:center; gap:14px; margin:0 0 16px; min-width:0; }
+.aa-me-id{ display:flex; flex-direction:column; align-items:flex-start; gap:6px; min-width:0; overflow:hidden; }
+.aa-me-face{ position:relative; overflow:hidden; width:56px; height:56px; border-radius:50%; background:var(--accent); color:#fff; font-size:22px; font-weight:900; display:flex; align-items:center; justify-content:center; flex:0 0 auto; }
 /* A face is the Google picture when there is one, the initial when there is not. Two players whose names start
    with the same letter get different colours, so the line-up over the board is never a row of identical As. */
 .aa-face-img{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; border-radius:50%; }
@@ -122,8 +123,7 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-rank.is-c5, .aa-me-face.is-c5, .aa-row-face.is-c5{ background:#0E7C86; }
 .aa-rank.is-c6, .aa-me-face.is-c6, .aa-row-face.is-c6{ background:#B5651D; }
 .aa-rank.is-c7, .aa-me-face.is-c7, .aa-row-face.is-c7{ background:#8C2F6B; }
-.aa-me-name{ display:block; font-size:20px; font-weight:900; color:var(--ink); line-height:1.1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.aa-me-sub{ font-size:12px; color:var(--muted); }
+.aa-me-name{ display:block; max-width:100%; font-size:21px; font-weight:900; color:var(--ink); line-height:1.15; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 /* Who is ahead, over the top left of the board: first place first, and the order changes as they play */
 .aa-ranks{ position:absolute; top:6px; left:6px; z-index:4; display:flex; gap:6px; pointer-events:none; }
 .aa-rank{ position:relative; overflow:visible; width:34px; height:34px; border-radius:50%; background:var(--line-soft); color:var(--card); font-size:15px; font-weight:900; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 6px rgba(0,0,0,.18); transition:transform .25s; }
@@ -158,8 +158,14 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-soon{ font-size:11px; font-weight:900; letter-spacing:1px; text-transform:uppercase; color:var(--muted); background:var(--bg2); border-radius:999px; padding:4px 10px; flex:0 0 auto; }
 .aa-input{ text-align:right; }
 .aa-vs{ display:grid; gap:6px; margin:0 0 14px; }
+.aa-vs-who{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.aa-vs-face{ flex:0 0 auto; width:30px; height:30px; font-size:13px; }
 .aa-vs-row{ display:flex; justify-content:space-between; align-items:center; gap:10px; background:var(--bg2); border-radius:12px; padding:9px 12px; font-weight:800; font-size:14px; color:var(--ink); }
 .aa-vs-row.is-win{ background:color-mix(in srgb, var(--good) 18%, var(--bg2)); }
+/* the same row shape carries who is asking you to play: a name with nothing beside it said nothing */
+.aa-from{ margin:0 0 10px; }
+.aa-from .aa-vs-face{ width:38px; height:38px; font-size:16px; }
+.aa-from .aa-vs-who{ white-space:normal; overflow:visible; text-overflow:clip; }
 .aa-gold.is-won{ animation:aapop .5s ease-out 2; color:var(--accent); }
 .aa-gold.is-big{ font-size:13px; padding:6px 11px; gap:4px; }
 .aa-gold.is-vast{ font-size:11px; padding:5px 9px; gap:3px; }
@@ -226,6 +232,22 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-lg-prize{ display:flex; align-items:center; gap:8px; padding:4px 0; font-size:13px; font-weight:900;
   font-variant-numeric:tabular-nums; }
 .aa-lg-prize .aa-lg-medal{ justify-self:start; }
+/* The people you have played with: a face, a name, what they are doing, and one tap to ask them over. */
+.aa-pl-list{ padding:4px 8px; }
+#aaRecentCap{ margin-top:14px; }
+.aa-pl{ display:flex; align-items:center; gap:10px; padding:8px 4px; min-width:0; text-align:left; }
+.aa-pl + .aa-pl{ border-top:1px solid var(--outline); }
+.aa-pl-face{ flex:0 0 auto; width:38px; height:38px; font-size:16px; }
+.aa-pl-who{ flex:1; min-width:0; overflow:hidden; }
+.aa-pl-who b{ display:block; font-size:15px; font-weight:900; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.aa-pl-when{ display:block; font-size:12px; font-weight:800; color:var(--muted); }
+/* Online and in a match are different answers to "shall I ask them", so they do not look the same. */
+.aa-pl-when.is-online{ color:var(--good); }
+.aa-pl-when.is-online::before, .aa-pl-when.is-playing::before{ content:''; display:inline-block; width:7px; height:7px; border-radius:50%; margin-right:6px; vertical-align:middle; background:currentColor; }
+.aa-pl-when.is-playing{ color:var(--accent); }
+.aa-pl-go{ flex:0 0 auto; }
+.aa-pl-go:disabled{ opacity:.55; }
+
 /* The way into the league from the dashboard, where the gold already is. */
 .aa-lg-open{ display:flex; align-items:center; gap:12px; width:100%; margin:12px 0 0; padding:12px 16px; border:none;
   border-radius:18px; background:var(--card); color:var(--ink); font-family:inherit; font-weight:900; cursor:pointer;

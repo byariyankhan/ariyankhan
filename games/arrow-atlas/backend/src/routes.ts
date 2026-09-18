@@ -9,10 +9,11 @@ import { pool, tx } from './db.js';
 import * as R from './rooms.js';
 import { balance } from './gold.js';
 import { deleteUser, endSession, googleVerify, providers, startSession, upsertUser, cleanName } from './auth.js';
-import { publish } from './events.js';
+import { publish, publishToUser } from './events.js';
 import { cleanLevels, cleanState, mergeLevels, mergeState, readAll } from './progress.js';
 import * as L from './league.js';
-import { liveProgress, roomPresence } from './presence.js';
+import { liveProgress, online, roomPresence } from './presence.js';
+import { havePlayedTogether, recentPlayers } from './players.js';
 import { body, caller, clearSessionCookie, limited, noStore, setSessionCookie, shapeUser, type Caller } from './httpkit.js';
 import { log } from './log.js';
 
@@ -167,6 +168,43 @@ const H = {
     });
   },
 
+  // ── The people you play with ──
+  //
+  // No friends list, no requests, no search: the game already knows who you have sat at a table with, and
+  // that is the whole list. It is also the permission — an invitation may only be sent to somebody you have
+  // played with, so there is nothing here a stranger can reach.
+
+  async recent(req: Req, res: Res, me: Caller) {
+    if (!me.user) { await noStore(res).code(401).send({ error: 'signed_out' }); return; }
+    if (!(await limited('players_read', req, res, me.user.id))) return;
+    await noStore(res).send({ players: await recentPlayers(pool, me.user.id) });
+  },
+
+  async invite(req: Req, res: Res, me: Caller) {
+    if (!me.user) { await noStore(res).code(401).send({ error: 'signed_out' }); return; }
+    if (!(await limited('match_invite', req, res, me.user.id))) return;
+    const code = codeOf(req);
+    const to = Number(body(req).user_id ?? 0);
+    if (!Number.isInteger(to) || to <= 0 || to === me.user.id) { await noStore(res).code(400).send({ error: 'bad_player' }); return; }
+
+    // The room has to be this player's to invite into, and still open: an invitation to a match already being
+    // played is a notification that can only disappoint.
+    const m = await R.matchRow(pool, code);
+    if (!m) { await noStore(res).code(404).send({ error: 'no_match' }); return; }
+    if (m.state !== 'open') { await noStore(res).code(409).send({ error: 'taken' }); return; }
+    const seats = await R.room(pool, m.code);
+    if (!seats.some(p => p.user_id === me.user!.id)) { await noStore(res).code(403).send({ error: 'not_yours' }); return; }
+    if (seats.some(p => p.user_id === to)) { await noStore(res).code(409).send({ error: 'already_in' }); return; }
+    if (!(await havePlayedTogether(pool, me.user.id, to))) { await noStore(res).code(403).send({ error: 'not_played_together' }); return; }
+
+    await publishToUser(to, 'invited', {
+      code: m.code, stake: m.stake, from: me.user.name, from_id: me.user.id, pic: me.user.pic ?? '',
+    });
+    // Whether they are reachable right now decides what the sender is told, not whether the invitation was
+    // sent: a socket that opens a second later still gets nothing, and saying so is kinder than a silent wait.
+    await noStore(res).send({ ok: true, delivered: await online.is(to) });
+  },
+
   async create(req: Req, res: Res, me: Caller) {
     if (!me.user) { await noStore(res).code(401).send({ error: 'signed_out' }); return; }
     if (!(await limited('match_create', req, res, me.user.id))) return;
@@ -314,6 +352,8 @@ export function registerRoutes(app: FastifyInstance): void {
   app.get(`${v1}/league`, withCaller(H.league));
 
   app.get(`${v1}/lobby`, withCaller(H.lobby));
+  app.get(`${v1}/players/recent`, withCaller(H.recent));
+  app.post(`${v1}/matches/:code/invite`, withCaller(H.invite));
   app.post(`${v1}/matches`, withCaller(H.create));
   app.get(`${v1}/matches/:code`, withCaller(H.get));
   app.post(`${v1}/matches/:code/join`, withCaller(H.join));

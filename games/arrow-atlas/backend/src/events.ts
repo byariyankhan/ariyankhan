@@ -10,7 +10,9 @@ import { log } from './log.js';
 export type MatchEventKind =
   | 'player_joined_room' | 'player_left_room' | 'player_connected' | 'player_disconnected'
   | 'countdown_started' | 'countdown_tick' | 'match_started'
-  | 'progress_updated' | 'player_finished' | 'match_finished' | 'room_closed';
+  | 'progress_updated' | 'player_finished' | 'match_finished' | 'room_closed'
+  // Not about a room at all: somebody asking one particular player to come and sit at theirs.
+  | 'invited';
 
 export interface MatchEvent {
   type: MatchEventKind;
@@ -25,6 +27,19 @@ const PATTERN_SUFFIX = ':events';
 export async function publish(code: string, type: MatchEventKind, data?: Record<string, unknown>): Promise<void> {
   const ev: MatchEvent = { type, code, at: Date.now(), ...(data ? { data } : {}) };
   await soft(() => redis.publish(channel(code), JSON.stringify(ev)), 0);
+}
+
+/**
+ * The one event addressed to a person rather than to a room.
+ *
+ * It travels on the same pattern the socket layer already subscribes to, under a code no room can have — a
+ * room code is letters and digits, and this one starts with a colon — so a second container delivers it to a
+ * player connected to the first without either of them knowing the other exists.
+ */
+export const userChannel = (userId: number): string => `:u${userId}`;
+
+export async function publishToUser(userId: number, type: MatchEventKind, data?: Record<string, unknown>): Promise<void> {
+  await publish(userChannel(userId), type, data);
 }
 
 type Handler = (ev: MatchEvent) => void;

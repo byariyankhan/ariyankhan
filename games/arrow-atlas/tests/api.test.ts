@@ -279,4 +279,56 @@ section('The league is readable signed out, and knows you when you are in');
   eq(lost.earning, -(config.game.stakes[0] ?? 0), 'with the stake they lost standing as their week so far');
 }
 
+section('The people you have played with, and inviting them without a link');
+{
+  const host = await mint('inviteHost'), mate = await mint('inviteMate'), stranger = await mint('inviteStranger');
+
+  const before = await call('/players/recent', { token: host.token });
+  eq(before.status, 200, 'the list answers for a player who has played nobody');
+  eq((before.json.players as unknown[]).length, 0, 'and it is empty rather than absent');
+  eq((await call('/players/recent')).status, 401, 'a signed-out visitor has no list to read');
+
+  // one match together is the whole qualification: no request, no accepting, nothing to manage
+  const made = await call('/matches', { token: host.token, body: { stake: config.game.stakes[0], open_to_all: false } });
+  const code = (made.json.match as { code: string }).code;
+  await call(`/matches/${code}/join`, { token: mate.token, body: {} });
+  await call(`/matches/${code}/start`, { token: host.token, body: {} });
+  await call(`/matches/${code}/result`, { token: host.token, body: { ms: 3_000, cleared: true } });
+
+  const after = await call('/players/recent', { token: host.token });
+  const list = after.json.players as { id: number; name: string; matches: number; status: string; last_at: number }[];
+  eq(list.length, 1, 'the person they just played is on the list');
+  eq(list[0]?.id, mate.id, 'and it is that person');
+  eq(list[0]?.name, 'inviteMate', 'by name, so a row can be drawn without a second call');
+  eq(list[0]?.matches, 1, 'with how many times they have played');
+  ok(typeof list[0]?.last_at === 'number' && list[0].last_at > 0, 'and when it last happened');
+  // The other seat has not reported a result, so that match is still being played — and "in a match" is a
+  // different answer from "online" to somebody deciding whether to invite them.
+  eq(list[0]?.status, 'playing', 'somebody still sitting in an unfinished match reads as playing');
+  await call(`/matches/${code}/result`, { token: mate.token, body: { ms: 9_000, cleared: true } });
+  eq(((await call('/players/recent', { token: host.token })).json.players as { status: string }[])[0]?.status, 'offline',
+     'and once that match is over, somebody with no socket open is offline');
+  eq(((await call('/players/recent', { token: mate.token })).json.players as { id: number }[])[0]?.id, host.id,
+     'and the list reads the same way round from the other seat');
+
+  const room = await call('/matches', { token: host.token, body: { stake: config.game.stakes[0], open_to_all: false } });
+  const next = (room.json.match as { code: string }).code;
+  const sent = await call(`/matches/${next}/invite`, { token: host.token, body: { user_id: mate.id } });
+  eq(sent.status, 200, 'the host may ask somebody they have played to come and sit down');
+  eq(sent.json.ok, true, 'and is told it went');
+  eq(sent.json.delivered, false, 'honestly, including that nobody was there to hear it');
+
+  const spam = await call(`/matches/${next}/invite`, { token: host.token, body: { user_id: stranger.id } });
+  eq(spam.status, 403, 'a stranger may not be invited');
+  eq(spam.json.error, 'not_played_together', 'which is the only rule there is about who may be asked');
+  const notMine = await call(`/matches/${next}/invite`, { token: mate.token, body: { user_id: stranger.id } });
+  eq(notMine.status, 403, 'and a room is only the host\u2019s to invite into');
+  eq((await call(`/matches/${next}/invite`, { token: host.token, body: { user_id: host.id } })).status, 400,
+     'inviting yourself is refused before anything is looked up');
+  eq((await call('/matches/ZZZZZZ/invite', { token: host.token, body: { user_id: mate.id } })).status, 404,
+     'so is inviting into a room that does not exist');
+  eq((await call(`/matches/${next}/invite`, { body: { user_id: mate.id } })).status, 401,
+     'and a signed-out caller may invite nobody');
+}
+
 await finish();
