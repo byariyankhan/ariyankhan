@@ -224,6 +224,22 @@ mode_inspect() {
         *)     printf '      %-12s present\n' "$v" ;;
       esac
     done
+
+    # And what those settings became: the addresses a message will actually carry. The two credentials are
+    # reported as set-or-not and by length alone — an address is meant to be read by whoever receives the
+    # mail, a relay key is not, and this output goes into a public build log.
+    note "the addresses the form will use:"
+    docker exec ariyankhan-web php -r '
+      $c = @include "/var/www/html/mail-config.local.php";
+      if (!is_array($c)) { echo "      (the config file is not there)\n"; exit(0); }
+      foreach (["driver","site_url","to_email","from_email","from_name","smtp_host","smtp_port"] as $k) {
+        printf("      %-11s %s\n", $k, isset($c[$k]) && $c[$k] !== "" ? $c[$k] : "(unset)");
+      }
+      foreach (["smtp_user","smtp_pass"] as $k) {
+        $v = $c[$k] ?? "";
+        printf("      %-11s %s\n", $k, $v !== "" ? "set, " . strlen((string) $v) . " characters (not printed)" : "(unset)");
+      }
+    ' 2>/dev/null || note "      (could not read it)"
   fi
 
   say "and the Arrow Atlas project"
