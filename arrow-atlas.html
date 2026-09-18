@@ -69,7 +69,7 @@
          set these two when the backend moves to a host of its own and the client follows without a change:
          <meta name="arrow-atlas-api" content="https://api.arrowatlas.com" />
          <meta name="arrow-atlas-ws"  content="wss://api.arrowatlas.com" /> -->
-    <link rel="stylesheet" href="css/arrow-atlas.css?v=64" />
+    <link rel="stylesheet" href="css/arrow-atlas.css?v=65" />
     <link rel="preload" href="games/data/arrow-atlas.json?v=11" as="fetch" crossorigin="anonymous" />
 
     <!-- SCHEMA -->
@@ -193,38 +193,11 @@
         <p class="aa-splash-by">— Arrow Atlas</p>
       </div>
     </div>
-    <!-- The gold of this game is not a modern token: it is a struck coin, the kind you dig up rather than
-         download — a beaded rim, a worn field and an eight-pointed star. One symbol, used everywhere gold is
-         named, so the purse, the tables, the prizes and the result sheet all show the same piece. -->
-    <svg class="aa-sprite" width="0" height="0" aria-hidden="true" focusable="false">
-      <defs>
-        <radialGradient id="aaCoinFace" cx="36%" cy="30%" r="80%">
-          <stop offset="0" stop-color="#F7DC8A"/>
-          <stop offset="48%" stop-color="#E3B247"/>
-          <stop offset="100%" stop-color="#A97318"/>
-        </radialGradient>
-        <linearGradient id="aaCoinRim" x1="0" y1="0" x2=".3" y2="1">
-          <stop offset="0" stop-color="#D8A43C"/>
-          <stop offset="1" stop-color="#7E5210"/>
-        </linearGradient>
-        <symbol id="aaCoin" viewBox="0 0 32 32">
-          <path d="M30.95 14.30Q30.99 16.00 30.75 17.66Q30.50 19.31 30.10 20.95Q29.69 22.59 28.64 23.92Q27.59 25.24 26.51 26.53Q25.43 27.82 23.97 28.68Q22.51 29.53 20.91 29.99Q19.30 30.45 17.65 30.78Q16.00 31.10 14.35 30.77Q12.71 30.43 11.09 30.00Q9.47 29.57 8.11 28.58Q6.76 27.59 5.58 26.42Q4.40 25.25 3.42 23.89Q2.44 22.53 1.76 20.97Q1.07 19.41 1.11 17.70Q1.14 16.00 1.30 14.34Q1.45 12.68 1.89 11.05Q2.32 9.41 3.15 7.91Q3.97 6.41 5.26 5.28Q6.55 4.16 8.02 3.31Q9.48 2.45 11.02 1.72Q12.57 0.98 14.29 1.09Q16.00 1.19 17.71 1.12Q19.41 1.05 20.95 1.79Q22.49 2.52 23.88 3.44Q25.27 4.37 26.44 5.56Q27.61 6.74 28.55 8.12Q29.49 9.50 30.21 11.05Q30.92 12.59 30.95 14.30Z" fill="url(#aaCoinRim)"/>
-          <path d="M28.95 14.53Q29.03 16.00 28.97 17.47Q28.91 18.95 28.43 20.35Q27.96 21.76 27.11 22.97Q26.27 24.19 25.26 25.26Q24.25 26.34 22.94 27.01Q21.63 27.69 20.26 28.17Q18.89 28.65 17.44 28.85Q16.00 29.05 14.52 29.00Q13.04 28.96 11.67 28.41Q10.29 27.86 9.06 27.05Q7.83 26.24 6.74 25.25Q5.65 24.26 4.89 22.99Q4.13 21.72 3.68 20.32Q3.23 18.91 2.94 17.46Q2.65 16.00 2.84 14.52Q3.03 13.04 3.63 11.69Q4.23 10.33 4.94 9.04Q5.65 7.75 6.71 6.71Q7.76 5.67 8.97 4.80Q10.19 3.93 11.61 3.47Q13.04 3.01 14.52 2.96Q16.00 2.91 17.50 2.90Q18.99 2.89 20.32 3.59Q21.64 4.29 22.92 5.00Q24.20 5.71 25.31 6.70Q26.42 7.69 27.08 9.02Q27.73 10.35 28.30 11.71Q28.86 13.06 28.95 14.53Z" fill="url(#aaCoinFace)"/>
-          <g fill="#7E5210" fill-opacity=".34"><circle cx="28.10" cy="16.00" r=".62"/><circle cx="27.69" cy="19.13" r=".62"/><circle cx="26.48" cy="22.05" r=".62"/><circle cx="24.56" cy="24.56" r=".62"/><circle cx="22.05" cy="26.48" r=".62"/><circle cx="19.13" cy="27.69" r=".62"/><circle cx="16.00" cy="28.10" r=".62"/><circle cx="12.87" cy="27.69" r=".62"/><circle cx="9.95" cy="26.48" r=".62"/><circle cx="7.44" cy="24.56" r=".62"/><circle cx="5.52" cy="22.05" r=".62"/><circle cx="4.31" cy="19.13" r=".62"/><circle cx="3.90" cy="16.00" r=".62"/><circle cx="4.31" cy="12.87" r=".62"/><circle cx="5.52" cy="9.95" r=".62"/><circle cx="7.44" cy="7.44" r=".62"/><circle cx="9.95" cy="5.52" r=".62"/><circle cx="12.87" cy="4.31" r=".62"/><circle cx="16.00" cy="3.90" r=".62"/><circle cx="19.13" cy="4.31" r=".62"/><circle cx="22.05" cy="5.52" r=".62"/><circle cx="24.56" cy="7.44" r=".62"/><circle cx="26.48" cy="9.95" r=".62"/><circle cx="27.69" cy="12.87" r=".62"/></g>
-          <circle cx="16" cy="16" r="10.2" fill="none" stroke="#7E5210" stroke-opacity=".28" stroke-width=".7"/>
-          <g stroke="#7E5210" stroke-opacity=".3" stroke-width=".7" stroke-linecap="round"><path d="M25.44 21.45L24.31 20.80"/><path d="M21.45 25.44L20.80 24.31"/><path d="M10.55 25.44L11.20 24.31"/><path d="M6.56 21.45L7.69 20.80"/><path d="M6.56 10.55L7.69 11.20"/><path d="M10.55 6.56L11.20 7.69"/><path d="M21.45 6.56L20.80 7.69"/><path d="M25.44 10.55L24.31 11.20"/></g>
-          <path d="M16.00 9.40L17.11 13.32L20.67 11.33L18.68 14.89L22.60 16.00L18.68 17.11L20.67 20.67L17.11 18.68L16.00 22.60L14.89 18.68L11.33 20.67L13.32 17.11L9.40 16.00L13.32 14.89L11.33 11.33L14.89 13.32Z" fill="#8A5A14" fill-opacity=".45"/>
-          <path d="M16.00 9.40L17.11 13.32L20.67 11.33L18.68 14.89L22.60 16.00L18.68 17.11L20.67 20.67L17.11 18.68L16.00 22.60L14.89 18.68L11.33 20.67L13.32 17.11L9.40 16.00L13.32 14.89L11.33 11.33L14.89 13.32Z" fill="none" stroke="#F7E3AE" stroke-opacity=".6" stroke-width=".65" stroke-linejoin="round" transform="translate(-.3 -.3)"/>
-          <path d="M16 2.9a13.1 13.1 0 0 0-11.7 7.2A13.1 13.1 0 0 1 16 4.4a13.1 13.1 0 0 1 11.7 5.7A13.1 13.1 0 0 0 16 2.9z" fill="#FFF4D2" fill-opacity=".38"/>
-          <path d="M28.6 18.4A13.2 13.2 0 0 1 8.2 26.9a13.2 13.2 0 0 0 19.1-9.6z" fill="#6B4409" fill-opacity=".25"/>
-        </symbol>
-      </defs>
-    </svg>
     <main class="aa-app" id="aaApp"><span id="top"></span>
       <!-- ── HOME ── -->
       <section class="aa-screen aa-home" id="aaSelect" aria-label="Home">
         <header class="aa-home-top">
-          <span class="aa-chip aa-chip--purse" id="aaPurse" hidden title="Your gold"><svg class="aa-coin" aria-hidden="true"><use href="#aaCoin"/></svg><b id="aaPurseNo">0</b></span>
+          <span class="aa-chip aa-chip--purse" id="aaPurse" hidden title="Your gold"><img class="aa-coin" src="images/arrow-atlas-coin.png" alt="" width="128" height="128" decoding="async"><b id="aaPurseNo">0</b></span>
           <button type="button" class="aa-chip aa-chip--league" id="aaLeague" hidden aria-label="This week's league"><span aria-hidden="true">🏆</span><b id="aaLeagueEnds"></b></button>
           <button type="button" class="aa-icon" id="aaSettings" aria-label="Settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5 19.4 7.7v8.6L12 20.5 4.6 16.3V7.7z"/><circle cx="12" cy="12" r="3"/></svg></button>
         </header>
@@ -506,6 +479,6 @@
       </div>
     </div>
 
-    <script src="js/arrow-atlas.js?v=88"></script>
+    <script src="js/arrow-atlas.js?v=89"></script>
   </body>
 </html>
