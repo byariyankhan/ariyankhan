@@ -37,6 +37,11 @@ export const LIMITS = {
   progress_read: { name: 'progress_read', limit: 60,  windowSeconds: 60,  by: 'user' },
   progress_write:{ name: 'progress_write',limit: 60,  windowSeconds: 60,  by: 'user' },
   ws_connect:    { name: 'ws_connect',    limit: 60,  windowSeconds: 60,  by: 'ip'   },
+  // The recent players list is read when the dashboard opens and when an invite panel is opened, so it is not
+  // a hot path; the invite itself is a notification on somebody else's screen, which is why it is the tightest
+  // limit here that does not move gold.
+  players_read:  { name: 'players_read',  limit: 60,  windowSeconds: 60,  by: 'user' },
+  match_invite:  { name: 'match_invite',  limit: 20,  windowSeconds: 60,  by: 'user' },
 } as const satisfies Record<string, Limit>;
 
 export type LimitName = keyof typeof LIMITS;

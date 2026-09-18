@@ -1047,6 +1047,8 @@
     $('[data-act]', el.card)?.focus({ preventScroll: true });
   }
   el.card.addEventListener('click', e => {
+    const inv = e.target.closest('[data-invite]');
+    if (inv) { invitePlayer(inv.dataset.invite, inv.dataset.name, inv); return; }
     const act = e.target.closest('[data-act]')?.dataset.act; if (!act) return;
     if (act === 'next') { const j = nextOpen(state.idx); if (j < 0) goToLevels(); else startLevel(j); }
     else if (act === 'again' || act === 'retry') startLevel(state.idx, false, state.daily, state.tier);
@@ -1059,7 +1061,9 @@
       el.card.innerHTML = '<h3>Sending…</h3>'; finishMatch(false, 0);
     }
     else if (act === 'resend') { const b = e.target.closest('[data-act]'); b.disabled = true; flushResult(true).then(ok => { if (!ok) b.disabled = false; }); }
-    else if (act === 'minvite') sendInvite(state.pendingMatch);
+    else if (act === 'minvite') showInvitePanel(state.pendingMatch);
+    else if (act === 'mshare') sendInvite(state.pendingMatch);
+    else if (act === 'mroom') renderRoom(state.pendingMatch);
     else if (act === 'mcancel') leaveRoom();
     else if (act === 'mstart') startMatch();
     else if (act === 'levels') goToLevels();
@@ -1069,7 +1073,7 @@
 
   function goToLevels() {
     stopTimer(); stopMatchPoll(); stopProgressPoll(); stopResultWatch();
-    live.close();   // back in the lobby: there is no room to watch, so let the socket go
+    live.leaveFeed();   // back in the lobby: nothing to watch, but the socket is how invitations arrive
     if (el.ranks) el.ranks.hidden = true; el.game.hidden = true; el.overlay.hidden = true; el.select.hidden = false; setHash(-1); renderSelect();
   }
   async function share() {
@@ -1103,6 +1107,9 @@
     try { const d = await authApi('me'); auth.user = d.user || null; auth.providers = d.providers || {}; }
     catch { auth.user = null; auth.providers = {}; }
     auth.ready = true;
+    // Signed in means reachable: the socket is what marks this player as about and what carries an invitation
+    // to them wherever they are in the game.
+    if (auth.user) { live.onInvite = onInvite; live.keep(); } else live.close();
     return auth;
   }
   async function openFriends() {
@@ -1303,8 +1310,16 @@
   // It is a speed-up, never a dependency. If the socket cannot open, or drops and cannot get back, the game
   // falls back to asking over REST on the timer it always used, and the player notices nothing but latency.
   const live = {
-    ws: null, code: null, tries: 0, retry: 0, onEvent: null, onTune: null,
+    ws: null, code: null, tries: 0, retry: 0, onEvent: null, onTune: null, onInvite: null,
+    // The socket used to exist only while a room was being watched, which made "online" mean "in a match" and
+    // left a player in the lobby unreachable. It is held open for as long as somebody is signed in now: that
+    // is what tells the server they are about, and it is how an invitation reaches them.
+    hold: false,
     get connected() { return this.ws && this.ws.readyState === 1; },
+
+    keep() { this.hold = true; this.tries = 0; this.open(); },
+    /** Stop watching a room without giving up the socket: the lobby still wants it. */
+    leaveFeed() { this.code = null; this.onEvent = null; this.send({ type: 'leave_feed' }); },
 
     watch(code, onEvent) {
       this.code = code; this.onEvent = onEvent;
@@ -1326,6 +1341,9 @@
       ws.onmessage = e => {
         let ev; try { ev = JSON.parse(e.data); } catch { return; }
         if (ev.type === 'hello') return;
+        // An invitation is addressed to the player, not to whatever room they happen to be watching, so it is
+        // handled apart from the room feed and reaches them anywhere in the game.
+        if (ev.type === 'invited') { this.onInvite?.(ev); return; }
         this.onEvent?.(ev);
       };
       ws.onclose = () => { this.ws = null; this.onTune?.(); this.fallback(); };
@@ -1336,7 +1354,7 @@
     // a player on a network that blocks WebSockets should not spend their match reconnecting.
     fallback() {
       clearTimeout(this.retry);
-      if (!this.code || this.tries >= 4) return;
+      if ((!this.code && !this.hold) || this.tries >= 4) return;
       const wait = Math.min(8000, 500 * 2 ** this.tries++);
       this.retry = setTimeout(() => this.open(), wait);
     },
@@ -1347,7 +1365,7 @@
 
     close() {
       clearTimeout(this.retry);
-      this.code = null; this.onEvent = null; this.tries = 0;
+      this.code = null; this.onEvent = null; this.hold = false; this.tries = 0;
       const ws = this.ws; this.ws = null;
       if (ws) { try { ws.close(); } catch { /* already gone */ } }
     },
@@ -1378,11 +1396,125 @@
     });
   }
 
-  // the player's own strip, kept at the top of every match screen
+  // The player's own strip, kept at the top of every match screen: their face, their name, and their purse
+  // directly under it. It used to read "Signed in with Google" — which the player knew, and which sat between
+  // the two things they came to look at while the purse drifted off to the far edge of the row.
   function meStrip() {
     const u = auth.user;
     if (!u) return '';
-    return `<div class="aa-me"><span class="aa-me-face${faceClass(u)}">${faceInner(u)}</span><span><span class="aa-me-name">${escapeHtml(u.name || 'Player')}</span><br><span class="aa-me-sub">Signed in with ${escapeHtml((u.provider || 'google').replace(/^./, c => c.toUpperCase()))}</span></span><span class="aa-gold${goldFit(u.gold)}" title="Your gold"><span aria-hidden="true">🪙</span>${gfmt(u.gold)}</span></div>`;
+    return `<div class="aa-me">
+      <span class="aa-me-face${faceClass(u)}">${faceInner(u)}</span>
+      <span class="aa-me-id">
+        <span class="aa-me-name">${escapeHtml(u.name || 'Player')}</span>
+        <span class="aa-gold${goldFit(u.gold)}" title="Your gold"><span aria-hidden="true">🪙</span>${gfmt(u.gold)}</span>
+      </span>
+    </div>`;
+  }
+
+  // ── The people you play with ──
+  //
+  // Sharing a link works and is staying, but it was the only way to bring somebody in: open the share sheet,
+  // pick an app, paste, wait for them to notice. The game already knows who you have played with — every seat
+  // ever taken is in the match table — so these are those people, most recent first, with whether they are
+  // about, and an Invite that reaches them inside the game.
+  //
+  // There is no friends list behind it: nothing to accept, nothing to manage, and the only way onto somebody's
+  // list is to have played with them, which is also the rule the server enforces on who may be invited.
+  const recent = { at: 0, list: [], asked: false };
+  async function loadRecent(force) {
+    if (!auth.user) return [];
+    if (!force && recent.asked && Date.now() - recent.at < 20000) return recent.list;
+    try {
+      const d = await fetch(`${API_V1}/players/recent`, { credentials: 'include', cache: 'no-store' }).then(r => r.json());
+      recent.list = Array.isArray(d.players) ? d.players : [];
+      recent.at = Date.now(); recent.asked = true;
+    } catch { /* the panel says it could not ask, and the link is still there */ }
+    return recent.list;
+  }
+  // The moment a match ends, whoever was at that table belongs at the top of this list — so the cached answer
+  // from before it is wrong, not merely old. Playing is the one thing that changes the list, so it is the one
+  // thing that throws the cache away.
+  const forgetRecent = () => { recent.at = 0; };
+  const AGO = ms => {
+    const m = Math.max(0, Math.round((Date.now() - ms) / 60000));
+    if (m < 60) return m <= 1 ? 'just now' : `${m} min ago`;
+    const h = Math.round(m / 60);
+    if (h < 24) return `${h} hr ago`;
+    const d = Math.round(h / 24);
+    return d === 1 ? 'yesterday' : `${d} days ago`;
+  };
+  // Three states, because "online" and "in a match" are different answers to "is it worth inviting them".
+  const playerRow = p => `
+    <div class="aa-pl" data-player="${p.id}">
+      <span class="aa-rank aa-pl-face${faceClass(p)}" aria-hidden="true">${faceInner(p)}</span>
+      <span class="aa-pl-who">
+        <b>${escapeHtml(p.name || 'Player')}</b>
+        <small class="aa-pl-when is-${p.status}">${p.status === 'playing' ? 'in a match' : p.status === 'online' ? 'online' : AGO(p.last_at)}</small>
+      </span>
+      <button type="button" class="aa-btn aa-btn--small aa-pl-go" data-invite="${p.id}" data-name="${escapeHtml(p.name || 'Player')}">Invite</button>
+    </div>`;
+
+  function playersHtml(list) {
+    if (!list.length) {
+      return `<p class="aa-sheet-note">Nobody yet. Play one match with somebody — a link is enough the first time — and they will be here afterwards.</p>`;
+    }
+    return `<div class="aa-group aa-pl-list">${list.map(playerRow).join('')}</div>`;
+  }
+
+  // The invite panel of an open room: who you have played with, then the link for everybody else.
+  async function showInvitePanel(m) {
+    if (!m) return;
+    state.pendingMatch = m;
+    const draw = list => {
+      el.card.innerHTML = `
+        <p class="aa-card-kicker">Gold match · ${gfmt(m.stake)}</p>
+        <h3>Invite</h3>
+        ${list === null ? '<p class="aa-loading">Looking…</p>' : playersHtml(list)}
+        <div class="aa-actions">
+          <button type="button" class="aa-btn aa-btn--primary" data-act="mshare">Share a link</button>
+          <button type="button" class="aa-btn" data-act="mroom">Back to the room</button>
+        </div>
+        <p class="aa-flash" hidden></p>`;
+      wireFaces(el.card);
+    };
+    draw(recent.asked ? recent.list : null);
+    el.overlay.hidden = false;
+    const list = await loadRecent(true);
+    if (state.pendingMatch?.code === m.code && !el.overlay.hidden) draw(list);
+  }
+
+  // Sending one. The room has to be open and theirs, which the server checks; this only has to say what
+  // happened, and to be honest about somebody who is not online to hear it.
+  async function invitePlayer(id, name, btn) {
+    const m = state.pendingMatch;
+    if (!m || !id) return;
+    if (btn) { btn.disabled = true; btn.textContent = 'Inviting…'; }
+    try {
+      const d = await matchApi('invite', { code: m.code, user_id: Number(id) });
+      if (btn) btn.textContent = d.delivered ? 'Invited' : 'Sent';
+      toast(d.delivered ? `${name} has been asked to join.` : `${name} is not online — send them the link instead.`, d.delivered ? 'good' : 'hint');
+    } catch (err) {
+      if (btn) { btn.disabled = false; btn.textContent = 'Invite'; }
+      toast(err.code === 'not_played_together' ? 'You can only invite people you have played with.'
+        : err.code === 'taken' ? 'That room has already started.'
+        : err.code === 'already_in' ? `${name} is already in this room.`
+        : 'Could not send that invitation.', 'bad');
+    }
+  }
+
+  // Receiving one: the same card a shared link opens, so there is one way to say yes to a match.
+  async function onInvite(ev) {
+    const d = ev?.data || {};
+    if (!d.code || !auth.user) return;
+    if (state.daily?.race && !state.finished) return;          // mid-race: an invitation can wait
+    if (state.pendingMatch?.code === d.code) return;            // already looking at this room
+    try {
+      const r = await matchApi('get', { code: d.code });
+      if (!r.match || r.match.state !== 'open') return;
+      SFX.join?.(); vibe(20);
+      closeSheets();
+      showConfirm({ ...r.match, host: d.from || r.match.host, host_pic: d.pic || '' });
+    } catch { /* the room went away between the invitation and the tap */ }
   }
 
   // On means the room takes whoever else is online at that stake and starts itself; off means only the people
@@ -1395,10 +1527,26 @@
       ${meStrip()}
       <div class="aa-stakes">${stakesHtml(gold, waiting)}</div>
       <label class="aa-fill"><input type="checkbox" id="aaFillOnline"${fill ? ' checked' : ''}><span>Fill from online</span></label>
+      <p class="aa-cap" id="aaRecentCap" hidden>Played with lately</p>
+      <div id="aaRecentBox"></div>
       <button type="button" class="aa-lg-open" data-mact="league"><span aria-hidden="true">🏆</span><span class="aa-lg-open-t">League<small>${league.data ? `Ends in ${fmtLeft(leagueLeft())} · ${gshort((league.data.prizes || [0])[0])} for first` : 'The week\u2019s gold, ranked'}</small></span><span class="aa-lg-open-go" aria-hidden="true">\u203A</span></button>`;
     openSheet(el.matchSheet);
     wireFaces(el.matchBody);
     refreshLobby();
+    refreshRecent();
+  }
+
+  // The dashboard's copy of the list. Inviting from here needs a table first — the room is what an invitation
+  // points at — so the tap remembers who, and the next table opened sends it.
+  async function refreshRecent() {
+    const box = $('#aaRecentBox', el.matchBody);
+    if (!box) return;
+    const list = await loadRecent(!recent.asked);
+    const cap = $('#aaRecentCap', el.matchBody);
+    if (!$('#aaRecentBox', el.matchBody)) return;         // the sheet changed under us
+    if (cap) cap.hidden = !list.length;
+    box.innerHTML = list.length ? playersHtml(list) : '';
+    wireFaces(box);
   }
   const stakesHtml = (gold, waiting) => STAKES.map(v =>
     `<button type="button" class="aa-stake" data-stake="${v}"${gold < v ? ' disabled' : ''}><span class="aa-stake-coin" aria-hidden="true">🪙</span><span class="aa-stake-amt">${gtiny(v)}</span><span class="aa-stake-live">${waiting[v] ? `${waiting[v]} waiting` : ''}</span></button>`).join('');
@@ -1559,7 +1707,10 @@
     el.matchTitle.textContent = 'A challenge';
     const gold = auth.user?.gold ?? 0, short = gold < m.stake;
     el.matchBody.innerHTML = `
-      <p class="aa-sheet-note"><b>${escapeHtml(m.host)}</b> challenges you.</p>
+      <div class="aa-vs-row aa-from">
+        <span class="aa-rank aa-vs-face${faceClass({ name: m.host, pic: m.host_pic })}" aria-hidden="true">${faceInner({ name: m.host, pic: m.host_pic })}</span>
+        <span class="aa-vs-who"><b>${escapeHtml(m.host)}</b> challenges you.</span>
+      </div>
       <p class="aa-purse"><span>Stake</span><span class="aa-gold"><span aria-hidden="true">🪙</span>${gfmt(m.stake)}</span></p>
       <p class="aa-sheet-note">Everyone puts in ${gfmt(m.stake)} gold and plays the very same board. Clear it first and you take the lot.${short ? ` <b>You have only ${gfmt(gold)}.</b>` : ''}</p>
       <div class="aa-actions">
@@ -1568,10 +1719,12 @@
       </div>
       <p class="aa-flash" hidden></p>`;
     openSheet(el.matchSheet);
+    wireFaces(el.matchBody);
     state.pendingMatch = m;
   }
 
   function showMatchState(m, goldBefore, celebrate = true) {
+    forgetRecent();
     el.matchTitle.textContent = m.you_won ? 'You win!' : m.winner ? `${m.winner} wins` : m.state === 'done' ? 'Nobody cleared it' : 'Waiting';
     // The time on each line is the race time the server keeps: from the match starting to that player's result
     // landing, which is the very thing first place is decided by. The board's own clock is a different number —
@@ -1579,13 +1732,19 @@
     // out of hearts — so showing it here put the winner on the slower-looking line and made the sheet read like
     // the wrong player had won. (race_ms is missing only from a server older than this; then the clock is all
     // there is.)
-    const row = p => `<div class="aa-vs-row${p.won ? ' is-win' : ''}"><span>${p.ms > 0 ? `${p.place}. ` : ''}${escapeHtml(p.you ? 'You' : p.name)}</span><b>${p.ms == null ? 'still playing' : p.ms < 0 ? 'ran out of hearts' : fmtTime(p.race_ms ?? p.ms, true)}</b></div>`;
+    // The same faces the line-up over the board uses. A result is about who you played, and a column of bare
+    // names says nothing about that — least of all in a room of five.
+    const row = p => `<div class="aa-vs-row${p.won ? ' is-win' : ''}">
+      <span class="aa-rank aa-vs-face${faceClass(p)}" aria-hidden="true">${faceInner(p)}</span>
+      <span class="aa-vs-who">${p.ms > 0 ? `${p.place}. ` : ''}${escapeHtml(p.you ? 'You' : p.name)}</span>
+      <b>${p.ms == null ? 'still playing' : p.ms < 0 ? 'ran out of hearts' : fmtTime(p.race_ms ?? p.ms, true)}</b></div>`;
     const purse = m.you_won ? `You won ${gfmt(m.pot)}` : m.winner ? `You lost ${gfmt(m.stake)}` : m.draw ? 'Every stake came back' : 'Your stake is held';
     el.matchBody.innerHTML = `
       <div class="aa-vs">${(m.players || []).map(row).join('')}</div>
       <p class="aa-purse"><span>${purse}</span><span class="aa-gold${m.you_won ? ' is-won' : ''}${goldFit(auth.user?.gold ?? 0)}"><span aria-hidden="true">🪙</span><span id="aaPurseCount">${gfmt(auth.user?.gold ?? 0)}</span></span></p>
       ${m.state === 'done' ? '' : '<p class="aa-sheet-note">The others are still playing for their place.</p>'}
       <div class="aa-actions"><button type="button" class="aa-btn aa-btn--primary" data-mact="stakes">Play another</button><button type="button" class="aa-btn" data-mact="close">Close</button></div>`;
+    wireFaces(el.matchBody);
     openSheet(el.matchSheet);
     if (m.you_won && celebrate) {
       if (typeof goldBefore === 'number') purseWin = { from: goldBefore, to: auth.user?.gold ?? goldBefore };
@@ -1700,12 +1859,24 @@
     store.set('fillOnline', e.target.checked);
   });
   el.matchBody?.addEventListener('click', async e => {
+    const inv = e.target.closest('[data-invite]');
+    if (inv) {
+      state.inviteAfter = { id: Number(inv.dataset.invite), name: inv.dataset.name };
+      toast(`Pick a table, and ${inv.dataset.name} will be invited to it.`, 'hint');
+      return;
+    }
     const stake = e.target.closest('[data-stake]')?.dataset.stake;
     const act = e.target.closest('[data-mact]')?.dataset.mact;
     if (stake) {
       const btn = e.target.closest('[data-stake]'); btn.disabled = true;
-      try { const d = await matchApi('create', { stake: +stake, tier: TIER_OF(), open_to_all: fillOn() }); setGold(d.gold); showRoom(d.match); }
-      catch (err) { btn.disabled = false; toast(goldError(err), 'bad'); if (typeof err.gold === 'number') setGold(err.gold); }
+      try {
+        const d = await matchApi('create', { stake: +stake, tier: TIER_OF(), open_to_all: fillOn() });
+        setGold(d.gold);
+        showRoom(d.match);
+        // Somebody was picked on the dashboard before the table was: now there is a room to point them at.
+        const who = state.inviteAfter; state.inviteAfter = null;
+        if (who) await invitePlayer(who.id, who.name, null);
+      } catch (err) { btn.disabled = false; toast(goldError(err), 'bad'); if (typeof err.gold === 'number') setGold(err.gold); }
       return;
     }
     if (!act) return;
@@ -1802,7 +1973,7 @@
   }
   el.signOutBtn?.addEventListener('click', async () => {
     try { await authApi('logout', {}); } catch { /* the cookie may already be gone */ }
-    auth.user = null; renderAccountRow(); closeSheets(); toast('Signed out.');
+    auth.user = null; live.close(); renderAccountRow(); closeSheets(); toast('Signed out.');
   });
   el.deleteAccBtn?.addEventListener('click', async () => {
     if (!confirm('Delete your account? Your gold and any matches go with it. The progress on this device stays.')) return;

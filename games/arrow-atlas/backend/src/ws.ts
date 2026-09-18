@@ -175,6 +175,13 @@ export function attachWebSocket(app: FastifyInstance): void {
 
   // Fan out what the game logic publishes, from whichever container raised it.
   void subscribeAll((ev: MatchEvent) => {
+    // An invitation is addressed to a player, not to a room: it goes to every socket that player has open,
+    // wherever they are in the game, and to nobody else.
+    if (ev.code.startsWith(':u')) {
+      const id = Number(ev.code.slice(2));
+      for (const c of clients) if (c.user.id === id) send(c, ev);
+      return;
+    }
     const set = byRoom.get(ev.code);
     if (!set) return;
     for (const c of set) send(c, ev);
