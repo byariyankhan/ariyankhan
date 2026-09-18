@@ -955,7 +955,9 @@
       syncTour({});   // the daily board lives in the state blob, which every push carries
     } else { store.set(progressKey(i), rec); forgetNums(); pushOne(DATA.levels[i].id, rec); }
     if (R) {
-      el.card.innerHTML = `<h3>Board cleared!</h3><p class="aa-card-lead">${fmtTime(t, true)}. Sending your time…</p>`;
+      // No number here on purpose: the one that counts is the race time the server works out, and it is on the
+      // sheet a second later. Two different times on two screens in a row is how a race stops making sense.
+      el.card.innerHTML = '<h3>Board cleared!</h3><p class="aa-card-lead">Sending your time…</p>';
       el.overlay.hidden = false;
       finishMatch(true, t);
       return;
@@ -1028,7 +1030,7 @@
   });
 
   function goToLevels() {
-    stopTimer(); stopMatchPoll(); stopProgressPoll();
+    stopTimer(); stopMatchPoll(); stopProgressPoll(); stopResultWatch();
     live.close();   // back in the lobby: there is no room to watch, so let the socket go
     if (el.ranks) el.ranks.hidden = true; el.game.hidden = true; el.overlay.hidden = true; el.select.hidden = false; setHash(-1); renderSelect();
   }
@@ -1531,9 +1533,15 @@
     state.pendingMatch = m;
   }
 
-  function showMatchState(m, goldBefore) {
+  function showMatchState(m, goldBefore, celebrate = true) {
     el.matchTitle.textContent = m.you_won ? 'You win!' : m.winner ? `${m.winner} wins` : m.state === 'done' ? 'Nobody cleared it' : 'Waiting';
-    const row = p => `<div class="aa-vs-row${p.won ? ' is-win' : ''}"><span>${p.ms > 0 ? `${p.place}. ` : ''}${escapeHtml(p.you ? 'You' : p.name)}</span><b>${p.ms == null ? 'still playing' : p.ms < 0 ? 'ran out of hearts' : fmtTime(p.ms, true)}</b></div>`;
+    // The time on each line is the race time the server keeps: from the match starting to that player's result
+    // landing, which is the very thing first place is decided by. The board's own clock is a different number —
+    // it starts at the player's first tap, and starts over when somebody takes the board again after running
+    // out of hearts — so showing it here put the winner on the slower-looking line and made the sheet read like
+    // the wrong player had won. (race_ms is missing only from a server older than this; then the clock is all
+    // there is.)
+    const row = p => `<div class="aa-vs-row${p.won ? ' is-win' : ''}"><span>${p.ms > 0 ? `${p.place}. ` : ''}${escapeHtml(p.you ? 'You' : p.name)}</span><b>${p.ms == null ? 'still playing' : p.ms < 0 ? 'ran out of hearts' : fmtTime(p.race_ms ?? p.ms, true)}</b></div>`;
     const purse = m.you_won ? `You won ${gfmt(m.pot)}` : m.winner ? `You lost ${gfmt(m.stake)}` : m.draw ? 'Every stake came back' : 'Your stake is held';
     el.matchBody.innerHTML = `
       <div class="aa-vs">${(m.players || []).map(row).join('')}</div>
@@ -1541,13 +1549,34 @@
       ${m.state === 'done' ? '' : '<p class="aa-sheet-note">The others are still playing for their place.</p>'}
       <div class="aa-actions"><button type="button" class="aa-btn aa-btn--primary" data-mact="stakes">Play another</button><button type="button" class="aa-btn" data-mact="close">Close</button></div>`;
     openSheet(el.matchSheet);
-    if (m.you_won) {
+    if (m.you_won && celebrate) {
       if (typeof goldBefore === 'number') purseWin = { from: goldBefore, to: auth.user?.gold ?? goldBefore };
       SFX.win(); vibe([0, 40, 60, 120]); goldRain(100, true);
       setTimeout(() => goldRain(60, true), 500);
       if (typeof goldBefore === 'number') countTo($('#aaPurseCount', el.matchBody), goldBefore, auth.user?.gold ?? goldBefore);
     }
   }
+
+  // Your own run is in, and with it the poll that carried the race stops — so the sheet freezes at the moment
+  // you finished, saying the others are still playing for as long as you leave it open. The match does end;
+  // it just ends on somebody else's screen. This follows the room until everybody has reported, and then
+  // stops. It never celebrates again: the pot was decided the moment the first player cleared the board, so a
+  // second fanfare would be for news that already broke.
+  function watchResult(code, m) {
+    stopResultWatch();
+    if (!m || m.state === 'done') return;
+    const tick = async () => {
+      if (!el.matchSheet || el.matchSheet.hidden) { stopResultWatch(); return; }
+      try {
+        const d = await matchApi('get', null, '&code=' + encodeURIComponent(code));
+        if (typeof d.gold === 'number') setGold(d.gold);
+        showMatchState(d.match, undefined, false);
+        if (d.match.state === 'done') stopResultWatch();
+      } catch { /* a dropped poll is nothing: the next one will do */ }
+    };
+    state.resultWatch = setInterval(tick, 4000);
+  }
+  function stopResultWatch() { clearInterval(state.resultWatch); state.resultWatch = 0; }
 
   // The line-up over the board: first place first, and the order moves as they play.
   function renderRanks(players) {
@@ -1780,10 +1809,11 @@
       renderRanks(d.match.players);
       el.overlay.hidden = true;
       showMatchState(d.match, before);
+      watchResult(sent.code, d.match);
     } catch (err) {
       store.set(PENDING, sent);   // it goes with the device until it gets through
       el.card.innerHTML = `<h3>${cleared ? 'Board cleared!' : 'Out of hearts'}</h3>
-        <p class="aa-card-lead">${cleared ? `${fmtTime(sent.ms, true)}. ` : ''}${resultTrouble(err)}</p>
+        <p class="aa-card-lead">${resultTrouble(err)}</p>
         <div class="aa-actions">
           <button type="button" class="aa-btn aa-btn--primary" data-act="resend">Send it again</button>
           <button type="button" class="aa-btn" data-act="levels">World Tour</button>
@@ -2129,7 +2159,7 @@
   el.play.addEventListener('click', () => startLevel(+el.play.dataset.level || 0));
   // Sheets
   const openSheet = sh => { sh.hidden = false; document.body.style.overflow = 'hidden'; };
-  const closeSheets = () => { el.sheet.hidden = true; if (el.signInSheet) el.signInSheet.hidden = true; if (el.matchSheet) el.matchSheet.hidden = true; if (el.leagueSheet) el.leagueSheet.hidden = true; document.body.style.overflow = ''; };
+  const closeSheets = () => { stopResultWatch(); el.sheet.hidden = true; if (el.signInSheet) el.signInSheet.hidden = true; if (el.matchSheet) el.matchSheet.hidden = true; if (el.leagueSheet) el.leagueSheet.hidden = true; document.body.style.overflow = ''; };
   el.settingsBtns.forEach(b => b.addEventListener('click', () => {
     openSheet(el.sheet);
     renderAccountRow();                                   // with what the page already knows, at once
