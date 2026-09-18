@@ -80,10 +80,16 @@ export interface Standing {
 /**
  * The table for one season.
  *
- * Only players in front are ranked: a week where you lost more than you won is not a placing, and without
- * that rule a quiet week would pay five million gold to whoever lost the least. The tie-break is who got
- * there first — equal earnings, and the one who stopped earlier is ahead — then the older account, so the
- * order is total and the same every time it is asked for.
+ * Everyone who played is in it. Playing a gold match is what puts you on the board — a friend's room counts
+ * the same as a room filled from the world, because both stake gold and both pay a pot — and a week you are
+ * down on is a place near the bottom rather than no place at all. A table you fall out of the moment you lose
+ * is a table nobody can read their own progress in.
+ *
+ * What losing does cost is the prize: settleDue pays only the players who are in front (see below), so a
+ * quiet week still cannot pay five million gold to whoever lost the least.
+ *
+ * The tie-break is who got there first — equal earnings, and the one who stopped earlier is ahead — then the
+ * older account, so the order is total and the same every time it is asked for.
  */
 export async function standings(sql: Sql, s: Season, limit = 100): Promise<Standing[]> {
   const r = await query<{ user_id: number; name: string; pic: string; earning: number }>(sql, `
@@ -93,7 +99,6 @@ export async function standings(sql: Sql, s: Season, limit = 100): Promise<Stand
      WHERE g.created_at >= $1 AND g.created_at < $2
        AND g.reason = ANY($3::text[])
      GROUP BY g.user_id, u.name, u.pic
-    HAVING SUM(g.delta) > 0
      ORDER BY SUM(g.delta) DESC, MAX(g.created_at) ASC, g.user_id ASC
      LIMIT $4`,
     [s.startsAt, s.endsAt, PLAY_REASONS, Math.max(1, Math.min(500, limit))]);
@@ -103,6 +108,10 @@ export async function standings(sql: Sql, s: Season, limit = 100): Promise<Stand
 /**
  * One player's own line. Counted over the whole season rather than over the page of the table they can see,
  * so somebody in 340th place is still told where they stand and what they have won.
+ *
+ * A rank at all means they played this week: a player who has not staked gold since the season opened has no
+ * place, and everybody else has one, whichever side of even they are on. The ordering is the same as the
+ * table's, so the number here and the row there are always the same number.
  */
 export async function placeOf(sql: Sql, s: Season, userId: number): Promise<{ rank: number | null; earning: number }> {
   const r = await query<{ rank: number | null; earning: number }>(sql, `
@@ -113,12 +122,11 @@ export async function placeOf(sql: Sql, s: Season, userId: number): Promise<{ ra
        GROUP BY user_id
     ), mine AS (SELECT * FROM play WHERE user_id = $4)
     SELECT COALESCE((SELECT earning FROM mine), 0)::bigint AS earning,
-           CASE WHEN (SELECT earning FROM mine) > 0 THEN (
+           CASE WHEN EXISTS (SELECT 1 FROM mine) THEN (
              SELECT 1 + count(*) FROM play p, mine m
-              WHERE p.earning > 0
-                AND (p.earning > m.earning
-                  OR (p.earning = m.earning AND (p.last_at < m.last_at
-                  OR (p.last_at = m.last_at AND p.user_id < m.user_id))))
+              WHERE p.earning > m.earning
+                 OR (p.earning = m.earning AND (p.last_at < m.last_at
+                 OR (p.last_at = m.last_at AND p.user_id < m.user_id)))
            ) END::int AS rank`,
     [s.startsAt, s.endsAt, PLAY_REASONS, userId]);
   const row = r.rows[0];
@@ -195,7 +203,10 @@ export async function settleDue(now: Date = new Date()): Promise<SettledSeason |
     if (!row) return null;
 
     const season: Season = { key: row.key, startsAt: row.starts_at, endsAt: row.ends_at };
-    const table = await standings(c, season, config.league.ranks);
+    // The table now holds everyone who played, so the prizes take only the part of it that is in front: a
+    // week you ended down on is a place on the board, never a payment. Losing rows sort below winning ones,
+    // so dropping them leaves the ranks running 1, 2, 3 with nothing missing from the middle.
+    const table = (await standings(c, season, config.league.ranks)).filter(p => p.earning > 0);
     const paid: SettledSeason['paid'] = [];
 
     for (const p of table) {

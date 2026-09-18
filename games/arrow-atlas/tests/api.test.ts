@@ -274,7 +274,9 @@ section('The league is readable signed out, and knows you when you are in');
   const top = after.json.top as { name: string; you: boolean }[];
   ok(top.some(r => r.you), 'and the row is marked as theirs');
   const loser = await call('/league', { token: rival.token });
-  eq((loser.json.me as { rank: number | null }).rank, null, 'the player who lost their stake is not in the table');
+  const lost = loser.json.me as { rank: number | null; earning: number };
+  ok(typeof lost.rank === 'number' && lost.rank > place.rank!, 'the player who lost their stake is still in the table, below the winner');
+  eq(lost.earning, -config.game.stakes[0], 'with the stake they lost standing as their week so far');
 }
 
 await finish();

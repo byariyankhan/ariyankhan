@@ -995,11 +995,11 @@
     el.card.innerHTML = `
       <p class="aa-card-kicker">${state.daily ? (state.daily.race ? `Gold match · ${gfmt(state.daily.match?.stake || 0)}` : 'Daily board') : hudLabel()} · ${DIFF_OF(state.tier)}</p>
       <h3>${reason}</h3>
-      <p class="aa-card-lead">${state.left} of ${state.pieces.length} arrows were still on the board.${state.daily?.race ? ' Your friend only has to clear it to take the gold.' : ''}</p>
+      <p class="aa-card-lead">${state.left} of ${state.pieces.length} arrows were still on the board.${state.daily?.race ? ' You are still in the challenge: Try again puts you back on the same board with your hearts back, to clear from the start. Nothing is lost until somebody else clears it.' : ''}</p>
       ${eased ? `<p class="aa-adapt aa-adapt--down">Two losses in a row. A new layout eases to ${DIFF_OF(learn.after.tier)}; Try again keeps this board.</p>` : learn && learn.after.losses === 1 && state.tier > 0 ? '<p class="aa-adapt">One more loss and the boards ease off a step.</p>' : ''}
       <div class="aa-actions">
-        ${state.daily?.race ? '<button type="button" class="aa-btn aa-btn--primary" data-act="giveup">Give the board up</button>' : '<button type="button" class="aa-btn aa-btn--primary" data-act="retry">Try again</button>'}
-        ${state.daily?.race ? '<button type="button" class="aa-btn" data-act="retry">Try again</button>' : `<button type="button" class="aa-btn" data-act="shuffle">${eased ? 'Easier layout' : 'New layout'}</button>`}
+        <button type="button" class="aa-btn aa-btn--primary" data-act="retry">Try again</button>
+        ${state.daily?.race ? '<button type="button" class="aa-btn" data-act="giveup">Give the board up</button>' : `<button type="button" class="aa-btn" data-act="shuffle">${eased ? 'Easier layout' : 'New layout'}</button>`}
         ${canSkip ? '<button type="button" class="aa-btn" data-act="skip">Skip level</button>' : ''}
         <button type="button" class="aa-btn" data-act="levels">World Tour</button>
       </div>`;
@@ -1012,7 +1012,12 @@
     else if (act === 'again' || act === 'retry') startLevel(state.idx, false, state.daily, state.tier);
     else if (act === 'shuffle') startLevel(state.idx, true, state.daily);
     else if (act === 'skip') { const id = DATA.levels[state.idx + 1]?.id; store.set(skipKey(state.idx + 1), true); if (id) syncTour({ [id]: { cleared: false, skipped: true } }); startLevel(nextOpen(state.idx)); }
-    else if (act === 'giveup') { el.card.innerHTML = '<h3>Sending…</h3>'; finishMatch(false, 0); }
+    // Out of hearts is not the end of a challenge — giving up is, and it cannot be taken back: the loss goes
+    // to the server, the seat closes and the stake is gone. So the quiet button asks before it does that.
+    else if (act === 'giveup') {
+      if (!confirm('Give the board up? Your run ends here, and your stake goes to whoever clears it.')) return;
+      el.card.innerHTML = '<h3>Sending…</h3>'; finishMatch(false, 0);
+    }
     else if (act === 'resend') { const b = e.target.closest('[data-act]'); b.disabled = true; flushResult(true).then(ok => { if (!ok) b.disabled = false; }); }
     else if (act === 'minvite') sendInvite(state.pendingMatch);
     else if (act === 'mcancel') leaveRoom();
@@ -2001,28 +2006,22 @@
 
   // ── Drawing it ──
   //
-  // The shape follows the league screens the game is being measured against: a card at the top saying which
-  // league this is and how long is left, a Results button that swaps the table for last week's paid one, a
-  // medal on every row, and your own row picked out in gold. The pieces are Arrow Atlas's own — its faces, its
-  // cards, its palette — because a screen that borrowed another game's art would look like a different game.
+  // One table, the week's clock above it and the rules folded behind the question mark. Every row is a player
+  // who played; the medals are on the places that are actually being paid, so a gold badge is a promise the
+  // settlement keeps rather than a decoration on the first line. The pieces are Arrow Atlas's own — its faces,
+  // its cards, its palette — because a screen that borrowed another game's art would look like a different game.
   const MEDAL = r => r === 1 ? ' is-g1' : r === 2 ? ' is-g2' : r === 3 ? ' is-g3' : r <= 10 ? ' is-prize' : '';
   const leagueRow = (r, prize, paid) => `
     <div class="aa-lg-row${r.you ? ' is-you' : ''}">
-      <span class="aa-lg-medal${MEDAL(r.rank)}">${r.rank}</span>
+      <span class="aa-lg-medal${prize ? MEDAL(r.rank) : ''}">${r.rank}</span>
       <span class="aa-rank${faceClass(r)}" aria-hidden="true">${faceInner(r)}</span>
       <span class="aa-lg-who"><b>${escapeHtml(r.name || 'Player')}</b>${prize ? `<small>${paid ? 'won' : 'wins'} ${gshort(prize)}</small>` : ''}</span>
-      <span class="aa-lg-earn"><span aria-hidden="true">🪙</span>${gshort(r.earning)}</span>
+      <span class="aa-lg-earn${r.earning < 0 ? ' is-down' : ''}"><span aria-hidden="true">🪙</span>${gshort(r.earning)}</span>
     </div>`;
-
-  // "2 days 17 hrs" on the card, where there is room for it to be read rather than decoded.
-  function fmtLeftLong(ms) {
-    const s = Math.max(0, Math.round(ms / 1000));
-    const d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60);
-    const unit = (n, one) => `${n} ${one}${n === 1 ? '' : 's'}`;
-    if (d) return `${unit(d, 'day')} ${h} hrs`;
-    if (h) return `${unit(h, 'hr')} ${m} min`;
-    return m ? unit(m, 'min') : 'any moment';
-  }
+  // A prize belongs to a row only while that row is in front: the table holds everyone who played, so places
+  // one to ten can be held by a player who is down on the week, and "wins 5.12M" under a losing line would be
+  // a promise the settlement does not keep.
+  const prizeOn = (r, prizes) => r.earning > 0 ? (prizes[r.rank - 1] || 0) : 0;
 
   function renderLeague() {
     if (!el.leagueBody) return;
@@ -2032,21 +2031,14 @@
     const last = d.last && d.last.paid.length ? d.last : null;
     const showing = league.view === 'last' && last ? 'last' : 'now';
 
-    // The card. The badge is where the player stands, because that is the number they came to see; the button
-    // beside it is the only way to last week's table, so the two weeks never crowd each other on one screen.
-    // Whichever week is on screen, the badge is their place in *that* week — this week's rank over last week's
-    // table would be the wrong number in a convincing place.
+    // One line, not a card. There is a single league and the player is already looking at it, so a panel
+    // announcing which one it is says only "the one you are in"; what is worth the space is the week's clock,
+    // where the player stands, and the way back to last week's paid table.
     const mineLast = last && last.paid.find(r => r.you);
     const myPlace = showing === 'last' ? (mineLast ? mineLast.rank : null) : (mine && mine.rank);
-    const place = myPlace ? `#${myPlace}` : '🏆';
-    const card = `
-      <div class="aa-lg-card">
-        <span class="aa-lg-badge${myPlace && myPlace <= 10 ? ' is-prize' : ''}">${place}</span>
-        <span class="aa-lg-card-t">
-          <small>${showing === 'last' ? 'Last league' : 'Current league'}</small>
-          <b>Global</b>
-          <i>${showing === 'last' ? 'Paid out' : `Ends in: ${fmtLeftLong(leagueLeft())}`}</i>
-        </span>
+    const bar = `
+      <div class="aa-lg-bar">
+        <span class="aa-lg-when">${showing === 'last' ? 'Last week, paid out' : `Ends in <b>${fmtLeft(leagueLeft())}</b>`}${myPlace ? ` · you are <b>#${myPlace}</b>` : ''}</span>
         ${last ? `<button type="button" class="aa-btn aa-btn--small aa-lg-results" data-lgact="${showing === 'last' ? 'now' : 'last'}">${showing === 'last' ? 'This week' : 'Results'}</button>` : ''}
       </div>`;
 
@@ -2054,40 +2046,39 @@
     const table = rows.length
       ? `<div class="aa-group aa-lg-table" id="aaLeagueTable">
            <div class="aa-lg-head"><span>Rank</span><span>Player</span><span>Earning</span></div>
-           ${rows.map(r => leagueRow(r, showing === 'last' ? r.gold : (prizes[r.rank - 1] || 0), showing === 'last')).join('')}
+           ${rows.map(r => leagueRow(r, showing === 'last' ? r.gold : prizeOn(r, prizes), showing === 'last')).join('')}
          </div>`
-      : `<p class="aa-sheet-note">Nobody has won gold this week yet. The first player to take a pot is first in the table.</p>`;
+      : `<p class="aa-sheet-note">Nobody has played for gold this week yet. The first match played is the first line in the table.</p>`;
 
     const meLine = showing === 'last' ? ''
       : !auth.user
         ? `<p class="aa-sheet-note">Sign in to play the gold tables and enter this week's league.</p>
            <p class="aa-lg-cta"><button type="button" class="aa-btn aa-btn--small" data-lgact="signin">Sign in</button></p>`
         : mine && mine.rank ? ''
-        : `<p class="aa-sheet-note">You have not won any gold this week yet. Win a gold match and you are in the table.${mine && mine.earning < 0 ? ` <b>You are ${gshort(-mine.earning)} down so far.</b>` : ''}</p>`;
-
-    const ladder = showing === 'last' ? '' : `
-      <p class="aa-cap">What the places pay</p>
-      <div class="aa-group aa-lg-prizes">
-        ${prizes.map((g, i) => `<div class="aa-lg-prize"><span class="aa-lg-medal${MEDAL(i + 1)}">${i + 1}</span><span><span aria-hidden="true">🪙</span> ${gshort(g)}</span></div>`).join('')}
-      </div>`;
+        : `<p class="aa-sheet-note">Play a gold match — a friend's room or an online table — and you are in this week's table.</p>`;
 
     // Your own row, pinned to the foot of the sheet. A hundred places is a long scroll, and a player deep in
     // it should not have to find themselves to see where they stand — so it follows the scroll, and gets out
     // of the way when the real row is on screen (see wireLeaguePin).
     const pinRow = showing === 'last' ? mineLast : (mine && mine.rank ? { ...auth.user, rank: mine.rank, earning: mine.earning, you: true } : null);
     const pinned = auth.user && pinRow
-      ? `<div class="aa-lg-pin" id="aaLeaguePin" hidden>${leagueRow(pinRow, showing === 'last' ? pinRow.gold : (prizes[pinRow.rank - 1] || 0), showing === 'last')}</div>`
+      ? `<div class="aa-lg-pin" id="aaLeaguePin" hidden>${leagueRow(pinRow, showing === 'last' ? pinRow.gold : prizeOn(pinRow, prizes), showing === 'last')}</div>`
       : '';
 
+    // What the places pay lives behind the question mark with the rest of the rules. It is a table of ten
+    // numbers that never change: worth reading once, and worth the room on the screen never again.
     el.leagueBody.innerHTML = `
-      ${card}
+      ${bar}
       <div class="aa-lg-rules" id="aaLeagueRules" hidden>
-        <p>Every gold match you play counts. What you win at the tables, less the stakes you paid, is your earning for the week — so the table is what you are up over the week, and gold you were given does not count.</p>
-        <p>When the week ends the top ten are paid, tenth place taking ${gshort(prizes[prizes.length - 1] || 0)} and every place above it doubling that, up to ${gshort(prizes[0] || 0)} for first.</p>
+        <p>Every gold match counts, a friend's room the same as an online table: play one and you are on the board. What you win, less the stakes you paid, is your earning for the week — so the table is what you are up over the week, and gold you were given does not count.</p>
+        <p>When the week ends the top ten are paid, tenth place taking ${gshort(prizes[prizes.length - 1] || 0)} and every place above it doubling that, up to ${gshort(prizes[0] || 0)} for first. A week you end down on keeps your place on the board and pays nothing.</p>
+        <p class="aa-cap aa-lg-cap">What the places pay</p>
+        <div class="aa-lg-prizes">
+          ${prizes.map((g, i) => `<div class="aa-lg-prize"><span class="aa-lg-medal${MEDAL(i + 1)}">${i + 1}</span><span><span aria-hidden="true">🪙</span> ${gshort(g)}</span></div>`).join('')}
+        </div>
       </div>
       ${meLine}
       ${table}
-      ${ladder}
       ${pinned}`;
     wireFaces(el.leagueBody);
     wireLeaguePin();
