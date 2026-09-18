@@ -2,6 +2,7 @@
 // N signed-in players, most of them sitting in open rooms, behind a long history of finished matches.
 import { pool, query } from '../backend/src/db.js';
 import { migrate } from '../backend/src/migrate.js';
+import { config } from '../backend/src/config.js';
 import { hashToken, newToken } from '../backend/src/auth.js';
 import { writeFileSync } from 'node:fs';
 
@@ -31,7 +32,7 @@ for (let i = 0; i < seated; i++) {
   if (!code || n >= 5) {
     code = 'L' + i.toString(36).toUpperCase().padStart(5, '0');
     codes.push(code); n = 0;
-    rooms.push(`('${code}',${ids[i]},${[500, 1000, 7000][i % 3]},'FRA',2,1234,'open',true,0,now()+interval '60 seconds',now())`);
+    rooms.push(`('${code}',${ids[i]},${config.game.stakes[i % config.game.stakes.length]},'FRA',2,1234,'open',true,0,now()+interval '60 seconds',now())`);
   }
   seats.push(`('${code}',${ids[i]},2)`);
   n++;

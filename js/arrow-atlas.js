@@ -1215,9 +1215,19 @@
 
   // ── Gold matches: stake, invite, play the same board, winner takes the pot ──
   // The server holds both stakes, picks the board and decides the winner; the game only shows what it says.
-  // Three stakes, and the bigger the stake the harder the board.
-  const STAKES = [500, 1000, 7000];
+  //
+  // The tables are the server's list, not this file's: it is the server that refuses a stake it does not
+  // recognise, so a client holding an older list would offer a table nobody can sit at. This is the list to
+  // draw with until the lobby answers, and it is replaced by whatever comes back.
+  let STAKES = [500, 1000, 10000, 1000000, 10000000];
   const gfmt = n => Number(n || 0).toLocaleString('en-US');
+  // A table is called 10K, not 10,000: on a row of five buttons the digits are what makes them hard to tell apart.
+  const gtiny = n => {
+    const v = Math.abs(Number(n) || 0);
+    if (v >= 1e6) return `${+(v / 1e6).toFixed(v % 1e6 ? 1 : 0)}M`;
+    if (v >= 1000) return `${+(v / 1000).toFixed(v % 1000 ? 1 : 0)}K`;
+    return gfmt(v);
+  };
   // A purse holds anything from nothing to a number with a dozen digits in it, so the badge is not a fixed box:
   // the longer the number, the smaller the type, and it never spills over the name beside it or off the page.
   const goldFit = v => { const w = gfmt(v).length; return w > 12 ? ' is-vast' : w > 9 ? ' is-big' : ''; };
@@ -1338,21 +1348,31 @@
     el.matchTitle.textContent = 'Dashboard';
     el.matchBody.innerHTML = `
       ${meStrip()}
-      <div class="aa-stakes">
-        ${STAKES.map(v => `<button type="button" class="aa-stake" data-stake="${v}"${gold < v ? ' disabled' : ''}><span class="aa-stake-coin" aria-hidden="true">🪙</span><span class="aa-stake-amt">${gfmt(v)}</span><span class="aa-stake-live">${waiting[v] ? `${waiting[v]} waiting` : ''}</span></button>`).join('')}
-      </div>
+      <div class="aa-stakes">${stakesHtml(gold, waiting)}</div>
       <label class="aa-fill"><input type="checkbox" id="aaFillOnline"${fill ? ' checked' : ''}><span>Fill from online</span></label>
       <button type="button" class="aa-lg-open" data-mact="league"><span aria-hidden="true">🏆</span><span class="aa-lg-open-t">League<small>${league.data ? `Ends in ${fmtLeft(leagueLeft())} · ${gshort((league.data.prizes || [0])[0])} for first` : 'The week\u2019s gold, ranked'}</small></span><span class="aa-lg-open-go" aria-hidden="true">\u203A</span></button>`;
     openSheet(el.matchSheet);
     wireFaces(el.matchBody);
     refreshLobby();
   }
+  const stakesHtml = (gold, waiting) => STAKES.map(v =>
+    `<button type="button" class="aa-stake" data-stake="${v}"${gold < v ? ' disabled' : ''}><span class="aa-stake-coin" aria-hidden="true">🪙</span><span class="aa-stake-amt">${gtiny(v)}</span><span class="aa-stake-live">${waiting[v] ? `${waiting[v]} waiting` : ''}</span></button>`).join('');
+
   // How many are sitting in a room at each stake. Shown under the coins so nobody waits at an empty one.
+  // The same answer carries the server's list of tables, so a table added or retired there reaches the player
+  // on their next look at the dashboard rather than on their next app update.
   async function refreshLobby() {
     try {
       const d = await matchApi('lobby');
       state.lobbyWaiting = d.waiting || {};
       if (typeof d.gold === 'number') setGold(d.gold);
+      const served = Array.isArray(d.stakes) ? d.stakes.filter(n => Number.isFinite(n) && n > 0) : [];
+      const row = $('.aa-stakes', el.matchBody);
+      if (served.length && String(served) !== String(STAKES)) {
+        STAKES = served;
+        if (row) row.innerHTML = stakesHtml(auth.user?.gold ?? 0, state.lobbyWaiting);
+        return;
+      }
       $$('.aa-stake', el.matchBody).forEach(b => {
         const live = $('.aa-stake-live', b), n = state.lobbyWaiting[b.dataset.stake] || 0;
         if (live) live.textContent = n ? `${n} waiting` : '';
@@ -1945,6 +1965,7 @@
   // A table of ten seven-digit numbers is a wall. 5.12M is a prize.
   const gshort = n => {
     const v = Number(n) || 0, a = Math.abs(v), sign = v < 0 ? '-' : '';
+    if (a >= 1e9) return `${sign}${(a / 1e9).toFixed(2).replace(/\.?0+$/, '')}B`;
     if (a >= 1e6) return `${sign}${(a / 1e6).toFixed(2).replace(/\.?0+$/, '')}M`;
     if (a >= 10000) return `${sign}${Math.round(a / 1000)}K`;
     return `${sign}${gfmt(a)}`;
@@ -1992,24 +2013,26 @@
     if (!d) { el.leagueBody.innerHTML = '<p class="aa-loading">Loading the league…</p>'; return; }
     const prizes = d.prizes || [];
     const mine = d.me;
-    const inTable = (d.top || []).some(r => r.you);
 
-    // Your own line, when you are not already in the part of the table on screen: a player in 340th place
-    // should still be told where they stand.
     const meLine = !auth.user
       ? `<p class="aa-sheet-note">Sign in to play the gold tables and enter this week's league.</p>
          <p class="aa-lg-cta"><button type="button" class="aa-btn aa-btn--small" data-lgact="signin">Sign in</button></p>`
-      : inTable ? ''
-      : mine && mine.rank
-        ? `<div class="aa-group aa-lg-table">${leagueRow({ ...auth.user, rank: mine.rank, earning: mine.earning, you: true }, prizes[mine.rank - 1] || 0)}</div>`
-        : `<p class="aa-sheet-note">You have not won any gold this week yet. Win a gold match and you are in the table.${mine && mine.earning < 0 ? ` <b>You are ${gshort(-mine.earning)} down so far.</b>` : ''}</p>`;
+      : mine && mine.rank ? ''
+      : `<p class="aa-sheet-note">You have not won any gold this week yet. Win a gold match and you are in the table.${mine && mine.earning < 0 ? ` <b>You are ${gshort(-mine.earning)} down so far.</b>` : ''}</p>`;
 
     const table = (d.top || []).length
-      ? `<div class="aa-group aa-lg-table">
+      ? `<div class="aa-group aa-lg-table" id="aaLeagueTable">
            <div class="aa-lg-head"><span>#</span><span>Player</span><span>Won this week</span></div>
            ${d.top.map(r => leagueRow(r, prizes[r.rank - 1] || 0)).join('')}
          </div>`
       : `<p class="aa-sheet-note">Nobody has won gold this week yet. The first player to take a pot is first in the table.</p>`;
+
+    // Your own row, pinned to the foot of the sheet. A hundred places is a long scroll, and a player deep in
+    // it should not have to find themselves to see where they stand — so it follows the scroll, and gets out
+    // of the way when the real row is on screen (see wireLeaguePin).
+    const pinned = auth.user && mine && mine.rank
+      ? `<div class="aa-lg-pin" id="aaLeaguePin" hidden>${leagueRow({ ...auth.user, rank: mine.rank, earning: mine.earning, you: true }, prizes[mine.rank - 1] || 0)}</div>`
+      : '';
 
     const ladder = `
       <p class="aa-cap">What the places pay</p>
@@ -2030,8 +2053,27 @@
       ${table}
       ${ladder}
       ${last}
-      <p class="aa-sheet-note">Only gold won or lost at the gold tables counts. Stakes you pay come off your total, so the table is what you are up over the week.</p>`;
+      <p class="aa-sheet-note">Only gold won or lost at the gold tables counts. Stakes you pay come off your total, so the table is what you are up over the week.</p>
+      ${pinned}`;
     wireFaces(el.leagueBody);
+    wireLeaguePin();
+  }
+
+  // The pinned row hides itself while the real one is on screen: two copies of the same line, one right above
+  // the other, reads as a bug rather than as help.
+  let leaguePinWatch = null;
+  function wireLeaguePin() {
+    leaguePinWatch?.disconnect();
+    leaguePinWatch = null;
+    const pin = $('#aaLeaguePin', el.leagueBody);
+    if (!pin) return;
+    const row = $('#aaLeagueTable .aa-lg-row.is-you', el.leagueBody);
+    const panel = el.leagueSheet?.querySelector('.aa-sheet-panel');
+    if (!row || !panel || typeof IntersectionObserver !== 'function') { pin.hidden = false; return; }
+    pin.hidden = false;
+    leaguePinWatch = new IntersectionObserver(entries => { pin.hidden = entries[entries.length - 1].isIntersecting; },
+      { root: panel, threshold: 0.75 });
+    leaguePinWatch.observe(row);
   }
 
   async function openLeague() {

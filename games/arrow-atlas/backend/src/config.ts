@@ -63,7 +63,9 @@ export const config = {
   // ── Game rules, carried over unchanged from the PHP service ──
   game: {
     signupGold: num('ARROW_ATLAS_SIGNUP_GOLD', 10_000),
-    stakes: str('ARROW_ATLAS_STAKES', '500,1000,7000').split(',').map(s => Number(s.trim())).filter(n => n > 0),
+    // The tables a player can sit at. Five of them, three orders of magnitude apart at the top, so a new
+    // account and one that has been winning for a month both have somewhere to play.
+    stakes: str('ARROW_ATLAS_STAKES', '500,1000,10000,1000000,10000000').split(',').map(s => Number(s.trim())).filter(n => n > 0),
     seats: num('ARROW_ATLAS_MATCH_SEATS', 7),
     fillSeconds: num('ARROW_ATLAS_FILL_SECONDS', 63),
     lonelySeconds: num('ARROW_ATLAS_LONELY_SECONDS', 120),

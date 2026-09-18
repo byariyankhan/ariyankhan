@@ -2,6 +2,7 @@
 // forwards, what a stranger is not allowed to see, and what a reconnecting phone gets back.
 import { pool, query, tx } from '../backend/src/db.js';
 import { give, idem } from '../backend/src/gold.js';
+import { config } from '../backend/src/config.js';
 import { startSession } from '../backend/src/auth.js';
 import { eq, finish, ok, reset, section } from './helpers.js';
 
@@ -98,7 +99,7 @@ section('A player joining reaches the room over the socket');
 
 section('The countdown is the server\'s, and it ticks');
 {
-  const fill = await api('/matches', a.token, { stake: 7000, open_to_all: true, tier: 2 }) as { match: { code: string } };
+  const fill = await api('/matches', a.token, { stake: config.game.stakes[1], open_to_all: true, tier: 2 }) as { match: { code: string } };
   const fillCode = fill.match.code;
   const sc = open(a.token); await sc.ready; await sc.waitFor('hello');
   sc.send({ type: 'watch', code: fillCode });

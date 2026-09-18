@@ -106,7 +106,7 @@ const H = {
     const season = L.seasonAt();
     await L.ensureSeason(pool, season);
     const [top, mine, last] = await Promise.all([
-      L.standings(pool, season, 50),
+      L.standings(pool, season, L.TABLE_SIZE),
       me.user ? L.placeOf(pool, season, me.user.id) : Promise.resolve(null),
       L.lastSettled(pool),
     ]);

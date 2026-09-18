@@ -66,6 +66,9 @@ export function prizeFor(rank: number): number {
 export const prizeLadder = (): number[] =>
   Array.from({ length: config.league.ranks }, (_, i) => prizeFor(i + 1));
 
+/** How many places the game shows. A hundred is a table worth climbing, and it is one query either way. */
+export const TABLE_SIZE = 100;
+
 export interface Standing {
   rank: number;
   user_id: number;

@@ -90,11 +90,11 @@ Three decisions hold it up:
 Seasons are counted from a fixed Monday, so a restart cannot produce a half-length week, and a service that was
 off for a fortnight comes back, fills in the weeks it missed and settles them oldest first.
 
-**On the size of the prizes.** The biggest pot a table can pay today is seven seats at 7,000 — 42,000 gold to
-the winner. First place in the league is 5.12M, which is around 120 of those. That is deliberate on the
-product's side, but it means the league, not the tables, is where most gold in the game now comes from; turn
-`ARROW_ATLAS_LEAGUE_BASE_GOLD` down and the whole ladder comes down with it, in proportion, without a deploy of
-anything but the environment.
+**On the size of the prizes.** The tables run 500, 1K, 10K, 1M and 10M, so the biggest pot is seven seats at
+10M — 70M gold to the winner, against 5.12M for first place in the league. The league is a bonus on top of a
+week's play rather than the main way gold enters the game, which is the right way round. If the ladder ever
+needs to keep pace with the tables, `ARROW_ATLAS_LEAGUE_BASE_GOLD` moves all ten places at once, in
+proportion, without a deploy of anything but the environment.
 
 ---
 
@@ -123,7 +123,7 @@ in the path.
 | GET | `/progress` | the whole tour this account has played |
 | POST | `/progress` | push what a device has; the merged whole comes back |
 | GET | `/league` | this week's table, your place in it, the prizes, and last week's result |
-| GET | `/lobby` | how many are waiting, per stake |
+| GET | `/lobby` | the tables the server seats, and how many are waiting at each |
 | POST | `/matches` | open a room (`stake`, `open_to_all`, `tier`) |
 | GET | `/matches/:code` | the room as you may see it |
 | POST | `/matches/:code/join` | take a seat |
