@@ -227,6 +227,7 @@ mode_logs() {
 mode_web_safe_fetch() {
   echo "Arrow Atlas — make the site survive a restart  ($(hostname), $(date -u))"
   have ariyankhan-web || { bad "no ariyankhan-web container here"; return; }
+  TGZ=/tmp/arrow-atlas-site.tgz
   command -v python3 >/dev/null || { bad "python3 is not on this host, and editing YAML without it is not worth the risk"; return; }
 
   PROJ=$(docker inspect -f '{{index .Config.Labels "com.docker.compose.project.working_dir"}}' ariyankhan-web 2>/dev/null)
@@ -284,12 +285,12 @@ if start is None:
 block = '\n'.join(lines[start:end])
 # Only the command this was written for. Anything else has been changed by hand since, and a blind
 # replacement would be a guess at what somebody meant.
-for needle in ('codeload.github.com', 'find /var/www/html -mindepth 1', 'web-entrypoint.sh'):
-    if needle not in block:
-        print('the command is not the one this expects (%s missing); leaving it alone' % needle, file=sys.stderr)
-        raise SystemExit(3)
-if 'next-site' in block:
+if 'holding the door open' in block:
     print('already safe', file=sys.stderr); raise SystemExit(4)
+for needle in ('codeload.github.com', 'web-entrypoint.sh'):
+    if needle not in block:
+        print('the command is not one this recognises (%s missing); leaving it alone' % needle, file=sys.stderr)
+        raise SystemExit(3)
 pad = ' ' * (len(lines[start]) - len(lines[start].lstrip()))
 new = [
     pad + 'command:',
@@ -321,8 +322,12 @@ new = [
     pad + '    elif [ -f /var/www/html/index.html ]; then',
     pad + '      echo "[deploy] could not fetch $$SITE_BRANCH; serving the copy already here"',
     pad + '    else',
-    pad + '      echo "[deploy] could not fetch $$SITE_BRANCH and there is nothing here to serve"',
-    pad + '      exit 1',
+    pad + '      # Coming up with nothing to serve is better than not coming up: a container that exits here',
+    pad + '      # cannot be given the files by hand either, and that is how a site with a private repository',
+    pad + '      # behind it goes from "an old copy" to "nothing at all". A holding page keeps the door open.',
+    pad + '      echo "[deploy] nothing to serve yet; holding the door open"',
+    pad + '      mkdir -p /var/www/html',
+    pad + '      printf "%s" "<!doctype html><title>ariyankhan.com</title><p>Updating, one moment.</p>" > /var/www/html/index.html',
     pad + '    fi',
     pad + '    rm -rf /var/www/.next-site',
     pad + '    exec bash /var/www/html/deploy/web-entrypoint.sh',
@@ -347,7 +352,26 @@ PY
   fi
 
   say "4. and the site, restarted onto it"
+  # Recreating the container throws away its filesystem, and /var/www/html is part of that filesystem rather
+  # than a volume — so the files that were copied into the old one are gone the moment this runs. That is why
+  # the command above must come up with nothing, and why the checkout is put back in here, before anything is
+  # asked of the health check.
   ( cd "$PROJ" && $SUDO docker compose up -d --force-recreate "$SVC" ) >/dev/null 2>&1 || bad "compose would not bring it up"
+  for i in $(seq 1 30); do running ariyankhan-web && break; sleep 2; done
+  if [ -s "$TGZ" ]; then
+    docker cp "$TGZ" ariyankhan-web:/tmp/arrow-atlas-site.tgz >/dev/null 2>&1 \
+      && docker exec ariyankhan-web bash -c '
+           set -e
+           rm -rf /tmp/site && mkdir -p /tmp/site
+           tar -xzf /tmp/arrow-atlas-site.tgz -C /tmp/site
+           [ -f /tmp/site/arrow-atlas.html ] || { echo "that is not the site"; exit 1; }
+           cp -a /tmp/site/. /var/www/html/
+           chown -R www-data:www-data /var/www/html || true
+           rm -rf /tmp/site /tmp/arrow-atlas-site.tgz' >/dev/null 2>&1 \
+      && ok "the site's files are in the new container" || bad "could not put the files into the new container"
+  else
+    bad "no checkout arrived, so the new container has only its holding page"
+  fi
   h=""
   for i in $(seq 1 30); do
     h=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' ariyankhan-web 2>/dev/null)

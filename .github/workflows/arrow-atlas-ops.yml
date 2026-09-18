@@ -107,7 +107,7 @@ jobs:
       # is not, this connection is the way in. Everything but the working tree is left behind, and .git most
       # of all — the VPS has no business holding the history.
       - name: Send this checkout
-        if: inputs.mode == 'push-source'
+        if: inputs.mode == 'push-source' || inputs.mode == 'web-safe-fetch'
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
