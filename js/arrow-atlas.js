@@ -214,8 +214,9 @@
   function renderSound() { el.btnSound.setAttribute('aria-checked', String(!state.muted)); el.btnSound.setAttribute('aria-label', state.muted ? 'Sound off' : 'Sound on'); }
 
   let toastTimer = 0;
-  // The coin itself lives in the page as one <symbol>; this is how every line of markup here names it.
-  const COIN = '<svg class="aa-coin" aria-hidden="true"><use href="#aaCoin"></use></svg>';
+  // The coin: one struck gold piece with the world on its face, used everywhere gold is named — the purse,
+  // the tables, a stake, the prize ladder and the result sheet — so it reads as one currency, not five icons.
+  const COIN = '<img class="aa-coin" src="images/arrow-atlas-coin.png" alt="" width="128" height="128" decoding="async">';
 
   function toast(msg, kind = '', ms = 2800) { el.toast.textContent = msg; el.toast.className = 'aa-toast' + (kind ? ' aa-toast--' + kind : ''); el.toast.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => { el.toast.hidden = true; }, ms); }
 
@@ -1577,7 +1578,7 @@
   // corner as a badge rather than as a line of type: the number is the news, the word "waiting" is not.
   const stakeLive = n => n ? `<span class="aa-stake-live" title="${n} waiting">${n}</span>` : '';
   const stakesHtml = (gold, waiting) => STAKES.map(v =>
-    `<button type="button" class="aa-stake" data-stake="${v}"${gold < v ? ' disabled' : ''} aria-label="Play for ${gfmt(v)} gold"><span class="aa-stake-in"><svg class="aa-coin aa-stake-coin" aria-hidden="true"><use href="#aaCoin"></use></svg><span class="aa-stake-amt">${gtiny(v)}</span></span>${stakeLive(waiting[v])}</button>`).join('');
+    `<button type="button" class="aa-stake" data-stake="${v}"${gold < v ? ' disabled' : ''} aria-label="Play for ${gfmt(v)} gold"><span class="aa-stake-in"><img class="aa-coin aa-stake-coin" src="images/arrow-atlas-coin.png" alt="" width="128" height="128" decoding="async"><span class="aa-stake-amt">${gtiny(v)}</span></span>${stakeLive(waiting[v])}</button>`).join('');
 
   // How many are sitting in a room at each stake. Shown under the coins so nobody waits at an empty one.
   // The same answer carries the server's list of tables, so a table added or retired there reaches the player

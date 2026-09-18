@@ -54,8 +54,7 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-chip{ font-size:13px; color:var(--muted); background:var(--bg2); border-radius:30px; padding:6px 12px; }
 .aa-chip:empty{ display:none; }
 /* the struck coin: sized in ems so it follows whatever type it sits beside */
-.aa-coin{ width:1.15em; height:1.15em; flex:0 0 auto; vertical-align:-.2em; }
-.aa-sprite{ position:absolute; width:0; height:0; overflow:hidden; }
+.aa-coin{ width:1.3em; height:1.3em; flex:0 0 auto; vertical-align:-.28em; object-fit:contain; }
 .aa-chip--purse{ display:inline-flex; align-items:center; gap:6px; color:var(--ink); font-weight:900; font-size:14px; font-variant-numeric:tabular-nums; }
 .aa-chip--purse.is-won{ animation:aapop .5s ease-out 2; color:var(--accent); }
 /* the badge follows the number rather than the number following the badge */
