@@ -390,7 +390,11 @@ try {
   // different jobs: the first has to be one the domain publishes so the message is delivered at all, and the
   // last is what makes hitting reply land in the visitor's inbox rather than in this site's own.
   $from_email = $config['from_email'] ?: $config['to_email'];
-  $from_name = $config['from_name'] ?: 'Ariyan Khan';
+  // The name beside that address is the visitor's own. An address and a display name are two separate things:
+  // the address is what a receiving server checks against SPF, DKIM and DMARC, while the name is free text the
+  // reader sees, so putting the visitor's name there costs nothing in deliverability and gives the inbox list
+  // the one thing worth showing. FROM_NAME stays as the fallback for a message that arrives without a name.
+  $from_name = $name !== '' ? $name : ($config['from_name'] ?: 'Ariyan Khan');
 
   $mail->setFrom($from_email, $from_name);
   $mail->addAddress($config['to_email'], 'Ariyan Khan');

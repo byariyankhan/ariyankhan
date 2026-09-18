@@ -160,13 +160,19 @@ try {
       eq(r.sent.transport, 'smtp', 'over SMTP rather than the local sendmail');
 
       eq(r.sent.from[0], RELAY.FROM_EMAIL, 'the message is From FROM_EMAIL');
-      eq(r.sent.from[1], RELAY.FROM_NAME, 'shown as FROM_NAME');
       ok(r.sent.from[0] !== RELAY.SMTP_USER, 'which is not the account it signed in as — the bug this replaces');
-      ok(!r.sent.from[1].includes('Philippe'), "and not the visitor's name either");
+      eq(r.sent.from[1], 'Philippe Nesser', "under the visitor's name, which is what an inbox list shows");
+      eq(r.sent.from[1], r.sent.replyTo[1], 'the same name the reply would go to');
 
       eq(r.sent.to[0][0], RELAY.TO_EMAIL, 'it is addressed To the inbox');
       eq(r.sent.replyTo[0], 'philippe@example.com', "and Reply-To is the visitor's own address");
       eq(r.sent.replyTo[1], 'Philippe Nesser', 'under their name, so a reply reaches them and not this site');
+
+      // The name is free text; the address is the part every receiving server checks. One must never follow
+      // the other, or a visitor could decide what domain this site claims to send from.
+      const other = await post(form({ name: 'Dana Reid', email: 'dana@example.com' }));
+      eq(other.sent.from[1], 'Dana Reid', 'a different visitor puts a different name on it');
+      eq(other.sent.from[0], RELAY.FROM_EMAIL, 'and never a different address');
     }
 
     console.log('\nThe subject is unchanged by any of that');
