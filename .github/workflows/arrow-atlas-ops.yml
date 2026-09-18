@@ -31,7 +31,7 @@ on:
         type: choice
         required: true
         default: inspect
-        options: [inspect, backup-verify, cleanup, deploy, deploy-site, health]
+        options: [inspect, logs, backup-verify, cleanup, deploy, deploy-site, health]
       confirm:
         description: "Type DELETE for cleanup, DEPLOY for deploy. Ignored by the read-only modes."
         required: false

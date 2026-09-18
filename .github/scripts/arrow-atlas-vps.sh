@@ -190,6 +190,21 @@ report_backups() {
 
 # ─────────────────────────────────────────────────────────────────────── modes
 
+# Why a container will not come up. inspect says what its state is; only its own log says why, and a container
+# that keeps restarting has already thrown its reason away by the time anyone opens a terminal. Read-only.
+mode_logs() {
+  echo "Arrow Atlas — what the API says about itself  ($(hostname), $(date -u))"
+  report_containers
+  say "arrow-atlas-api, as Docker sees it"
+  docker inspect -f 'status={{.State.Status}}  restarts={{.RestartCount}}  last exit={{.State.ExitCode}}  health={{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' \
+    arrow-atlas-api 2>&1 | sed 's/^/      /'
+  say "the last of its log"
+  docker logs --tail 150 arrow-atlas-api 2>&1 | sed 's/^/      /'
+  say "and what the health probe last got back"
+  docker inspect -f '{{if .State.Health}}{{range .State.Health.Log}}{{.End}} exit={{.ExitCode}} {{.Output}}
+{{end}}{{end}}' arrow-atlas-api 2>&1 | tail -6 | sed 's/^/      /'
+}
+
 mode_inspect() {
   echo "Arrow Atlas — inspect  ($(hostname), $(date -u))"
   report_containers
@@ -598,6 +613,7 @@ mode_health() {
 
 case "$MODE" in
   inspect)       mode_inspect ;;
+  logs)          mode_logs ;;
   backup-verify) mode_backup_verify ;;
   cleanup)       mode_cleanup ;;
   deploy)        mode_deploy ;;
