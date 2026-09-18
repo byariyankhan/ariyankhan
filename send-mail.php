@@ -79,6 +79,12 @@ function load_mail_config(): array {
     'allowed_origin' => $local['allowed_origin'] ?? env_config('MAIL_ALLOWED_ORIGIN') ?? $site_url,
     'driver'         => $local['driver'] ?? env_config('MAIL_DRIVER') ?? 'smtp',
     'to_email'       => $local['to_email'] ?? env_config('TO_EMAIL'),
+    // Who the message is *from*, which is not who we authenticate as. The relay signs in as its own machine
+    // account; the address a reader sees has to be one the domain actually publishes, or the message is spam
+    // to every receiving server that checks. With no relay (driver 'mail') the site sends to itself, so the
+    // inbox address is a truthful sender and the setting is optional.
+    'from_email'     => $local['from_email'] ?? env_config('FROM_EMAIL'),
+    'from_name'      => $local['from_name'] ?? env_config('FROM_NAME') ?? normalize_host($site_url),
     'smtp_host'      => $local['smtp_host'] ?? env_config('SMTP_HOST'),
     'smtp_user'      => $local['smtp_user'] ?? env_config('SMTP_USER'),
     'smtp_pass'      => $local['smtp_pass'] ?? env_config('SMTP_PASS'),
@@ -282,7 +288,10 @@ validate_origin($config['allowed_origin']);
 
 $required = ['to_email'];
 if ($config['driver'] === 'smtp') {
-  $required = array_merge($required, ['smtp_host', 'smtp_user', 'smtp_pass']);
+  // from_email is required rather than defaulted: a relay refuses, or silently reputation-burns, a sender it
+  // has not been told about, and a form that quietly sends from the wrong address is worse than one that says
+  // it is not configured. The health check asks for exactly this and reports it.
+  $required = array_merge($required, ['smtp_host', 'smtp_user', 'smtp_pass', 'from_email']);
 }
 foreach ($required as $key) {
   if (empty($config[$key])) {
@@ -377,8 +386,11 @@ try {
 
   $mail->CharSet = 'UTF-8';
 
-  $from_email = $config['driver'] === 'smtp' ? $config['smtp_user'] : $config['to_email'];
-  $from_name = $config['driver'] === 'smtp' ? "{$name} (via ariyankhan.com)" : 'Ariyan Khan';
+  // From is the site, To is the inbox, Reply-To is the visitor. Three different addresses doing three
+  // different jobs: the first has to be one the domain publishes so the message is delivered at all, and the
+  // last is what makes hitting reply land in the visitor's inbox rather than in this site's own.
+  $from_email = $config['from_email'] ?: $config['to_email'];
+  $from_name = $config['from_name'] ?: 'Ariyan Khan';
 
   $mail->setFrom($from_email, $from_name);
   $mail->addAddress($config['to_email'], 'Ariyan Khan');

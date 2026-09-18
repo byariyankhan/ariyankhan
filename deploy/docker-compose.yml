@@ -13,7 +13,7 @@
 #
 # Environment (Docker Manager → project env / .env):
 #   WEB_PORT, SITE_BRANCH,
-#   SITE_URL, TO_EMAIL, SMTP_HOST, SMTP_USER, SMTP_PASS, SMTP_PORT
+#   SITE_URL, TO_EMAIL, FROM_EMAIL, FROM_NAME, SMTP_HOST, SMTP_USER, SMTP_PASS, SMTP_PORT
 #
 # Dedicated VPS with nothing else on :80/:443 → deploy/docker-compose.standalone.yml
 
@@ -28,6 +28,10 @@ services:
       SITE_BRANCH: ${SITE_BRANCH:-main}
       SITE_URL: ${SITE_URL:-https://ariyankhan.com}
       TO_EMAIL: ${TO_EMAIL:-}
+      # The address the message is from, which is not the account the relay signs in as. It has to be one this
+      # domain publishes (SPF/DKIM at the relay), or receiving servers treat the mail as forged.
+      FROM_EMAIL: ${FROM_EMAIL:-}
+      FROM_NAME: ${FROM_NAME:-ariyankhan.com}
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASS: ${SMTP_PASS:-}

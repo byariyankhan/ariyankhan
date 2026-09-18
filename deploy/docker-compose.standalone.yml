@@ -33,6 +33,8 @@ services:
     environment:
       SITE_URL: ${SITE_URL:-https://ariyankhan.com}
       TO_EMAIL: ${TO_EMAIL:-}
+      FROM_EMAIL: ${FROM_EMAIL:-}
+      FROM_NAME: ${FROM_NAME:-ariyankhan.com}
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASS: ${SMTP_PASS:-}

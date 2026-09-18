@@ -216,7 +216,7 @@ mode_inspect() {
     # mail-config.local.php at start. Names and whether they hold anything — never the values.
     note "contact form settings on the container:"
     env_dump=$(docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' ariyankhan-web 2>/dev/null)
-    for v in TO_EMAIL SMTP_HOST SMTP_USER SMTP_PASS SMTP_PORT MAIL_DRIVER SITE_URL; do
+    for v in TO_EMAIL FROM_EMAIL FROM_NAME SMTP_HOST SMTP_USER SMTP_PASS SMTP_PORT MAIL_DRIVER SITE_URL; do
       line=$(printf '%s\n' "$env_dump" | grep "^$v=" | head -1)
       case "$line" in
         "")    printf '      %-12s not set\n' "$v" ;;

@@ -15,12 +15,15 @@ RemoteIPInternalProxy 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16
 CONF
 sed -ri 's#AllowOverride None#AllowOverride All#g' /etc/apache2/apache2.conf
 
-# mail-config.local.php <- SITE_URL, TO_EMAIL, SMTP_*, ALLOW_SELF_SIGNED (contact form)
+# mail-config.local.php <- SITE_URL, TO_EMAIL, FROM_EMAIL, FROM_NAME, SMTP_*, ALLOW_SELF_SIGNED
+# Each key is read from the environment variable of the same name in capitals, except the driver: the setting
+# is called `driver` in the file and MAIL_DRIVER in the environment, which is the name send-mail.php looks for
+# too, so the two agree.
 php -r '
-$keys = ["site_url","to_email","driver","smtp_host","smtp_user","smtp_pass","smtp_port","allow_self_signed"];
+$keys = ["site_url","to_email","from_email","from_name","driver","smtp_host","smtp_user","smtp_pass","smtp_port","allow_self_signed"];
 $cfg = [];
 foreach ($keys as $k) {
-  $v = getenv(strtoupper($k));
+  $v = getenv($k === "driver" ? "MAIL_DRIVER" : strtoupper($k));
   if ($v !== false && trim($v) !== "") $cfg[$k] = trim($v);
 }
 file_put_contents("/var/www/html/mail-config.local.php", "<?php\nreturn " . var_export($cfg, true) . ";\n");

@@ -74,7 +74,12 @@ file on every start:
 
 | Env var | Ends up in |
 |---------|-----------|
-| `SMTP_HOST`, `SMTP_USER`, `SMTP_PASS`, `SMTP_PORT`, `TO_EMAIL`, `SITE_URL` | `mail-config.local.php` (contact form) |
+| `TO_EMAIL`, `FROM_EMAIL`, `FROM_NAME`, `SMTP_HOST`, `SMTP_USER`, `SMTP_PASS`, `SMTP_PORT`, `SITE_URL` | `mail-config.local.php` (contact form) |
+
+`FROM_EMAIL` is the address the message is *from* and `SMTP_USER` is the account the relay signs in as:
+two different things, and the relay refuses a sender it has not been told about. The visitor's own
+address is the `Reply-To`, so replying to an enquiry goes to them and not to this site.
+
 | `WEB_PORT` (default 8081), `SITE_BRANCH` (default `main`) | compose itself |
 
 **Proxy note:** `.htaccess` forces HTTPS via `%{HTTPS}` *or*
