@@ -85,7 +85,7 @@
 
   const el = {
     select: $('#aaSelect'), tagline: $('#aaTagline'), homeSel: $('#aaHome'), purse: $('#aaPurse'), purseNo: $('#aaPurseNo'), hudDiff: $('#aaHudDiff'), play: $('#aaPlay'), path: $('#aaPath'), btnVibe: $('#aaVibe'), btnGuides: $('#aaGuides'), btnMusic: $('#aaMusic'), howTo: $('#aaHowTo'),
-    sheet: $('#aaSheet'), friends: $('#aaFriends'), signInSheet: $('#aaSignInSheet'), googleBtn: $('#aaGoogleBtn'), signInNote: $('#aaSignInNote'), ranks: $('#aaRanks'), league: $('#aaLeague'), leagueEnds: $('#aaLeagueEnds'), leagueSheet: $('#aaLeagueSheet'), leagueBody: $('#aaLeagueBody'), matchSheet: $('#aaMatchSheet'), matchBody: $('#aaMatchBody'), matchTitle: $('#aaMatchTitle'), accountGroup: $('#aaAccountGroup'), accountCap: $('#aaAccountCap'), accountWho: $('#aaAccountWho'), accountGold: $('#aaAccountGold'), accountFace: $('#aaAccountFace'), sessionGroup: $('#aaSessionGroup'), sessionCap: $('#aaSessionCap'), signOutBtn: $('#aaSignOut'), deleteAccBtn: $('#aaDeleteAcc'), settingsBtns: $$('#aaSettings, #aaSettingsG'), themeBtn: $('#aaTheme'), themes: $('#aaThemes'),
+    sheet: $('#aaSheet'), friends: $('#aaFriends'), signInSheet: $('#aaSignInSheet'), googleBtn: $('#aaGoogleBtn'), signInNote: $('#aaSignInNote'), ranks: $('#aaRanks'), league: $('#aaLeague'), leagueEnds: $('#aaLeagueEnds'), leagueSheet: $('#aaLeagueSheet'), leagueBody: $('#aaLeagueBody'), leagueInfo: $('#aaLeagueInfo'), matchSheet: $('#aaMatchSheet'), matchBody: $('#aaMatchBody'), matchTitle: $('#aaMatchTitle'), accountGroup: $('#aaAccountGroup'), accountCap: $('#aaAccountCap'), accountWho: $('#aaAccountWho'), accountGold: $('#aaAccountGold'), accountFace: $('#aaAccountFace'), sessionGroup: $('#aaSessionGroup'), sessionCap: $('#aaSessionCap'), signOutBtn: $('#aaSignOut'), deleteAccBtn: $('#aaDeleteAcc'), settingsBtns: $$('#aaSettings, #aaSettingsG'), themeBtn: $('#aaTheme'), themes: $('#aaThemes'),
     game: $('#aaGame'), boardWrap: $('#aaBoardWrap'), board: $('#aaBoard'), toast: $('#aaToast'), confetti: $('#aaConfetti'),
     hudLevel: $('#aaHudLevel'), hudMode: $('#aaHudMode'), hudTime: $('#aaHudTime'), hudLeft: $('#aaHudLeft'), hudLives: $('#aaHudLives'), hudLivesWrap: $('#aaHudLivesWrap'), hudPct: $('#aaHudPct'), boardBar: $('#aaBoardBar'),
     btnHint: $('#aaHint'), btnLevels: $('#aaBackToLevels'), btnSound: $('#aaSound'),
@@ -1958,7 +1958,7 @@
   //
   // What is worked out here is only the countdown, from the end the server gave: a clock that ticks without
   // asking again, and one request when the screen is opened.
-  const league = { data: null, at: 0, tick: 0 };
+  const league = { data: null, at: 0, tick: 0, view: 'now' };
   const leagueApi = () => fetch(`${API_V1}/league`, { credentials: 'include', cache: 'no-store' })
     .then(async r => { const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.error || `HTTP ${r.status}`); return d; });
 
@@ -1999,61 +1999,95 @@
     return league.data;
   }
 
+  // ── Drawing it ──
+  //
+  // The shape follows the league screens the game is being measured against: a card at the top saying which
+  // league this is and how long is left, a Results button that swaps the table for last week's paid one, a
+  // medal on every row, and your own row picked out in gold. The pieces are Arrow Atlas's own — its faces, its
+  // cards, its palette — because a screen that borrowed another game's art would look like a different game.
+  const MEDAL = r => r === 1 ? ' is-g1' : r === 2 ? ' is-g2' : r === 3 ? ' is-g3' : r <= 10 ? ' is-prize' : '';
   const leagueRow = (r, prize, paid) => `
     <div class="aa-lg-row${r.you ? ' is-you' : ''}">
-      <span class="aa-lg-no${r.rank <= 3 ? ' is-top' : ''}">${r.rank}</span>
+      <span class="aa-lg-medal${MEDAL(r.rank)}">${r.rank}</span>
       <span class="aa-rank${faceClass(r)}" aria-hidden="true">${faceInner(r)}</span>
       <span class="aa-lg-who"><b>${escapeHtml(r.name || 'Player')}</b>${prize ? `<small>${paid ? 'won' : 'wins'} ${gshort(prize)}</small>` : ''}</span>
       <span class="aa-lg-earn"><span aria-hidden="true">🪙</span>${gshort(r.earning)}</span>
     </div>`;
 
+  // "2 days 17 hrs" on the card, where there is room for it to be read rather than decoded.
+  function fmtLeftLong(ms) {
+    const s = Math.max(0, Math.round(ms / 1000));
+    const d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60);
+    const unit = (n, one) => `${n} ${one}${n === 1 ? '' : 's'}`;
+    if (d) return `${unit(d, 'day')} ${h} hrs`;
+    if (h) return `${unit(h, 'hr')} ${m} min`;
+    return m ? unit(m, 'min') : 'any moment';
+  }
+
   function renderLeague() {
     if (!el.leagueBody) return;
     const d = league.data;
     if (!d) { el.leagueBody.innerHTML = '<p class="aa-loading">Loading the league…</p>'; return; }
-    const prizes = d.prizes || [];
-    const mine = d.me;
+    const prizes = d.prizes || [], mine = d.me;
+    const last = d.last && d.last.paid.length ? d.last : null;
+    const showing = league.view === 'last' && last ? 'last' : 'now';
 
-    const meLine = !auth.user
-      ? `<p class="aa-sheet-note">Sign in to play the gold tables and enter this week's league.</p>
-         <p class="aa-lg-cta"><button type="button" class="aa-btn aa-btn--small" data-lgact="signin">Sign in</button></p>`
-      : mine && mine.rank ? ''
-      : `<p class="aa-sheet-note">You have not won any gold this week yet. Win a gold match and you are in the table.${mine && mine.earning < 0 ? ` <b>You are ${gshort(-mine.earning)} down so far.</b>` : ''}</p>`;
+    // The card. The badge is where the player stands, because that is the number they came to see; the button
+    // beside it is the only way to last week's table, so the two weeks never crowd each other on one screen.
+    // Whichever week is on screen, the badge is their place in *that* week — this week's rank over last week's
+    // table would be the wrong number in a convincing place.
+    const mineLast = last && last.paid.find(r => r.you);
+    const myPlace = showing === 'last' ? (mineLast ? mineLast.rank : null) : (mine && mine.rank);
+    const place = myPlace ? `#${myPlace}` : '🏆';
+    const card = `
+      <div class="aa-lg-card">
+        <span class="aa-lg-badge${myPlace && myPlace <= 10 ? ' is-prize' : ''}">${place}</span>
+        <span class="aa-lg-card-t">
+          <small>${showing === 'last' ? 'Last league' : 'Current league'}</small>
+          <b>Global</b>
+          <i>${showing === 'last' ? 'Paid out' : `Ends in: ${fmtLeftLong(leagueLeft())}`}</i>
+        </span>
+        ${last ? `<button type="button" class="aa-btn aa-btn--small aa-lg-results" data-lgact="${showing === 'last' ? 'now' : 'last'}">${showing === 'last' ? 'This week' : 'Results'}</button>` : ''}
+      </div>`;
 
-    const table = (d.top || []).length
+    const rows = showing === 'last' ? last.paid : (d.top || []);
+    const table = rows.length
       ? `<div class="aa-group aa-lg-table" id="aaLeagueTable">
-           <div class="aa-lg-head"><span>#</span><span>Player</span><span>Won this week</span></div>
-           ${d.top.map(r => leagueRow(r, prizes[r.rank - 1] || 0)).join('')}
+           <div class="aa-lg-head"><span>Rank</span><span>Player</span><span>Earning</span></div>
+           ${rows.map(r => leagueRow(r, showing === 'last' ? r.gold : (prizes[r.rank - 1] || 0), showing === 'last')).join('')}
          </div>`
       : `<p class="aa-sheet-note">Nobody has won gold this week yet. The first player to take a pot is first in the table.</p>`;
+
+    const meLine = showing === 'last' ? ''
+      : !auth.user
+        ? `<p class="aa-sheet-note">Sign in to play the gold tables and enter this week's league.</p>
+           <p class="aa-lg-cta"><button type="button" class="aa-btn aa-btn--small" data-lgact="signin">Sign in</button></p>`
+        : mine && mine.rank ? ''
+        : `<p class="aa-sheet-note">You have not won any gold this week yet. Win a gold match and you are in the table.${mine && mine.earning < 0 ? ` <b>You are ${gshort(-mine.earning)} down so far.</b>` : ''}</p>`;
+
+    const ladder = showing === 'last' ? '' : `
+      <p class="aa-cap">What the places pay</p>
+      <div class="aa-group aa-lg-prizes">
+        ${prizes.map((g, i) => `<div class="aa-lg-prize"><span class="aa-lg-medal${MEDAL(i + 1)}">${i + 1}</span><span><span aria-hidden="true">🪙</span> ${gshort(g)}</span></div>`).join('')}
+      </div>`;
 
     // Your own row, pinned to the foot of the sheet. A hundred places is a long scroll, and a player deep in
     // it should not have to find themselves to see where they stand — so it follows the scroll, and gets out
     // of the way when the real row is on screen (see wireLeaguePin).
-    const pinned = auth.user && mine && mine.rank
-      ? `<div class="aa-lg-pin" id="aaLeaguePin" hidden>${leagueRow({ ...auth.user, rank: mine.rank, earning: mine.earning, you: true }, prizes[mine.rank - 1] || 0)}</div>`
-      : '';
-
-    const ladder = `
-      <p class="aa-cap">What the places pay</p>
-      <div class="aa-group aa-lg-prizes">
-        ${prizes.map((g, i) => `<div class="aa-lg-prize"><span class="aa-lg-no${i < 3 ? ' is-top' : ''}">${i + 1}</span><span><span aria-hidden="true">🪙</span> ${gshort(g)}</span></div>`).join('')}
-      </div>`;
-
-    const last = d.last && d.last.paid.length
-      ? `<p class="aa-cap">Last week</p>
-         <div class="aa-group aa-lg-table">
-           ${d.last.paid.map(r => leagueRow(r, r.gold, true)).join('')}
-         </div>`
+    const pinRow = showing === 'last' ? mineLast : (mine && mine.rank ? { ...auth.user, rank: mine.rank, earning: mine.earning, you: true } : null);
+    const pinned = auth.user && pinRow
+      ? `<div class="aa-lg-pin" id="aaLeaguePin" hidden>${leagueRow(pinRow, showing === 'last' ? pinRow.gold : (prizes[pinRow.rank - 1] || 0), showing === 'last')}</div>`
       : '';
 
     el.leagueBody.innerHTML = `
-      <p class="aa-lg-when">Ends in <b>${fmtLeft(leagueLeft())}</b> · the gold you win at the tables is your place</p>
+      ${card}
+      <div class="aa-lg-rules" id="aaLeagueRules" hidden>
+        <p>Every gold match you play counts. What you win at the tables, less the stakes you paid, is your earning for the week — so the table is what you are up over the week, and gold you were given does not count.</p>
+        <p>When the week ends the top ten are paid, tenth place taking ${gshort(prizes[prizes.length - 1] || 0)} and every place above it doubling that, up to ${gshort(prizes[0] || 0)} for first.</p>
+      </div>
       ${meLine}
       ${table}
       ${ladder}
-      ${last}
-      <p class="aa-sheet-note">Only gold won or lost at the gold tables counts. Stakes you pay come off your total, so the table is what you are up over the week.</p>
       ${pinned}`;
     wireFaces(el.leagueBody);
     wireLeaguePin();
@@ -2078,6 +2112,7 @@
 
   async function openLeague() {
     closeSheets();
+    league.view = 'now';
     openSheet(el.leagueSheet);
     renderLeague();                                   // with whatever is already known, at once
     await authLoad(true).catch(() => {});             // the prize may have landed while the game was closed
@@ -2112,7 +2147,14 @@
   el.friends?.addEventListener('click', openFriends);
   el.league?.addEventListener('click', openLeague);
   el.leagueBody?.addEventListener('click', e => {
-    if (e.target.closest('[data-lgact="signin"]')) { closeSheets(); openSignIn('Sign in to play the gold tables and enter this week\'s league.'); }
+    const act = e.target.closest('[data-lgact]')?.dataset.lgact;
+    if (act === 'signin') { closeSheets(); openSignIn('Sign in to play the gold tables and enter this week\'s league.'); return; }
+    // Results swaps the table for last week's paid one, and back: two weeks on one screen would crowd both.
+    if (act === 'last' || act === 'now') { league.view = act; renderLeague(); el.leagueSheet.querySelector('.aa-sheet-panel').scrollTop = 0; }
+  });
+  el.leagueInfo?.addEventListener('click', () => {
+    const box = $('#aaLeagueRules', el.leagueBody);
+    if (box) { box.hidden = !box.hidden; el.leagueInfo.setAttribute('aria-expanded', String(!box.hidden)); }
   });
   $$('[data-close-sheet]').forEach(b => b.addEventListener('click', closeSheets));
   $$('.aa-sheet').forEach(sh => sh.addEventListener('click', e => { if (e.target === sh) closeSheets(); }));
