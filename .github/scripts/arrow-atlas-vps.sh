@@ -192,6 +192,53 @@ report_backups() {
 
 # Why a container will not come up. inspect says what its state is; only its own log says why, and a container
 # that keeps restarting has already thrown its reason away by the time anyone opens a terminal. Read-only.
+# How this host can reach GitHub, if at all. Read-only, and no key material is printed: `ssh -T` answers with
+# the name of whatever the key is attached to, which is what decides the question — an account key can read
+# every repository, a deploy key only the one it was made for.
+#
+# The point is Bookween: that project is private too, and it deploys by having the VPS pull the repository
+# itself over a read-only deploy key, then rebuilding from that checkout. Nothing there fetches a tarball over
+# an unauthenticated URL, which is why nothing there broke when a repository went private. If this host can
+# already read this repository the same way, Arrow Atlas can work exactly like it.
+mode_git_access() {
+  echo "Arrow Atlas — what this host can read from GitHub  ($(hostname), $(date -u))"
+
+  say "the source directory the containers are configured from"
+  SRC=/var/www/ariyankhan-src
+  if $SUDO test -d "$SRC/.git"; then
+    ok "$SRC is a git checkout"
+    note "remote:  $($SUDO git -C "$SRC" remote get-url origin 2>/dev/null || echo 'none')"
+    note "branch:  $($SUDO git -C "$SRC" rev-parse --abbrev-ref HEAD 2>/dev/null || echo '?')"
+    note "commit:  $($SUDO git -C "$SRC" rev-parse --short HEAD 2>/dev/null || echo '?')"
+  elif $SUDO test -d "$SRC"; then
+    note "$SRC exists but is not a git checkout"
+  else
+    note "$SRC is not there at all"
+  fi
+
+  say "keys this host holds (names and fingerprints only)"
+  for f in /root/.ssh/id_* /root/.ssh/*deploy* /root/.ssh/*bookween* /root/.ssh/*ariyankhan*; do
+    case "$f" in *.pub) continue ;; esac
+    $SUDO test -f "$f" || continue
+    note "$f  $($SUDO ssh-keygen -lf "$f" 2>/dev/null | awk '{print $1, $2, $4}')"
+  done
+  $SUDO test -f /root/.ssh/config && note "and an ssh config naming: $($SUDO grep -iE '^host ' /root/.ssh/config | tr '\n' ' ')"
+
+  say "what GitHub says when this host connects"
+  # A deploy key answers with the repository it belongs to; an account key answers with the account name.
+  $SUDO ssh -o StrictHostKeyChecking=accept-new -o BatchMode=yes -T git@github.com 2>&1 | sed 's/^/      /'
+
+  say "and whether it can read this repository"
+  if $SUDO git ls-remote --heads git@github.com:byariyankhan/ariyankhan.git main >/dev/null 2>&1; then
+    ok "git@github.com:byariyankhan/ariyankhan.git is readable from here"
+  else
+    bad "this host cannot read byariyankhan/ariyankhan over SSH yet"
+  fi
+  if $SUDO git ls-remote --heads git@github.com:byariyankhan/bookween.git main >/dev/null 2>&1; then
+    note "(it can read byariyankhan/bookween, which is how that project deploys)"
+  fi
+}
+
 mode_logs() {
   echo "Arrow Atlas — what the API says about itself  ($(hostname), $(date -u))"
   report_containers
@@ -876,6 +923,7 @@ mode_health() {
 case "$MODE" in
   inspect)       mode_inspect ;;
   logs)          mode_logs ;;
+  git-access)    mode_git_access ;;
   push-source)   mode_push_source ;;
   web-safe-fetch) mode_web_safe_fetch ;;
   backup-verify) mode_backup_verify ;;
