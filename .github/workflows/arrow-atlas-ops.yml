@@ -23,6 +23,12 @@
 #                  API builds from, installs the compose file that came with it and starts the API from it.
 #                  What to run while the repository cannot be read without a key, since the API's own start
 #                  fetches from GitHub. Touches no .env and no other project. Needs confirm=DEPLOY.
+#   web-safe-fetch Replaces one thing in hPanel's own compose file for ariyankhan-web: the start command that
+#                  empties the document root before fetching, which is how a restart it cannot fetch through
+#                  would leave the site with nothing to serve. Everything else in that file is left byte for
+#                  byte as it is, it refuses unless the command is the one it expects, it validates before
+#                  applying, and it puts the backup back if the container does not come up. Needs
+#                  confirm=DEPLOY, and is a no-op once done.
 #   health         Reads. The four containers, the API, the socket, the backup timer, and that no legacy
 #                  artifact is left anywhere.
 #
@@ -38,7 +44,7 @@ on:
         type: choice
         required: true
         default: inspect
-        options: [inspect, logs, backup-verify, cleanup, deploy, deploy-site, push-source, health]
+        options: [inspect, logs, backup-verify, cleanup, deploy, deploy-site, push-source, web-safe-fetch, health]
       confirm:
         description: "Type DELETE for cleanup, DEPLOY for deploy. Ignored by the read-only modes."
         required: false
@@ -63,7 +69,7 @@ jobs:
           set -euo pipefail
           case "${{ inputs.mode }}" in
             cleanup) [ "${{ inputs.confirm }}" = "DELETE" ] || { echo "::error::cleanup needs confirm=DELETE"; exit 1; } ;;
-            deploy|deploy-site|push-source) [ "${{ inputs.confirm }}" = "DEPLOY" ] || { echo "::error::${{ inputs.mode }} needs confirm=DEPLOY"; exit 1; } ;;
+            deploy|deploy-site|push-source|web-safe-fetch) [ "${{ inputs.confirm }}" = "DEPLOY" ] || { echo "::error::${{ inputs.mode }} needs confirm=DEPLOY"; exit 1; } ;;
             *) echo "read-only mode, no confirmation needed" ;;
           esac
 

@@ -212,6 +212,160 @@ mode_logs() {
 # fetching, there was nothing left to fall back on and the container restarted forever. This sends the source
 # down the connection the ops workflow already has — no token on the host, nothing secret in the repository —
 # installs the compose file that came with it, and starts the API from what was sent. Needs confirm=DEPLOY.
+# Make the site container survive a restart it cannot fetch through.
+#
+# ariyankhan-web is defined by hPanel's own copy of a compose file, and its start command empties
+# /var/www/html and then fetches the branch from GitHub. While the repository cannot be read without a key
+# that fetch fails — and because the emptying comes first, a restart would leave the site with no files at
+# all. Nobody has to run anything for that to happen: a reboot, an out-of-memory kill or a click in hPanel is
+# enough.
+#
+# This replaces that one command with the staging-and-swap version, and nothing else in the file: the
+# environment, ports and volumes hPanel wrote are left byte for byte as they are. It refuses unless the
+# command it finds is the one it expects, validates the result before applying it, and puts the backup back
+# if the container does not come up healthy.
+mode_web_safe_fetch() {
+  echo "Arrow Atlas — make the site survive a restart  ($(hostname), $(date -u))"
+  have ariyankhan-web || { bad "no ariyankhan-web container here"; return; }
+  command -v python3 >/dev/null || { bad "python3 is not on this host, and editing YAML without it is not worth the risk"; return; }
+
+  PROJ=$(docker inspect -f '{{index .Config.Labels "com.docker.compose.project.working_dir"}}' ariyankhan-web 2>/dev/null)
+  SVC=$(docker inspect -f '{{index .Config.Labels "com.docker.compose.service"}}' ariyankhan-web 2>/dev/null)
+  [ -n "$PROJ" ] && [ -n "$SVC" ] && $SUDO test -f "$PROJ/docker-compose.yml" \
+    || { bad "cannot find the compose file behind ariyankhan-web"; return; }
+  note "$PROJ/docker-compose.yml, service $SVC"
+
+  say "1. what it runs at the moment"
+  # A command block holds no secrets — it is the shell the container starts with — so it can be shown.
+  $SUDO python3 - "$PROJ/docker-compose.yml" "$SVC" <<'PY' || { bad "could not read the command out of it"; return; }
+import sys, io
+path, svc = sys.argv[1], sys.argv[2]
+lines = io.open(path, encoding='utf-8').read().split('\n')
+out = []
+inside = False
+for i, l in enumerate(lines):
+    if l.strip().startswith('command:') and inside:
+        indent = len(l) - len(l.lstrip())
+        out.append(l)
+        for m in lines[i+1:]:
+            if m.strip() and (len(m) - len(m.lstrip())) <= indent: break
+            out.append(m)
+        break
+    if l.startswith('  ') and l.strip().endswith(':') and not l.startswith('    '):
+        inside = l.strip()[:-1] == svc
+print('\n'.join('      ' + o for o in out) if out else '      (no command block)')
+PY
+
+  say "2. the same file with only that command replaced"
+  $SUDO cp -a "$PROJ/docker-compose.yml" "$HOST_BACKUPS/web-compose.yml.before-$STAMP" \
+    && kept "$HOST_BACKUPS/web-compose.yml.before-$STAMP  (the way back)"
+  if $SUDO python3 - "$PROJ/docker-compose.yml" "$SVC" <<'PY'
+import sys, io
+path, svc = sys.argv[1], sys.argv[2]
+src = io.open(path, encoding='utf-8').read()
+lines = src.split('\n')
+start = end = None
+inside = False
+for i, l in enumerate(lines):
+    if l.startswith('  ') and not l.startswith('    ') and l.strip().endswith(':'):
+        inside = l.strip()[:-1] == svc
+    if inside and l.strip().startswith('command:'):
+        indent = len(l) - len(l.lstrip())
+        start = i
+        end = len(lines)
+        for j in range(i + 1, len(lines)):
+            m = lines[j]
+            if m.strip() and (len(m) - len(m.lstrip())) <= indent:
+                end = j
+                break
+        break
+if start is None:
+    print('no command block for that service', file=sys.stderr); raise SystemExit(2)
+block = '\n'.join(lines[start:end])
+# Only the command this was written for. Anything else has been changed by hand since, and a blind
+# replacement would be a guess at what somebody meant.
+for needle in ('codeload.github.com', 'find /var/www/html -mindepth 1', 'web-entrypoint.sh'):
+    if needle not in block:
+        print('the command is not the one this expects (%s missing); leaving it alone' % needle, file=sys.stderr)
+        raise SystemExit(3)
+if 'next-site' in block:
+    print('already safe', file=sys.stderr); raise SystemExit(4)
+pad = ' ' * (len(lines[start]) - len(lines[start].lstrip()))
+new = [
+    pad + 'command:',
+    pad + '  - bash',
+    pad + '  - -c',
+    pad + '  - |',
+    pad + '    set -e',
+    pad + '    # Fetched beside the site and swapped in whole. Emptying the document root first and fetching',
+    pad + '    # afterwards means a bad minute at GitHub leaves nothing to serve. With GITHUB_TOKEN set the',
+    pad + '    # fetch goes through the API, so a private repository works too; without one it is the public',
+    pad + '    # tarball, and if that fails the files already here are served rather than deleted.',
+    # Every $ the shell is meant to see is written $$: compose interpolates the single ones itself, and a
+    # branch name or a token quietly turning into nothing is exactly the kind of bug that only shows up on a
+    # restart nobody is watching.
+    pad + '    fetch() {',
+    pad + '      if [ -n "$${GITHUB_TOKEN:-}" ]; then',
+    pad + '        curl -fsSL -H "Authorization: Bearer $$GITHUB_TOKEN" \\',
+    pad + '          "https://api.github.com/repos/byariyankhan/ariyankhan/tarball/$$SITE_BRANCH"',
+    pad + '      else',
+    pad + '        curl -fsSL "https://codeload.github.com/byariyankhan/ariyankhan/tar.gz/refs/heads/$$SITE_BRANCH"',
+    pad + '      fi',
+    pad + '    }',
+    pad + '    echo "[deploy] fetching branch $$SITE_BRANCH"',
+    pad + '    rm -rf /var/www/.next-site && mkdir -p /var/www/.next-site',
+    pad + '    if fetch | tar -xz --strip-components=1 -C /var/www/.next-site && [ -f /var/www/.next-site/index.html ]; then',
+    pad + '      find /var/www/html -mindepth 1 -maxdepth 1 -exec rm -rf {} +',
+    pad + '      (cd /var/www/.next-site && tar -cf - .) | (cd /var/www/html && tar -xf -)',
+    pad + '      echo "[deploy] fetched $$(date -u)"',
+    pad + '    elif [ -f /var/www/html/index.html ]; then',
+    pad + '      echo "[deploy] could not fetch $$SITE_BRANCH; serving the copy already here"',
+    pad + '    else',
+    pad + '      echo "[deploy] could not fetch $$SITE_BRANCH and there is nothing here to serve"',
+    pad + '      exit 1',
+    pad + '    fi',
+    pad + '    rm -rf /var/www/.next-site',
+    pad + '    exec bash /var/www/html/deploy/web-entrypoint.sh',
+]
+io.open(path, 'w', encoding='utf-8').write('\n'.join(lines[:start] + new + lines[end:]))
+PY
+  then ok "written"
+  else
+    case "$?" in
+      4) note "it is already the safe version; nothing to do"; return ;;
+      *) bad "left the file alone"; return ;;
+    esac
+  fi
+
+  say "3. does compose still understand it"
+  if ( cd "$PROJ" && $SUDO docker compose config -q ) 2>/dev/null; then
+    ok "the file parses and resolves"
+  else
+    bad "compose refused it; putting the backup back"
+    $SUDO cp -a "$HOST_BACKUPS/web-compose.yml.before-$STAMP" "$PROJ/docker-compose.yml"
+    return
+  fi
+
+  say "4. and the site, restarted onto it"
+  ( cd "$PROJ" && $SUDO docker compose up -d --force-recreate "$SVC" ) >/dev/null 2>&1 || bad "compose would not bring it up"
+  h=""
+  for i in $(seq 1 30); do
+    h=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' ariyankhan-web 2>/dev/null)
+    [ "$h" = "healthy" ] && break
+    sleep 5
+  done
+  live=$(curl -fsS -m 10 "https://$DOMAIN/arrow-atlas.html" 2>/dev/null | grep -o 'js/arrow-atlas\.js?v=[0-9]*' | head -1)
+  if [ "$h" = "healthy" ] && [ -n "$live" ]; then
+    ok "ariyankhan-web is healthy and the page still serves ($live)"
+    docker logs --tail 6 ariyankhan-web 2>&1 | sed 's/^/      /'
+  else
+    bad "ariyankhan-web is ${h:-gone} and the page returned ${live:-nothing}; putting the backup back"
+    $SUDO cp -a "$HOST_BACKUPS/web-compose.yml.before-$STAMP" "$PROJ/docker-compose.yml"
+    ( cd "$PROJ" && $SUDO docker compose up -d --force-recreate "$SVC" ) >/dev/null 2>&1
+    docker logs --tail 20 ariyankhan-web 2>&1 | sed 's/^/      /'
+  fi
+}
+
 mode_push_source() {
   echo "Arrow Atlas — send this checkout and start the API from it  ($(hostname), $(date -u))"
   TGZ=/tmp/arrow-atlas-site.tgz
@@ -692,6 +846,7 @@ case "$MODE" in
   inspect)       mode_inspect ;;
   logs)          mode_logs ;;
   push-source)   mode_push_source ;;
+  web-safe-fetch) mode_web_safe_fetch ;;
   backup-verify) mode_backup_verify ;;
   cleanup)       mode_cleanup ;;
   deploy)        mode_deploy ;;
