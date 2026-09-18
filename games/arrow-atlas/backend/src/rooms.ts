@@ -36,6 +36,9 @@ export interface MatchView {
   code: string; stake: number; state: string; players: PlayerView[]; count: number; seats: number;
   pot: number; host: string; you: '' | 'host' | 'guest'; can_start: boolean; open_to_all: boolean;
   fills_in: number | null; board?: string; tier?: number; seed?: number; your_ms?: number | null;
+  // How long the match has been running, as this server counts it. The client starts its own clock from this
+  // rather than from a timestamp, because a device with a wrong clock would then show a wrong race.
+  age_ms?: number;
   winner?: string; you_won?: boolean; draw?: boolean;
 }
 
@@ -143,6 +146,7 @@ async function nameOf(sql: PoolClient | typeof pool, id: number | null, seats?: 
 export async function matchView(sql: PoolClient | typeof pool, m: MatchRow, meId: number | null, known?: SeatRow[]): Promise<MatchView> {
   const seats = known ?? await room(sql, m.code);
   const players = orderPlayers(m, seats, meId);
+  const started = m.started_at ? m.started_at.getTime() : 0;
   const mine = meId !== null && seats.some(p => p.user_id === meId);
   const isHost = meId !== null && m.host_id === meId;
   const view: MatchView = {
@@ -165,6 +169,9 @@ export async function matchView(sql: PoolClient | typeof pool, m: MatchRow, meId
     view.tier = m.tier;
     view.seed = m.seed;
     view.your_ms = players.find(p => p.you)?.ms ?? null;
+    // The race began when the match did, for everyone in it at once. The clock on the board is counted from
+    // here, so the time a player watches is the time they are ranked on — waiting, thinking and all.
+    if (started) view.age_ms = Math.max(0, Date.now() - started);
   }
   // The pot is paid the instant somebody clears it, so the winner is named long before the match closes. The
   // name is read from the snapshot taken at settlement, so a winner who has since deleted their account is still
