@@ -215,4 +215,40 @@ section('A link cannot delete somebody\u2019s account');
   eq(gone.rows[0]!.n, 0, 'and it is really gone');
 }
 
+section('The league is readable signed out, and knows you when you are in');
+{
+  const out = await call('/league');
+  eq(out.status, 200, 'a signed-out visitor may read the league');
+  const prizes = out.json.prizes as number[];
+  eq(prizes.length, 10, 'the ladder comes with it');
+  eq(prizes[0], 5_120_000, 'first place is the base doubled nine times');
+  eq(prizes[9], 10_000, 'and tenth is the base');
+  const season = out.json.season as { key: string; ends_at: number; ends_in_ms: number };
+  ok(season.ends_at > Date.now(), 'the week has an end in the future');
+  ok(season.ends_in_ms > 0 && season.ends_in_ms <= 168 * 3600_000, 'and a countdown no longer than the week itself');
+  eq(out.json.me, null, 'a visitor has no place in it');
+
+  const me = await mint('leaguer');
+  const mine = await call('/league', { token: me.token });
+  eq((mine.json.me as { rank: number | null }).rank, null, 'a player who has not played is unranked');
+  eq((mine.json.me as { earning: number }).earning, 0, 'and has won nothing');
+
+  // win a pot, and the table has to know about it
+  const rival = await mint('leaguer-rival');
+  const made = await call('/matches', { token: me.token, body: { stake: config.game.stakes[0], open_to_all: false } });
+  const code = (made.json.match as { code: string }).code;
+  await call(`/matches/${code}/join`, { token: rival.token, body: {} });
+  await call(`/matches/${code}/start`, { token: me.token, body: {} });
+  await call(`/matches/${code}/result`, { token: me.token, body: { ms: 3_000, cleared: true } });
+
+  const after = await call('/league', { token: me.token });
+  const place = after.json.me as { rank: number | null; earning: number };
+  eq(place.rank, 1, 'the winner is first in a league nobody else has won in');
+  eq(place.earning, config.game.stakes[0], 'having won the other seat\u2019s stake');
+  const top = after.json.top as { name: string; you: boolean }[];
+  ok(top.some(r => r.you), 'and the row is marked as theirs');
+  const loser = await call('/league', { token: rival.token });
+  eq((loser.json.me as { rank: number | null }).rank, null, 'the player who lost their stake is not in the table');
+}
+
 await finish();

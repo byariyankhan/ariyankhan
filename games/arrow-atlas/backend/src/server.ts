@@ -12,6 +12,7 @@ import { migrate } from './migrate.js';
 import { registerRoutes } from './routes.js';
 import { attachWebSocket, wsStats } from './ws.js';
 import { startSweeper, stopSweeper } from './rooms.js';
+import { startLeagueTimer, stopLeagueTimer } from './league.js';
 import { pruneSessions } from './auth.js';
 import { online } from './presence.js';
 import { log } from './log.js';
@@ -87,6 +88,7 @@ async function main(): Promise<void> {
   await migrate();
   attachWebSocket(app);
   startSweeper();
+  startLeagueTimer();
 
   // Expired sessions are swept hourly rather than on every request: nobody is waiting for it.
   const pruner = setInterval(() => { void pruneSessions().catch(e => log.err('session prune failed', e)); }, 3_600_000);
@@ -106,6 +108,7 @@ async function shutdown(signal: string): Promise<void> {
   closing = true;
   log.info('shutting down', { signal });
   stopSweeper();
+  stopLeagueTimer();
   // Stop taking new work, let what is in flight finish, then let go of the connections.
   await app.close().catch(e => log.err('http close failed', e));
   await closeRedis().catch(() => {});

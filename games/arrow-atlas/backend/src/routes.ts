@@ -11,6 +11,7 @@ import { balance } from './gold.js';
 import { deleteUser, endSession, googleVerify, providers, startSession, upsertUser, cleanName } from './auth.js';
 import { publish } from './events.js';
 import { cleanLevels, cleanState, mergeLevels, mergeState, readAll } from './progress.js';
+import * as L from './league.js';
 import { liveProgress, roomPresence } from './presence.js';
 import { body, caller, clearSessionCookie, limited, noStore, setSessionCookie, shapeUser, type Caller } from './httpkit.js';
 import { log } from './log.js';
@@ -93,6 +94,38 @@ const H = {
     clearSessionCookie(res);
     log.info('account deleted', { user_id: me.user.id });
     await noStore(res).send({ user: null, deleted: true });
+  },
+
+  // ── The league ──
+  //
+  // One table a week, built from the ledger rather than from a counter of its own, and open to a signed-out
+  // visitor as well: the league is a reason to sign in, so it has to be visible before you do.
+
+  async league(req: Req, res: Res, me: Caller) {
+    if (!(await limited('league_read', req, res, me.user?.id ?? null))) return;
+    const season = L.seasonAt();
+    await L.ensureSeason(pool, season);
+    const [top, mine, last] = await Promise.all([
+      L.standings(pool, season, 50),
+      me.user ? L.placeOf(pool, season, me.user.id) : Promise.resolve(null),
+      L.lastSettled(pool),
+    ]);
+    await noStore(res).send({
+      season: {
+        key: season.key,
+        starts_at: season.startsAt.getTime(),
+        ends_at: season.endsAt.getTime(),
+        ends_in_ms: Math.max(0, season.endsAt.getTime() - Date.now()),
+      },
+      prizes: L.prizeLadder(),
+      top: top.map(r => ({ ...r, you: !!me.user && r.user_id === me.user.id })),
+      me: mine,
+      last: last && {
+        key: last.key,
+        ends_at: last.ends_at.getTime(),
+        paid: last.paid.map(r => ({ ...r, you: !!me.user && r.user_id === me.user.id })),
+      },
+    });
   },
 
   // ── Rooms ──
@@ -277,6 +310,8 @@ export function registerRoutes(app: FastifyInstance): void {
 
   app.get(`${v1}/progress`, withCaller(H.progressRead));
   app.post(`${v1}/progress`, withCaller(H.progressPush));
+
+  app.get(`${v1}/league`, withCaller(H.league));
 
   app.get(`${v1}/lobby`, withCaller(H.lobby));
   app.post(`${v1}/matches`, withCaller(H.create));

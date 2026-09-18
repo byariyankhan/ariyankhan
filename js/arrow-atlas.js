@@ -85,7 +85,7 @@
 
   const el = {
     select: $('#aaSelect'), tagline: $('#aaTagline'), homeSel: $('#aaHome'), purse: $('#aaPurse'), purseNo: $('#aaPurseNo'), hudDiff: $('#aaHudDiff'), play: $('#aaPlay'), path: $('#aaPath'), btnVibe: $('#aaVibe'), btnGuides: $('#aaGuides'), btnMusic: $('#aaMusic'), howTo: $('#aaHowTo'),
-    sheet: $('#aaSheet'), friends: $('#aaFriends'), signInSheet: $('#aaSignInSheet'), googleBtn: $('#aaGoogleBtn'), signInNote: $('#aaSignInNote'), ranks: $('#aaRanks'), matchSheet: $('#aaMatchSheet'), matchBody: $('#aaMatchBody'), matchTitle: $('#aaMatchTitle'), accountGroup: $('#aaAccountGroup'), accountCap: $('#aaAccountCap'), accountWho: $('#aaAccountWho'), accountGold: $('#aaAccountGold'), accountFace: $('#aaAccountFace'), sessionGroup: $('#aaSessionGroup'), sessionCap: $('#aaSessionCap'), signOutBtn: $('#aaSignOut'), deleteAccBtn: $('#aaDeleteAcc'), settingsBtns: $$('#aaSettings, #aaSettingsG'), themeBtn: $('#aaTheme'), themes: $('#aaThemes'),
+    sheet: $('#aaSheet'), friends: $('#aaFriends'), signInSheet: $('#aaSignInSheet'), googleBtn: $('#aaGoogleBtn'), signInNote: $('#aaSignInNote'), ranks: $('#aaRanks'), league: $('#aaLeague'), leagueEnds: $('#aaLeagueEnds'), leagueSheet: $('#aaLeagueSheet'), leagueBody: $('#aaLeagueBody'), matchSheet: $('#aaMatchSheet'), matchBody: $('#aaMatchBody'), matchTitle: $('#aaMatchTitle'), accountGroup: $('#aaAccountGroup'), accountCap: $('#aaAccountCap'), accountWho: $('#aaAccountWho'), accountGold: $('#aaAccountGold'), accountFace: $('#aaAccountFace'), sessionGroup: $('#aaSessionGroup'), sessionCap: $('#aaSessionCap'), signOutBtn: $('#aaSignOut'), deleteAccBtn: $('#aaDeleteAcc'), settingsBtns: $$('#aaSettings, #aaSettingsG'), themeBtn: $('#aaTheme'), themes: $('#aaThemes'),
     game: $('#aaGame'), boardWrap: $('#aaBoardWrap'), board: $('#aaBoard'), toast: $('#aaToast'), confetti: $('#aaConfetti'),
     hudLevel: $('#aaHudLevel'), hudMode: $('#aaHudMode'), hudTime: $('#aaHudTime'), hudLeft: $('#aaHudLeft'), hudLives: $('#aaHudLives'), hudLivesWrap: $('#aaHudLivesWrap'), hudPct: $('#aaHudPct'), boardBar: $('#aaBoardBar'),
     btnHint: $('#aaHint'), btnLevels: $('#aaBackToLevels'), btnSound: $('#aaSound'),
@@ -1341,7 +1341,8 @@
       <div class="aa-stakes">
         ${STAKES.map(v => `<button type="button" class="aa-stake" data-stake="${v}"${gold < v ? ' disabled' : ''}><span class="aa-stake-coin" aria-hidden="true">🪙</span><span class="aa-stake-amt">${gfmt(v)}</span><span class="aa-stake-live">${waiting[v] ? `${waiting[v]} waiting` : ''}</span></button>`).join('')}
       </div>
-      <label class="aa-fill"><input type="checkbox" id="aaFillOnline"${fill ? ' checked' : ''}><span>Fill from online</span></label>`;
+      <label class="aa-fill"><input type="checkbox" id="aaFillOnline"${fill ? ' checked' : ''}><span>Fill from online</span></label>
+      <button type="button" class="aa-lg-open" data-mact="league"><span aria-hidden="true">🏆</span><span class="aa-lg-open-t">League<small>${league.data ? `Ends in ${fmtLeft(leagueLeft())} · ${gshort((league.data.prizes || [0])[0])} for first` : 'The week\u2019s gold, ranked'}</small></span><span class="aa-lg-open-go" aria-hidden="true">\u203A</span></button>`;
     openSheet(el.matchSheet);
     wireFaces(el.matchBody);
     refreshLobby();
@@ -1616,6 +1617,7 @@
     }
     if (!act) return;
     const m = state.pendingMatch;
+    if (act === 'league') { openLeague(); return; }
     if (act === 'stakes') openFriends();
     else if (act === 'close') { closeSheets(); if (state.daily?.race && state.finished) goToLevels(); }
     else if (act === 'join' && m) {
@@ -1927,18 +1929,149 @@
     wrap.addEventListener('pointerup', up); wrap.addEventListener('pointercancel', up);
     wrap.addEventListener('wheel', e => { if (!el.game || el.game.hidden) return; e.preventDefault(); const r = el.board.getBoundingClientRect(); zoomAt(e.deltaY < 0 ? 1.2 : 1 / 1.2, e.clientX - r.left + zoom.x, e.clientY - r.top + zoom.y); }, { passive: false });
   }
+  // ── The league ──
+  //
+  // Every week the gold won at the tables is counted and the ten who won the most are paid: tenth place takes
+  // the base prize and every place above it doubles, so first takes it doubled nine times. The table, the
+  // ladder and the week's end all come from the server — it counts from its own ledger, and a client that
+  // guessed any of it would be showing a number nobody is going to be paid.
+  //
+  // What is worked out here is only the countdown, from the end the server gave: a clock that ticks without
+  // asking again, and one request when the screen is opened.
+  const league = { data: null, at: 0, tick: 0 };
+  const leagueApi = () => fetch(`${API_V1}/league`, { credentials: 'include', cache: 'no-store' })
+    .then(async r => { const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.error || `HTTP ${r.status}`); return d; });
+
+  // A table of ten seven-digit numbers is a wall. 5.12M is a prize.
+  const gshort = n => {
+    const v = Number(n) || 0, a = Math.abs(v), sign = v < 0 ? '-' : '';
+    if (a >= 1e6) return `${sign}${(a / 1e6).toFixed(2).replace(/\.?0+$/, '')}M`;
+    if (a >= 10000) return `${sign}${Math.round(a / 1000)}K`;
+    return `${sign}${gfmt(a)}`;
+  };
+  // "2d 18h", then "18h 40m", then "9m": always two units while there are two, so the size of what is left
+  // reads at a glance without the player doing arithmetic.
+  function fmtLeft(ms) {
+    const s = Math.max(0, Math.round(ms / 1000));
+    const d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60);
+    if (d) return `${d}d ${h}h`;
+    if (h) return `${h}h ${m}m`;
+    return m ? `${m}m` : 'any moment';
+  }
+  const leagueLeft = () => league.data ? league.data.season.ends_at - Date.now() : 0;
+
+  // The chip on the home screen is the way in, and it carries the countdown so the week is visible without
+  // opening anything. It appears once the server has answered: a game whose API is unreachable should not be
+  // showing a league that cannot be played.
+  function renderLeagueChip() {
+    if (!el.league) return;
+    if (!league.data) { el.league.hidden = true; return; }
+    el.league.hidden = false;
+    el.leagueEnds.textContent = fmtLeft(leagueLeft());
+    el.league.title = `League · ends in ${fmtLeft(leagueLeft())}`;
+  }
+  async function loadLeague(force) {
+    if (!force && league.data && Date.now() - league.at < 30000) return league.data;
+    try { league.data = await leagueApi(); league.at = Date.now(); }
+    catch { /* the league is a screen, never the game: if it cannot be read, the chip simply stays away */ }
+    renderLeagueChip();
+    return league.data;
+  }
+
+  const leagueRow = (r, prize, paid) => `
+    <div class="aa-lg-row${r.you ? ' is-you' : ''}">
+      <span class="aa-lg-no${r.rank <= 3 ? ' is-top' : ''}">${r.rank}</span>
+      <span class="aa-rank${faceClass(r)}" aria-hidden="true">${faceInner(r)}</span>
+      <span class="aa-lg-who"><b>${escapeHtml(r.name || 'Player')}</b>${prize ? `<small>${paid ? 'won' : 'wins'} ${gshort(prize)}</small>` : ''}</span>
+      <span class="aa-lg-earn"><span aria-hidden="true">🪙</span>${gshort(r.earning)}</span>
+    </div>`;
+
+  function renderLeague() {
+    if (!el.leagueBody) return;
+    const d = league.data;
+    if (!d) { el.leagueBody.innerHTML = '<p class="aa-loading">Loading the league…</p>'; return; }
+    const prizes = d.prizes || [];
+    const mine = d.me;
+    const inTable = (d.top || []).some(r => r.you);
+
+    // Your own line, when you are not already in the part of the table on screen: a player in 340th place
+    // should still be told where they stand.
+    const meLine = !auth.user
+      ? `<p class="aa-sheet-note">Sign in to play the gold tables and enter this week's league.</p>
+         <p class="aa-lg-cta"><button type="button" class="aa-btn aa-btn--small" data-lgact="signin">Sign in</button></p>`
+      : inTable ? ''
+      : mine && mine.rank
+        ? `<div class="aa-group aa-lg-table">${leagueRow({ ...auth.user, rank: mine.rank, earning: mine.earning, you: true }, prizes[mine.rank - 1] || 0)}</div>`
+        : `<p class="aa-sheet-note">You have not won any gold this week yet. Win a gold match and you are in the table.${mine && mine.earning < 0 ? ` <b>You are ${gshort(-mine.earning)} down so far.</b>` : ''}</p>`;
+
+    const table = (d.top || []).length
+      ? `<div class="aa-group aa-lg-table">
+           <div class="aa-lg-head"><span>#</span><span>Player</span><span>Won this week</span></div>
+           ${d.top.map(r => leagueRow(r, prizes[r.rank - 1] || 0)).join('')}
+         </div>`
+      : `<p class="aa-sheet-note">Nobody has won gold this week yet. The first player to take a pot is first in the table.</p>`;
+
+    const ladder = `
+      <p class="aa-cap">What the places pay</p>
+      <div class="aa-group aa-lg-prizes">
+        ${prizes.map((g, i) => `<div class="aa-lg-prize"><span class="aa-lg-no${i < 3 ? ' is-top' : ''}">${i + 1}</span><span><span aria-hidden="true">🪙</span> ${gshort(g)}</span></div>`).join('')}
+      </div>`;
+
+    const last = d.last && d.last.paid.length
+      ? `<p class="aa-cap">Last week</p>
+         <div class="aa-group aa-lg-table">
+           ${d.last.paid.map(r => leagueRow(r, r.gold, true)).join('')}
+         </div>`
+      : '';
+
+    el.leagueBody.innerHTML = `
+      <p class="aa-lg-when">Ends in <b>${fmtLeft(leagueLeft())}</b> · the gold you win at the tables is your place</p>
+      ${meLine}
+      ${table}
+      ${ladder}
+      ${last}
+      <p class="aa-sheet-note">Only gold won or lost at the gold tables counts. Stakes you pay come off your total, so the table is what you are up over the week.</p>`;
+    wireFaces(el.leagueBody);
+  }
+
+  async function openLeague() {
+    closeSheets();
+    openSheet(el.leagueSheet);
+    renderLeague();                                   // with whatever is already known, at once
+    await authLoad(true).catch(() => {});             // the prize may have landed while the game was closed
+    await loadLeague(true);
+    renderPurse(); renderAccountRow();
+    renderLeague();
+  }
+
+  // The countdown is redrawn on a slow timer rather than on every frame: it changes by the minute at most.
+  function startLeagueTick() {
+    if (league.tick) return;
+    league.tick = setInterval(() => {
+      if (document.hidden) return;
+      renderLeagueChip();
+      if (el.leagueSheet && !el.leagueSheet.hidden) renderLeague();
+      // the week has turned while the game was open: ask for the new one
+      if (league.data && leagueLeft() <= 0) loadLeague(true).then(() => { if (el.leagueSheet && !el.leagueSheet.hidden) renderLeague(); });
+    }, 30000);
+  }
+
   // ── Wiring ──
   el.btnHint.addEventListener('click', hint);
   el.play.addEventListener('click', () => startLevel(+el.play.dataset.level || 0));
   // Sheets
   const openSheet = sh => { sh.hidden = false; document.body.style.overflow = 'hidden'; };
-  const closeSheets = () => { el.sheet.hidden = true; if (el.signInSheet) el.signInSheet.hidden = true; if (el.matchSheet) el.matchSheet.hidden = true; document.body.style.overflow = ''; };
+  const closeSheets = () => { el.sheet.hidden = true; if (el.signInSheet) el.signInSheet.hidden = true; if (el.matchSheet) el.matchSheet.hidden = true; if (el.leagueSheet) el.leagueSheet.hidden = true; document.body.style.overflow = ''; };
   el.settingsBtns.forEach(b => b.addEventListener('click', () => {
     openSheet(el.sheet);
     renderAccountRow();                                   // with what the page already knows, at once
     authLoad(true).then(() => { renderAccountRow(); renderPurse(); syncTour(); }).catch(() => {});   // then with the server's answer, tour included
   }));
   el.friends?.addEventListener('click', openFriends);
+  el.league?.addEventListener('click', openLeague);
+  el.leagueBody?.addEventListener('click', e => {
+    if (e.target.closest('[data-lgact="signin"]')) { closeSheets(); openSignIn('Sign in to play the gold tables and enter this week\'s league.'); }
+  });
   $$('[data-close-sheet]').forEach(b => b.addEventListener('click', closeSheets));
   $$('.aa-sheet').forEach(sh => sh.addEventListener('click', e => { if (e.target === sh) closeSheets(); }));
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSheets(); });
@@ -2019,6 +2152,8 @@
     // the purse and the account row from the first paint, not only once Play with Friends has been tapped, and
     // a time from last time that never got through goes now
     authLoad().then(() => { renderPurse(); renderAccountRow(); syncTour(); return flushResult(false); }).catch(() => {});
+    // the league chip, and the clock that keeps its countdown honest
+    loadLeague().then(startLeagueTick).catch(() => {});
     const m = /^#level-(\d+)$/.exec(location.hash), mb = /^#b-([\w:]+)$/.exec(location.hash), mm = matchHash();
     if (mm) openMatchLink(mm);
     else if (mb) { const j = DATA.levels.findIndex(L => L.id === mb[1]); startLevel(j < 0 ? 0 : j); }

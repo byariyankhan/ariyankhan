@@ -49,7 +49,8 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 /* ── Home ── */
 .aa-home{ gap:10px; }
 .aa-home-top{ display:flex; align-items:center; justify-content:flex-end; min-height:42px; }
-.aa-home-top .aa-chip{ margin-right:auto; }
+.aa-home-top{ gap:8px; }
+.aa-home-top .aa-chip--purse{ margin-right:auto; }
 .aa-chip{ font-size:13px; color:var(--muted); background:var(--bg2); border-radius:30px; padding:6px 12px; }
 .aa-chip:empty{ display:none; }
 .aa-chip--purse{ display:inline-flex; align-items:center; gap:6px; color:var(--ink); font-weight:900; font-size:14px; font-variant-numeric:tabular-nums; }
@@ -166,6 +167,45 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-play:active{ transform:translateY(3px); box-shadow:0 3px 0 color-mix(in srgb, var(--accent2) 70%, #000); }
 .aa-play-label{ font-size:30px; font-weight:900; line-height:1; }
 .aa-play-sub{ font-size:14px; font-weight:800; opacity:.85; }
+
+/* ── League ──
+   The week's table. It borrows the pieces the game already has — the round face, the card group, the gold
+   pill — so a screen nobody has seen before still reads as part of the same game. */
+.aa-chip--league{ display:inline-flex; align-items:center; gap:6px; border:none; cursor:pointer; color:var(--ink);
+  font-weight:900; font-size:13px; font-variant-numeric:tabular-nums; transition:transform .12s, filter .15s; }
+.aa-chip--league:hover{ filter:brightness(1.04); }
+.aa-chip--league:active{ transform:scale(.95); }
+.aa-lg-when{ margin:0 0 14px; font-size:13px; color:var(--muted); text-align:center; }
+.aa-lg-when b{ color:var(--ink); }
+.aa-lg-cta{ margin:0 0 14px; text-align:center; }
+.aa-lg-table{ padding:6px 10px; }
+.aa-lg-head{ display:grid; grid-template-columns:30px 34px 1fr auto; align-items:center; gap:10px; padding:6px 4px;
+  font-size:11px; font-weight:900; letter-spacing:.8px; text-transform:uppercase; color:var(--muted); }
+.aa-lg-head span:last-child{ text-align:right; }
+.aa-lg-row{ display:grid; grid-template-columns:30px 34px 1fr auto; align-items:center; gap:10px; padding:6px 4px;
+  border-radius:14px; min-width:0; }
+.aa-lg-row + .aa-lg-row{ border-top:1px solid var(--outline); }
+.aa-lg-row.is-you{ background:color-mix(in srgb, var(--accent) 16%, transparent); }
+.aa-lg-no{ font-size:15px; font-weight:900; color:var(--muted); text-align:center; font-variant-numeric:tabular-nums; }
+/* The first three places are the ones worth chasing, so they are the ones that are coloured. */
+.aa-lg-no.is-top{ color:var(--accent); }
+.aa-lg-who{ min-width:0; overflow:hidden; }
+.aa-lg-who b{ display:block; font-size:15px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.aa-lg-who small{ display:block; font-size:11px; font-weight:800; color:var(--good); }
+.aa-lg-earn{ display:inline-flex; align-items:center; gap:4px; font-size:14px; font-weight:900;
+  font-variant-numeric:tabular-nums; white-space:nowrap; }
+.aa-lg-prizes{ display:grid; grid-template-columns:repeat(auto-fit, minmax(110px, 1fr)); gap:2px 12px; padding:10px 14px; }
+.aa-lg-prize{ display:flex; align-items:center; gap:8px; padding:4px 0; font-size:13px; font-weight:900;
+  font-variant-numeric:tabular-nums; }
+.aa-lg-prize .aa-lg-no{ width:22px; text-align:left; }
+/* The way into the league from the dashboard, where the gold already is. */
+.aa-lg-open{ display:flex; align-items:center; gap:12px; width:100%; margin:12px 0 0; padding:12px 16px; border:none;
+  border-radius:18px; background:var(--card); color:var(--ink); font-family:inherit; font-weight:900; cursor:pointer;
+  box-shadow:0 2px 10px rgba(0,0,0,.05); text-align:left; transition:transform .1s; }
+.aa-lg-open:active{ transform:translateY(2px); }
+.aa-lg-open-t{ flex:1; min-width:0; font-size:15px; }
+.aa-lg-open-t small{ display:block; font-size:12px; font-weight:700; color:var(--muted); }
+.aa-lg-open-go{ color:var(--muted); font-size:20px; }
 
 /* ── Game ── */
 .aa-gamescreen{ gap:6px; }

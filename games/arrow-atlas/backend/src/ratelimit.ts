@@ -28,6 +28,9 @@ export const LIMITS = {
   match_progress:{ name: 'match_progress',limit: 120, windowSeconds: 60,  by: 'user' },
   match_result:  { name: 'match_result',  limit: 20,  windowSeconds: 60,  by: 'user' },
   lobby_read:    { name: 'lobby_read',    limit: 120, windowSeconds: 60,  by: 'ip'   },
+  // The league screen polls its countdown, and a signed-out visitor may read it too, so this is counted
+  // against the address rather than the account.
+  league_read:   { name: 'league_read',   limit: 90,  windowSeconds: 60,  by: 'ip'   },
   // Progress is read once when a device wakes up and written once per board cleared, so neither of these is
   // a hot path. The write limit is per account and generous enough for the first sync after a long spell
   // offline, which pushes the whole tour in one request rather than as two hundred.
