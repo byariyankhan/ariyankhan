@@ -330,7 +330,15 @@ new = [
     pad + '      printf "%s" "<!doctype html><title>ariyankhan.com</title><p>Updating, one moment.</p>" > /var/www/html/index.html',
     pad + '    fi',
     pad + '    rm -rf /var/www/.next-site',
-    pad + '    exec bash /var/www/html/deploy/web-entrypoint.sh',
+    pad + '    # The entrypoint is itself part of the checkout, so a container with nothing fetched has no',
+    pad + '    # entrypoint to exec either — and exec-ing a missing file is how a holding page still ends in a',
+    pad + '    # restart loop. Apache alone is enough to serve what is there and to answer the health check.',
+    pad + '    if [ -f /var/www/html/deploy/web-entrypoint.sh ]; then',
+    pad + '      exec bash /var/www/html/deploy/web-entrypoint.sh',
+    pad + '    else',
+    pad + '      echo "[deploy] no entrypoint in the document root; serving what is here"',
+    pad + '      exec apache2-foreground',
+    pad + '    fi',
 ]
 io.open(path, 'w', encoding='utf-8').write('\n'.join(lines[:start] + new + lines[end:]))
 PY
@@ -356,22 +364,21 @@ PY
   # than a volume — so the files that were copied into the old one are gone the moment this runs. That is why
   # the command above must come up with nothing, and why the checkout is put back in here, before anything is
   # asked of the health check.
-  ( cd "$PROJ" && $SUDO docker compose up -d --force-recreate "$SVC" ) >/dev/null 2>&1 || bad "compose would not bring it up"
-  for i in $(seq 1 30); do running ariyankhan-web && break; sleep 2; done
-  if [ -s "$TGZ" ]; then
-    docker cp "$TGZ" ariyankhan-web:/tmp/arrow-atlas-site.tgz >/dev/null 2>&1 \
-      && docker exec ariyankhan-web bash -c '
-           set -e
-           rm -rf /tmp/site && mkdir -p /tmp/site
-           tar -xzf /tmp/arrow-atlas-site.tgz -C /tmp/site
-           [ -f /tmp/site/arrow-atlas.html ] || { echo "that is not the site"; exit 1; }
-           cp -a /tmp/site/. /var/www/html/
-           chown -R www-data:www-data /var/www/html || true
-           rm -rf /tmp/site /tmp/arrow-atlas-site.tgz' >/dev/null 2>&1 \
-      && ok "the site's files are in the new container" || bad "could not put the files into the new container"
+  [ -s "$TGZ" ] || { bad "no checkout arrived; refusing to recreate a container with nothing to put in it"; return; }
+  ( cd "$PROJ" && $SUDO docker compose create --force-recreate "$SVC" ) 2>&1 | sed 's/^/      /'
+  running ariyankhan-web && note "it was still running; it will be started again below"
+  rm -rf /tmp/aa-site && mkdir -p /tmp/aa-site
+  if tar -xzf "$TGZ" -C /tmp/aa-site && [ -f /tmp/aa-site/arrow-atlas.html ]; then
+    if docker cp /tmp/aa-site/. ariyankhan-web:/var/www/html 2>&1 | sed 's/^/      /'; then
+      ok "the site's files are in the new container, before it starts"
+    else
+      bad "could not copy the site into the container"; rm -rf /tmp/aa-site; return
+    fi
   else
-    bad "no checkout arrived, so the new container has only its holding page"
+    bad "the tarball does not hold the site"; rm -rf /tmp/aa-site; return
   fi
+  rm -rf /tmp/aa-site
+  ( cd "$PROJ" && $SUDO docker compose start "$SVC" ) 2>&1 | sed 's/^/      /'
   h=""
   for i in $(seq 1 30); do
     h=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' ariyankhan-web 2>/dev/null)
