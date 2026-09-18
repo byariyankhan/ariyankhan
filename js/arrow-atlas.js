@@ -100,7 +100,7 @@
   const state = {
     mode: 'classic', muted: !!store.get('muted', false), music: store.get('music', true) !== false, vibe: store.get('vibe', true) !== false, guides: !!store.get('guides', false),
     idx: -1, level: null, tier: 0, mask: null, pieces: [], occ: null, W: 0, H: 0, left: 0,
-    lives: LIVES, livesMax: LIVES, startedAt: 0, elapsed: 0, timerId: 0, finished: false, hintsUsed: 0, wrong: 0, fails: 0, seedBump: 0, busy: false, potGone: false,
+    lives: LIVES, livesMax: LIVES, startedAt: 0, raceBase: 0, elapsed: 0, timerId: 0, finished: false, hintsUsed: 0, wrong: 0, fails: 0, seedBump: 0, busy: false, potGone: false,
     combo: 0, bestCombo: 0, lastShot: 0, cheerHold: 0, shown: new Set(), daily: null,
   };
 
@@ -740,14 +740,14 @@
     const seed = (daily ? daily.seed : (i + 1) * 1000) + state.seedBump;
     const gen = bestBoard(state.maskInfo, state.tier, seed);
     const livesMax = livesFor(state.tier);
-    Object.assign(state, { W: gen.W, H: gen.H, pieces: gen.pieces, occ: gen.occ, land: gen.land, left: gen.pieces.length, hintsMax: hintsFor(state.tier), lives: livesMax, livesMax, elapsed: 0, startedAt: 0, finished: false, hintsUsed: 0, wrong: 0, busy: false, potGone: false, combo: 0, bestCombo: 0, lastShot: 0, cheerHold: 0, shown: new Set(), armed: new Set() });
+    Object.assign(state, { W: gen.W, H: gen.H, pieces: gen.pieces, occ: gen.occ, land: gen.land, left: gen.pieces.length, hintsMax: hintsFor(state.tier), lives: livesMax, livesMax, elapsed: 0, startedAt: 0, raceBase: 0, finished: false, hintsUsed: 0, wrong: 0, busy: false, potGone: false, combo: 0, bestCombo: 0, lastShot: 0, cheerHold: 0, shown: new Set(), armed: new Set() });
     el.error.hidden = true; el.loading.hidden = true;
     if (daily) { if (history.replaceState) history.replaceState(null, '', location.pathname + location.search + (daily.hash ?? '#daily')); } else setHash(i);
     scrollToGame();
     const diff = DIFF_OF(state.tier);
     state.diff = diff;
     resetZoom(); renderBoard(); renderHud();
-    if (daily?.race && daily.match) { renderRanks(daily.match.players); startProgressPoll(); }   // back on a race board is back in the match
+    if (daily?.race && daily.match) { renderRanks(daily.match.players); syncRaceClock(daily.match); startProgressPoll(); }   // back on a race board is back in the match, on the match's own clock
     if (i === 0 && !cleared(0) && !daily) toast('Tap an arrow to shoot it off the board. If another arrow is in its way, you lose a heart.', 'hint');
     else if (state.disc) toast(`${state.disc.country.name}'s ${KIND_WORD[state.disc.kind]} · ${state.pieces.length} arrows · what is it?`, state.tier >= 2 ? 'hard' : '');
     else if (state.tier >= 2) toast(`${diff.toUpperCase()} LEVEL · ${state.pieces.length} arrows${daily ? '' : ' · you earned this'}`, 'hard');
@@ -771,19 +771,56 @@
     el.hudLives.innerHTML = Array.from({ length: max }, (_, k) => `<span class="${k < state.lives ? 'is-on' : 'is-off'}">♥</span>`).join('');
     el.hudLives.setAttribute('aria-label', `${state.lives} of ${max} hearts`);
     el.hudLives.classList.toggle('is-last', max > 1 && state.lives === 1 && !state.finished);
+    // The clock is shown in a challenge and nowhere else. A race is decided by it, so a player is owed the
+    // number they are being judged on; a tour level is not a race against anybody, and a clock ticking away
+    // in the corner of one only makes a quiet puzzle feel like an exam.
+    el.hudTime.hidden = !state.daily?.race;
     renderTime();
   }
-  const currentElapsed = () => state.startedAt ? state.elapsed + (performance.now() - state.startedAt) : state.elapsed;
+  // A challenge is timed from the moment the match starts, not from the player's first tap: everyone in it is
+  // racing the same clock, and the five seconds somebody spends looking at the board before touching it are
+  // five seconds of the race. So a race keeps a base — a point on this device's own monotonic clock standing
+  // for the instant the match began — and the time shown is simply now minus that. It is set from the age the
+  // server reports rather than from a timestamp, so a device whose clock is wrong still shows the right race,
+  // and it survives Try again, because restarting the board does not restart the match.
+  //
+  // Everything else (the tour, the daily board) is still timed from the first tap and still pauses when the
+  // tab goes away: there is nobody else in those, and a clock running while the game is not on screen would
+  // only punish being interrupted.
+  const currentElapsed = () => state.raceBase
+    ? performance.now() - state.raceBase
+    : state.startedAt ? state.elapsed + (performance.now() - state.startedAt) : state.elapsed;
   function renderTime() {
     const e = currentElapsed();
     el.hudTime.textContent = fmtTime(e);
   }
   function startTimer() {
-    if (state.startedAt || state.finished) return;
+    if (state.startedAt || state.raceBase || state.finished) return;
     state.startedAt = performance.now();
     state.timerId = setInterval(renderTime, 500);
   }
-  function stopTimer() { if (state.startedAt) { state.elapsed += performance.now() - state.startedAt; state.startedAt = 0; } clearInterval(state.timerId); state.timerId = 0; }
+  // The race clock, started from the age the server reports for the match. It is kept beside the board rather
+  // than in it, because the board is thrown away and redrawn by Try again while the match — and its clock —
+  // carries on. The base only ever moves to make the race older, never younger: the match view held on this
+  // device can be minutes out of date, and a stale age must not wind the clock back.
+  let raceClock = { code: '', base: 0 };
+  function syncRaceClock(m) {
+    if (!state.daily?.race || state.finished) return;
+    const code = m?.code || state.daily?.match?.code || '';
+    if (code && raceClock.code !== code) raceClock = { code, base: 0 };
+    const age = Number(m?.age_ms);
+    const shown = raceClock.base ? performance.now() - raceClock.base : 0;
+    if (Number.isFinite(age) && (!raceClock.base || age > shown + 1500)) raceClock.base = performance.now() - age;
+    if (!raceClock.base) return;
+    state.raceBase = raceClock.base;
+    if (!state.timerId) state.timerId = setInterval(renderTime, 500);
+    renderTime();
+  }
+  function stopTimer() {
+    if (state.raceBase) { state.elapsed = performance.now() - state.raceBase; state.raceBase = 0; }
+    else if (state.startedAt) { state.elapsed += performance.now() - state.startedAt; state.startedAt = 0; }
+    clearInterval(state.timerId); state.timerId = 0;
+  }
 
   // ── Moves ──
   function blockerOf(p) {
@@ -889,7 +926,8 @@
     const p = state.pieces.find(q => !q.gone && !blockerOf(q));
     if (!p) return;
     startTimer();
-    state.hintsUsed++; state.elapsed += HINT_PENALTY_MS;
+    state.hintsUsed++;
+    if (!state.daily?.race) state.elapsed += HINT_PENALTY_MS;   // a race is timed by the match, not by this board
     $$('.aa-piece.is-hint', el.board).forEach(g => g.classList.remove('is-hint'));
     p.el.classList.add('is-hint');
     setTimeout(() => p.el.classList.remove('is-hint'), 2500);
@@ -1604,6 +1642,7 @@
       try {
         const d = await matchApi('progress', { code: R.match.code, pct: myPct() });
         renderRanks(d.match.players);
+        syncRaceClock(d.match);     // the match's own age, in case this device slept through part of it
         notePot(d.match);
       } catch { /* the next tick will try again */ }
     };
@@ -1616,7 +1655,7 @@
     live.watch(R.match.code, ev => {
       // Somebody moved, finished, or the match ended. The state that comes with a start or a finish is the
       // whole room; a bare progress event only needs the ranks redrawn, and the socket sends one per tap.
-      if (ev.type === 'state' && ev.match) { renderRanks(ev.match.players); notePot(ev.match); return; }
+      if (ev.type === 'state' && ev.match) { renderRanks(ev.match.players); syncRaceClock(ev.match); notePot(ev.match); return; }
       if (ev.type === 'progress_updated' || ev.type === 'player_finished' || ev.type === 'match_finished') live.resync();
     });
     // While the socket is up, our own progress goes over it — no request per tap, no waiting for a reply.
@@ -2211,7 +2250,7 @@
   $$('a[href="#aaAbout"]').forEach(a => a.addEventListener('click', e => { e.preventDefault(); goAbout(); }));
   renderToggles();
   document.addEventListener('keydown', e => { if (!el.game.hidden && !state.finished && (e.key === 'h' || e.key === 'H') && !/input|textarea/i.test(document.activeElement?.tagName || '')) hint(); });
-  document.addEventListener('visibilitychange', () => { if (document.hidden && state.startedAt && !state.finished) { stopTimer(); } });
+  document.addEventListener('visibilitychange', () => { if (document.hidden && state.startedAt && !state.raceBase && !state.finished) { stopTimer(); } });
   el.board.addEventListener('pointerdown', () => { if (!state.startedAt && !state.finished && state.elapsed) startTimer(); });
 
   // ── First open: welcome and terms. Every launch: the logo and a line to set the mood ──
