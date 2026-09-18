@@ -103,20 +103,27 @@ section('The table is ordered by earning, and a tie goes to whoever got there fi
   await played(early.id, 20_000, new Date(mid), 'r-early');
   await played(late.id, 20_000, new Date(mid + HOUR), 'r-late');
   await played(small.id, 5_000, new Date(mid), 'r-small');
-  // A losing week, and a week that broke even: neither is a placing.
+  // A losing week and a week that broke even: both are places, at the bottom where they belong.
   const lost = await player('rank-lost'), even = await player('rank-even');
   await moved(lost.id, -1_000, 'stake', 't-stake:r-lost', new Date(mid));
   await played(even.id, 0, new Date(mid), 'r-even');
 
   const table = await L.standings(pool, lastWeek);
-  eq(table.map(r => r.name), ['rank-big', 'rank-early', 'rank-late', 'rank-small'], 'most won is first, and only players in front are ranked');
-  eq(table.map(r => r.earning), [30_000, 20_000, 20_000, 5_000], 'with what each of them won');
-  eq(table.map(r => r.rank), [1, 2, 3, 4], 'ranked from one');
+  eq(table.map(r => r.name), ['rank-big', 'rank-early', 'rank-late', 'rank-small', 'rank-even', 'rank-lost'],
+    'most won is first, and everyone who played is on the board');
+  eq(table.map(r => r.earning), [30_000, 20_000, 20_000, 5_000, 0, -1_000], 'with what each of them is up over the week');
+  eq(table.map(r => r.rank), [1, 2, 3, 4, 5, 6], 'ranked from one, straight down');
 
   eq((await L.placeOf(pool, lastWeek, late.id)).rank, 3, 'a tie is broken by who stopped earning first, not by chance');
-  eq((await L.placeOf(pool, lastWeek, lost.id)).rank, null, 'a losing week has no rank');
-  eq((await L.placeOf(pool, lastWeek, lost.id)).earning, -1_000, 'though it is still counted, and it is negative');
-  eq((await L.placeOf(pool, lastWeek, even.id)).rank, null, 'breaking even is not a placing either');
+  eq((await L.placeOf(pool, lastWeek, even.id)).rank, 5, 'breaking even is a placing');
+  eq((await L.placeOf(pool, lastWeek, lost.id)).rank, 6, 'and so is losing: a bad week is a low place, not the door');
+  eq((await L.placeOf(pool, lastWeek, lost.id)).earning, -1_000, 'ranked on the earning it actually has, which is negative');
+  eq((await L.placeOf(pool, lastWeek, lost.id)).rank, table.find(r => r.name === 'rank-lost')!.rank,
+    'and their own line agrees with the row the table shows them in');
+
+  // Nothing to do with the league: a player who has not played this week is not in the table at all.
+  const idle = await player('rank-idle');
+  eq((await L.placeOf(pool, lastWeek, idle.id)).rank, null, 'a week you sat out is no place');
 }
 
 section('A finished season is ranked, paid and frozen');
@@ -197,10 +204,11 @@ section('A league nobody won pays nobody');
   await reset();
   const a = await player('quiet');
   await moved(a.id, -1_000, 'stake', 't-stake:quiet', new Date(lastWeek.startsAt.getTime() + HOUR));
+  eq((await L.standings(pool, lastWeek)).map(r => r.name), ['quiet'], 'the one player who turned up is in the table');
   await L.ensureSeason(pool, lastWeek);
   const done = await L.settleDue(now);
   ok(!!done, 'the season still closes');
-  eq(done!.paid.length, 0, 'but nothing is paid out');
+  eq(done!.paid.length, 0, 'but a player who ended the week down is not paid for being on the board');
   const rows = await query<{ n: number }>(pool, `SELECT COUNT(*)::bigint AS n FROM gold_ledger WHERE reason = 'league'`);
   eq(Number(rows.rows[0]!.n), 0, 'and no prize row is written');
 }
@@ -209,14 +217,16 @@ section('Fewer players than places');
 {
   await reset();
   const mid = lastWeek.startsAt.getTime() + 12 * HOUR;
-  const a = await player('few-a'), b = await player('few-b');
+  const a = await player('few-a'), b = await player('few-b'), c = await player('few-down');
   await played(a.id, 8_000, new Date(mid), 'f-a');
   await played(b.id, 3_000, new Date(mid + 60_000), 'f-b');
-  const before = [await goldOf(a.id), await goldOf(b.id)];
+  await moved(c.id, -2_000, 'stake', 't-stake:f-down', new Date(mid + 120_000));   // third on the board, down on the week
+  const before = [await goldOf(a.id), await goldOf(b.id), await goldOf(c.id)];
 
   await L.ensureSeason(pool, lastWeek);
   const done = await L.settleDue(now);
   eq(done!.paid.map(p => p.rank), [1, 2], 'only the places that were played for are paid');
+  eq(await goldOf(c.id) - before[2]!, 0, 'third place on a losing week is paid nothing, prize ladder or not');
   eq(await goldOf(a.id) - before[0]!, 5_120_000, 'first place is still first place');
   eq(await goldOf(b.id) - before[1]!, 2_560_000, 'and second is second, however few turned up');
 }
