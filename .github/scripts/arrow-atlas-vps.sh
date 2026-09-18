@@ -254,6 +254,32 @@ mode_push_source() {
   done
   [ "$h" = "healthy" ] && ok "arrow-atlas-api is healthy" || bad "arrow-atlas-api is $h after ten minutes"
   docker logs --tail 20 arrow-atlas-api 2>&1 | sed 's/^/      /'
+
+  # And the client, into the container that serves the site. Not by restarting it: that container is defined
+  # by hPanel's own copy of a compose file, which still empties the document root before fetching — restarting
+  # it while GitHub answers 404 would leave the whole site with nothing to serve. Copying the files in over
+  # the top has neither problem, and the page is read from disk on every request, so it takes effect at once.
+  say "4. the client, into the portfolio container"
+  if ! have ariyankhan-web; then note "no ariyankhan-web here; nothing to do"; return; fi
+  docker cp "$TGZ" ariyankhan-web:/tmp/arrow-atlas-site.tgz >/dev/null 2>&1 || { bad "could not hand it to ariyankhan-web"; return; }
+  # mail-config.local.php is written at start from the container's environment and is in no checkout, so the
+  # document root is written over rather than emptied: the contact form keeps the settings it is running with.
+  if docker exec ariyankhan-web bash -c '
+       set -e
+       rm -rf /tmp/site && mkdir -p /tmp/site
+       tar -xzf /tmp/arrow-atlas-site.tgz -C /tmp/site
+       [ -f /tmp/site/arrow-atlas.html ] || { echo "that is not the site"; exit 1; }
+       cp -a /tmp/site/. /var/www/html/
+       chown -R www-data:www-data /var/www/html || true
+       rm -rf /tmp/site /tmp/arrow-atlas-site.tgz' >/dev/null 2>&1; then
+    ok "the client is in place"
+  else
+    bad "could not put the client in place"; return
+  fi
+  want=$(tar -xzf "$TGZ" -O ./arrow-atlas.html 2>/dev/null | grep -o 'js/arrow-atlas\.js?v=[0-9]*' | head -1)
+  live=$(curl -fsS -H 'X-Forwarded-Proto: https' "https://$DOMAIN/arrow-atlas.html" 2>/dev/null | grep -o 'js/arrow-atlas\.js?v=[0-9]*' | head -1)
+  [ -n "$want" ] && [ "$want" = "$live" ] && ok "the page asks for $live, which is what this checkout ships" \
+    || bad "the page asks for ${live:-nothing} and this checkout ships ${want:-nothing}"
 }
 
 mode_inspect() {
