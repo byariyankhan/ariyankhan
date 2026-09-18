@@ -212,6 +212,18 @@ mode_inspect() {
         note "still set on the container: $v  (the repository no longer sets it; hPanel's own copy of the compose file does)"
       fi
     done
+    # The contact form is configured from the container's environment, which the entrypoint turns into
+    # mail-config.local.php at start. Names and whether they hold anything — never the values.
+    note "contact form settings on the container:"
+    env_dump=$(docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' ariyankhan-web 2>/dev/null)
+    for v in TO_EMAIL SMTP_HOST SMTP_USER SMTP_PASS SMTP_PORT MAIL_DRIVER SITE_URL; do
+      line=$(printf '%s\n' "$env_dump" | grep "^$v=" | head -1)
+      case "$line" in
+        "")    printf '      %-12s not set\n' "$v" ;;
+        "$v=") printf '      %-12s set but empty\n' "$v" ;;
+        *)     printf '      %-12s present\n' "$v" ;;
+      esac
+    done
   fi
 
   say "and the Arrow Atlas project"
@@ -518,6 +530,12 @@ mode_health() {
   hc "the legacy PHP path is gone" 404 "https://$DOMAIN/games/api/auth.php?a=me"
   hc "and so is the PHP file"     404 "https://$DOMAIN/games/api/match.php"
   hc "other PHP still runs"       405 "https://$DOMAIN/send-mail.php"
+  # A GET only proves the file is there. This is a POST that trips the contact form's own honeypot, so it
+  # stops before it would send anything — but it stops *after* the handler has checked that it has somewhere
+  # to send to, which is the part that fails silently when the container comes up without TO_EMAIL or the
+  # SMTP settings. 200 means the form can actually deliver; 500 means every visitor who writes in is refused.
+  hc "the contact form can send"  200 "https://$DOMAIN/send-mail.php" \
+     -X POST -H 'Content-Type: application/json' -d '{"website":"health-check"}'
   # 200, not 403. These requests come from the VPS over loopback, and the health location allows 127.0.0.1
   # and denies everything else on the real peer address — so being served here is the allowlist working. That
   # it is refused from off the machine is a different question, asked from a GitHub runner by vps-smoke.yml,
