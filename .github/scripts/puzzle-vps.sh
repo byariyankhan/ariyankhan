@@ -32,6 +32,13 @@ SITEVOL=$(docker volume inspect puzzle-site >/dev/null 2>&1 && echo puzzle-site 
 # Where compose reads this project from. The container's own label is asked first and is normally right; after
 # the directory is renamed the containers still carry the old one until they are next recreated, so a label
 # pointing at a directory with no compose file in it falls through to the names it could be.
+# The snippet nginx includes for the game. It was installed as arrow-atlas.conf and is puzzle.conf after
+# rename-nginx; a deploy has to install over whichever one the server block actually includes.
+snippetpath() {
+  if $SUDO test -f /etc/nginx/snippets/puzzle.conf; then echo /etc/nginx/snippets/puzzle.conf
+  else echo /etc/nginx/snippets/arrow-atlas.conf; fi
+}
+
 projdir() {
   d=$(docker inspect -f '{{index .Config.Labels "com.docker.compose.project.working_dir"}}' "$API" 2>/dev/null)
   if [ -n "$d" ] && $SUDO test -f "$d/docker-compose.yml"; then echo "$d"; return; fi
@@ -164,7 +171,9 @@ report_legacy() {
 
 report_nginx() {
   say "nginx"
-  for f in /etc/nginx/snippets/arrow-atlas.conf /etc/nginx/conf.d/arrow-atlas-map.conf /etc/nginx/sites-available/ariyankhan.conf; do
+  for f in /etc/nginx/snippets/puzzle.conf /etc/nginx/conf.d/puzzle-map.conf \
+           /etc/nginx/snippets/arrow-atlas.conf /etc/nginx/conf.d/arrow-atlas-map.conf \
+           /etc/nginx/sites-available/ariyankhan.conf; do
     if $SUDO test -f "$f"; then
       printf '  %-52s %s bytes\n' "$f" "$($SUDO stat -c %s "$f")"
     else
@@ -173,7 +182,7 @@ report_nginx() {
   done
 
   echo
-  if $SUDO grep -qs 'games/api' /etc/nginx/snippets/arrow-atlas.conf; then
+  if $SUDO grep -qs 'games/api' "$(snippetpath)"; then
     note "the snippet still proxies /games/api/ (the compatibility route)"
   else
     note "the snippet has no /games/api/ route"
@@ -449,6 +458,110 @@ env_rollback() {
   $SUDO cp -a "$EBK" "$ENVF" && note "the .env is back as it was"
   $SUDO cp -a "$CBK" "$COMP" && note "the compose file is back as it was"
 }
+# The last old names anywhere: the two nginx files.
+#
+#   /etc/nginx/snippets/arrow-atlas.conf    -> puzzle.conf
+#   /etc/nginx/conf.d/arrow-atlas-map.conf  -> puzzle-map.conf
+#   and $arrow_atlas_upgrade, the map variable the two share, -> $puzzle_upgrade
+#
+# The live files are what is renamed, not the ones from the checkout: what nginx is serving has been tested in
+# front of real traffic, and installing something else is a deploy, which is a separate decision.
+#
+# It all moves in one step because it has to. conf.d/*.conf is included wholesale, so two map files at once
+# declares the same variable twice and nginx refuses everything. So: write the new pair, take the old map out of
+# the way, point every server block that includes the snippet by its old path at the new one, and only then ask
+# nginx. If nginx says no, or if the game stops answering, the tar taken before any of it goes back and nginx is
+# reloaded from that. No server block that does not name the game's own snippet is touched, which is what keeps
+# this away from ASR and Bookween.
+ng_rollback() {
+  $SUDO tar -xzf "$BK" -C / && note "the files are back as they were"
+  $SUDO rm -f "$NEWS" "$NEWM"
+  if $SUDO nginx -t >/dev/null 2>&1 && $SUDO systemctl reload nginx; then note "nginx reloaded on the old files"
+  else bad "nginx will not accept the restored configuration either — this one needs a person on the box"; fi
+}
+mode_rename_nginx() {
+  [ "$CONFIRM" = "RENAME" ] || { echo "::error::rename-nginx needs confirm=RENAME"; exit 2; }
+  echo "Puzzle — the nginx files  ($(hostname), $(date -u))"
+  OLDS=/etc/nginx/snippets/arrow-atlas.conf
+  NEWS=/etc/nginx/snippets/puzzle.conf
+  OLDM=/etc/nginx/conf.d/arrow-atlas-map.conf
+  NEWM=/etc/nginx/conf.d/puzzle-map.conf
+  BK="$HOST_BACKUPS/nginx-before-rename-$STAMP.tar.gz"
+
+  say "1. what is there now, and whether nginx accepts it"
+  if $SUDO test -f "$NEWS" && ! $SUDO test -f "$OLDS"; then
+    ok "already renamed"; $SUDO nginx -t 2>&1 | sed 's/^/      /'; report_nginx; return
+  fi
+  $SUDO test -f "$OLDS" || { bad "there is no $OLDS to rename"; return; }
+  $SUDO test -f "$OLDM" || { bad "there is no $OLDM; the map and the snippet have to move together"; return; }
+  if $SUDO nginx -t >/tmp/ng.log 2>&1; then ok "nginx -t accepts what is live"; else
+    bad "nginx does not accept its own configuration as it stands; not touching it"
+    sed 's/^/      /' /tmp/ng.log; return
+  fi
+
+  say "2. which server blocks include the snippet"
+  INCS=$($SUDO grep -rl 'snippets/arrow-atlas\.conf' /etc/nginx --include='*.conf' 2>/dev/null | grep -v '/snippets/' | sort -u)
+  [ -n "$INCS" ] || { bad "nothing in /etc/nginx includes that snippet; stopping rather than guessing"; return; }
+  printf '%s\n' "$INCS" | sed 's/^/      /'
+
+  say "3. a way back, before anything moves"
+  if $SUDO tar -czf "$BK" -C / etc/nginx/nginx.conf "${OLDS#/}" "${OLDM#/}" \
+       $(printf '%s\n' "$INCS" | sed 's#^/##' | tr '\n' ' ') 2>/dev/null; then
+    kept "$BK  (nginx.conf, both of the game's files, and every block that includes them)"
+  else
+    bad "could not write the backup; nothing has been changed"; return
+  fi
+
+  say "4. the new pair, and the includes pointed at it"
+  $SUDO sed 's/\$arrow_atlas_upgrade/$puzzle_upgrade/g' "$OLDS" > /tmp/puzzle-snippet.conf
+  $SUDO sed 's/\$arrow_atlas_upgrade/$puzzle_upgrade/g' "$OLDM" > /tmp/puzzle-map.conf
+  if ! grep -q 'puzzle_upgrade' /tmp/puzzle-snippet.conf || ! grep -q 'puzzle_upgrade' /tmp/puzzle-map.conf; then
+    bad "the map variable is not in both files the way this expects; stopping and changing nothing"
+    rm -f /tmp/puzzle-snippet.conf /tmp/puzzle-map.conf; return
+  fi
+  $SUDO install -m 644 /tmp/puzzle-snippet.conf "$NEWS" && ok "$NEWS" || { bad "could not write $NEWS"; return; }
+  $SUDO install -m 644 /tmp/puzzle-map.conf "$NEWM" && ok "$NEWM" || { bad "could not write $NEWM"; ng_rollback; return; }
+  rm -f /tmp/puzzle-snippet.conf /tmp/puzzle-map.conf
+  $SUDO rm -f "$OLDM" && gone "$OLDM (two maps of one variable is a duplicate nginx would refuse)"
+  for f in $INCS; do
+    $SUDO sed -i 's#snippets/arrow-atlas\.conf#snippets/puzzle.conf#g' "$f" && note "$f includes snippets/puzzle.conf now"
+  done
+
+  say "5. nginx has to accept it, and the game has to still answer"
+  if $SUDO nginx -t >/tmp/ng.log 2>&1; then
+    ok "nginx -t accepts the renamed pair"
+    $SUDO systemctl reload nginx && ok "reloaded" || { bad "the reload failed"; ng_rollback; return; }
+  else
+    bad "nginx -t refused it; putting everything back"
+    sed 's/^/      /' /tmp/ng.log; ng_rollback; return
+  fi
+  fails=0
+  for probe in "/:200" "/puzzle/:200" "/api/puzzle/v1/lobby:200"; do
+    path=${probe%:*}; want=${probe##*:}
+    code=$(curl -so /dev/null -w '%{http_code}' -m 15 "https://$DOMAIN$path")
+    [ "$code" = "$want" ] && ok "$path answers $code" || { bad "$path answered $code, wanted $want"; fails=1; }
+  done
+  # The socket is the reason the map exists, so it is the thing to check: a handshake with no session must be
+  # refused with 401. A 404 would mean the route is gone, which is what renaming the variable in one of the two
+  # files and not the other would do.
+  code=$(curl -sS -m 15 -o /dev/null -w '%{http_code}' \
+      -H 'Connection: Upgrade' -H 'Upgrade: websocket' -H 'Sec-WebSocket-Version: 13' \
+      -H 'Sec-WebSocket-Key: AAAAAAAAAAAAAAAAAAAAAA==' "https://$DOMAIN/ws/puzzle" 2>/dev/null || echo 000)
+  case "$code" in
+    401) ok "the socket refuses an unauthenticated handshake (401), so the route and the map are both there" ;;
+    404) bad "404 on /ws/puzzle — the route is gone"; fails=1 ;;
+    *)   note "the handshake answered $code" ;;
+  esac
+  [ "$fails" = "0" ] || { bad "something the game needs stopped answering; putting everything back"; ng_rollback; return; }
+
+  say "6. and the old snippet, which nothing includes any more"
+  left=$($SUDO grep -rl 'snippets/arrow-atlas\.conf' /etc/nginx --include='*.conf' 2>/dev/null | grep -v '/snippets/' | sort -u)
+  [ -z "$left" ] && ok "nothing names it" || { printf '%s\n' "$left" | sed 's/^/      still names it: /'; bad "leaving $OLDS where it is"; return; }
+  $SUDO rm -f "$OLDS" && gone "$OLDS" || note "could not remove $OLDS"
+  $SUDO nginx -t 2>&1 | sed 's/^/      /'
+  report_nginx
+}
+
 # The two paths the rename left behind, and the last of it on this host.
 #
 #   * the dumps. rename-infra made /var/backups/puzzle and this script has read and written it ever since, but
@@ -1280,16 +1393,18 @@ mode_deploy() {
   fi
   ok "no /games/api/ route in it"
 
-  if $SUDO test -f /etc/nginx/snippets/arrow-atlas.conf; then
-    $SUDO cp -a /etc/nginx/snippets/arrow-atlas.conf "$HOST_BACKUPS/arrow-atlas.conf.before-$STAMP"
-    kept "$HOST_BACKUPS/arrow-atlas.conf.before-$STAMP  (the way back, if the new one misbehaves)"
+  SNIP=$(snippetpath)
+  note "installing to $SNIP"
+  if $SUDO test -f "$SNIP"; then
+    $SUDO cp -a "$SNIP" "$HOST_BACKUPS/$(basename "$SNIP").before-$STAMP"
+    kept "$HOST_BACKUPS/$(basename "$SNIP").before-$STAMP  (the way back, if the new one misbehaves)"
   fi
-  $SUDO install -m 644 /tmp/arrow-atlas.conf.new /etc/nginx/snippets/arrow-atlas.conf || { bad "could not install it"; return; }
+  $SUDO install -m 644 /tmp/arrow-atlas.conf.new "$SNIP" || { bad "could not install it"; return; }
   if $SUDO nginx -t 2>&1 | sed 's/^/      /'; then
     $SUDO systemctl reload nginx && ok "nginx reloaded with the new snippet"
   else
     bad "nginx -t refused the new snippet; putting the old one back"
-    $SUDO cp -a "$HOST_BACKUPS/arrow-atlas.conf.before-$STAMP" /etc/nginx/snippets/arrow-atlas.conf
+    $SUDO cp -a "$HOST_BACKUPS/$(basename "$SNIP").before-$STAMP" "$SNIP"
     $SUDO nginx -t && $SUDO systemctl reload nginx
     return
   fi
@@ -1423,7 +1538,7 @@ mode_health() {
   fi
   if $SUDO ls "$HOST_BACKUPS"/*.sqlite >/dev/null 2>&1; then bad "a pre-migration SQLite backup is still on the host"
   else ok "no SQLite backup left on the host"; fi
-  if $SUDO grep -qs 'games/api' /etc/nginx/snippets/arrow-atlas.conf; then bad "nginx still proxies /games/api/"
+  if $SUDO grep -qs 'games/api' "$(snippetpath)"; then bad "nginx still proxies /games/api/"
   else ok "nginx has no /games/api/ route"; fi
   if docker exec "$API" sh -c 'ls /srv/arrow-atlas/site/games/puzzle/backend/dist/import-sqlite.js' >/dev/null 2>&1; then
     bad "the SQLite importer is still in the deployed build"
@@ -1966,6 +2081,7 @@ case "$MODE" in
   rename-infra)  mode_rename_infra ;;
   rename-env)    mode_rename_env ;;
   rename-paths)  mode_rename_paths ;;
+  rename-nginx)  mode_rename_nginx ;;
   finish-rename) mode_finish_rename ;;
   drop-old-volumes) mode_drop_old_volumes ;;
   volumes)       mode_volumes ;;
