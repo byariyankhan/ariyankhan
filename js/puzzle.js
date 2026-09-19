@@ -173,18 +173,18 @@
   const MUSIC = {
     tick: 400,                  // how often intensity is recomputed, ms
     rise: 0.22, fall: 0.08,     // how far it travels toward its target each tick, up and down
-    gain: [0.085, 0.155],       // the master, at rest and at full
+    gain: [0.085, 0.13],        // the master, at rest and at full: a whisker over the one volume it used to hold
     cutoff: [520, 1500],        // the pad's lowpass: muffled to present
     lfoHz: [0.05, 0.17], lfoDepth: [180, 80],
     feedback: [0.32, 0.17],     // the delay tail, shorter when it matters
     chord: [14, 9],             // seconds a chord is held: the harmony moves quicker under pressure
-    pulseFrom: 0.42,            // below this there is no pulse at all
+    pulseFrom: 0.55,            // below this there is no pulse at all, so a heartbeat always means jeopardy
     pulseBpm: [46, 92],
-    idleFrom: 7,                // seconds with nothing moving before thinking starts to tell
+    idleFrom: 18, idleOver: 90, // a long think is the point of this game: 18s before it tells at all, 41s to the top
     spikeWrong: 0.3, spikeCap: 0.5, spikeDecay: 0.93, spikeFix: 0.55,
     reducedCeiling: 0.55,
   };
-  const music = { ctx: null, master: null, timer: 0, step: 0, on: false, aim: 0, cur: 0, spike: 0, race: 0, lastMove: 0, tickTimer: 0, pulseTimer: 0 };
+  const music = { ctx: null, master: null, timer: 0, step: 0, on: false, aim: 0, cur: 0, spike: 0, race: 0, raceTo: 0, heartAt: 0, lastMove: 0, tickTimer: 0, pulseTimer: 0 };
   const mix = (r, i) => r[0] + (r[1] - r[0]) * i;
   // Somebody who has asked their system for less movement gets less of this too. Asked once and remembered,
   // rather than on every tick.
@@ -201,7 +201,12 @@
       audio = audio || new (window.AudioContext || window.webkitAudioContext)();
       if (audio.state === 'suspended') audio.resume();
       const ctx = audio; music.ctx = ctx;
-      const master = ctx.createGain(); master.gain.value = 0.0001; master.connect(ctx.destination);
+      // Two stages, and the reason is the ticker. The intensity layer ramps the master every 400ms, so a slow
+      // fade-in written on the master is overwritten by the first tick 0.64s later -- the eight-second arrival
+      // collapses into half a second and the music lands on the player instead of appearing under them. The
+      // intro owns the fade; the master owns the intensity; neither writes to the other's parameter.
+      const intro = ctx.createGain(); intro.gain.value = 0.0001; intro.connect(ctx.destination);
+      const master = ctx.createGain(); master.gain.value = MUSIC.gain[0]; master.connect(intro);
       const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 520; lp.Q.value = 0.6; lp.connect(master);
       const delay = ctx.createDelay(1.2); delay.delayTime.value = 0.52; const fb = ctx.createGain(); fb.gain.value = 0.32;
       const dlp = ctx.createBiquadFilter(); dlp.type = 'lowpass'; dlp.frequency.value = 900;
@@ -210,12 +215,12 @@
       // The pulse goes straight to the master, not through the pad's lowpass: it is meant to be felt under the
       // harmony rather than washed into it.
       const pulseOut = ctx.createGain(); pulseOut.gain.value = 1; pulseOut.connect(master);
-      music.master = master; music.lp = lp; music.lfo = lfo; music.lfoG = lfoG; music.fb = fb; music.pulseOut = pulseOut; music.on = true;
+      music.master = master; music.intro = intro; music.lp = lp; music.lfo = lfo; music.lfoG = lfoG; music.fb = fb; music.pulseOut = pulseOut; music.on = true;
       music.cur = 0; music.aim = 0; music.spike = 0; music.lastMove = performance.now();
-      // It comes in softly. Eight seconds from nothing to the resting volume is slow enough that a player
-      // starting a board does not hear it arrive, which is the point of starting it here rather than on the
-      // way in through the door.
-      master.gain.exponentialRampToValueAtTime(MUSIC.gain[0], ctx.currentTime + 8);
+      // It comes in softly. Eight seconds from nothing to full is slow enough that a player who has just
+      // touched their first arrow does not hear it arrive, which is the point of starting it here rather than
+      // on the way in through the door.
+      intro.gain.exponentialRampToValueAtTime(1, ctx.currentTime + 8);
       musicTick(); musicPulse();
       const playChord = () => {
         if (!music.on) return;
@@ -243,8 +248,21 @@
   function musicStop() {
     if (!music.on) return;
     music.on = false; clearTimeout(music.timer); clearTimeout(music.tickTimer); clearTimeout(music.pulseTimer);
-    music.cur = 0; music.aim = 0; music.spike = 0; music.race = 0;
-    try { const t = music.ctx.currentTime; music.master.gain.setValueAtTime(music.master.gain.value, t); music.master.gain.exponentialRampToValueAtTime(0.0001, t + 1.5); setTimeout(() => { try { music.master.disconnect(); music.lfo.stop(); } catch { /* ignore */ } }, 1700); } catch { /* ignore */ }
+    music.cur = 0; music.aim = 0; music.spike = 0; music.race = 0; music.raceTo = 0; music.heartAt = 0;
+    // The fade-out outlives this call by 1.7 seconds, and the nodes it tidies up afterwards must be THESE
+    // nodes. Reading them off the shared object when the timer fires was survivable while music only stopped on
+    // a hidden tab; now that leaving a board stops it, going back in and starting another one inside those 1.7
+    // seconds is an ordinary thing to do -- and it would have disconnected the master of the new graph and
+    // stopped its LFO, with music.on left true so nothing could ever start it again. Silence, permanently, from
+    // tapping the next level too quickly. They are held in locals now, so the timer can only reach its own.
+    const ctx = music.ctx, master = music.master, intro = music.intro, lfo = music.lfo;
+    try {
+      const t = ctx.currentTime;
+      intro.gain.cancelScheduledValues(t);
+      intro.gain.setValueAtTime(Math.max(0.0001, intro.gain.value), t);
+      intro.gain.exponentialRampToValueAtTime(0.0001, t + 1.5);
+      setTimeout(() => { try { master.disconnect(); intro.disconnect(); lfo.stop(); } catch { /* ignore */ } }, 1700);
+    } catch { /* ignore */ }
   }
   // What the board is asking of the player, as one number between nothing and everything.
   function musicAim() {
@@ -253,7 +271,9 @@
     const lm = state.livesMax || 0;
     if (lm > 0) {
       a += 0.40 * Math.pow(1 - Math.max(0, state.lives) / lm, 1.6);   // gentle for the first heart, steep for the last
-      if (state.lives === 1) a += 0.16;                                // and being one away is its own weather
+      // Being one heart away is news, and then it is the rest of the board. Reaching it early on eighty arrows
+      // would otherwise mean ten minutes at the top of the range, which is how a good idea becomes exhausting.
+      if (state.lives === 1) a += (performance.now() - (music.heartAt || 0)) / 1000 < 45 ? 0.16 : 0.06;
     }
     a += music.spike;                                    // a wrong tap, fading
     a += music.race;                                     // somebody ahead of you, or already home
@@ -262,16 +282,23 @@
     const away = document.hidden || (el.overlay && !el.overlay.hidden);
     if (away) music.lastMove = performance.now();
     const idle = (performance.now() - (music.lastMove || 0)) / 1000;
-    if (!away && idle > MUSIC.idleFrom) a += Math.min(0.26, (idle - MUSIC.idleFrom) / 40);   // a long look at a board that is not moving
+    if (!away && idle > MUSIC.idleFrom) a += Math.min(0.26, (idle - MUSIC.idleFrom) / MUSIC.idleOver);   // a long look at a board that is not moving
     const total = state.pieces?.length || 0;
     if (total && state.left > 0 && (total - state.left) / total > 0.85) a += 0.12;  // the last few, with everything to lose
-    const ceiling = calmer() ? MUSIC.reducedCeiling : 1;
+    // And the thing that keeps an hour of calm play calm. Thinking and being deep into a board are the signals
+    // most likely to fire while nothing is actually wrong, so on their own they cannot take it past the middle:
+    // the top half of the range is unlocked by losing hearts or being behind in a race, and by nothing else.
+    const hurt = lm > 0 ? 1 - Math.max(0, state.lives) / lm : 0;
+    const cap = Math.min(1, 0.55 + 0.9 * Math.max(hurt, music.race));
+    const ceiling = Math.min(cap, calmer() ? MUSIC.reducedCeiling : 1);
     return Math.max(0, Math.min(ceiling, a));
   }
   function musicTick() {
     if (!music.on) return;
     music.spike *= MUSIC.spikeDecay;
     if (music.spike < 0.01) music.spike = 0;
+    music.race += ((music.raceTo || 0) - music.race) * 0.12;
+    if (music.race < 0.005) music.race = 0;
     music.aim = musicAim();
     music.cur += (music.aim - music.cur) * (music.aim > music.cur ? MUSIC.rise : MUSIC.fall);
     try {
@@ -308,10 +335,14 @@
     music.pulseTimer = setTimeout(musicPulse, 60000 / mix(MUSIC.pulseBpm, music.cur));
   }
   // The four things the board can say to the music.
+  const musicBegin = () => { if (!music.on) musicStart(); };
   const musicMoved = () => { music.lastMove = performance.now(); };
-  const musicWrong = () => { music.spike = Math.min(MUSIC.spikeCap, music.spike + MUSIC.spikeWrong); musicMoved(); };
+  const musicWrong = () => { music.spike = Math.min(MUSIC.spikeCap, music.spike + MUSIC.spikeWrong); music.heartAt = performance.now(); musicMoved(); };
   const musicRight = () => { music.spike *= MUSIC.spikeFix; musicMoved(); };   // putting it right takes it back faster than it came
-  const musicRace = n => { music.race = n; };
+  // renderRanks is called by the socket, by the REST poll and by starting a board, and it can only see places
+  // rather than distances -- so the same standing arrives again and again, and can flip on a poll boundary. The
+  // target is set here and the value is eased toward it in the ticker, so nothing flaps.
+  const musicRace = n => { music.raceTo = n; };
 
   const SFX = { shoot: () => beep([[880, 0, 0.07], [1320, 0.04, 0.08]]), cheer: lv => { const f = 587 * Math.pow(2, lv * 3 / 12); beep([[f, 0, 0.09], [f * 1.26, 0.07, 0.1], [f * 1.5, 0.14, 0.14], [f * 2, 0.21, 0.22, 'sine', 0.06]]); }, block: () => beep([[220, 0, 0.06, 'square', 0.05], [110, 0.05, 0.22, 'triangle', 0.06]]), win: () => beep([[523, 0, 0.12], [659, 0.1, 0.12], [784, 0.2, 0.12], [1047, 0.3, 0.35]]), lose: () => beep([[300, 0, 0.2, 'triangle'], [220, 0.2, 0.35, 'triangle']]), taken: () => beep([[784, 0, 0.1], [523, 0.09, 0.18, 'triangle', 0.05]]),
     // the room: a tap on anything, somebody arriving, somebody going, the last seconds, and the off
@@ -853,6 +884,11 @@
       g.addEventListener('pointermove', e => { if (down && Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 12) { clearTimeout(holdTimer); down = null; } });
       g.addEventListener('pointerup', () => { clearTimeout(holdTimer); g.classList.remove('is-pressed'); if (!down) return; down = null; if (held) { held = false; return; } tapPiece(p); });
       g.addEventListener('pointercancel', () => { clearTimeout(holdTimer); g.classList.remove('is-pressed'); down = null; });
+      // A held mouse that slides off the arrow is no longer holding that arrow. The 12px move-cancel above
+      // catches most of it, but a thin arrow can be left without travelling twelve pixels, and a check that
+      // spends itself on an arrow the pointer is not over any more is a check taken for nothing. Mouse only:
+      // a touch keeps its pointer captured until release, so cancelling there would break the gesture itself.
+      g.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse') { clearTimeout(holdTimer); down = null; } });
       g.addEventListener('pointerleave', () => g.classList.remove('is-pressed'));
       g.addEventListener('contextmenu', e => e.preventDefault());
       g.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); tapPiece(p); } else if (e.key === 'l' || e.key === 'L') { e.preventDefault(); peek(p); } });
@@ -898,7 +934,6 @@
     state.diff = diff;
     resetZoom(); renderBoard(); renderHud();
     if (daily?.race && daily.match) { renderRanks(daily.match.players); syncRaceClock(daily.match); startProgressPoll(); }   // back on a race board is back in the match, on the match's own clock
-    musicStart();   // when play starts, not when the door opens: a board is a user gesture, the lobby is not
     if (i === 0 && !cleared(0) && !daily) teach('tap', 'Tap an arrow to shoot it off the board. If another arrow is in its way, you lose a heart.');
     else if (state.disc) toast(`${state.disc.country.name}'s ${KIND_WORD[state.disc.kind]} · ${state.pieces.length} arrows · clear it to see what it is`, state.tier >= 2 ? 'hard' : '');
     else if (state.tier >= 2) toast(`${diff.toUpperCase()} LEVEL · ${state.pieces.length} arrows${daily ? '' : ' · you earned this'}`, 'hard');
@@ -952,6 +987,10 @@
     el.hudTime.textContent = fmtTime(e);
   }
   function startTimer() {
+    // Play has begun. Dealing a board is not that -- a board can sit there untouched for as long as the player
+    // likes -- and the race clock takes the early return below without ever reaching the music, so the call
+    // goes above the guard.
+    musicBegin();
     if (state.startedAt || state.raceBase || state.finished) return;
     state.startedAt = performance.now();
     state.timerId = setInterval(renderTime, 500);
@@ -1012,6 +1051,7 @@
   const checksLeftNow = () => (state.checksMax ?? CHECKS_PER_LEVEL) - state.checksUsed;
   function peek(p) {
     if (state.finished || p.gone) return;
+    musicBegin();   // a hold is a player playing, the same as a tap is
     if (checksLeftNow() <= 0) { clearPeek(); toast(`No ${CHECK_WORD}s left on this level.`, 'bad'); vibe(20); return; }
     state.checksUsed++;
     renderHud(); musicMoved();
@@ -1102,7 +1142,10 @@
     $$('.aa-piece.is-hint', el.board).forEach(g => g.classList.remove('is-hint'));
     p.el.classList.add('is-hint');
     setTimeout(() => p.el.classList.remove('is-hint'), 2500);
-    toast(`Hint: the glowing arrow is free. ${(state.hintsMax ?? HINTS_PER_LEVEL) - state.hintsUsed} left.`, 'hint');
+    // The same split as everywhere else: what a hint IS gets said while the player is learning, and how many
+    // are left gets said every time, because that is the part that changes.
+    const hintsLeft = (state.hintsMax ?? HINTS_PER_LEVEL) - state.hintsUsed;
+    if (!teach('hint', `Hint: the glowing arrow is free. ${hintsLeft} left.`, 'hint')) toast(`${hintsLeft} hint${hintsLeft === 1 ? '' : 's'} left.`, 'hint', 1600);
     renderHud();
   }
 
@@ -1335,6 +1378,7 @@
     state.lives = LIVES; state.livesMax = LIVES;
     state.elapsed = 0; state.startedAt = 0; state.raceBase = 0;
     state.hintsUsed = 0; state.hintsMax = HINTS_PER_LEVEL;
+    state.checksUsed = 0; state.checksMax = CHECKS_PER_LEVEL;   // the same two lines as the hints, for the same reason
     state.finished = false; state.wrong = 0; state.fails = 0; state.potGone = false;
     state.combo = 0; state.bestCombo = 0; state.lastShot = 0; state.shown = new Set();
     state.daily = null; state.disc = null;
