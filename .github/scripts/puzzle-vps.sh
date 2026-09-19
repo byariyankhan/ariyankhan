@@ -1292,6 +1292,49 @@ mode_volumes() {
   done
 }
 
+# ── drop-orphan-volumes ─────────────────────────────────────────────────────
+#
+# Anonymous volumes nothing holds and nothing wrote to. Docker makes one of these every time a container is
+# created from an image that declares a VOLUME and nobody names it — postgres:16-alpine does, and the backup
+# container is built from it while never running a database — so one is left behind each time that container
+# is replaced. They are 4KB of nothing, but they accumulate.
+#
+# Three conditions, all three required, and they are what makes this safe: the name is 64 hex characters, so
+# no volume anybody named can match; no container, running or stopped, refers to it; and the directory is
+# empty. A named volume — ASR's, Bookween's, the portfolio's, this game's — cannot pass the first test.
+mode_drop_orphan_volumes() {
+  [ "$CONFIRM" = "DELETE" ] || { echo "::error::drop-orphan-volumes needs confirm=DELETE"; exit 2; }
+
+  say "Looking for anonymous volumes that nothing holds and nothing wrote to"
+  found=0; removed=0
+  for v in $(docker volume ls -q | sort); do
+    case "$v" in
+      *[!0-9a-f]*) continue ;;                                  # anything but 64 hex characters is somebody's name
+      ????????????????????????????????????????????????????????????????) ;;
+      *) continue ;;
+    esac
+    found=$((found + 1))
+    holders=$(docker ps -aq --filter "volume=$v" | wc -l | tr -d ' ')
+    mp=$(docker volume inspect -f '{{.Mountpoint}}' "$v" 2>/dev/null)
+    contents=$($SUDO ls -A "$mp" 2>/dev/null | wc -l | tr -d ' ')
+    if [ "$holders" != "0" ]; then
+      kept "$v — held by $(docker ps -a --filter "volume=$v" --format '{{.Names}}' | tr '\n' ' ')"
+      continue
+    fi
+    if [ "$contents" != "0" ]; then
+      kept "$v — nothing holds it, but it is not empty ($contents entries); look before removing it"
+      continue
+    fi
+    if $SUDO docker volume rm "$v" >/dev/null 2>&1; then gone "$v — anonymous, unheld, empty"; removed=$((removed + 1))
+    else bad "could not remove $v"; fi
+  done
+  [ "$found" -eq 0 ] && note "there are none"
+  ok "$removed of $found anonymous volume(s) removed"
+
+  say "What is left"
+  docker volume ls --format '{{.Name}}' | sed 's/^/      /'
+}
+
 
 case "$MODE" in
   inspect)       mode_inspect ;;
@@ -1309,6 +1352,7 @@ case "$MODE" in
   finish-rename) mode_finish_rename ;;
   drop-old-volumes) mode_drop_old_volumes ;;
   volumes)       mode_volumes ;;
+  drop-orphan-volumes) mode_drop_orphan_volumes ;;
   *) echo "::error::unknown mode: $MODE"; exit 2 ;;
 esac
 
