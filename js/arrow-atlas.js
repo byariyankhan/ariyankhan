@@ -1304,23 +1304,24 @@
   // A table is called 10K, not 10,000: on a row of five buttons the digits are what makes them hard to tell apart.
   const gtiny = n => {
     const v = Math.abs(Number(n) || 0);
-    if (v >= 1e6) return `${+(v / 1e6).toFixed(v % 1e6 ? 1 : 0)}m`;
-    if (v >= 1000) return `${+(v / 1000).toFixed(v % 1000 ? 1 : 0)}k`;
+    if (v >= 1e6) return `${+(v / 1e6).toFixed(v % 1e6 ? 1 : 0)}M`;
+    if (v >= 1000) return `${+(v / 1000).toFixed(v % 1000 ? 1 : 0)}K`;
     return gfmt(v);
   };
   // How a purse is written. "1,000,004,500" is twelve characters of arithmetic nobody does: what a player wants
-  // from their own gold is its size, and from somebody else's, whether it is bigger than theirs. So 1b, 12.4m,
-  // 340k — short enough to be set in type you can actually read, and the exact figure rides in the title for
-  // anyone who wants to count it.
+  // from their own gold is its size, and from somebody else's, whether it is bigger than theirs. So 1B, 12.4M,
+  // 340K — short enough to be set in type you can actually read, and the exact figure rides in the title for
+  // anyone who wants to count it. The letters are capitals because that is how a game writes them, and
+  // because a small m is milli: a thousandth, the opposite of what a purse is saying.
   const gpurse = n => {
     const v = Number(n) || 0, a = Math.abs(v), sign = v < 0 ? '-' : '';
     const cut = (div, unit) => {
       const x = a / div;
       return `${sign}${+(x < 10 ? x.toFixed(2) : x < 100 ? x.toFixed(1) : x.toFixed(0))}${unit}`;
     };
-    if (a >= 1e9) return cut(1e9, 'b');
-    if (a >= 1e6) return cut(1e6, 'm');
-    if (a >= 1000) return cut(1000, 'k');
+    if (a >= 1e9) return cut(1e9, 'B');
+    if (a >= 1e6) return cut(1e6, 'M');
+    if (a >= 1000) return cut(1000, 'K');
     return `${sign}${gfmt(a)}`;
   };
   // The old service took an action in the query string; the new one has a path per action. The call sites keep
@@ -2354,9 +2355,9 @@
   // A table of ten seven-digit numbers is a wall. 5.12M is a prize.
   const gshort = n => {
     const v = Number(n) || 0, a = Math.abs(v), sign = v < 0 ? '-' : '';
-    if (a >= 1e9) return `${sign}${(a / 1e9).toFixed(2).replace(/\.?0+$/, '')}b`;
-    if (a >= 1e6) return `${sign}${(a / 1e6).toFixed(2).replace(/\.?0+$/, '')}m`;
-    if (a >= 10000) return `${sign}${Math.round(a / 1000)}k`;
+    if (a >= 1e9) return `${sign}${(a / 1e9).toFixed(2).replace(/\.?0+$/, '')}B`;
+    if (a >= 1e6) return `${sign}${(a / 1e6).toFixed(2).replace(/\.?0+$/, '')}M`;
+    if (a >= 10000) return `${sign}${Math.round(a / 1000)}K`;
     return `${sign}${gfmt(a)}`;
   };
   // "2d 18h", then "18h 40m", then "9m": always two units while there are two, so the size of what is left
