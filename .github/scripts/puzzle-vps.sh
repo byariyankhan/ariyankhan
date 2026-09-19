@@ -15,6 +15,7 @@ set -uo pipefail
 MODE="${MODE:-inspect}"
 DOMAIN="${DOMAIN:-ariyankhan.com}"
 SNIPPET_B64="${SNIPPET_B64:-}"
+SRC_SHA="${SRC_SHA:-}"
 CONFIRM="${CONFIRM:-}"
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 # The containers were called arrow-atlas-* before the game was renamed. Which set is on the box is a
@@ -1136,6 +1137,29 @@ mode_push_source() {
   tar -tzf "$TGZ" ./games/puzzle/backend/package.json >/dev/null 2>&1 \
     || { bad "that tarball is not this repository"; return; }
   ok "it carries the API's own package.json"
+
+  # The API's start command prefers the git checkout this host keeps over anything in the volume: that is what
+  # makes a start independent of GitHub being reachable, and it is also a trap. Writing a newer checkout into
+  # the volume and restarting looks exactly like a deploy -- every line says PASS -- and the container then
+  # copies the host's older checkout over it and builds that instead. This deploy spent a round finding that
+  # out. So the first thing this mode does now is say which source is actually going to win.
+  say "0. which source the API will actually build from"
+  HOSTSRC=/var/www/ariyankhan-src
+  if $SUDO test -f "$HOSTSRC/games/puzzle/backend/package.json" || $SUDO test -f "$HOSTSRC/games/arrow-atlas/backend/package.json"; then
+    at=$($SUDO git -C "$HOSTSRC" rev-parse HEAD 2>/dev/null)
+    br=$($SUDO git -C "$HOSTSRC" rev-parse --abbrev-ref HEAD 2>/dev/null)
+    note "$HOSTSRC is here, and the container takes it before the volume"
+    note "it is at ${at:0:7} on ${br:-unknown}"
+    if [ -n "$SRC_SHA" ] && [ "$at" != "$SRC_SHA" ]; then
+      bad "this deploy is ${SRC_SHA:0:7}, and that is NOT what will run"
+      note "the volume below will be written and then overwritten by the checkout above"
+      note "run git-sync first: it pulls that checkout, and then this mode deploys what you mean"
+      return
+    fi
+    ok "and it is the same commit as this deploy, so the volume and the host agree"
+  else
+    note "no checkout on the host; the volume below is what the API will build from"
+  fi
 
   say "1. into the volume the API builds from"
   docker volume inspect "$SITEVOL" >/dev/null 2>&1 \
