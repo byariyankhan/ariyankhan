@@ -8,7 +8,6 @@ import { eq, finish, ok, reset, section } from './helpers.js';
 
 const BASE = process.env.AA_TEST_BASE ?? 'http://127.0.0.1:8760';
 const WS_URL = BASE.replace(/^http/, 'ws') + '/ws/puzzle';
-const WS_LEGACY = BASE.replace(/^http/, 'ws') + '/ws/arrow-atlas';   // what an un-reloaded client still opens
 const V = BASE + '/api/puzzle/v1';
 
 async function mint(name: string, gold = 100_000): Promise<{ id: number; token: string }> {

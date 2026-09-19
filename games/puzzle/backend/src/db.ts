@@ -23,7 +23,7 @@ export const pool = new pg.Pool({
   connectionTimeoutMillis: config.pg.connectionTimeoutMillis,
   // A runaway query holds a row lock that stalls the lobby; better to fail it and answer the player.
   statement_timeout: config.pg.statementTimeoutMillis,
-  application_name: 'arrow-atlas-api',
+  application_name: 'puzzle-api',
 });
 
 pool.on('error', e => log.err('postgres pool error', e));

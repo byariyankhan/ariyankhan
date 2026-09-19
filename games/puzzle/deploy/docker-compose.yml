@@ -80,23 +80,23 @@ services:
       NODE_ENV: production
       PORT: 8760
       SITE_BRANCH: ${SITE_BRANCH:-main}
-      ARROW_ATLAS_VERSION: ${ARROW_ATLAS_VERSION:-main}
-      ARROW_ATLAS_BOARDS_FILE: /srv/arrow-atlas/site/games/data/arrow-atlas.json
-      ARROW_ATLAS_MIGRATIONS_DIR: /srv/arrow-atlas/site/games/puzzle/migrations
-      ARROW_ATLAS_PG_HOST: arrow-atlas-postgres
-      ARROW_ATLAS_PG_DATABASE: ${ARROW_ATLAS_PG_DATABASE:-arrow_atlas}
-      ARROW_ATLAS_PG_USER: ${ARROW_ATLAS_PG_USER:-arrow_atlas}
-      ARROW_ATLAS_PG_PASSWORD: ${ARROW_ATLAS_PG_PASSWORD}
-      ARROW_ATLAS_REDIS_HOST: arrow-atlas-redis
-      ARROW_ATLAS_REDIS_PASSWORD: ${ARROW_ATLAS_REDIS_PASSWORD}
-      ARROW_ATLAS_REDIS_PREFIX: ${ARROW_ATLAS_REDIS_PREFIX:-arrow-atlas:}
+      PUZZLE_VERSION: ${ARROW_ATLAS_VERSION:-main}
+      PUZZLE_BOARDS_FILE: /srv/arrow-atlas/site/games/data/puzzle.json
+      PUZZLE_MIGRATIONS_DIR: /srv/arrow-atlas/site/games/puzzle/migrations
+      PUZZLE_PG_HOST: arrow-atlas-postgres
+      PUZZLE_PG_DATABASE: ${ARROW_ATLAS_PG_DATABASE:-arrow_atlas}
+      PUZZLE_PG_USER: ${ARROW_ATLAS_PG_USER:-arrow_atlas}
+      PUZZLE_PG_PASSWORD: ${ARROW_ATLAS_PG_PASSWORD}
+      PUZZLE_REDIS_HOST: arrow-atlas-redis
+      PUZZLE_REDIS_PASSWORD: ${ARROW_ATLAS_REDIS_PASSWORD}
+      PUZZLE_REDIS_PREFIX: ${ARROW_ATLAS_REDIS_PREFIX:-puzzle:}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       # Only needed while the repository is private, and only ever set in the project's .env on the host:
       # a read-only token for contents. Empty, the start falls back to the public tarball.
       GITHUB_TOKEN: ${GITHUB_TOKEN:-}
-      ARROW_ATLAS_ALLOWED_ORIGINS: ${ARROW_ATLAS_ALLOWED_ORIGINS:-}
-      ARROW_ATLAS_COOKIE_SECURE: ${ARROW_ATLAS_COOKIE_SECURE:-true}
-      ARROW_ATLAS_LOG_LEVEL: ${ARROW_ATLAS_LOG_LEVEL:-info}
+      PUZZLE_ALLOWED_ORIGINS: ${ARROW_ATLAS_ALLOWED_ORIGINS:-}
+      PUZZLE_COOKIE_SECURE: ${ARROW_ATLAS_COOKIE_SECURE:-true}
+      PUZZLE_LOG_LEVEL: ${ARROW_ATLAS_LOG_LEVEL:-info}
     working_dir: /srv/arrow-atlas
     command:
       - sh
@@ -168,7 +168,7 @@ services:
         npm prune --omit=dev
         # The migrations live beside the backend, so they are found wherever it was found rather than at a
         # path written down twice.
-        export ARROW_ATLAS_MIGRATIONS_DIR="$$(cd .. && pwd)/migrations"
+        export PUZZLE_MIGRATIONS_DIR="$$(cd .. && pwd)/migrations"
         echo "[arrow-atlas] starting"
         exec node dist/server.js
     volumes:
@@ -211,9 +211,9 @@ services:
       PGUSER: ${ARROW_ATLAS_PG_USER:-arrow_atlas}
       PGPASSWORD: ${ARROW_ATLAS_PG_PASSWORD}
       ARROW_ATLAS_BACKUP_DIR: /backups
-      ARROW_ATLAS_BACKUP_KEEP_DAYS: ${ARROW_ATLAS_BACKUP_KEEP_DAYS:-14}
-      ARROW_ATLAS_BACKUP_AT_HOUR: ${ARROW_ATLAS_BACKUP_AT_HOUR:-3}
-      ARROW_ATLAS_SCRIPTS_DIR: /srv/arrow-atlas/site/games/puzzle/deploy
+      PUZZLE_BACKUP_KEEP_DAYS: ${ARROW_ATLAS_BACKUP_KEEP_DAYS:-14}
+      PUZZLE_BACKUP_AT_HOUR: ${ARROW_ATLAS_BACKUP_AT_HOUR:-3}
+      PUZZLE_SCRIPTS_DIR: /srv/arrow-atlas/site/games/puzzle/deploy
     volumes:
       # A named volume so the dumps never sit in the live PostgreSQL data directory, plus a bind mount so the
       # host (and whatever backs the host up) can see them without entering the container.
@@ -230,7 +230,7 @@ services:
         # Wait for the checkout. On a first deploy the API is still fetching it, which takes seconds; on every
         # later start it is already there and this returns at once. Invoked through sh, so the file mode in the
         # tarball is not something backups depend on.
-        S="$${ARROW_ATLAS_SCRIPTS_DIR}"
+        S="$${PUZZLE_SCRIPTS_DIR:-$$ARROW_ATLAS_SCRIPTS_DIR}"
         i=0
         while [ ! -f "$$S/backup.sh" ]; do
           i=$$((i + 1))

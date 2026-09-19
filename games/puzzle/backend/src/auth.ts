@@ -1,4 +1,4 @@
-// Arrow Atlas accounts. Signing in is only needed to play with other people; the single-player game never asks.
+// Player accounts. Signing in is only needed to play with other people; the single-player game never asks.
 //
 // The token model is the one the PHP service used, because it was already the right one: a long random opaque
 // token, stored only as a SHA-256 hash, carrying no claims of its own. What is new is how it travels. A browser

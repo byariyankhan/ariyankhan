@@ -162,7 +162,7 @@ uploaded to that old name is not served.
 | `games/data/*.json`, `games/build-data.mjs` | Level data (piece paths per continent) and the script that builds it from Natural Earth |
 | `games/piece-the-world.webmanifest`, `piece-the-world-sw.js` | PWA manifest + service worker for both games (offline levels, installable) |
 | `puzzle/index.html`, `js/puzzle.js`, `css/puzzle.css` | Tap-away arrow puzzle game on country maps, served at `/puzzle/` — see "Puzzle – Train Your Brain" section below |
-| `games/data/arrow-atlas.json`, `games/build-arrow-atlas.mjs`, `puzzle/app.webmanifest` | Its level data (outlines + tier scales for 197 countries; masks are rasterised in the browser), build script and PWA manifest |
+| `games/data/puzzle.json`, `games/build-arrow-atlas.mjs`, `puzzle/app.webmanifest` | Its level data (outlines + tier scales for 197 countries; masks are rasterised in the browser), build script and PWA manifest |
 | `games/puzzle/` | Its backend service, which is a project of its own: Node 22 + TypeScript + Fastify, PostgreSQL, Redis and a WebSocket, with its migrations, test suites, compose file, backup and restore scripts and nginx snippet — see `games/puzzle/README.md` |
 | `js/vendor/` | Local copies of d3-array, d3-geo, d3-geo-projection, topojson-client and Natural Earth country data (`countries-110m.json`, `countries-50m.json`); the site CSP forbids CDNs |
 
@@ -918,7 +918,7 @@ links.
   stored in `aa:v1:welcomed`), then `#aaSplash` (logo + one line from `QUOTES`,
   rotating per launch in `aa:v1:launches`, tap or 2.4 s to dismiss, skipped for
   `#level-N`/`#daily` deep links and once per browser session).
-- **Data**: `games/data/arrow-atlas.json` (112 KB for 168 countries) built by
+- **Data**: `games/data/puzzle.json` (112 KB for 168 countries) built by
   `games/build-arrow-atlas.mjs` from world-atlas 110m + Natural Earth 50m
   properties: per country the outline (`d`, in a 100×100 box) and five tier
   scales `k` (cells per unit). The grid mask is rasterised in the browser by

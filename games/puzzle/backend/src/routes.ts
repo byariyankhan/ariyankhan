@@ -1,4 +1,4 @@
-// The Arrow Atlas HTTP surface.
+// The HTTP surface of Puzzle – Train Your Brain.
 //
 // Every action is written once, as a handler over a Caller, and mounted under the versioned prefix that both
 // the web client and a phone app ask for. Durable commands stay here even where the socket could carry them:

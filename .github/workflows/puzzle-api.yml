@@ -11,7 +11,7 @@ on:
     branches: [main]
     paths:
       - 'games/puzzle/**'
-      - 'games/data/arrow-atlas.json'
+      - 'games/data/puzzle.json'
       - '.github/workflows/puzzle-api.yml'
   pull_request:
     paths:
@@ -52,7 +52,7 @@ jobs:
       ARROW_ATLAS_REDIS_PORT: '6379'
       ARROW_ATLAS_COOKIE_SECURE: 'false'
       ARROW_ATLAS_LOG_LEVEL: warn
-      ARROW_ATLAS_BOARDS_FILE: ${{ github.workspace }}/games/data/arrow-atlas.json
+      ARROW_ATLAS_BOARDS_FILE: ${{ github.workspace }}/games/data/puzzle.json
       NODE_ENV: development
     steps:
       - uses: actions/checkout@v4

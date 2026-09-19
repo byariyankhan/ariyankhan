@@ -1,11 +1,11 @@
-// arrow-atlas-api: the whole Arrow Atlas backend in one process — REST, WebSocket and the housekeeping timer.
+// The whole backend of Puzzle – Train Your Brain in one process — REST, WebSocket and the housekeeping timer.
 //
 // Keeping them together is deliberate while there is one container: the socket layer reads the same PostgreSQL
 // rows the REST handlers write, so there is nothing to keep in step. It is also cheap to split later, because
 // events already travel through Redis rather than through memory: run this image with the sweeper off and only
 // REST mounted, run it again with only the socket, and no client contract changes.
 import Fastify from 'fastify';
-import { API_PREFIX, LEGACY_API_PREFIX, WS_PATH, config } from './config.js';
+import { API_PREFIX, WS_PATH, config } from './config.js';
 import { closeDb, dbHealthy, pool } from './db.js';
 import { closeRedis, redisHealthy } from './redis.js';
 import { migrate } from './migrate.js';
@@ -21,17 +21,11 @@ const app = Fastify({
   logger: false,                          // we write our own structured lines, with redaction
   trustProxy: config.trustProxy,           // the host nginx is in front; req.ip must be the player, not the proxy
   bodyLimit: 64 * 1024,
-  // The game's old name is still in the URL of every client that has not reloaded since it changed. Answering
-  // both would mean registering every route twice; rewriting here, before anything is routed, means the route
-  // table knows one name. Only that exact prefix is touched, and only at the front of the path.
-  rewriteUrl: req => (req.url?.startsWith(LEGACY_API_PREFIX)
-    ? API_PREFIX + req.url.slice(LEGACY_API_PREFIX.length)
-    : req.url ?? '/'),
 });
 
 // ── Cross-origin ──
 //
-// The web client is same-origin today, so it needs none of this. It exists for the day Arrow Atlas moves to
+// The web client is same-origin today, so it needs none of this. It exists for the day this service moves to
 // api.arrowatlas.com, and for a phone app, which sends no Origin at all and is authorised by its Bearer token.
 app.addHook('onRequest', async (req, reply) => {
   const origin = req.headers.origin;
@@ -101,7 +95,7 @@ async function main(): Promise<void> {
   pruner.unref?.();
 
   await app.listen({ port: config.port, host: config.host });
-  log.info('arrow-atlas-api listening', {
+  log.info('puzzle api listening', {
     port: config.port, api: API_PREFIX, ws: WS_PATH,
     postgres: `${config.pg.host}:${config.pg.port}/${config.pg.database}`,
     redis: `${config.redis.host}:${config.redis.port}`,

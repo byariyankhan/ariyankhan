@@ -1,7 +1,7 @@
 // What just happened in a room, on its way to the people watching it.
 //
 // The game logic publishes; the WebSocket layer subscribes. They talk through Redis rather than through each
-// other, so a second arrow-atlas-api container fans out events raised by the first one without either of them
+// other, so a second copy of this service fans out events raised by the first one without either of them
 // knowing the other exists. If Redis is down the publish is dropped rather than raised: the clients fall back
 // to asking over REST, which is slower but still correct.
 import { redis, redisSub, k, soft } from './redis.js';
@@ -46,7 +46,7 @@ type Handler = (ev: MatchEvent) => void;
 const handlers = new Set<Handler>();
 let listening = false;
 
-/** Listen to every Arrow Atlas room at once; the socket layer decides which of them each client cares about. */
+/** Listen to every room at once; the socket layer decides which of them each client cares about. */
 export async function subscribeAll(h: Handler): Promise<() => void> {
   handlers.add(h);
   if (!listening) {

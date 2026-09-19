@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import path from 'node:path';
 const root = path.resolve(new URL('.', import.meta.url).pathname, '..');
 const js = fs.readFileSync(path.join(root, 'js/puzzle.js'), 'utf8');
-const data = JSON.parse(fs.readFileSync(path.join(root, 'games/data/arrow-atlas.json'), 'utf8'));
+const data = JSON.parse(fs.readFileSync(path.join(root, 'games/data/puzzle.json'), 'utf8'));
 const html = fs.readFileSync(path.join(root, 'puzzle/index.html'), 'utf8');
 // Pull the pure pieces of the engine out of the IIFE so the exact production code is tested.
 const grab = re => { const m = js.match(re); if (!m) throw new Error('could not find ' + re); return m[0]; };
@@ -117,6 +117,6 @@ test('discovery boards generate and are solvable at every tier (every fifth shap
     for (let t = 0; t < 5; t++) { const board = generate(rasterise(sh.d, sh.k[t]), MAXLEN_OF[t], 1500 + t, GEN_OPTS(t)); assert.ok(board.pieces.length >= 15, `${hex} tier ${t}: ${board.pieces.length} arrows`); assert.ok(solvable(board), `${hex} tier ${t} not solvable`); }
   });
 });
-test('data file stays under 200 KB', () => assert.ok(fs.statSync(path.join(root, 'games/data/arrow-atlas.json')).size < 200 * 1024));
+test('data file stays under 200 KB', () => assert.ok(fs.statSync(path.join(root, 'games/data/puzzle.json')).size < 200 * 1024));
 test('page copy quotes the level count and keeps the no-inline-style rule', () => { assert.ok(html.includes(`${data.levels.length} countries`)); assert.ok(!/\b70 (countries|levels)\b/.test(html)); assert.ok(!/<[a-z][^>]*\sstyle="/i.test(html)); });
 console.log(process.exitCode ? `\nsome of ${tests} tests failed` : `\nall ${tests} tests passed`);

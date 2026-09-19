@@ -1,4 +1,4 @@
-// Redis holds only what Arrow Atlas can afford to lose: who is online, live race progress, countdown mirrors,
+// Redis holds only what the game can afford to lose: who is online, live race progress, countdown mirrors,
 // rate-limit counters, and the pub/sub channel that lets one API process tell another what just happened.
 // Every key is prefixed with the product, and everything perishable carries a TTL. If this whole server is
 // flushed, accounts, gold and finished matches are untouched in PostgreSQL and the game keeps running.
@@ -34,7 +34,7 @@ for (const [name, client] of [['redis', redis], ['redis-sub', redisSub]] as cons
   client.on('ready', () => log.info(`${name} ready`, { host: config.redis.host, port: config.redis.port }));
 }
 
-/** Product-scoped key. `k('room', code)` -> `arrow-atlas:room:ABC123`. */
+/** Product-scoped key. `k('room', code)` -> `puzzle:room:ABC123`. */
 export const k = (...parts: (string | number)[]): string => config.redis.prefix + parts.join(':');
 
 /**

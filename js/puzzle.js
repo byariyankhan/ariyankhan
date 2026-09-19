@@ -1,6 +1,6 @@
 /* ══════════════════════════════════════════════════
    PUZZLE – TRAIN YOUR BRAIN — tap-away arrow puzzle on country maps
-   No dependencies. Data: /games/data/arrow-atlas.json
+   No dependencies. Data: /games/data/puzzle.json
    Each level is a country: a grid mask (land cells) at one of five
    difficulty tiers plus the outline for the reveal. The puzzle itself is
    generated in the browser from a fixed seed, so level 12 is the same
@@ -234,7 +234,7 @@
   // ── Data ──
   async function loadData() {
     if (DATA) return DATA;
-    const [r] = await Promise.all([fetch(`/games/data/arrow-atlas.json?v=${DATA_VERSION}`, { cache: 'force-cache' }), loadDiscBoards()]);
+    const [r] = await Promise.all([fetch(`/games/data/puzzle.json?v=${DATA_VERSION}`, { cache: 'force-cache' }), loadDiscBoards()]);
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     const d = await r.json(); d.canon = d.levels.slice();
     migrateProgress(d);

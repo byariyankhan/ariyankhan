@@ -2,7 +2,7 @@
 # Arrow Atlas PostgreSQL backups.
 #
 #   arrow-atlas-backup once     take one backup now and exit
-#   arrow-atlas-backup loop     take one every day at ARROW_ATLAS_BACKUP_AT_HOUR (what the container runs)
+#   arrow-atlas-backup loop     take one every day at PUZZLE_BACKUP_AT_HOUR (what the container runs)
 #   arrow-atlas-backup list     what we have
 #
 # Three things this does that a bare pg_dump in a cron line does not:
@@ -14,10 +14,10 @@
 #     a backup that has quietly stopped shows up as an unhealthy container instead of a surprise in six months.
 set -eu
 
-DIR="${ARROW_ATLAS_BACKUP_DIR:-/backups}"
+DIR="${PUZZLE_BACKUP_DIR:-${ARROW_ATLAS_BACKUP_DIR:-/backups}}"
 HOST_DIR="/backups-host"
-KEEP_DAYS="${ARROW_ATLAS_BACKUP_KEEP_DAYS:-14}"
-AT_HOUR="${ARROW_ATLAS_BACKUP_AT_HOUR:-3}"
+KEEP_DAYS="${PUZZLE_BACKUP_KEEP_DAYS:-${ARROW_ATLAS_BACKUP_KEEP_DAYS:-14}}"
+AT_HOUR="${PUZZLE_BACKUP_AT_HOUR:-${ARROW_ATLAS_BACKUP_AT_HOUR:-3}}"
 AT_HOUR="${AT_HOUR#0}"; [ -n "$AT_HOUR" ] || AT_HOUR=0   # "03" is an illegal octal number in POSIX arithmetic
 DB="${PGDATABASE:-arrow_atlas}"
 STATUS="$DIR/last-run.json"
