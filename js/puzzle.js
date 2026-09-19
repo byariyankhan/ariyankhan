@@ -318,7 +318,8 @@
   function musicPulse() {
     if (!music.on) return;
     const i = music.cur;
-    if (i >= MUSIC.pulseFrom) {
+    if (heart.on) { /* the heartbeat is already the pulse: two of them is a muddle, not twice the tension */ }
+    else if (i >= MUSIC.pulseFrom) {
       try {
         const ctx = music.ctx, t = ctx.currentTime;
         const depth = Math.min(1, (i - MUSIC.pulseFrom) / (1 - MUSIC.pulseFrom));
@@ -343,6 +344,64 @@
   // rather than distances -- so the same standing arrives again and again, and can flip on a poll boundary. The
   // target is set here and the value is eased toward it in the ticker, so nothing flaps.
   const musicRace = n => { music.raceTo = n; };
+
+  // ── The heartbeat ──
+  //
+  // A heart lost is heard as well as seen. A low two-beat thump comes up under the board -- quicker, and a
+  // little louder, the fewer hearts are left -- and then it goes away by itself: three seconds for the first
+  // heart lost, four for the next, seven for the one after that. On the last heart it does not go away. It
+  // stays until the board is won, lost or left, because on the last heart there is nothing else left to lose,
+  // and a sound that stops there would be the game relaxing at the exact moment the player cannot.
+  //
+  // Staying is not the same as never letting up, though. After forty-five seconds on one heart it drops back to
+  // a quieter beat and holds there -- present, not shouting. A board of eighty arrows can take ten minutes, and
+  // ten minutes of full-strength alarm is how a good idea turns into a reason to turn the sound off.
+  //
+  // This is sound, not music: it answers the sound switch, and it plays whether or not the pad is on. While it
+  // is beating, the pad's own pulse stands aside, so there is one heartbeat in the room rather than two.
+  const HEART_HOLD = [3000, 4000, 7000];   // the burst, after the first, second and third heart lost
+  const HEART_BPM = [74, 132];             // resting, and on the last heart
+  const HEART_EASE_MS = 45000;             // how long the last heart is loud before it settles
+  const heart = { on: false, timer: 0, until: 0, rate: HEART_BPM[0], amp: 0.06, lastAt: 0 };
+  function heartbeatStop() { heart.on = false; heart.until = 0; heart.lastAt = 0; clearTimeout(heart.timer); heart.timer = 0; }
+  // One beat: the thud and its echo, straight out to the speakers. Nothing is kept between beats, so the graph
+  // cannot be left behind by a board that ended mid-beat.
+  function heartBeat() {
+    if (!heart.on) return;
+    if (heart.until && performance.now() > heart.until) { heartbeatStop(); return; }
+    if (!state.muted && !document.hidden) {
+      try {
+        audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+        if (audio.state === 'suspended') audio.resume();
+        const t = audio.currentTime;
+        // The last heart eases off once the news has landed; everything else is at the level its urgency asked for.
+        const settled = !heart.until && heart.lastAt && performance.now() - heart.lastAt > HEART_EASE_MS;
+        let amp = heart.amp * (settled ? 0.55 : 1);
+        if (calmer()) amp *= 0.7;
+        const thump = (at, a, from, to, dur) => {
+          const o = audio.createOscillator(), g = audio.createGain();
+          o.type = 'sine'; o.frequency.setValueAtTime(from, at); o.frequency.exponentialRampToValueAtTime(to, at + dur * 0.7);
+          g.gain.setValueAtTime(0.0001, at); g.gain.exponentialRampToValueAtTime(a, at + 0.015); g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+          o.connect(g).connect(audio.destination); o.start(at); o.stop(at + dur + 0.02);
+        };
+        thump(t, amp, 62, 38, 0.26);                       // lub
+        thump(t + 0.19, amp * 0.62, 52, 32, 0.22);         // dub
+      } catch { /* no audio, no heartbeat */ }
+    }
+    heart.timer = setTimeout(heartBeat, 60000 / heart.rate);
+  }
+  // A heart just went. How fast it beats and how long it lasts are both read off what is left, so the same call
+  // does for the first heart of five and the last of two.
+  function heartLost() {
+    const max = state.livesMax || 0, left = Math.max(0, state.lives);
+    if (state.finished || left <= 0 || max < 2) { heartbeatStop(); return; }   // out of hearts belongs to the fail card, not to this
+    const hurt = 1 - (left - 1) / (max - 1);             // 0 with everything still to spare, 1 on the last heart
+    heart.rate = mix(HEART_BPM, hurt);
+    heart.amp = 0.055 + 0.05 * hurt;
+    heart.until = left === 1 ? 0 : performance.now() + HEART_HOLD[Math.min(max - left, HEART_HOLD.length) - 1];
+    heart.lastAt = performance.now();
+    if (!heart.on) { heart.on = true; heartBeat(); }      // already beating: it carries on, at the new rate
+  }
 
   const SFX = { shoot: () => beep([[880, 0, 0.07], [1320, 0.04, 0.08]]), cheer: lv => { const f = 587 * Math.pow(2, lv * 3 / 12); beep([[f, 0, 0.09], [f * 1.26, 0.07, 0.1], [f * 1.5, 0.14, 0.14], [f * 2, 0.21, 0.22, 'sine', 0.06]]); }, block: () => beep([[220, 0, 0.06, 'square', 0.05], [110, 0.05, 0.22, 'triangle', 0.06]]), win: () => beep([[523, 0, 0.12], [659, 0.1, 0.12], [784, 0.2, 0.12], [1047, 0.3, 0.35]]), lose: () => beep([[300, 0, 0.2, 'triangle'], [220, 0.2, 0.35, 'triangle']]), taken: () => beep([[784, 0, 0.1], [523, 0.09, 0.18, 'triangle', 0.05]]),
     // the room: a tap on anything, somebody arriving, somebody going, the last seconds, and the off
@@ -917,7 +976,7 @@
     if (i < 0 || i >= DATA.levels.length) i = 0;
     if (!daily && !unlocked(i)) i = DATA.levels.findIndex((_, j) => !cleared(j) && unlocked(j));
     if (i < 0) i = 0;
-    stopTimer(); stopProgressPoll();
+    stopTimer(); stopProgressPoll(); heartbeatStop();
     if (el.ranks) el.ranks.hidden = true;
     if (daily?.race) state.seedBump = 0;   // a race is that exact board: a stray reshuffle must not change it
     else if (bumpSeed) state.seedBump++; else if (state.idx !== i || !!daily !== !!state.daily) { state.seedBump = 0; state.fails = 0; }
@@ -939,11 +998,11 @@
     state.diff = diff;
     resetZoom(); renderBoard(); renderHud();
     if (daily?.race && daily.match) { renderRanks(daily.match.players); syncRaceClock(daily.match); startProgressPoll(); }   // back on a race board is back in the match, on the match's own clock
+    // A board that has just been drawn is announced by nothing. The level, the difficulty and the arrows left
+    // are already on the HUD above it, and a country whose name is the answer has no business being written
+    // across the board that asks the question. The one line still said here is the only one that is not a
+    // reading of the screen: what to do, once, to somebody who has never played.
     if (i === 0 && !cleared(0) && !daily) teach('tap', 'Tap an arrow to shoot it off the board. If another arrow is in its way, you lose a heart.');
-    else if (state.disc) toast(`${state.disc.country.name}'s ${KIND_WORD[state.disc.kind]} · ${state.pieces.length} arrows · clear it to see what it is`, state.tier >= 2 ? 'hard' : '');
-    else if (state.tier >= 2) toast(`${diff.toUpperCase()} LEVEL · ${state.pieces.length} arrows${daily ? '' : ' · you earned this'}`, 'hard');
-    else if (daily?.race) toast(`Challenge board · ${state.pieces.length} arrows · clear it as fast as you can.`);
-    else toast(`${daily ? 'Daily board' : 'Level ' + levelNo(i)} · ${state.pieces.length} arrows · which country is this?`);
   }
 
   function renderHud() {
@@ -1130,7 +1189,7 @@
     bounce(p);
     blocker.el.classList.add('is-blocker');
     setTimeout(() => blocker.el.classList.remove('is-blocker'), 600);
-    renderHud();
+    renderHud(); heartLost();
     if (state.lives <= 0) failLevel('Out of hearts.');
     else {
       // The explanation is taught. The warning is not: being down to one heart is news every single time.
@@ -1243,9 +1302,21 @@
   }
 
   function stars() { const lost = state.livesMax - state.lives; return lost === 0 ? 3 : lost === 1 ? 2 : 1; }
+  // Every card in the game opens through here, and a card that has just opened cannot be pressed yet.
+  //
+  // The board is played with pointer events, and the browser still sends a click after them. Losing the last
+  // heart on a tap means the fail card appears under the finger that is mid-tap: the click that follows lands on
+  // whatever is at those coordinates now, and what is there now is the card's first button. Try again fires, the
+  // board comes back with its hearts, and the player never sees the card at all -- from the outside the board
+  // simply resets itself. A mouse does exactly the same thing. So a card is deaf for a moment after it appears:
+  // nobody presses a button they have not had time to see, and nothing else in the game is slowed by it.
+  const CARD_DEAF_MS = 450;
+  let cardShownAt = 0;
+  function showCard() { cardShownAt = performance.now(); el.overlay.hidden = false; }
+
   function winLevel() {
     stopTimer(); state.finished = true; state.busy = true;
-    music.spike = 0; musicRace(0);   // it is done: whatever was leaning on the player stops leaning
+    music.spike = 0; musicRace(0); heartbeatStop();   // it is done: whatever was leaning on the player stops leaning
     state.outlineEl?.style.setProperty('fill-opacity', '0.9');
     SFX.win(); confetti();
     // Every board ends the same way: it tells you what you cleared. It used to stop a country board to ask
@@ -1276,7 +1347,7 @@
       // No number here on purpose: the one that counts is the race time the server works out, and it is on the
       // sheet a second later. Two different times on two screens in a row is how a race stops making sense.
       el.card.innerHTML = '<h3>Board cleared!</h3><p class="aa-card-lead">Sending your time…</p>';
-      el.overlay.hidden = false;
+      showCard();
       finishMatch(true, t);
       return;
     }
@@ -1311,7 +1382,7 @@
       </div>
       <p class="aa-flash" hidden></p>
       <p class="aa-yt">Curious about ${escapeHtml(C.name)}? I make geography, history and economy videos: <a href="https://www.youtube.com/@ariyankhan" target="_blank" rel="noopener">youtube.com/@ariyankhan</a></p>`;
-    el.overlay.hidden = false;
+    showCard();
     $('[data-act]', el.card)?.focus({ preventScroll: true });
     runFocusBar(focus);
     showPace(DATA.levels[i].id, state.tier, t);
@@ -1336,7 +1407,7 @@
   function failLevel(reason) {
     if (state.finished) return;
     stopTimer(); state.finished = true; state.busy = true; state.fails++;
-    music.spike = 0; musicRace(0);
+    music.spike = 0; musicRace(0); heartbeatStop();
     store.set('streak', 0);
     SFX.lose(); renderHud();
     const learn = learnFrom(false);
@@ -1356,10 +1427,11 @@
           : `<button type="button" class="aa-btn" data-act="levels">${ICON_MAP}World Tour</button>`}
       </div>
       ${adCanOffer('heart') ? '<p class="aa-card-out"><button type="button" class="aa-linkbtn" data-act="levels">Back to the World Tour</button></p>' : ''}`;
-    el.overlay.hidden = false;
+    showCard();
     $('[data-act]', el.card)?.focus({ preventScroll: true });
   }
   el.card.addEventListener('click', e => {
+    if (performance.now() - cardShownAt < CARD_DEAF_MS) return;   // the click that opened this card is not a press on it
     const inv = e.target.closest('[data-invite]');
     if (inv) { invitePlayer(inv.dataset.invite, inv.dataset.name, inv); return; }
     const act = e.target.closest('[data-act]')?.dataset.act; if (!act) return;
@@ -1390,7 +1462,7 @@
   // and the hints of the last match sat over the next room while it waited for players to join, which reads
   // like a game already in progress and is simply somebody else's board's leftovers.
   function clearRun() {
-    stopTimer();
+    stopTimer(); heartbeatStop();
     state.pieces = []; state.occ = null; state.mask = null; state.left = 0; state.W = 0; state.H = 0;
     state.lives = LIVES; state.livesMax = LIVES;
     state.elapsed = 0; state.startedAt = 0; state.raceBase = 0;
@@ -1567,7 +1639,7 @@
       title: 'One more heart',
       lead: 'Watch a short advertisement and carry on with this board from where it stopped, with one heart.',
       cta: 'Watch for a heart',
-      grant() { state.lives = 1; state.finished = false; state.busy = false; el.overlay.hidden = true; renderHud(); startTimer(); toast('One heart. Make it count.', 'good'); },
+      grant() { state.lives = 1; state.finished = false; state.busy = false; el.overlay.hidden = true; renderHud(); startTimer(); heartLost(); toast('One heart. Make it count.', 'good'); },
     },
     hint: {
       title: 'One more hint',
@@ -2046,7 +2118,7 @@
       wireFaces(el.card);
     };
     draw(recent.asked ? recent.list : null);
-    el.overlay.hidden = false;
+    showCard();
     const list = await loadRecent(true);
     if (state.pendingMatch?.code === m.code && !el.overlay.hidden) draw(list);
   }
@@ -2177,7 +2249,7 @@
     scrollToGame();
     if (history.replaceState) history.replaceState(null, '', location.pathname + location.search + '#m=' + m.code);
     renderRoom(m);
-    el.overlay.hidden = false;
+    showCard();
     startRoomPoll(m.code);
     tickFill(m.fills_in);   // after the poll: starting it clears any tick already running, this one included
   }
@@ -2720,7 +2792,7 @@
           <button type="button" class="aa-btn aa-btn--primary" data-act="resend">Send it again</button>
           <button type="button" class="aa-btn" data-act="levels">World Tour</button>
         </div>`;
-      el.overlay.hidden = false;
+      showCard();
     }
   }
 
@@ -3118,10 +3190,12 @@
   // the board is a gesture it will accept, and the music that was built silently comes up then.
   document.addEventListener('pointerdown', () => { try { if (music.on && audio?.state === 'suspended') audio.resume(); } catch { /* ignore */ } }, { passive: true });
   document.addEventListener('visibilitychange', () => {
-    if (document.hidden) { musicStop(); return; }
+    if (document.hidden) { musicStop(); heartbeatStop(); return; }
     // Back on a board that was left mid-play. Nothing else restarts it now that music begins with a board
     // rather than with the first tap anywhere, so coming back is its own beginning.
     if (state.music && !el.game.hidden && !state.finished) musicStart();
+    // And a board still standing on its last heart is still standing on its last heart.
+    if (!el.game.hidden && !state.finished && state.lives === 1 && state.startedAt) heartLost();
   });
   el.btnGuides?.addEventListener('click', () => { state.guides = !state.guides; store.set('guides', state.guides); renderToggles(); });
   const goAbout = () => { closeSheets(); if (!el.game.hidden) goToLevels(); document.getElementById('aaAbout')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); };
