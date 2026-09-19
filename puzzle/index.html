@@ -79,7 +79,7 @@
          set these two when the backend moves to a host of its own and the client follows without a change:
          <meta name="puzzle-api" content="https://api.example.com" />
          <meta name="puzzle-ws"  content="wss://api.example.com" /> -->
-    <link rel="stylesheet" href="/css/puzzle.css?v=6" />
+    <link rel="stylesheet" href="/css/puzzle.css?v=7" />
     <link rel="preload" href="/games/data/puzzle.json?v=11" as="fetch" crossorigin="anonymous" />
 
     <!-- SCHEMA -->
@@ -242,7 +242,7 @@
         <div class="aa-status">
           <span class="aa-status-left"><b class="aa-time" id="aaHudTime" hidden>0:00</b><span class="aa-status-mid"><b id="aaHudLeft">0</b> left · <b id="aaHudPct">0%</b></span></span>
           <span class="aa-status-right"><span id="aaHudLivesWrap"><b class="aa-lives" id="aaHudLives" role="img" aria-label="4 of 4 hearts"></b></span>
-          <button type="button" class="aa-icon aa-hintbtn aa-checkbtn" id="aaCheck" title="Press and hold an arrow to check its lane (L)">🔎 4</button><button type="button" class="aa-icon aa-hintbtn" id="aaHint" title="Light up a free arrow (H)">💡 3</button></span>
+          <button type="button" class="aa-icon aa-hintbtn aa-checkbtn" id="aaCheck" title="Press and hold an arrow to check its lane (L)"><svg class="aa-cnt-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="10.5" cy="10.5" r="6.2"/><path d="m15.2 15.2 4.6 4.6"/></svg><b class="aa-cnt-val" id="aaCheckVal">4</b></button><button type="button" class="aa-icon aa-hintbtn" id="aaHint" title="Light up a free arrow (H)"><svg class="aa-cnt-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3.2a6.2 6.2 0 0 0-3.6 11.25c.45.33.72.85.72 1.4v.15h5.76v-.15c0-.55.27-1.07.72-1.4A6.2 6.2 0 0 0 12 3.2z"/><path d="M9.7 19h4.6"/><path d="M10.6 21.4h2.8"/></svg><b class="aa-cnt-val" id="aaHintVal">3</b></button></span>
         </div>
         <div class="aa-board-wrap" id="aaBoardWrap">
             <div class="aa-ranks" id="aaRanks" hidden aria-label="Who is ahead"></div>
@@ -250,7 +250,7 @@
           <svg id="aaBoard" class="aa-board" viewBox="0 0 10 10" role="group" aria-label="Puzzle board. Tap an arrow to shoot it off the board."></svg>
           <canvas class="aa-confetti" id="aaConfetti" hidden></canvas>
           <div class="aa-toast" id="aaToast" role="status" aria-live="polite" hidden></div>
-          <div class="aa-zoom" id="aaZoom" role="group" aria-label="Zoom"><button type="button" class="aa-zoom-btn" data-zoom="out" aria-label="Zoom out">−</button><button type="button" class="aa-zoom-btn aa-zoom-fit" data-zoom="fit" aria-label="Fit board to screen">⤢</button><button type="button" class="aa-zoom-btn" data-zoom="in" aria-label="Zoom in">+</button></div>
+          <div class="aa-zoom" id="aaZoom" role="group" aria-label="Zoom"><button type="button" class="aa-zoom-btn" data-zoom="out" aria-label="Zoom out"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 12h12"/></svg></button><button type="button" class="aa-zoom-btn" data-zoom="fit" aria-label="Fit board to screen"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 4H4v5"/><path d="M15 4h5v5"/><path d="M15 20h5v-5"/><path d="M9 20H4v-5"/></svg></button><button type="button" class="aa-zoom-btn" data-zoom="in" aria-label="Zoom in"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 12h12"/><path d="M12 6v12"/></svg></button></div>
           <div class="aa-overlay" id="aaOverlay" hidden>
             <div class="aa-card" id="aaCard" role="dialog" aria-live="polite"></div>
           </div>
@@ -493,6 +493,6 @@
       </div>
     </div>
 
-    <script src="/js/puzzle.js?v=9"></script>
+    <script src="/js/puzzle.js?v=10"></script>
   </body>
 </html>
