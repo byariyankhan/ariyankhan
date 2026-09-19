@@ -41,7 +41,7 @@ psqlc() {
 
 # backup.sh / restore.sh live in the checkout that arrow-atlas-api fetched, mounted read-only into the
 # backup container. This is the same call the README documents.
-aabackup() { docker exec arrow-atlas-backup sh -c "sh \$ARROW_ATLAS_SCRIPTS_DIR/$1" ; }
+aabackup() { docker exec arrow-atlas-backup sh -c "sh \${PUZZLE_SCRIPTS_DIR:-\$ARROW_ATLAS_SCRIPTS_DIR}/$1" ; }
 
 newest_dump() {
   docker exec arrow-atlas-backup sh -c \
@@ -179,8 +179,8 @@ report_backups() {
       bad "could not read the newest dump's age"
     fi
   fi
-  hour=$(docker exec arrow-atlas-backup sh -c 'echo "${ARROW_ATLAS_BACKUP_AT_HOUR:-3}"' 2>/dev/null)
-  keep=$(docker exec arrow-atlas-backup sh -c 'echo "${ARROW_ATLAS_BACKUP_KEEP_DAYS:-14}"' 2>/dev/null)
+  hour=$(docker exec arrow-atlas-backup sh -c 'echo "${PUZZLE_BACKUP_AT_HOUR:-${ARROW_ATLAS_BACKUP_AT_HOUR:-3}}"' 2>/dev/null)
+  keep=$(docker exec arrow-atlas-backup sh -c 'echo "${PUZZLE_BACKUP_KEEP_DAYS:-${ARROW_ATLAS_BACKUP_KEEP_DAYS:-14}}"' 2>/dev/null)
   note "the schedule: daily at ${hour}:00 UTC, once more on every container start, keeping ${keep} days"
   docker exec arrow-atlas-backup sh -c 'cat /backups/last-run.json' 2>/dev/null | sed 's/^/      last recorded run: /'
   echo
@@ -662,7 +662,7 @@ mode_backup_verify() {
   say "restoring it into a scratch database and reading it back"
   # `verify` restores into a scratch database, counts every core table, reconciles the ledger inside the
   # restored copy, and drops the scratch database again. It is the only check that means anything.
-  if docker exec arrow-atlas-backup sh -c "sh \$ARROW_ATLAS_SCRIPTS_DIR/restore.sh verify '$d'" 2>&1 | sed 's/^/  /'; then
+  if docker exec arrow-atlas-backup sh -c "sh \${PUZZLE_SCRIPTS_DIR:-\$ARROW_ATLAS_SCRIPTS_DIR}/restore.sh verify '$d'" 2>&1 | sed 's/^/  /'; then
     ok "the dump restores and the restored copy reconciles"
   else
     bad "the restore verification failed — nothing may be deleted"
@@ -687,7 +687,7 @@ mode_cleanup() {
   d=$(newest_dump)
   [ -n "$d" ] || { bad "there is no PostgreSQL dump; refusing to delete anything"; return; }
   note "checking $d"
-  if docker exec arrow-atlas-backup sh -c "sh \$ARROW_ATLAS_SCRIPTS_DIR/restore.sh verify '$d'" >/tmp/aa-verify.log 2>&1; then
+  if docker exec arrow-atlas-backup sh -c "sh \${PUZZLE_SCRIPTS_DIR:-\$ARROW_ATLAS_SCRIPTS_DIR}/restore.sh verify '$d'" >/tmp/aa-verify.log 2>&1; then
     ok "$d restores and reconciles"
     tail -6 /tmp/aa-verify.log | sed 's/^/      /'
   else

@@ -2,7 +2,7 @@
    Scope is the whole origin (it has to be, to control the game page), but the fetch
    handler only ever answers for the game's own files; every other request on the
    site is left to the network exactly as if no worker were installed. */
-const VERSION = 'ptw-cache-v66';
+const VERSION = 'ptw-cache-v67';
 const GAME_FILES = new Set([
   '/piece-the-world.html', '/css/style.css', '/css/piece-the-world.css',
   '/js/piece-the-world.js', '/js/site-nav.js', '/js/site-footer.js',
@@ -30,8 +30,7 @@ self.addEventListener('fetch', event => {
   const path = url.pathname;
   // The game's backend is never cached, and never touched by this worker: every answer it gives is about right
   // now. It falls outside GAME_FILES anyway, but saying so here keeps a later broad rule from swallowing it.
-  if (path.startsWith('/api/puzzle/') || path.startsWith('/ws/puzzle')
-      || path.startsWith('/api/arrow-atlas/') || path.startsWith('/ws/arrow-atlas')) return;   // the old names are still answered
+  if (path.startsWith('/api/puzzle/') || path.startsWith('/ws/puzzle')) return;
   if (isLevelData(path)) {
     // Level data is versioned by query string → cache first, forever.
     event.respondWith(caches.open(VERSION).then(async cache => {

@@ -1,5 +1,5 @@
 // Structured logs, one JSON object per line, every one of them tagged with the product so a shared log drain
-// can still tell Arrow Atlas apart from whatever else runs on the box.
+// can still tell this service apart from whatever else runs on the box.
 import { config, PRODUCT } from './config.js';
 
 type Level = 'debug' | 'info' | 'warn' | 'error';

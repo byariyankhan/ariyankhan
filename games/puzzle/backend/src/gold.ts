@@ -1,4 +1,4 @@
-// The Arrow Atlas economy. Nothing anywhere else in this service may write users.gold: every movement goes
+// The game economy. Nothing anywhere else in this service may write users.gold: every movement goes
 // through move(), which writes a ledger row and adjusts the balance in the same transaction.
 //
 // The ledger's idem_key carries the safety. Ask to pay pot ABC123 twice and the second INSERT hits a unique

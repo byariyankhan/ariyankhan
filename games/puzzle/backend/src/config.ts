@@ -1,28 +1,29 @@
-// Every knob Arrow Atlas turns, in one place. The game rules keep the values the PHP service ran with, so a
+// Every knob this service turns, in one place. The game rules keep the values the PHP service ran with, so a
 // migrated player finds the game they left; the infrastructure values come from the environment, so the same
-// image runs on this VPS today and on an Arrow Atlas VPS later without a rebuild.
+// image runs on this VPS today and on a VPS of the game's own later without a rebuild.
+//
+// Every variable is PUZZLE_*, and every one of them also answers to the PUZZLE_* name it had before the
+// game was renamed. That is not indecision: those names are in a .env file on the host, beside secrets, and a
+// rename in here must not be able to stop the service starting on a box nobody has edited yet. Rename them
+// there whenever it suits; until then both work, and the day the old ones are gone this reads one name.
+const envOf = (name: string): string | undefined =>
+  process.env[name] ?? process.env[name.replace(/^PUZZLE_/, 'ARROW_ATLAS_')];
 const num = (name: string, fallback: number): number => {
-  const raw = process.env[name];
+  const raw = envOf(name);
   if (raw === undefined || raw.trim() === '') return fallback;
   const n = Number(raw);
   if (!Number.isFinite(n)) throw new Error(`${name} is not a number: ${raw}`);
   return n;
 };
-const str = (name: string, fallback = ''): string => (process.env[name] ?? fallback).trim();
+const str = (name: string, fallback = ''): string => (envOf(name) ?? fallback).trim();
 const bool = (name: string, fallback: boolean): boolean => {
   const raw = str(name);
   return raw === '' ? fallback : /^(1|true|yes|on)$/i.test(raw);
 };
 
-export const PRODUCT = 'arrow-atlas';           // the product boundary: database, Redis keys, volumes, logs
+export const PRODUCT = 'puzzle';                // the product boundary: Redis keys, logs, the health line
 export const API_PREFIX = '/api/puzzle/v1';
 export const WS_PATH = '/ws/puzzle';
-// What the game was called before it was Puzzle – Train Your Brain. Every client already out there — a page
-// held in a cache, an installed copy that has not fetched a new script yet — asks for these, and will for as
-// long as those copies exist. They are answered by rewriting to the names above, in one place, so the rest of
-// the service only knows the new ones and this pair can be deleted the day nothing asks for them.
-export const LEGACY_API_PREFIX = '/api/arrow-atlas/v1';
-export const LEGACY_WS_PATH = '/ws/arrow-atlas';
 
 export const config = {
   product: PRODUCT,
@@ -31,53 +32,54 @@ export const config = {
   host: str('HOST', '0.0.0.0'),
   // Where the browser should reach this service. Empty means "same origin as the page", which is what
   // ariyankhan.com wants today; set it to https://api.arrowatlas.com and the client follows without a rewrite.
-  publicApiBase: str('ARROW_ATLAS_PUBLIC_API_BASE'),
-  publicWsBase: str('ARROW_ATLAS_PUBLIC_WS_BASE'),
+  publicApiBase: str('PUZZLE_PUBLIC_API_BASE'),
+  publicWsBase: str('PUZZLE_PUBLIC_WS_BASE'),
   // Which origins may call the API with credentials. Empty = same-origin only, which is the web case; a phone
   // app sends no Origin at all and is allowed through on its Bearer token.
-  allowedOrigins: str('ARROW_ATLAS_ALLOWED_ORIGINS').split(',').map(s => s.trim()).filter(Boolean),
-  trustProxy: bool('ARROW_ATLAS_TRUST_PROXY', true),
-  cookieSecure: bool('ARROW_ATLAS_COOKIE_SECURE', true),
+  allowedOrigins: str('PUZZLE_ALLOWED_ORIGINS').split(',').map(s => s.trim()).filter(Boolean),
+  trustProxy: bool('PUZZLE_TRUST_PROXY', true),
+  cookieSecure: bool('PUZZLE_COOKIE_SECURE', true),
 
   pg: {
-    host: str('ARROW_ATLAS_PG_HOST', 'arrow-atlas-postgres'),
-    port: num('ARROW_ATLAS_PG_PORT', 5432),
-    database: str('ARROW_ATLAS_PG_DATABASE', 'arrow_atlas'),
-    user: str('ARROW_ATLAS_PG_USER', 'arrow_atlas'),
-    password: str('ARROW_ATLAS_PG_PASSWORD'),
-    max: num('ARROW_ATLAS_PG_POOL_MAX', 16),
-    idleTimeoutMillis: num('ARROW_ATLAS_PG_IDLE_MS', 30_000),
-    connectionTimeoutMillis: num('ARROW_ATLAS_PG_CONNECT_MS', 5_000),
-    statementTimeoutMillis: num('ARROW_ATLAS_PG_STATEMENT_MS', 10_000),
+    // The container names, not the product's name: renaming those is a separate job with a database in it.
+    host: str('PUZZLE_PG_HOST', 'arrow-atlas-postgres'),
+    port: num('PUZZLE_PG_PORT', 5432),
+    database: str('PUZZLE_PG_DATABASE', 'arrow_atlas'),
+    user: str('PUZZLE_PG_USER', 'arrow_atlas'),
+    password: str('PUZZLE_PG_PASSWORD'),
+    max: num('PUZZLE_PG_POOL_MAX', 16),
+    idleTimeoutMillis: num('PUZZLE_PG_IDLE_MS', 30_000),
+    connectionTimeoutMillis: num('PUZZLE_PG_CONNECT_MS', 5_000),
+    statementTimeoutMillis: num('PUZZLE_PG_STATEMENT_MS', 10_000),
   },
 
   redis: {
-    host: str('ARROW_ATLAS_REDIS_HOST', 'arrow-atlas-redis'),
-    port: num('ARROW_ATLAS_REDIS_PORT', 6379),
-    password: str('ARROW_ATLAS_REDIS_PASSWORD'),
-    // Every key this product writes starts here, so a second game can never collide with Arrow Atlas.
-    prefix: str('ARROW_ATLAS_REDIS_PREFIX', 'arrow-atlas:'),
-    db: num('ARROW_ATLAS_REDIS_DB', 0),
+    host: str('PUZZLE_REDIS_HOST', 'arrow-atlas-redis'),
+    port: num('PUZZLE_REDIS_PORT', 6379),
+    password: str('PUZZLE_REDIS_PASSWORD'),
+    // Every key this product writes starts here, so a second game can never collide with this one.
+    prefix: str('PUZZLE_REDIS_PREFIX', 'puzzle:'),
+    db: num('PUZZLE_REDIS_DB', 0),
   },
 
   auth: {
-    cookie: str('ARROW_ATLAS_COOKIE_NAME', 'aa_session'),
-    sessionDays: num('ARROW_ATLAS_SESSION_DAYS', 180),
+    cookie: str('PUZZLE_COOKIE_NAME', 'aa_session'),
+    sessionDays: num('PUZZLE_SESSION_DAYS', 180),
     googleClientId: str('GOOGLE_CLIENT_ID'),
   },
 
   // ── Game rules, carried over unchanged from the PHP service ──
   game: {
-    signupGold: num('ARROW_ATLAS_SIGNUP_GOLD', 10_000),
+    signupGold: num('PUZZLE_SIGNUP_GOLD', 10_000),
     // The tables a player can sit at. Five of them, three orders of magnitude apart at the top, so a new
     // account and one that has been winning for a month both have somewhere to play.
-    stakes: str('ARROW_ATLAS_STAKES', '500,1000,10000,1000000,10000000').split(',').map(s => Number(s.trim())).filter(n => n > 0),
-    seats: num('ARROW_ATLAS_MATCH_SEATS', 7),
-    fillSeconds: num('ARROW_ATLAS_FILL_SECONDS', 63),
-    lonelySeconds: num('ARROW_ATLAS_LONELY_SECONDS', 120),
-    matchHours: num('ARROW_ATLAS_MATCH_HOURS', 24),
+    stakes: str('PUZZLE_STAKES', '500,1000,10000,1000000,10000000').split(',').map(s => Number(s.trim())).filter(n => n > 0),
+    seats: num('PUZZLE_MATCH_SEATS', 7),
+    fillSeconds: num('PUZZLE_FILL_SECONDS', 63),
+    lonelySeconds: num('PUZZLE_LONELY_SECONDS', 120),
+    matchHours: num('PUZZLE_MATCH_HOURS', 24),
     // The board list the server picks from, so no client can choose an easy country.
-    boardsFile: str('ARROW_ATLAS_BOARDS_FILE', '/srv/arrow-atlas/data/arrow-atlas.json'),
+    boardsFile: str('PUZZLE_BOARDS_FILE', '/srv/arrow-atlas/site/games/data/puzzle.json'),
   },
 
   // ── The league ──
@@ -87,15 +89,15 @@ export const config = {
   // than constants because the right size for them is a question about the economy, not about the code: turn
   // the base down and the whole ladder comes down with it, in proportion.
   league: {
-    hours: num('ARROW_ATLAS_LEAGUE_HOURS', 168),      // 168 = one week
-    ranks: num('ARROW_ATLAS_LEAGUE_RANKS', 10),
-    baseGold: num('ARROW_ATLAS_LEAGUE_BASE_GOLD', 10_000),   // what last place in the prizes is paid
+    hours: num('PUZZLE_LEAGUE_HOURS', 168),      // 168 = one week
+    ranks: num('PUZZLE_LEAGUE_RANKS', 10),
+    baseGold: num('PUZZLE_LEAGUE_BASE_GOLD', 10_000),   // what last place in the prizes is paid
   },
 
   // How often the housekeeping loop runs. The PHP service swept on every request, which is what made a busy
   // lobby slow; one timer in one process does the same work without taxing the players.
-  sweepSeconds: num('ARROW_ATLAS_SWEEP_SECONDS', 2),
-  logLevel: str('ARROW_ATLAS_LOG_LEVEL', 'info'),
+  sweepSeconds: num('PUZZLE_SWEEP_SECONDS', 2),
+  logLevel: str('PUZZLE_LOG_LEVEL', 'info'),
 } as const;
 
 export type Config = typeof config;

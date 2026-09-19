@@ -110,8 +110,6 @@ jobs:
           # flattering answer: the health endpoint's allowlist admits the host on purpose.
           check "the game's API answers"            200 "https://$DOMAIN/api/puzzle/v1/lobby"       "${RESOLVE[@]}" "${TLS[@]}"
           check "and its health is not public"      403 "https://$DOMAIN/api/puzzle/health"         "${RESOLVE[@]}" "${TLS[@]}"
-          # The name the game had before it was renamed, which clients that have not reloaded still ask for.
-          check "the old API path still answers"    200 "https://$DOMAIN/api/arrow-atlas/v1/lobby"  "${RESOLVE[@]}" "${TLS[@]}"
           check "the old PHP API is gone"           404 "https://$DOMAIN/games/api/auth.php?a=me"   "${RESOLVE[@]}" "${TLS[@]}"
           check "and so is its match endpoint"      404 "https://$DOMAIN/games/api/match.php"       "${RESOLVE[@]}" "${TLS[@]}"
 

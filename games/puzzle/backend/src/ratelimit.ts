@@ -16,7 +16,7 @@ const SCALE = Math.max(1, Number(process.env.ARROW_ATLAS_RATE_MULTIPLIER ?? 1) |
 
 export interface Limit { name: string; limit: number; windowSeconds: number; by: 'ip' | 'user'; }
 
-/** Every limit Arrow Atlas enforces, in one table, so they can be read and documented at a glance. */
+/** Every limit this service enforces, in one table, so they can be read and documented at a glance. */
 export const LIMITS = {
   auth_signin:   { name: 'auth_signin',   limit: 10,  windowSeconds: 300, by: 'ip'   },
   auth_read:     { name: 'auth_read',     limit: 120, windowSeconds: 60,  by: 'ip'   },
