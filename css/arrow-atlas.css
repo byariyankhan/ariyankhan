@@ -388,21 +388,21 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-facts{ font-size:14px; color:var(--muted); margin:0 0 12px; line-height:1.5; }
 /* The focus reading, as a bar anybody can read: red at one end, green at the other, and a brain sitting where
    this run landed. The words beside it are for whoever wants them; the picture is the reading. */
-.aa-focus{ --at:0%; margin:14px 0 0; padding:16px 14px 12px; border-radius:16px; background:var(--bg2); text-align:center; }
-.aa-focus-bar{ position:relative; height:14px; margin:14px 24px 0; border-radius:999px;
+.aa-focus{ --at:0%; margin:14px 0 0; padding:12px 14px 8px; border-radius:16px; background:var(--bg2); text-align:center; }
+.aa-focus-cap{ margin:0; font-size:12px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); }
+.aa-focus-bar{ position:relative; height:14px; margin:18px 24px 0; border-radius:999px;
   background:linear-gradient(90deg, var(--bad) 0%, var(--accent) 52%, var(--good) 100%); }
 /* everything past the brain is still to come, so it is dimmed rather than coloured */
 .aa-focus-dim{ position:absolute; top:-1px; bottom:-1px; right:-1px; left:var(--at); border-radius:999px;
   background:color-mix(in srgb, var(--bg2) 82%, transparent); transition:left .06s linear; }
 .aa-focus-mark{ position:absolute; top:50%; left:var(--at); transform:translate(-50%, -50%); display:flex; flex-direction:column; align-items:center; gap:2px; transition:left .06s linear; }
 .aa-brain{ width:36px; height:36px; color:var(--line); filter:drop-shadow(0 2px 4px rgba(0,0,0,.25)); background:var(--panel); border-radius:50%; padding:2px; }
-.aa-focus-num{ position:absolute; bottom:-25px; font-size:15px; font-weight:900; color:var(--ink); font-variant-numeric:tabular-nums; }
+.aa-focus-num{ position:absolute; bottom:-26px; font-size:15px; font-weight:900; color:var(--ink); font-variant-numeric:tabular-nums; }
 .aa-focus.is-done .aa-brain{ animation:aapop .45s ease-out; }
-.aa-focus-vs{ margin:38px 0 0; font-size:13px; font-weight:800; color:var(--muted); }
-.aa-focus-note{ margin:6px 0 0; font-size:13px; font-weight:700; color:var(--ink); }
-.aa-focus-tip{ display:block; margin-top:4px; color:var(--muted); font-weight:700; }
+/* Empty until the server has enough players to compare against, but it keeps its height either way: the
+   number under the brain sits in this space, and the card must not change size when the line arrives. */
+.aa-focus-vs{ margin:36px 0 0; min-height:16px; font-size:13px; font-weight:800; color:var(--muted); }
 @media(prefers-reduced-motion:reduce){ .aa-focus.is-done .aa-brain{ animation:none; } }
-.aa-disc-fact{ font-size:13px; line-height:1.45; color:var(--ink); background:var(--bg2); border-radius:12px; padding:10px 12px; margin:0 0 14px; text-align:left; }
 .aa-facts b{ color:var(--ink); }
 /* discoveries: four finds per cleared country */
 .aa-seo-credit{ font-size:12px; color:var(--muted); }
