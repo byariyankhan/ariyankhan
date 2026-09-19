@@ -43,6 +43,9 @@
 #   drop-orphan-volumes  Removes anonymous volumes (a 64-hex name, which is Docker's own, never anybody
 #                  else's) that no container refers to and that are empty. Keeps and says so for any that
 #                  fail either test. Needs confirm=DELETE.
+#   retire-site-data  Copies the one file out of ariyankhan_site_data to /var/backups/ariyankhan-site, checks
+#                  the copy, and then removes the volume. Says what it would take to remove ariyankhan_aa-data
+#                  and does not attempt it. Needs confirm=DELETE.
 #   volumes        Reads. Every volume, what holds it and where, how big it is, and what is inside the
 #                  anonymous ones, so a volume nobody recognises can be identified before anyone deletes it.
 #   health         Reads. The four containers, the API, the socket, the backup timer, and that no legacy
@@ -60,7 +63,7 @@ on:
         type: choice
         required: true
         default: inspect
-        options: [inspect, logs, git-access, git-sync, backup-verify, cleanup, deploy, deploy-site, push-source, web-safe-fetch, rename-infra, finish-rename, drop-old-volumes, drop-orphan-volumes, volumes, health]
+        options: [inspect, logs, git-access, git-sync, backup-verify, cleanup, deploy, deploy-site, push-source, web-safe-fetch, rename-infra, finish-rename, drop-old-volumes, drop-orphan-volumes, retire-site-data, volumes, health]
       confirm:
         description: "Type DELETE for cleanup, DEPLOY for deploy, RENAME for rename-infra. Ignored by the read-only modes."
         required: false
@@ -84,7 +87,7 @@ jobs:
         run: |
           set -euo pipefail
           case "${{ inputs.mode }}" in
-            cleanup|drop-old-volumes|drop-orphan-volumes) [ "${{ inputs.confirm }}" = "DELETE" ] || { echo "::error::${{ inputs.mode }} needs confirm=DELETE"; exit 1; } ;;
+            cleanup|drop-old-volumes|drop-orphan-volumes|retire-site-data) [ "${{ inputs.confirm }}" = "DELETE" ] || { echo "::error::${{ inputs.mode }} needs confirm=DELETE"; exit 1; } ;;
             deploy|deploy-site|push-source|web-safe-fetch) [ "${{ inputs.confirm }}" = "DEPLOY" ] || { echo "::error::${{ inputs.mode }} needs confirm=DEPLOY"; exit 1; } ;;
             rename-infra|finish-rename) [ "${{ inputs.confirm }}" = "RENAME" ] || { echo "::error::${{ inputs.mode }} needs confirm=RENAME"; exit 1; } ;;
             *) echo "read-only mode, no confirmation needed" ;;
