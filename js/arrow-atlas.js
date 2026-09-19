@@ -1439,20 +1439,13 @@
   // from before it is wrong, not merely old. Playing is the one thing that changes the list, so it is the one
   // thing that throws the cache away.
   const forgetRecent = () => { recent.at = 0; };
-  const AGO = ms => {
-    const m = Math.max(0, Math.round((Date.now() - ms) / 60000));
-    if (m < 60) return m <= 1 ? 'just now' : `${m} min ago`;
-    const h = Math.round(m / 60);
-    if (h < 24) return `${h} hr ago`;
-    const d = Math.round(h / 24);
-    return d === 1 ? 'yesterday' : `${d} days ago`;
-  };
   // Who the next table should invite. On the dashboard there is no room yet — an invitation has to point at a
   // table — so a tap there marks somebody instead of sending, and the stake that opens the table sends them
   // all. In a room the same button sends at once, because there is something to send.
   const picks = new Map();
 
-  // Three states, because "online" and "in a match" are different answers to "is it worth inviting them".
+  // Three states, and no fourth. It used to say when somebody was last seen, which is a diary of their evening
+  // and nobody's business: whether they are there now is the only thing that decides whether to invite them.
   const playerRow = (p, mode) => {
     const picked = mode === 'pick' && picks.has(p.id);
     return `
@@ -1460,7 +1453,7 @@
       <span class="aa-rank aa-pl-face${faceClass(p)}" aria-hidden="true">${faceInner(p)}</span>
       <span class="aa-pl-who">
         <b>${escapeHtml(p.name || 'Player')}</b>
-        <small class="aa-pl-when is-${p.status}">${p.status === 'playing' ? 'in a match' : p.status === 'online' ? 'online' : AGO(p.last_at)}</small>
+        <small class="aa-pl-when is-${p.status}">${p.status === 'playing' ? 'In a match' : p.status === 'online' ? 'Online' : 'Offline'}</small>
       </span>
       <button type="button" class="aa-btn aa-btn--small aa-pl-go${picked ? ' is-on' : ''}" data-invite="${p.id}" data-name="${escapeHtml(p.name || 'Player')}"${mode === 'pick' ? ` aria-pressed="${picked}"` : ''}>${picked ? '\u2713 Picked' : 'Invite'}</button>
     </div>`;

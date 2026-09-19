@@ -297,12 +297,14 @@ section('The people you have played with, and inviting them without a link');
   await call(`/matches/${code}/result`, { token: host.token, body: { ms: 3_000, cleared: true } });
 
   const after = await call('/players/recent', { token: host.token });
-  const list = after.json.players as { id: number; name: string; matches: number; status: string; last_at: number }[];
+  const list = after.json.players as { id: number; name: string; matches: number; status: string }[];
   eq(list.length, 1, 'the person they just played is on the list');
   eq(list[0]?.id, mate.id, 'and it is that person');
   eq(list[0]?.name, 'inviteMate', 'by name, so a row can be drawn without a second call');
   eq(list[0]?.matches, 1, 'with how many times they have played');
-  ok(typeof list[0]?.last_at === 'number' && list[0].last_at > 0, 'and when it last happened');
+  // When they last played is what orders the list, and it stays on the server: a row saying "14 hr ago" is a
+  // diary of somebody's evening, and no part of deciding whether to invite them.
+  ok(!('last_at' in (list[0] ?? {})), 'but not when they were last seen, which is nobody\u2019s business');
   // The other seat has not reported a result, so that match is open in the database — but a room nobody
   // finished stays that way for hours, and somebody with the game shut is not playing anything. Presence
   // decides, and only then does the seat choose between "online" and "in a match".

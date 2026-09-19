@@ -9,6 +9,11 @@
 // Nothing here is a friends list. There is no request to accept, nothing to manage, and no way to appear on
 // somebody's list except by playing with them — which also makes it the spam rule: an invitation may only be
 // sent to somebody you have actually played with.
+//
+// What it will not say is when somebody was last seen. The order of the list is decided here from that time,
+// but the time itself never leaves the server: "played at 3am, then again at 6" is a diary of a person's
+// night, and the only thing a player needs in order to decide whether to invite somebody is whether they are
+// there now.
 import type { Sql } from './db.js';
 import { query } from './db.js';
 import { online } from './presence.js';
@@ -17,7 +22,6 @@ export interface RecentPlayer {
   id: number;
   name: string;
   pic: string;
-  last_at: number;                       // when the two of you last shared a table
   matches: number;                       // how many times, which is what makes "played once" look different
   status: 'playing' | 'online' | 'offline';
 }
@@ -71,7 +75,6 @@ export async function recentPlayers(sql: Sql, userId: number, limit = 24): Promi
     id: x.id,
     name: x.name,
     pic: x.pic ?? '',
-    last_at: x.last_at.getTime(),
     matches: Number(x.matches),
     // The other half: a live socket. Somebody with the game closed is not playing, whatever a half-finished
     // row says, so presence decides first and the seat only chooses between "online" and "in a match".
