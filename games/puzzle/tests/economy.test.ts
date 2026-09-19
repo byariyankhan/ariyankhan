@@ -254,43 +254,54 @@ section('A finished match remembers who won it after they leave');
 
 section('Gold for an advertisement is bounded, not trusted');
 {
+  const AMOUNT = 500, PER_DAY = 3;
   const a = await player('adam');
   const before = await goldOf(a.id);
-  const AMOUNT = 500, PER_DAY = 3;
 
   const first = await tx(c => adClaim(c, a.id, AMOUNT, PER_DAY));
   eq(first.capped, false, 'the first claim of the day is allowed');
   eq(first.granted, AMOUNT, 'and it grants exactly what an ad is worth');
   eq(await goldOf(a.id), before + AMOUNT, 'the purse has it');
   eq(first.left, PER_DAY - 1, 'and the day has one fewer left');
+}
 
-  // The whole point of the deterministic key: a retried request, or a button tapped twice, is one grant.
-  await tx(c => query(c, `INSERT INTO gold_ledger (user_id, delta, reason, match_code, idem_key)
-                          VALUES ($1, $2, 'ad_reward', NULL, $3) ON CONFLICT (idem_key) DO NOTHING`,
-                      [a.id, AMOUNT, idem.adReward(a.id, new Date().toISOString().slice(0, 10), 2)]));
-  const dup = await tx(c => adClaim(c, a.id, AMOUNT, PER_DAY));
-  eq(dup.granted, 0, 'a claim whose key is already in the ledger grants nothing');
+{
+  // The deterministic key is what protects a double-tapped button and two requests racing: both compute the
+  // same claim number for the same day, and only one of them can write the row.
+  const b = await player('bea');
+  const before = await goldOf(b.id);
+  const key = idem.adReward(b.id, new Date().toISOString().slice(0, 10), 1);
+  const one = await tx(c => give(c, b.id, 500, 'ad_reward', key));
+  const two = await tx(c => give(c, b.id, 500, 'ad_reward', key));
+  eq(one?.applied, true, 'the first of two racing claims is the one that lands');
+  eq(two?.applied, false, 'the second finds the key taken and grants nothing');
+  eq(await goldOf(b.id), before + 500, 'so the purse moved exactly once');
+}
 
-  // Spend the day out, then ask once more.
-  while (true) {
-    const r = await tx(c => adClaim(c, a.id, AMOUNT, PER_DAY));
-    if (r.capped) { eq(r.granted, 0, 'the claim past the cap grants nothing'); break; }
+{
+  // And the day runs out.
+  const c2 = await player('cass');
+  const before = await goldOf(c2.id);
+  const AMOUNT = 500, PER_DAY = 3;
+  let granted = 0;
+  for (let i = 0; i < PER_DAY + 2; i++) {
+    const r = await tx(c => adClaim(c, c2.id, AMOUNT, PER_DAY));
+    if (!r.capped) { granted += r.granted; continue; }
+    eq(r.granted, 0, 'a claim past the cap grants nothing');
+    eq(r.left, 0, 'with nothing left to claim');
   }
-  const spent = await goldOf(a.id);
-  const over = await tx(c => adClaim(c, a.id, AMOUNT, PER_DAY));
-  eq(over.capped, true, 'and it stays capped for the rest of the day');
-  eq(over.left, 0, 'with nothing left to claim');
-  eq(await goldOf(a.id), spent, 'the purse does not move past the cap');
+  eq(granted, AMOUNT * PER_DAY, 'a day is worth exactly the cap and no more');
+  eq(await goldOf(c2.id), before + AMOUNT * PER_DAY, 'and that is what the purse holds');
 
   const rows = await query<{ n: string }>(pool,
-    `SELECT count(*) AS n FROM gold_ledger WHERE user_id = $1 AND reason = 'ad_reward'`, [a.id]);
-  eq(Number(rows.rows[0]!.n), PER_DAY, 'exactly one ledger row per claim the cap allowed');
+    `SELECT count(*) AS n FROM gold_ledger WHERE user_id = $1 AND reason = 'ad_reward'`, [c2.id]);
+  eq(Number(rows.rows[0]!.n), PER_DAY, 'one ledger row per claim the cap allowed, and no more');
 
-  // An ad is not play, so it must not be able to climb the league.
-  const inLeague = await query<{ n: string }>(pool,
+  // An advertisement is not play, so it must never be able to climb the league.
+  const asPlay = await query<{ n: string }>(pool,
     `SELECT count(*) AS n FROM gold_ledger
-      WHERE user_id = $1 AND reason IN ('stake', 'payout', 'leave_refund', 'expire_refund', 'draw_refund')`, [a.id]);
-  eq(Number(inLeague.rows[0]!.n), 0, 'and none of it counts as a match played');
+      WHERE user_id = $1 AND reason IN ('stake', 'payout', 'leave_refund', 'expire_refund', 'draw_refund')`, [c2.id]);
+  eq(Number(asPlay.rows[0]!.n), 0, 'and none of it counts as a match played');
 }
 
 await finish();
