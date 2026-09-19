@@ -1102,7 +1102,7 @@
     $('[data-act]', el.card)?.focus({ preventScroll: true });
     runFocusBar(focus);
     showPace(DATA.levels[i].id, state.tier, t);
-    if (typeof gtag === 'function') gtag('event', 'level_complete', { game: 'arrow_atlas', level: n, disc: D ? 1 : 0, mode: state.mode, tier: state.tier, arrows: state.pieces.length, time_ms: t, stars: s, tier_next: learn?.after.tier ?? state.tier });
+    if (typeof gtag === 'function') gtag('event', 'level_complete', { game: 'puzzle', level: n, disc: D ? 1 : 0, mode: state.mode, tier: state.tier, arrows: state.pieces.length, time_ms: t, stars: s, tier_next: learn?.after.tier ?? state.tier });
   }
   // Everybody else who has cleared this board at this difficulty. The server answers with a percentage only
   // once there are enough of them to mean something; until then the line stays empty and the bar speaks for
@@ -1275,7 +1275,7 @@
       if (auth.user) {
         if (state.pendingCode) { const c = state.pendingCode; state.pendingCode = null; openMatchLink(c); } else openStakes();
         toast(fresh ? `Welcome, ${auth.user.name}. ${Number(auth.user.gold || 0).toLocaleString('en-US')} gold to start you off.` : `Signed in as ${auth.user.name}`, 'good', fresh ? 5000 : 2800);
-        if (typeof gtag === 'function') gtag('event', 'login', { method: 'google', game: 'arrow_atlas' });
+        if (typeof gtag === 'function') gtag('event', 'login', { method: 'google', game: 'puzzle' });
       }
     } catch (e) {
       signInNote(e.code === 'google_not_configured' ? 'Google sign-in is not switched on yet.' : 'That sign-in did not go through. Please try again.');
@@ -1995,7 +1995,7 @@
     stopMatchPoll();
     startLevel(i, false, { key: 'match', race: true, match: m, board: m.board, tier: m.tier, seed: m.seed, hash: '#m=' + m.code })
       .then(() => { SFX.go(); vibe([0, 30, 60, 70]); });   // startLevel puts the line-up and the poll back
-    if (typeof gtag === 'function') gtag('event', 'match_play', { game: 'arrow_atlas', stake: m.stake });
+    if (typeof gtag === 'function') gtag('event', 'match_play', { game: 'puzzle', stake: m.stake });
   }
 
   async function sendInvite(m) {

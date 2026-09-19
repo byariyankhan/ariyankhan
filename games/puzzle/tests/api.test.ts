@@ -1,4 +1,4 @@
-// The HTTP surface, exercised over the wire against a running arrow-atlas-api.
+// The HTTP surface, exercised over the wire against a running puzzle API.
 //
 // Point it at the API directly, or at nginx, with AA_TEST_BASE. Everything here is the outside view: what a
 // browser and a phone app can actually do, what they are refused, and what happens when Redis disappears.
