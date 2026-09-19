@@ -997,6 +997,12 @@
         <path d="M16 7.4v15.6"/>
       </g>
     </svg>`;
+  // A mark on each button: the card is read at a glance, and an arrow, a loop and a share glyph are read
+  // faster than their labels — and by people who cannot read the labels at all.
+  const ICO = (d, extra = '') => `<svg class="aa-bi" viewBox="0 0 24 24" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">${d}</g>${extra}</svg>`;
+  const ICON_NEXT  = ICO('<path d="M4.5 12h14"/><path d="M12.5 6l6 6-6 6"/>');
+  const ICON_AGAIN = ICO('<path d="M20 12a8 8 0 1 1-2.5-5.8"/><path d="M20 3.6V9h-5.4"/>');
+  const ICON_SHARE = ICO('<circle cx="17.5" cy="5.5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="17.5" cy="18.5" r="2.6"/><path d="M8.4 10.7l6.8-3.9"/><path d="M8.4 13.3l6.8 3.9"/>');
   // The bar is filled in front of the player rather than handed to them finished: the brain travels, the
   // number counts up with it, and the sound climbs alongside. That second is the whole point of the reading —
   // it is the only part of the card that is worth watching happen.
@@ -1081,10 +1087,10 @@
         </div>
         <p class="aa-focus-vs" id="aaFocusVs"></p>
       </div>
-      <div class="aa-actions">
-        ${last || state.daily ? '' : `<button type="button" class="aa-btn aa-btn--primary" data-act="next">Next: Level ${levelNo(nj)} · ${DIFF_OF(TIER_OF())}</button>`}
-        <button type="button" class="aa-btn" data-act="again">Play again</button>
-        <button type="button" class="aa-btn" data-act="share">Share</button>
+      <div class="aa-actions aa-actions--stack">
+        ${last || state.daily ? '' : `<button type="button" class="aa-btn aa-btn--primary" data-act="next">Next: Level ${levelNo(nj)} · ${DIFF_OF(TIER_OF())}${ICON_NEXT}</button>`}
+        <button type="button" class="aa-btn" data-act="again">${ICON_AGAIN}Play again</button>
+        <button type="button" class="aa-btn" data-act="share">${ICON_SHARE}Share</button>
       </div>
       <p class="aa-flash" hidden></p>
       <p class="aa-yt">Curious about ${escapeHtml(C.name)}? I make geography, history and economy videos: <a href="https://www.youtube.com/@ariyankhan" target="_blank" rel="noopener">youtube.com/@ariyankhan</a></p>`;
