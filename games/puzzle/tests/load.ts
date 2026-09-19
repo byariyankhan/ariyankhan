@@ -6,8 +6,8 @@
 import { readFileSync } from 'node:fs';
 
 const BASE = process.env.AA_TEST_BASE ?? 'http://127.0.0.1:8760';
-const V = `${BASE}/api/arrow-atlas/v1`;
-const WS_URL = BASE.replace(/^http/, 'ws') + '/ws/arrow-atlas';
+const V = `${BASE}/api/puzzle/v1`;
+const WS_URL = BASE.replace(/^http/, 'ws') + '/ws/puzzle';
 const tokens = readFileSync(new URL('./load-tokens.txt', import.meta.url), 'utf8').split('\n').filter(Boolean);
 const codes = readFileSync(new URL('./load-codes.txt', import.meta.url), 'utf8').split('\n').filter(Boolean);
 

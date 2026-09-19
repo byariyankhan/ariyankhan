@@ -82,7 +82,7 @@ services:
       SITE_BRANCH: ${SITE_BRANCH:-main}
       ARROW_ATLAS_VERSION: ${ARROW_ATLAS_VERSION:-main}
       ARROW_ATLAS_BOARDS_FILE: /srv/arrow-atlas/site/games/data/arrow-atlas.json
-      ARROW_ATLAS_MIGRATIONS_DIR: /srv/arrow-atlas/site/games/arrow-atlas/migrations
+      ARROW_ATLAS_MIGRATIONS_DIR: /srv/arrow-atlas/site/games/puzzle/migrations
       ARROW_ATLAS_PG_HOST: arrow-atlas-postgres
       ARROW_ATLAS_PG_DATABASE: ${ARROW_ATLAS_PG_DATABASE:-arrow_atlas}
       ARROW_ATLAS_PG_USER: ${ARROW_ATLAS_PG_USER:-arrow_atlas}
@@ -128,21 +128,26 @@ services:
         # only once it is whole: clearing the volume and then fetching is how a 404 at GitHub turned into an
         # API that could not start at all, with nothing left on disk to start from. The contents are cleared
         # rather than the directory, which is a mount point.
+        # The backend moved from games/arrow-atlas to games/puzzle when the game was renamed. A volume filled
+        # before that still holds the old layout, and it is the thing this container falls back on when GitHub
+        # cannot be reached, so every check below accepts either name. The fallback is the whole point of it.
+        BE() { [ -f "$$1/games/puzzle/backend/package.json" ] || [ -f "$$1/games/arrow-atlas/backend/package.json" ]; }
+        BEDIR() { [ -d "$$1/games/puzzle/backend" ] && echo "$$1/games/puzzle/backend" || echo "$$1/games/arrow-atlas/backend"; }
         mkdir -p "$$SITE"
         rm -rf "$$NEXT" && mkdir -p "$$NEXT"
-        if [ -f "$$SRC/games/arrow-atlas/backend/package.json" ]; then
+        if BE "$$SRC"; then
           echo "[arrow-atlas] taking the source this host already holds"
           (cd "$$SRC" && tar -cf - --exclude=./.git .) | (cd "$$NEXT" && tar -xf -)
           find "$$SITE" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
           (cd "$$NEXT" && tar -cf - .) | (cd "$$SITE" && tar -xf -)
           rm -rf "$$NEXT"
         elif echo "[arrow-atlas] no checkout mounted; fetching $$SITE_BRANCH" \
-             && fetch | tar -xz --strip-components=1 -C "$$NEXT" && [ -f "$$NEXT/games/arrow-atlas/backend/package.json" ]; then
+             && fetch | tar -xz --strip-components=1 -C "$$NEXT" && BE "$$NEXT"; then
           find "$$SITE" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
           (cd "$$NEXT" && tar -cf - .) | (cd "$$SITE" && tar -xf -)
           rm -rf "$$NEXT"
           echo "[arrow-atlas] fetched"
-        elif [ -f "$$SITE/games/arrow-atlas/backend/package.json" ]; then
+        elif BE "$$SITE"; then
           # An old version answering is better than none: the service comes up on what is already here and
           # says so, rather than restarting forever over a network that will be back in a minute.
           rm -rf "$$NEXT"
@@ -152,7 +157,7 @@ services:
           echo "[arrow-atlas] could not fetch $$SITE_BRANCH and there is nothing here to fall back on"
           exit 1
         fi
-        cd "$$SITE/games/arrow-atlas/backend"
+        cd "$$(BEDIR "$$SITE")"
         echo "[arrow-atlas] installing and building"
         # --include=dev is not optional here: NODE_ENV is production, which makes npm ci skip
         # devDependencies, and typescript is one of them. Without it the build dies on "sh: tsc: not found"
@@ -161,6 +166,9 @@ services:
         npm ci --include=dev --no-audit --no-fund
         npm run build
         npm prune --omit=dev
+        # The migrations live beside the backend, so they are found wherever it was found rather than at a
+        # path written down twice.
+        export ARROW_ATLAS_MIGRATIONS_DIR="$$(cd .. && pwd)/migrations"
         echo "[arrow-atlas] starting"
         exec node dist/server.js
     volumes:
@@ -205,7 +213,7 @@ services:
       ARROW_ATLAS_BACKUP_DIR: /backups
       ARROW_ATLAS_BACKUP_KEEP_DAYS: ${ARROW_ATLAS_BACKUP_KEEP_DAYS:-14}
       ARROW_ATLAS_BACKUP_AT_HOUR: ${ARROW_ATLAS_BACKUP_AT_HOUR:-3}
-      ARROW_ATLAS_SCRIPTS_DIR: /srv/arrow-atlas/site/games/arrow-atlas/deploy
+      ARROW_ATLAS_SCRIPTS_DIR: /srv/arrow-atlas/site/games/puzzle/deploy
     volumes:
       # A named volume so the dumps never sit in the live PostgreSQL data directory, plus a bind mount so the
       # host (and whatever backs the host up) can see them without entering the container.

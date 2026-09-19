@@ -5,7 +5,7 @@
 // events already travel through Redis rather than through memory: run this image with the sweeper off and only
 // REST mounted, run it again with only the socket, and no client contract changes.
 import Fastify from 'fastify';
-import { API_PREFIX, WS_PATH, config } from './config.js';
+import { API_PREFIX, LEGACY_API_PREFIX, WS_PATH, config } from './config.js';
 import { closeDb, dbHealthy, pool } from './db.js';
 import { closeRedis, redisHealthy } from './redis.js';
 import { migrate } from './migrate.js';
@@ -21,6 +21,12 @@ const app = Fastify({
   logger: false,                          // we write our own structured lines, with redaction
   trustProxy: config.trustProxy,           // the host nginx is in front; req.ip must be the player, not the proxy
   bodyLimit: 64 * 1024,
+  // The game's old name is still in the URL of every client that has not reloaded since it changed. Answering
+  // both would mean registering every route twice; rewriting here, before anything is routed, means the route
+  // table knows one name. Only that exact prefix is touched, and only at the front of the path.
+  rewriteUrl: req => (req.url?.startsWith(LEGACY_API_PREFIX)
+    ? API_PREFIX + req.url.slice(LEGACY_API_PREFIX.length)
+    : req.url ?? '/'),
 });
 
 // ── Cross-origin ──

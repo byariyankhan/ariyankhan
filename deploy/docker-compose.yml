@@ -6,7 +6,7 @@
 # 8747). The VPS's host nginx routes ariyankhan.com to that port. This container
 # is entirely stateless: static pages and a PHP contact form, nothing to keep.
 # Arrow Atlas used to put a SQLite file in a volume here; it has its own service
-# on PostgreSQL now (games/arrow-atlas/deploy) and this container holds no data
+# on PostgreSQL now (games/puzzle/deploy) and this container holds no data
 # for it. Moving to another VPS is: run this compose there, flip DNS.
 #
 # Redeploy = re-run the project (container restarts → fetches latest code).

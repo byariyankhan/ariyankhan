@@ -163,7 +163,7 @@ uploaded to that old name is not served.
 | `games/piece-the-world.webmanifest`, `piece-the-world-sw.js` | PWA manifest + service worker for both games (offline levels, installable) |
 | `puzzle/index.html`, `js/puzzle.js`, `css/puzzle.css` | Tap-away arrow puzzle game on country maps, served at `/puzzle/` — see "Puzzle – Train Your Brain" section below |
 | `games/data/arrow-atlas.json`, `games/build-arrow-atlas.mjs`, `puzzle/app.webmanifest` | Its level data (outlines + tier scales for 197 countries; masks are rasterised in the browser), build script and PWA manifest |
-| `games/arrow-atlas/` | Its backend service, which is a project of its own: Node 22 + TypeScript + Fastify, PostgreSQL, Redis and a WebSocket, with its migrations, test suites, compose file, backup and restore scripts and nginx snippet — see `games/arrow-atlas/README.md` |
+| `games/puzzle/` | Its backend service, which is a project of its own: Node 22 + TypeScript + Fastify, PostgreSQL, Redis and a WebSocket, with its migrations, test suites, compose file, backup and restore scripts and nginx snippet — see `games/puzzle/README.md` |
 | `js/vendor/` | Local copies of d3-array, d3-geo, d3-geo-projection, topojson-client and Natural Earth country data (`countries-110m.json`, `countries-50m.json`); the site CSP forbids CDNs |
 
 ---
@@ -700,7 +700,7 @@ links.
   the gold ledger, so the welcome purse lands exactly once: signing out and back
   in never tops it up. The balance rides along in every `user` object and shows
   on the dashboard.
-  `games/arrow-atlas/tests/` covers the security-critical half against a real
+  `games/puzzle/tests/` covers the security-critical half against a real
   PostgreSQL: which ID tokens are accepted (audience, issuer, expiry, unverified
   accounts, junk answers), that one Google account makes exactly one player, that
   session tokens are stored hashed and expire, that deleting an account takes its
@@ -859,7 +859,7 @@ links.
   that went in (`matches.stakes_in`, stored when the match starts rather than
   counted from the players it can still name). A match whose every account has
   since gone is closed rather than swept again.
-  The suites in `games/arrow-atlas/tests/` cover the stakes, the room rules, a room of
+  The suites in `games/puzzle/tests/` cover the stakes, the room rules, a room of
   seven, the finish-order rule against a shorter clock, the instant payout and
   that it never pays twice, that second place wins a place and no gold, that a 500
   room of beginners gets an easy board while a 7,000 room of strong players gets a
@@ -932,7 +932,7 @@ links.
   `DATA_VERSION`; served immutable by `games/data/.htaccess`.
 - **Adding countries**: append to `TOUR` and `CAPITALS`, rebuild, bump
   `DATA_VERSION`. Tiers by level index are in `TIER_OF` in the JS.
-- **PWA**: `games/arrow-atlas.webmanifest`; the shared worker
+- **PWA**: `puzzle/app.webmanifest` (and `games/arrow-atlas.webmanifest`, kept so copies installed under the old name update in place); the shared worker
   `piece-the-world-sw.js` also caches this game's files.
 - **Tests**: `node tests/arrow-atlas.test.mjs` runs the production `generate()` on
   every level (and 100 random seeds on the hardest tier), checks solvability, full

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Runs on the VPS, piped in over SSH by .github/workflows/arrow-atlas-ops.yml. See that file for the modes.
+# Runs on the VPS, piped in over SSH by .github/workflows/puzzle-ops.yml. See that file for the modes.
 #
 # Two rules hold everywhere below:
 #
@@ -517,7 +517,7 @@ mode_push_source() {
   TGZ=/tmp/arrow-atlas-site.tgz
   [ -s "$TGZ" ] || { bad "no source arrived at $TGZ"; return; }
   note "$(du -h "$TGZ" | cut -f1) arrived"
-  tar -tzf "$TGZ" ./games/arrow-atlas/backend/package.json >/dev/null 2>&1 \
+  tar -tzf "$TGZ" ./games/puzzle/backend/package.json >/dev/null 2>&1 \
     || { bad "that tarball is not this repository"; return; }
   ok "it carries the API's own package.json"
 
@@ -537,7 +537,7 @@ mode_push_source() {
     && kept "$HOST_BACKUPS/docker-compose.yml.before-$STAMP  (the way back)"
   # Only this one file, and only out of the tarball just verified: the project's .env, which holds every
   # secret this deployment has, is never read, written or moved by any line here.
-  tar -xzf "$TGZ" -O ./games/arrow-atlas/deploy/docker-compose.yml > /tmp/aa-compose.yml 2>/dev/null
+  tar -xzf "$TGZ" -O ./games/puzzle/deploy/docker-compose.yml > /tmp/aa-compose.yml 2>/dev/null
   [ -s /tmp/aa-compose.yml ] || { bad "the tarball has no compose file"; return; }
   $SUDO install -m 644 /tmp/aa-compose.yml "$PROJ/docker-compose.yml" && ok "installed" || { bad "could not install it"; return; }
   rm -f /tmp/aa-compose.yml
@@ -981,7 +981,7 @@ mode_health() {
   else ok "no SQLite backup left on the host"; fi
   if $SUDO grep -qs 'games/api' /etc/nginx/snippets/arrow-atlas.conf; then bad "nginx still proxies /games/api/"
   else ok "nginx has no /games/api/ route"; fi
-  if docker exec arrow-atlas-api sh -c 'ls /srv/arrow-atlas/site/games/arrow-atlas/backend/dist/import-sqlite.js' >/dev/null 2>&1; then
+  if docker exec arrow-atlas-api sh -c 'ls /srv/arrow-atlas/site/games/puzzle/backend/dist/import-sqlite.js' >/dev/null 2>&1; then
     bad "the SQLite importer is still in the deployed build"
   else ok "the SQLite importer is not in the deployed build"; fi
 

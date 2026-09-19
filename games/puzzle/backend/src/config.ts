@@ -15,8 +15,14 @@ const bool = (name: string, fallback: boolean): boolean => {
 };
 
 export const PRODUCT = 'arrow-atlas';           // the product boundary: database, Redis keys, volumes, logs
-export const API_PREFIX = '/api/arrow-atlas/v1';
-export const WS_PATH = '/ws/arrow-atlas';
+export const API_PREFIX = '/api/puzzle/v1';
+export const WS_PATH = '/ws/puzzle';
+// What the game was called before it was Puzzle – Train Your Brain. Every client already out there — a page
+// held in a cache, an installed copy that has not fetched a new script yet — asks for these, and will for as
+// long as those copies exist. They are answered by rewriting to the names above, in one place, so the rest of
+// the service only knows the new ones and this pair can be deleted the day nothing asks for them.
+export const LEGACY_API_PREFIX = '/api/arrow-atlas/v1';
+export const LEGACY_WS_PATH = '/ws/arrow-atlas';
 
 export const config = {
   product: PRODUCT,

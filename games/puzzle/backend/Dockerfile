@@ -1,15 +1,15 @@
 # arrow-atlas-api. Built from the repository root, so the one board list the game owns is baked in rather than
 # duplicated: the client reads games/data/arrow-atlas.json over HTTP, the server reads the same file from here.
 #
-#   docker build -f games/arrow-atlas/backend/Dockerfile -t arrow-atlas-api .
+#   docker build -f games/puzzle/backend/Dockerfile -t arrow-atlas-api .
 FROM node:22-alpine AS build
 WORKDIR /build
-COPY games/arrow-atlas/backend/package.json games/arrow-atlas/backend/package-lock.json* ./
+COPY games/puzzle/backend/package.json games/puzzle/backend/package-lock.json* ./
 # --include=dev, explicitly: typescript is a devDependency, and this stage would stop installing it the day
 # anyone sets NODE_ENV=production above. The runtime stage below copies the pruned tree, not this one.
 RUN npm ci --include=dev --no-audit --no-fund
-COPY games/arrow-atlas/backend/tsconfig.json ./
-COPY games/arrow-atlas/backend/src ./src
+COPY games/puzzle/backend/tsconfig.json ./
+COPY games/puzzle/backend/src ./src
 RUN npm run build && npm prune --omit=dev
 
 FROM node:22-alpine AS run
@@ -28,9 +28,9 @@ ENV NODE_ENV=production \
     ARROW_ATLAS_MIGRATIONS_DIR=/srv/arrow-atlas/migrations
 COPY --from=build /build/node_modules ./node_modules
 COPY --from=build /build/dist ./dist
-COPY games/arrow-atlas/migrations ./migrations
+COPY games/puzzle/migrations ./migrations
 COPY games/data/arrow-atlas.json ./data/arrow-atlas.json
-COPY games/arrow-atlas/deploy/backup.sh games/arrow-atlas/deploy/restore.sh ./bin/
+COPY games/puzzle/deploy/backup.sh games/puzzle/deploy/restore.sh ./bin/
 RUN chmod +x ./bin/*.sh && chown -R arrowatlas:arrowatlas /srv/arrow-atlas
 USER arrowatlas
 EXPOSE 8760
