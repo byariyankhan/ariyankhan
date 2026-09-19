@@ -52,8 +52,7 @@
   // and invisible -- nothing in the game mentioned it, and nothing counted it. Four a level makes it a choice
   // worth making and puts it on the bar where a player can see it, beside the hearts and the lamp.
   const CHECKS_PER_LEVEL = 4;
-  const CHECK_ICON = '🔎';
-  const CHECK_WORD = 'check';
+  const CHECK_WORD = 'check';   // the icon is drawn in the markup now, beside the counter's value
   const hintsFor = tier => HINTS_OF[tier] ?? HINTS_PER_LEVEL;
   const MODES = { classic: 'Classic' };  // one way to play: the tour ramps up, and the player's own form shifts it
   const LIVES_OF = [4, 4, 4, 4, 4];   // hearts per tier: four everywhere
@@ -97,7 +96,7 @@
     sheet: $('#aaSheet'), friends: $('#aaFriends'), signInSheet: $('#aaSignInSheet'), googleBtn: $('#aaGoogleBtn'), signInNote: $('#aaSignInNote'), ranks: $('#aaRanks'), league: $('#aaLeague'), leagueEnds: $('#aaLeagueEnds'), leagueSheet: $('#aaLeagueSheet'), leagueBody: $('#aaLeagueBody'), leagueInfo: $('#aaLeagueInfo'), matchSheet: $('#aaMatchSheet'), matchBody: $('#aaMatchBody'), matchTitle: $('#aaMatchTitle'), accountGroup: $('#aaAccountGroup'), accountCap: $('#aaAccountCap'), accountRow: $('#aaAccountRow'), accountName: $('#aaAccountName'), accountWho: $('#aaAccountWho'), accountGold: $('#aaAccountGold'), accountFace: $('#aaAccountFace'), sessionGroup: $('#aaSessionGroup'), sessionCap: $('#aaSessionCap'), signOutBtn: $('#aaSignOut'), deleteAccBtn: $('#aaDeleteAcc'), settingsBtns: $$('#aaSettings, #aaSettingsG'), themeBtn: $('#aaTheme'), themes: $('#aaThemes'),
     game: $('#aaGame'), boardWrap: $('#aaBoardWrap'), board: $('#aaBoard'), toast: $('#aaToast'), confetti: $('#aaConfetti'),
     hudLevel: $('#aaHudLevel'), hudMode: $('#aaHudMode'), hudTime: $('#aaHudTime'), hudLeft: $('#aaHudLeft'), hudLives: $('#aaHudLives'), hudLivesWrap: $('#aaHudLivesWrap'), hudPct: $('#aaHudPct'), boardBar: $('#aaBoardBar'),
-    btnHint: $('#aaHint'), btnCheck: $('#aaCheck'), btnLevels: $('#aaBackToLevels'), btnSound: $('#aaSound'),
+    btnHint: $('#aaHint'), btnCheck: $('#aaCheck'), hintVal: $('#aaHintVal'), checkVal: $('#aaCheckVal'), btnLevels: $('#aaBackToLevels'), btnSound: $('#aaSound'),
     overlay: $('#aaOverlay'), card: $('#aaCard'),
     loading: $('#aaLoading'), error: $('#aaError'),
     gate: $('#aaGate'), accept: $('#aaAccept'), splash: $('#aaSplash'), splashQuote: $('#aaSplashQuote'),
@@ -999,7 +998,7 @@
     const seed = (daily ? daily.seed : (i + 1) * 1000) + state.seedBump;
     const gen = bestBoard(state.maskInfo, state.tier, seed);
     const livesMax = livesFor(state.tier);
-    Object.assign(state, { W: gen.W, H: gen.H, pieces: gen.pieces, occ: gen.occ, land: gen.land, left: gen.pieces.length, hintsMax: hintsFor(state.tier), checksUsed: 0, checksMax: CHECKS_PER_LEVEL, adKinds: new Set(), lives: livesMax, livesMax, elapsed: 0, startedAt: 0, raceBase: 0, finished: false, hintsUsed: 0, wrong: 0, busy: false, potGone: false, combo: 0, bestCombo: 0, lastShot: 0, cheerHold: 0, shown: new Set(), armed: new Set() });
+    Object.assign(state, { W: gen.W, H: gen.H, pieces: gen.pieces, occ: gen.occ, land: gen.land, left: gen.pieces.length, hintsMax: hintsFor(state.tier), checksUsed: 0, checksMax: CHECKS_PER_LEVEL, lives: livesMax, livesMax, elapsed: 0, startedAt: 0, raceBase: 0, finished: false, hintsUsed: 0, wrong: 0, busy: false, potGone: false, combo: 0, bestCombo: 0, lastShot: 0, cheerHold: 0, shown: new Set(), armed: new Set() });
     el.error.hidden = true; el.loading.hidden = true;
     if (daily) { if (history.replaceState) history.replaceState(null, '', location.pathname + location.search + (daily.hash ?? '#daily')); } else setHash(i);
     scrollToGame();
@@ -1025,7 +1024,8 @@
     // it was, so the offer behind it could never be reached.
     const hintsLeft = (state.hintsMax ?? HINTS_PER_LEVEL) - state.hintsUsed;
     const hintAd = hintsLeft <= 0 && !state.finished && adCanOffer('hint');
-    el.btnHint.textContent = hintAd ? '💡 +' : `💡 ${Math.max(0, hintsLeft)}`;
+    // The value only. Writing the whole button would throw away the icon drawn inside it.
+    if (el.hintVal) el.hintVal.textContent = hintAd ? '+' : String(Math.max(0, hintsLeft));
     el.btnHint.disabled = state.finished || (hintsLeft <= 0 && !hintAd);
     el.btnHint.classList.toggle('is-ad', !!hintAd);
     el.btnHint.setAttribute('aria-label', hintAd
@@ -1034,7 +1034,7 @@
     if (el.btnCheck) {
       const left = checksLeftNow();
       const checkAd = left <= 0 && !state.finished && adCanOffer('check');
-      el.btnCheck.textContent = checkAd ? `${CHECK_ICON} +` : `${CHECK_ICON} ${Math.max(0, left)}`;
+      if (el.checkVal) el.checkVal.textContent = checkAd ? '+' : String(Math.max(0, left));
       el.btnCheck.classList.toggle('is-spent', left <= 0 && !checkAd);
       el.btnCheck.classList.toggle('is-ad', !!checkAd);
       el.btnCheck.setAttribute('aria-label', checkAd
@@ -1490,7 +1490,6 @@
     state.elapsed = 0; state.startedAt = 0; state.raceBase = 0;
     state.hintsUsed = 0; state.hintsMax = HINTS_PER_LEVEL;
     state.checksUsed = 0; state.checksMax = CHECKS_PER_LEVEL;   // the same two lines as the hints, for the same reason
-    state.adKinds = new Set();
     state.finished = false; state.wrong = 0; state.fails = 0; state.potGone = false;
     state.combo = 0; state.bestCombo = 0; state.lastShot = 0; state.shown = new Set();
     state.daily = null; state.disc = null;
@@ -1577,12 +1576,15 @@
 
   // When an ad may be offered for a lifeline.
   //
-  // Once per board per kind, so a board cannot be watched into submission -- and never in a gold match. Somebody
-  // who has put gold on a table is racing people who put in the same gold; letting one of them buy an extra
-  // heart with thirty seconds of their attention is not a lifeline, it is a different game. The daily board and
-  // the tour have nothing at stake but pride, and there it is a kindness.
-  function adCanOffer(kind) { return ads.on() && !state.daily?.race && !state.adKinds?.has(kind); }
-  const adSpend = kind => { (state.adKinds = state.adKinds || new Set()).add(kind); };
+  // As often as the player asks. There used to be a cap of one per board per kind, on the theory that a board
+  // should not be watchable into submission -- but that is the player's own time they are spending, and a cap
+  // turns the plus into a button that works once and is then a dead nought for the rest of the board, which
+  // reads like a fault rather than a rule.
+  //
+  // The one place it is still refused is a gold match. Somebody who has put gold on a table is racing people who
+  // put in the same gold; letting one of them buy extra hearts with their attention is not a lifeline, it is a
+  // different game. The tour and the daily board have nothing at stake but pride, and there it is a kindness.
+  function adCanOffer(kind) { return ads.on() && !state.daily?.race; }
 
   // A stand-in ad: the same shape as the real one, long enough to be a real decision, skippable like the real
   // one, and it resolves exactly the way the real one does.
@@ -1737,8 +1739,6 @@
       const how = await adShow(`${PRODUCT_AD}-${kind}`);
       close();
       if (how !== 'watched') { toast(how === 'dismissed' ? 'The advertisement was not finished, so nothing was added.' : 'No advertisement was available. Try again in a moment.', 'hint'); return; }
-      // Only now, and only once per board for the lifelines.
-      if (kind !== 'gold') adSpend(kind);
       await R.grant();
     });
     $('[data-ad]', wrap)?.focus({ preventScroll: true });

@@ -286,7 +286,13 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-time.is-low{ color:var(--bad); }
 .aa-status-mid{ font-size:13px; color:var(--muted); }
 .aa-status-mid b{ color:var(--ink); }
-.aa-hintbtn{ width:auto; padding:0 12px; border-radius:22px; font-size:16px; background:var(--bg2); }
+/* The two counters are one shape with two halves: a line-drawn icon in the same family as every other icon in
+   this game, and a value beside it. Both halves are fixed: the icon is a set size rather than whatever optical
+   size an emoji font felt like, and the value sits in a slot wide enough for any of 4, 0 and +, so the pill does
+   not grow when the plus arrives and the row does not shuffle sideways under the player's thumb. */
+.aa-hintbtn{ width:auto; min-width:66px; height:40px; padding:0 13px; gap:7px; border-radius:20px; font-size:16px; background:var(--bg2); }
+.aa-hintbtn .aa-cnt-ico{ width:19px; height:19px; flex:none; }
+.aa-hintbtn .aa-cnt-val{ min-width:11px; text-align:center; font-weight:900; font-variant-numeric:tabular-nums; line-height:1; }
 .aa-hintbtn:disabled{ opacity:.4; }
 /* The check counter reads like the lamp beside it. It is never disabled: an empty one is still worth tapping,
    because tapping it is how a player finds out the gesture exists at all. */
@@ -305,7 +311,7 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
    come down a little so all three sit on the same visual line. */
 .aa-status-left{ display:flex; align-items:center; gap:10px; min-width:0; }
 .aa-status-right{ display:flex; align-items:center; gap:6px; }
-.aa-status-right .aa-lives{ font-size:20px; letter-spacing:1px; margin-right:2px; }
+.aa-status-right .aa-lives{ font-size:20px; line-height:40px; letter-spacing:1px; margin-right:2px; }
 @media(max-width:380px){
   .aa-status-right .aa-lives{ font-size:17px; }
   .aa-hintbtn{ padding:0 9px; font-size:15px; }
@@ -386,9 +392,11 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 /* Toast + overlay card */
 /* pinch to zoom the board (two fingers), drag to pan when zoomed; the buttons do the same for one thumb */
 .aa-zoom{ position:absolute; right:4px; top:8px; z-index:4; display:flex; gap:4px; }   /* top right: the toast lives at the bottom */
-.aa-zoom-btn{ width:36px; height:36px; border-radius:12px; border:none; background:var(--bg2); color:var(--ink); font:inherit; font-weight:900; font-size:20px; line-height:1; cursor:pointer; box-shadow:var(--shadow); opacity:.9; }
+/* Drawn, not typed. These were the characters −, ⤢ and +, which every platform sizes and weights differently and
+   none of which matched the drawn icons in the header two rows above. */
+.aa-zoom-btn{ width:36px; height:36px; border-radius:14px; border:none; background:var(--bg2); color:var(--ink); display:inline-flex; align-items:center; justify-content:center; padding:0; cursor:pointer; box-shadow:var(--shadow); opacity:.9; }
+.aa-zoom-btn svg{ width:19px; height:19px; fill:none; stroke:currentColor; stroke-width:1.9; stroke-linecap:round; stroke-linejoin:round; }
 .aa-zoom-btn:active{ transform:scale(.94); }
-.aa-zoom-fit{ font-size:16px; }
 .aa-toast{ position:absolute; left:50%; bottom:10px; transform:translateX(-50%); z-index:4; max-width:min(92%,460px); background:var(--ink); color:var(--bg); font-size:14px; font-weight:800; padding:10px 16px; border-radius:30px; text-align:center; pointer-events:none; box-shadow:var(--shadow); }
 .aa-toast--bad{ background:var(--bad); color:#fff; }
 .aa-toast--hint{ background:var(--accent); color:var(--accent-ink); }
