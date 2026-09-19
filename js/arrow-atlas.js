@@ -1075,9 +1075,27 @@
     else if (act === 'gorace') el.overlay.hidden = true;
   });
 
+  // A run belongs to the match it was played in. When that match is over — cleared, lost, given up, left, or
+  // closed by somebody else — everything it put on the HUD goes with it. Without this the clock, the hearts
+  // and the hints of the last match sat over the next room while it waited for players to join, which reads
+  // like a game already in progress and is simply somebody else's board's leftovers.
+  function clearRun() {
+    stopTimer();
+    state.pieces = []; state.occ = null; state.mask = null; state.left = 0; state.W = 0; state.H = 0;
+    state.lives = LIVES; state.livesMax = LIVES;
+    state.elapsed = 0; state.startedAt = 0; state.raceBase = 0;
+    state.hintsUsed = 0; state.hintsMax = HINTS_PER_LEVEL;
+    state.finished = false; state.wrong = 0; state.fails = 0; state.potGone = false;
+    state.combo = 0; state.bestCombo = 0; state.lastShot = 0; state.shown = new Set();
+    state.daily = null; state.disc = null;
+    el.board.innerHTML = '';
+    if (el.ranks) el.ranks.hidden = true;
+    renderHud();
+  }
   function goToLevels() {
     stopTimer(); stopMatchPoll(); stopProgressPoll(); stopResultWatch();
     live.leaveFeed();   // back in the lobby: nothing to watch, but the socket is how invitations arrive
+    clearRun();
     if (el.ranks) el.ranks.hidden = true; el.game.hidden = true; el.overlay.hidden = true; el.select.hidden = false; setHash(-1); renderSelect();
   }
   async function share() {
@@ -1614,6 +1632,7 @@
   function showRoom(m) {
     state.pendingMatch = m;
     closeSheets();
+    clearRun();                       // the waiting room shows this match's nothing, not the last one's ending
     el.select.hidden = true; el.game.hidden = false; el.board.innerHTML = '';
     el.hudLevel.textContent = 'Gold match'; el.hudLevel.classList.remove('is-disc');
     el.hudDiff.textContent = ''; el.hudLeft.textContent = '0'; el.hudPct.textContent = '0%';
