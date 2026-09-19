@@ -1388,6 +1388,128 @@ mode_retire_site_data() {
   fi
 }
 
+# ── web-drop-aa-mount ───────────────────────────────────────────────────────
+#
+# Takes the game's dead mount off the portfolio container: the ariyankhan_aa-data volume at
+# /var/lib/arrow-atlas, where the SQLite database lived before any of this ran on PostgreSQL, and the
+# AA_DATA_DIR variable that pointed at it. That directory has been empty since the migration.
+#
+# This is the only mode that edits hPanel's own compose file for the container serving the whole site, so it
+# is built like web-safe-fetch, which does the same thing to the same file:
+#
+#   * the file is backed up before it is touched, and put back on any failure;
+#   * only lines naming that volume or that variable are removed, and if none match, nothing is written;
+#   * compose has to accept the result before the container is recreated;
+#   * /var/www/html is part of that container's filesystem rather than a volume, so recreating it empties the
+#     site — this checkout is copied straight back in, exactly as push-source does;
+#   * the live page has to answer before the volume is removed, and if it does not, the old file goes back,
+#     the container is recreated on it, and the checkout is put in again.
+mode_web_drop_aa_mount() {
+  [ "$CONFIRM" = "DELETE" ] || { echo "::error::web-drop-aa-mount needs confirm=DELETE"; exit 2; }
+  V=ariyankhan_aa-data
+  TGZ=/tmp/arrow-atlas-site.tgz
+  BK="$HOST_BACKUPS/web-compose.yml.before-aa-$STAMP"
+  have ariyankhan-web || { bad "no ariyankhan-web container here"; return; }
+  command -v python3 >/dev/null || { bad "python3 is not on this host, and editing YAML without it is not worth the risk"; return; }
+  [ -s "$TGZ" ] || { bad "no checkout arrived; recreating this container without one would empty the site"; return; }
+  rm -rf /tmp/aa-web && mkdir -p /tmp/aa-web && tar -xzf "$TGZ" -C /tmp/aa-web
+  [ -f /tmp/aa-web/puzzle/index.html ] || { bad "what arrived is not the site"; return; }
+  ok "a checkout is here to put back"
+
+  PROJ=$(docker inspect -f '{{index .Config.Labels "com.docker.compose.project.working_dir"}}' ariyankhan-web 2>/dev/null)
+  SVC=$(docker inspect -f '{{index .Config.Labels "com.docker.compose.service"}}' ariyankhan-web 2>/dev/null)
+  [ -n "$PROJ" ] && [ -n "$SVC" ] && $SUDO test -f "$PROJ/docker-compose.yml" \
+    || { bad "cannot find the compose file behind ariyankhan-web"; return; }
+  note "$PROJ/docker-compose.yml, service $SVC"
+
+  say "1. what names it today"
+  $SUDO grep -n 'aa-data\|AA_DATA_DIR\|/var/lib/arrow-atlas' "$PROJ/docker-compose.yml" | sed 's/^/      /' \
+    || { ok "nothing in that file names it; only the volume is left to remove"; }
+
+  say "2. the same file with only those lines gone"
+  $SUDO cp -a "$PROJ/docker-compose.yml" "$BK" && kept "$BK  (the way back)"
+  $SUDO python3 - "$PROJ/docker-compose.yml" <<'AADROP' || { bad "the file was left alone"; return; }
+import io, sys
+path = sys.argv[1]
+lines = io.open(path, encoding='utf-8').read().split('\n')
+def ind(l): return len(l) - len(l.lstrip())
+names = lambda l: ('aa-data' in l) or ('AA_DATA_DIR' in l) or ('/var/lib/arrow-atlas' in l)
+drop = set()
+for i, l in enumerate(lines):
+    if not l.strip() or not names(l):
+        continue
+    drop.add(i)
+    if l.strip().endswith(':'):          # a key with a block under it: the block goes with it
+        for j in range(i + 1, len(lines)):
+            if lines[j].strip() and ind(lines[j]) <= ind(l):
+                break
+            drop.add(j)
+if not drop:
+    print('nothing in this file names that volume or that variable', file=sys.stderr)
+    raise SystemExit(3)
+left = [l for i, l in enumerate(lines) if i not in drop]
+# A key whose whole list was removed would be left dangling, and compose reads a dangling key as null.
+out = []
+for i, l in enumerate(left):
+    if l.strip() in ('volumes:', 'environment:'):
+        nxt = next((m for m in left[i + 1:] if m.strip()), '')
+        if not nxt or ind(nxt) <= ind(l):
+            continue
+    out.append(l)
+io.open(path, 'w', encoding='utf-8').write('\n'.join(out))
+print('      removed %d line(s)' % len(drop))
+AADROP
+  if $SUDO grep -q 'aa-data\|AA_DATA_DIR\|/var/lib/arrow-atlas' "$PROJ/docker-compose.yml" 2>/dev/null; then
+    bad "some of it is still in the file; putting the backup back"
+    $SUDO cp -a "$BK" "$PROJ/docker-compose.yml"; return
+  fi
+  ok "the file no longer names it"
+
+  say "3. compose has to accept it"
+  if ( cd "$PROJ" && $SUDO docker compose config -q ) >/dev/null 2>&1; then ok "compose reads it"; else
+    bad "compose refused the edited file; putting the backup back"
+    $SUDO cp -a "$BK" "$PROJ/docker-compose.yml"; return
+  fi
+
+  say "4. recreating it, and putting the site straight back"
+  ( cd "$PROJ" && $SUDO docker compose up -d --force-recreate "$SVC" ) >/dev/null 2>&1 \
+    || note "compose reported trouble bringing it up; checking anyway"
+  sleep 5
+  docker cp /tmp/aa-web/. ariyankhan-web:/var/www/html >/dev/null 2>&1 && note "the checkout is back in /var/www/html"
+  live=""
+  for _ in $(seq 1 24); do
+    h=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' ariyankhan-web 2>/dev/null)
+    live=$(curl -fsS -m 10 "https://$DOMAIN/puzzle/" 2>/dev/null | grep -o 'js/puzzle\.js?v=[0-9]*' | head -1)
+    [ "$h" = "healthy" ] && [ -n "$live" ] && break
+    printf '      ariyankhan-web: %s, page: %s\n' "${h:-gone}" "${live:-nothing}"
+    sleep 10
+  done
+  if [ -n "$live" ]; then
+    ok "the site answers and serves $live"
+  else
+    bad "the site did not come back; putting the old compose file back"
+    $SUDO cp -a "$BK" "$PROJ/docker-compose.yml"
+    ( cd "$PROJ" && $SUDO docker compose up -d --force-recreate "$SVC" ) >/dev/null 2>&1
+    sleep 5
+    docker cp /tmp/aa-web/. ariyankhan-web:/var/www/html >/dev/null 2>&1
+    sleep 10
+    live=$(curl -fsS -m 10 "https://$DOMAIN/puzzle/" 2>/dev/null | grep -o 'js/puzzle\.js?v=[0-9]*' | head -1)
+    [ -n "$live" ] && note "it is back on the old file, serving $live" \
+      || bad "it is still not answering — push-source is the mode that puts this checkout in"
+    return
+  fi
+
+  say "5. now the volume can go"
+  holders=$(docker ps -aq --filter "volume=$V" | wc -l | tr -d ' ')
+  [ "$holders" = "0" ] || { bad "$V is still held by $(docker ps -a --filter "volume=$V" --format '{{.Names}}' | tr '\n' ' ')"; return; }
+  if docker volume inspect "$V" >/dev/null 2>&1; then
+    $SUDO docker volume rm "$V" >/dev/null 2>&1 && gone "$V" || bad "could not remove $V"
+  else note "$V is already gone"; fi
+
+  say "What is left"
+  docker volume ls --format '{{.Name}}' | sed 's/^/      /'
+}
+
 
 case "$MODE" in
   inspect)       mode_inspect ;;
@@ -1407,6 +1529,7 @@ case "$MODE" in
   volumes)       mode_volumes ;;
   drop-orphan-volumes) mode_drop_orphan_volumes ;;
   retire-site-data) mode_retire_site_data ;;
+  web-drop-aa-mount) mode_web_drop_aa_mount ;;
   *) echo "::error::unknown mode: $MODE"; exit 2 ;;
 esac
 
