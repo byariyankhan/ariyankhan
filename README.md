@@ -648,7 +648,22 @@ links.
   country, disc: true }` and sits in the one tour list right after its country
   (`tourFor`: 197 countries → 394 levels; more kinds of board later mean more
   levels), so it unlocks, seeds, saves (`lv:d:<id>`) and deep-links (`#b-<id>`)
-  exactly like a country. **Level numbers are the player's own progress**
+  exactly like a country.
+- **Focus boards** (`games/build-focus-boards.mjs` → `games/data/focus-boards.json`,
+  26 boards, 15 KB) are the boards the game opens on: a brain, a lightbulb, a
+  key, a cog, a puzzle piece, a labyrinth, a knight — the game's own language
+  rather than a country's, drawn here as M/L/Z outlines in the same 100-unit box
+  and scaled per tier by the same `rasterise`. In the game one is `{ id:
+  'f:<id>', name, d, k, focus: true }`. `tourFor` puts the whole block at the
+  **frontier**, in front of the first board the player has not cleared: a new
+  player's level 1 is the brain, and a player who has already cleared a hundred
+  countries meets them next rather than never (appending) or behind a wall
+  (putting them first would lock the country they were on). Their progress stays
+  on the device (`isLocalOnly`): the account's progress is a list of country ids
+  and a board that is not a country has no place in it. They are counted out of
+  "N countries discovered" on the map, and the win card gives them **no facts
+  line and no YouTube line** — a country has something to tell you when you clear
+  it and a lightbulb has not. **Level numbers are the player's own progress**
   (`levelNo`): cleared boards ranked by clear time, then the board in hand is
   cleared-count + 1. The list only decides what comes next; a player who cleared
   63 countries before the discovery boards existed is on level 65, not back on
@@ -656,7 +671,7 @@ links.
   10th) and the share text use that number; `#level-n` (position in the list)
   is still read for old links. The win card is deliberately short: kicker, name,
   the subtitle under it (what the find is, or capital, population and region for
-  a country), stars, the four stats, the fact box on discovery boards, then Next,
+  a country, and nothing at all on a focus board), stars, the four stats, the fact box on discovery boards, then Next,
   Play again and Share. No World Tour button: the back arrow in the HUD already
   leads there. The best-time line and
   the paragraph explaining what the player's form did to the next tier were both

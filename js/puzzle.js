@@ -17,6 +17,7 @@
   const DATA_VERSION = '11';
   const MAP_VERSION = '3';
   const DISCB_VERSION = '4';  // games/data/discover-boards.json: the board shaped like each country's animal, bird or landmark
+  const FOCUS_VERSION = '1';  // games/data/focus-boards.json: the brain, the lightbulb, the key — the boards the game opens on
   const STORE = 'aa:v1:';
 
   // ── Where the backend lives ──
@@ -476,7 +477,7 @@
   // ── Data ──
   async function loadData() {
     if (DATA) return DATA;
-    const [r] = await Promise.all([fetch(`/games/data/puzzle.json?v=${DATA_VERSION}`, { cache: 'force-cache' }), loadDiscBoards()]);
+    const [r] = await Promise.all([fetch(`/games/data/puzzle.json?v=${DATA_VERSION}`, { cache: 'force-cache' }), loadDiscBoards(), loadFocusBoards()]);
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     const d = await r.json(); d.canon = d.levels.slice();
     migrateProgress(d);
@@ -496,7 +497,15 @@
     const tour = orderFor(d, home).flatMap(C => [C, discLevelFor(C)].filter(Boolean));
     // discovery clears were briefly kept under dv:<id> before the boards became levels of their own
     for (const L of tour) if (L.disc && !store.get('lv:' + L.id)) { const v = store.get('dv:' + L.country.id); if (v) store.set('lv:' + L.id, v); }
-    return tour;
+    // The focus boards go in at the frontier — in front of the first board the player has not cleared. For a new
+    // player that is the very start, which is the point: the game is called Train Your Brain and the first thing
+    // it hands you is a brain. For a player who has already cleared a hundred countries it is the board they were
+    // about to play, so the new boards are the next thing they meet rather than never (appending would be never)
+    // and rather than a wall (putting them first would lock the country they were on until all of these were done).
+    const focus = focusLevels();
+    if (!focus.length) return tour;
+    const at = tour.findIndex(L => !store.get('lv:' + L.id));
+    return at < 0 ? tour.concat(focus) : tour.slice(0, at).concat(focus, tour.slice(at));
   }
   // ── Home country: the tour starts at the player's own country and spreads out from there ──
   // Cloudflare tells the server which country a connection comes from (games/geo.php passes on the two-letter code,
@@ -549,7 +558,7 @@
       }
     }
     labels.innerHTML = '';
-    const n = DATA.levels.filter(L => !L.disc).length, done = DATA.levels.filter((L, i) => !L.disc && cleared(i)).length;
+    const n = DATA.levels.filter(L => !L.disc && !L.focus).length, done = DATA.levels.filter((L, i) => !L.disc && !L.focus && cleared(i)).length;
     const nextIdx = DATA.levels.findIndex((_, j) => !cleared(j) && unlocked(j)), nextL = DATA.levels[nextIdx];
     const nextId = nextL ? (nextL.disc ? nextL.country.id : nextL.id) : null;
     for (const c of MAP.countries) {
@@ -655,6 +664,31 @@
     if (!discCache.has(C.id)) discCache.set(C.id, { id: 'd:' + C.id, name: b.name, kind: b.kind, hex: b.hex, rel: b.rel, fact: b.fact, d: sh.d, k: sh.k, country: C, disc: true });
     return discCache.get(C.id);
   }
+  // ── Focus boards ──
+  // The boards the game opens on: a brain, a lightbulb, a key, a cog, a puzzle piece — the game's own language
+  // rather than a country's (games/build-focus-boards.mjs draws them). Same generator, same tiers, same result
+  // card, with one difference that is the whole point of them: a country board has something to tell you when
+  // you clear it and one of these has not, so it says nothing (see showResult).
+  //
+  // Their progress stays on the device. The account's progress is a list of country ids, and a board that is not
+  // a country has no place in it; sending one could only be refused. It costs a returning player a replay on a
+  // new phone, which is a small price for not putting the whole sync at risk.
+  let FOCUS = null, focusPromise = null;
+  function loadFocusBoards() {
+    // A failure here is not fatal: without them the tour is the world tour, exactly as it was.
+    if (!focusPromise) focusPromise = fetch(`/games/data/focus-boards.json?v=${FOCUS_VERSION}`, { cache: 'force-cache' }).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }).then(d => { FOCUS = d; return d; }).catch(() => null);
+    return focusPromise;
+  }
+  const focusCache = new Map();
+  function focusLevels() {
+    if (!Array.isArray(FOCUS?.boards)) return [];
+    return FOCUS.boards.map(b => {
+      if (!focusCache.has(b.id)) focusCache.set(b.id, { id: 'f:' + b.id, name: b.name, d: b.d, k: b.k, focus: true });
+      return focusCache.get(b.id);
+    });
+  }
+  const isLocalOnly = id => String(id).startsWith('f:');   // a focus board: cleared here, kept here
+
   // the next board to play after i: the first open one further down the list (cleared boards are skipped, so Next
   // never lands on a replay), else the first open one anywhere, else nothing (-1)
   function nextOpen(i) {
@@ -1381,7 +1415,10 @@
     // it away would throw away every player's, permanently. It is simply not announced on the card any more.
     store.set('streak', store.get('streak', 0) + 1);
     const n = levelNo(i), milestone = !state.daily && n % 10 === 0;
-    const facts = D ? escapeHtml(D.rel.charAt(0).toUpperCase() + D.rel.slice(1)) : [L.cap ? `Capital: <b>${L.cap}</b>` : '', L.pop ? `Population: <b>${fmtPop(L.pop)}</b>` : '', L.sub ? `Region: <b>${L.sub}</b>` : ''].filter(Boolean).join(' · ');
+    // What the card has to say about the board, where there is anything to say. A country has its capital,
+    // its size and its region; a discovery board has what the find is to that country; a focus board is a brain
+    // or a lightbulb and has nothing of the kind, so it is given nothing and the line is left out altogether.
+    const facts = D ? escapeHtml(D.rel.charAt(0).toUpperCase() + D.rel.slice(1)) : L.focus ? '' : [L.cap ? `Capital: <b>${L.cap}</b>` : '', L.pop ? `Population: <b>${fmtPop(L.pop)}</b>` : '', L.sub ? `Region: <b>${L.sub}</b>` : ''].filter(Boolean).join(' · ');
     const nj = nextOpen(i), last = nj < 0;
     // The reading. It is shown, not described: a bar under a caption, with the comparison against everybody
     // else added underneath only when the server has enough players to make it true.
@@ -1390,7 +1427,7 @@
     el.card.innerHTML = `
       <p class="aa-card-kicker">${milestone ? `Milestone · level ${n} · ` : ''}You cleared</p>
       <h3>${escapeHtml(L.name)}</h3>
-      <p class="aa-facts">${facts}</p>
+      ${facts ? `<p class="aa-facts">${facts}</p>` : ''}
       <p class="aa-stars" aria-label="${s} of 3 stars">${'★'.repeat(s)}${'☆'.repeat(3 - s)}</p>
       <div class="aa-stats"><span><b>${fmtTime(t, true)}</b>time</span><span><b>${state.livesMax - state.lives}</b>hearts lost</span><span><b>${state.hintsUsed}</b>hints</span><span><b>x${state.bestCombo}</b>best combo</span></div>
       <div class="aa-focus" id="aaFocus" role="img" aria-label="Focus ${focus} out of 100 — ${band.name}">
@@ -1407,7 +1444,7 @@
         <button type="button" class="aa-btn" data-act="share">${ICON_SHARE}Share</button>
       </div>
       <p class="aa-flash" hidden></p>
-      <p class="aa-yt">Curious about ${escapeHtml(C.name)}? I make geography, history and economy videos: <a href="https://www.youtube.com/@ariyankhan" target="_blank" rel="noopener">youtube.com/@ariyankhan</a></p>`;
+      ${L.focus ? '' : `<p class="aa-yt">Curious about ${escapeHtml(C.name)}? I make geography, history and economy videos: <a href="https://www.youtube.com/@ariyankhan" target="_blank" rel="noopener">youtube.com/@ariyankhan</a></p>`}`;
     showCard();
     $('[data-act]', el.card)?.focus({ preventScroll: true });
     runFocusBar(focus);
@@ -1465,7 +1502,7 @@
     if (act === 'next') { const j = nextOpen(state.idx); if (j < 0) goToLevels(); else startLevel(j); }
     else if (act === 'again' || act === 'retry') startLevel(state.idx, false, state.daily, state.tier);
     else if (act === 'shuffle') startLevel(state.idx, true, state.daily);
-    else if (act === 'skip') { const id = DATA.levels[state.idx + 1]?.id; store.set(skipKey(state.idx + 1), true); if (id) syncTour({ [id]: { cleared: false, skipped: true } }); startLevel(nextOpen(state.idx)); }
+    else if (act === 'skip') { const id = DATA.levels[state.idx + 1]?.id; store.set(skipKey(state.idx + 1), true); if (id && !isLocalOnly(id)) syncTour({ [id]: { cleared: false, skipped: true } }); startLevel(nextOpen(state.idx)); }
     // Out of hearts is not the end of a challenge — giving up is, and it cannot be taken back: the loss goes
     // to the server, the seat closes and the stake is gone. So the quiet button asks before it does that.
     else if (act === 'giveup') {
@@ -1514,7 +1551,7 @@
     const n = DATA.levels.length, done = DATA.levels.filter((_, i) => cleared(i)).length;
     const D = state.disc, rec = state.daily ? store.get(`daily:${state.daily.key}`) : cleared(state.idx);
     const what = D ? `${D.country.name}'s ${KIND_WORD[D.kind]}, the ${state.level.name}` : state.level.name;
-    const text = `Puzzle – Train Your Brain: I cleared ${what} (${state.daily ? 'daily board ' + state.daily.key : 'level ' + levelNo(state.idx)}) in ${fmtTime(rec?.t ?? state.elapsed, true)} ${'★'.repeat(rec?.stars || stars())} and ${done}/${n} countries so far.\nYour turn: https://ariyankhan.com/puzzle/${state.daily ? '#daily' : '#b-' + state.level.id}`;
+    const text = `Puzzle – Train Your Brain: I cleared ${what} (${state.daily ? 'daily board ' + state.daily.key : 'level ' + levelNo(state.idx)}) in ${fmtTime(rec?.t ?? state.elapsed, true)} ${'★'.repeat(rec?.stars || stars())} and ${done}/${n} boards so far.\nYour turn: https://ariyankhan.com/puzzle/${state.daily ? '#daily' : '#b-' + state.level.id}`;
     const flash = $('.aa-flash', el.card);
     try {
       if (navigator.share) { await navigator.share({ text }); return; }
@@ -1923,13 +1960,13 @@
         if (!k.startsWith(STORE)) continue;
         const key = k.slice(STORE.length);
         if (key.startsWith('lv:')) {
-          const r = store.get(key); if (!r) continue;
+          const r = store.get(key); if (!r || isLocalOnly(key.slice(3))) continue;
           const e = touch(key.slice(3));
           e.cleared = true;
           e.ms = typeof r.t === 'number' ? r.t : null;
           e.stars = r.stars || 0; e.quiz = !!r.quiz; e.tier = r.tier || 0; e.arrows = r.arrows || 0;
         } else if (key.startsWith('skip:')) {
-          if (store.get(key)) touch(key.slice(5)).skipped = true;
+          if (store.get(key) && !isLocalOnly(key.slice(5))) touch(key.slice(5)).skipped = true;
         }
       }
     } catch { /* storage can be unreadable in a private window; syncing is optional, playing is not */ }
@@ -1992,7 +2029,7 @@
   }
   /** One board, the moment it is cleared. The full sync would do the same thing, more slowly and less often. */
   function pushOne(id, rec) {
-    if (!auth.user || !id) return;
+    if (!auth.user || !id || isLocalOnly(id)) return;
     syncTour({ [id]: { cleared: true, ms: rec.t ?? null, stars: rec.stars || 0, quiz: !!rec.quiz, tier: rec.tier || 0, arrows: rec.arrows || 0 } });
   }
 

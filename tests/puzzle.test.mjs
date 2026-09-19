@@ -117,6 +117,25 @@ test('discovery boards generate and are solvable at every tier (every fifth shap
     for (let t = 0; t < 5; t++) { const board = generate(rasterise(sh.d, sh.k[t]), MAXLEN_OF[t], 1500 + t, GEN_OPTS(t)); assert.ok(board.pieces.length >= 15, `${hex} tier ${t}: ${board.pieces.length} arrows`); assert.ok(solvable(board), `${hex} tier ${t} not solvable`); }
   });
 });
+test('focus-boards.json: the boards a new player starts on, M/L/Z paths with five scales', () => {
+  const fb = JSON.parse(fs.readFileSync(path.join(root, 'games/data/focus-boards.json'), 'utf8'));
+  assert.ok(fb.boards.length >= 20, `only ${fb.boards.length} focus boards`);
+  assert.equal(new Set(fb.boards.map(b => b.id)).size, fb.boards.length, 'focus board ids are unique');
+  for (const b of fb.boards) {
+    assert.match(b.id, /^[a-z][a-z0-9]{1,11}$/, `${b.id}: odd id`);
+    assert.ok(typeof b.name === 'string' && b.name.length >= 3 && b.name.length <= 24, `${b.id}: name odd: ${b.name}`);
+    assert.match(b.d, /^[MLZ0-9 .-]+$/, `${b.id}: path is not M/L/Z`);
+    assert.equal(b.k.length, 5, `${b.id}: five scales`);
+    for (let t = 0; t < 5; t++) { const m = rasterise(b.d, b.k[t]); assert.ok(m.count >= 60, `${b.id} tier ${t}: only ${m.count} cells`); assert.ok(m.w <= 50 && m.h <= 58, `${b.id} tier ${t}: ${m.w}x${m.h} too big`); if (t) assert.ok(m.count >= rasterise(b.d, b.k[t - 1]).count, `${b.id} tier ${t} smaller than tier ${t - 1}`); }
+  }
+  assert.ok(fs.statSync(path.join(root, 'games/data/focus-boards.json')).size < 40 * 1024, 'focus boards file under 40 KB');
+});
+test('focus boards generate and are solvable at every tier', () => {
+  const fb = JSON.parse(fs.readFileSync(path.join(root, 'games/data/focus-boards.json'), 'utf8'));
+  fb.boards.forEach((b, i) => {
+    for (let t = 0; t < 5; t++) { const board = generate(rasterise(b.d, b.k[t]), MAXLEN_OF[t], 2500 + i * 10 + t, GEN_OPTS(t)); assert.ok(board.pieces.length >= 15, `${b.id} tier ${t}: ${board.pieces.length} arrows`); assert.ok(solvable(board), `${b.id} tier ${t} not solvable`); }
+  });
+});
 test('data file stays under 200 KB', () => assert.ok(fs.statSync(path.join(root, 'games/data/puzzle.json')).size < 200 * 1024));
 test('page copy quotes the level count and keeps the no-inline-style rule', () => { assert.ok(html.includes(`${data.levels.length} countries`)); assert.ok(!/\b70 (countries|levels)\b/.test(html)); assert.ok(!/<[a-z][^>]*\sstyle="/i.test(html)); });
 console.log(process.exitCode ? `\nsome of ${tests} tests failed` : `\nall ${tests} tests passed`);
