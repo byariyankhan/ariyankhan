@@ -48,6 +48,12 @@
   // hours, and an invitation to one that has since filled up or been called off is worse than none.
   const INVITE_KEEP_MS = 120_000;
   const HINTS_OF = [3, 3, 3, 3, 3];   // hints per tier: three everywhere (fewer hints or hearts is not how this game gets hard)
+  // Press and hold an arrow and it says whether its lane is clear: green it goes, red it does not. That was free
+  // and invisible -- nothing in the game mentioned it, and nothing counted it. Four a level makes it a choice
+  // worth making and puts it on the bar where a player can see it, beside the hearts and the lamp.
+  const CHECKS_PER_LEVEL = 4;
+  const CHECK_ICON = '🔎';
+  const CHECK_WORD = 'check';
   const hintsFor = tier => HINTS_OF[tier] ?? HINTS_PER_LEVEL;
   const MODES = { classic: 'Classic' };  // one way to play: the tour ramps up, and the player's own form shifts it
   const LIVES_OF = [4, 4, 4, 4, 4];   // hearts per tier: four everywhere
@@ -91,7 +97,7 @@
     sheet: $('#aaSheet'), friends: $('#aaFriends'), signInSheet: $('#aaSignInSheet'), googleBtn: $('#aaGoogleBtn'), signInNote: $('#aaSignInNote'), ranks: $('#aaRanks'), league: $('#aaLeague'), leagueEnds: $('#aaLeagueEnds'), leagueSheet: $('#aaLeagueSheet'), leagueBody: $('#aaLeagueBody'), leagueInfo: $('#aaLeagueInfo'), matchSheet: $('#aaMatchSheet'), matchBody: $('#aaMatchBody'), matchTitle: $('#aaMatchTitle'), accountGroup: $('#aaAccountGroup'), accountCap: $('#aaAccountCap'), accountRow: $('#aaAccountRow'), accountName: $('#aaAccountName'), accountWho: $('#aaAccountWho'), accountGold: $('#aaAccountGold'), accountFace: $('#aaAccountFace'), sessionGroup: $('#aaSessionGroup'), sessionCap: $('#aaSessionCap'), signOutBtn: $('#aaSignOut'), deleteAccBtn: $('#aaDeleteAcc'), settingsBtns: $$('#aaSettings, #aaSettingsG'), themeBtn: $('#aaTheme'), themes: $('#aaThemes'),
     game: $('#aaGame'), boardWrap: $('#aaBoardWrap'), board: $('#aaBoard'), toast: $('#aaToast'), confetti: $('#aaConfetti'),
     hudLevel: $('#aaHudLevel'), hudMode: $('#aaHudMode'), hudTime: $('#aaHudTime'), hudLeft: $('#aaHudLeft'), hudLives: $('#aaHudLives'), hudLivesWrap: $('#aaHudLivesWrap'), hudPct: $('#aaHudPct'), boardBar: $('#aaBoardBar'),
-    btnHint: $('#aaHint'), btnLevels: $('#aaBackToLevels'), btnSound: $('#aaSound'),
+    btnHint: $('#aaHint'), btnCheck: $('#aaCheck'), btnLevels: $('#aaBackToLevels'), btnSound: $('#aaSound'),
     overlay: $('#aaOverlay'), card: $('#aaCard'),
     loading: $('#aaLoading'), error: $('#aaError'),
     gate: $('#aaGate'), accept: $('#aaAccept'), splash: $('#aaSplash'), splashQuote: $('#aaSplashQuote'),
@@ -103,7 +109,7 @@
   const state = {
     mode: 'classic', muted: !!store.get('muted', false), music: store.get('music', true) !== false, vibe: store.get('vibe', true) !== false, guides: !!store.get('guides', false),
     idx: -1, level: null, tier: 0, mask: null, pieces: [], occ: null, W: 0, H: 0, left: 0,
-    lives: LIVES, livesMax: LIVES, startedAt: 0, raceBase: 0, elapsed: 0, timerId: 0, finished: false, hintsUsed: 0, wrong: 0, fails: 0, seedBump: 0, busy: false, potGone: false,
+    lives: LIVES, livesMax: LIVES, startedAt: 0, raceBase: 0, elapsed: 0, timerId: 0, finished: false, hintsUsed: 0, checksUsed: 0, checksMax: CHECKS_PER_LEVEL, wrong: 0, fails: 0, seedBump: 0, busy: false, potGone: false,
     combo: 0, bestCombo: 0, lastShot: 0, cheerHold: 0, shown: new Set(), daily: null,
   };
 
@@ -154,47 +160,190 @@
     } catch { /* silent */ }
   }
   // ── Music: a slow ambient pad synthesised on the device (no audio file, no licence, works offline) ──
-  const music = { ctx: null, master: null, timer: 0, step: 0, on: false };
+  //
+  // It is the same pad throughout. What changes is how much of it there is. A board at rest is a low, wide,
+  // slow hum under everything; as the board gets harder to be in -- hearts gone, a wrong tap a moment ago, a
+  // long stare at nothing, somebody ahead of you in a race -- the filter opens, the movement quickens, the
+  // delay tail shortens and a slow pulse comes up underneath. Putting the board right takes all of it back
+  // down again, faster than it came up on the way in and slower on the way out, so it breathes rather than
+  // flickers.
+  //
+  // Nothing here gets loud. The ceiling is a little above the one volume the pad used to play at forever, and
+  // the whole thing is capped lower again for anyone who has asked their system for less movement.
+  const MUSIC = {
+    tick: 400,                  // how often intensity is recomputed, ms
+    rise: 0.22, fall: 0.08,     // how far it travels toward its target each tick, up and down
+    gain: [0.085, 0.13],        // the master, at rest and at full: a whisker over the one volume it used to hold
+    cutoff: [520, 1500],        // the pad's lowpass: muffled to present
+    lfoHz: [0.05, 0.17], lfoDepth: [180, 80],
+    feedback: [0.32, 0.17],     // the delay tail, shorter when it matters
+    chord: [14, 9],             // seconds a chord is held: the harmony moves quicker under pressure
+    pulseFrom: 0.55,            // below this there is no pulse at all, so a heartbeat always means jeopardy
+    pulseBpm: [46, 92],
+    idleFrom: 18, idleOver: 90, // a long think is the point of this game: 18s before it tells at all, 41s to the top
+    spikeWrong: 0.3, spikeCap: 0.5, spikeDecay: 0.93, spikeFix: 0.55,
+    reducedCeiling: 0.55,
+  };
+  const music = { ctx: null, master: null, timer: 0, step: 0, on: false, aim: 0, cur: 0, spike: 0, race: 0, raceTo: 0, heartAt: 0, lastMove: 0, tickTimer: 0, pulseTimer: 0 };
+  const mix = (r, i) => r[0] + (r[1] - r[0]) * i;
+  // Somebody who has asked their system for less movement gets less of this too. Asked once and remembered,
+  // rather than on every tick.
+  let calmQuery = null;
+  const calmer = () => { try { calmQuery = calmQuery || matchMedia('(prefers-reduced-motion: reduce)'); return calmQuery.matches; } catch { return false; } };
   const CHORDS = [[57, 64, 67, 71, 76], [53, 60, 64, 69, 72], [48, 55, 60, 64, 71], [55, 59, 62, 67, 74]]; // Am9 · Fmaj7 · Cmaj7 · G6 (MIDI)
   const mtof = m => 440 * Math.pow(2, (m - 69) / 12);
   function musicStart() {
-    if (music.on || !state.music) return;
+    if (!state.music) return;
+    // Already playing, because the player went straight from one board to the next: the pad carries on, but
+    // whatever the last board was doing to it does not.
+    if (music.on) { music.spike = 0; music.race = 0; music.lastMove = performance.now(); return; }
     try {
       audio = audio || new (window.AudioContext || window.webkitAudioContext)();
       if (audio.state === 'suspended') audio.resume();
       const ctx = audio; music.ctx = ctx;
-      const master = ctx.createGain(); master.gain.value = 0.0001; master.connect(ctx.destination);
+      // Two stages, and the reason is the ticker. The intensity layer ramps the master every 400ms, so a slow
+      // fade-in written on the master is overwritten by the first tick 0.64s later -- the eight-second arrival
+      // collapses into half a second and the music lands on the player instead of appearing under them. The
+      // intro owns the fade; the master owns the intensity; neither writes to the other's parameter.
+      const intro = ctx.createGain(); intro.gain.value = 0.0001; intro.connect(ctx.destination);
+      const master = ctx.createGain(); master.gain.value = MUSIC.gain[0]; master.connect(intro);
       const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 520; lp.Q.value = 0.6; lp.connect(master);
       const delay = ctx.createDelay(1.2); delay.delayTime.value = 0.52; const fb = ctx.createGain(); fb.gain.value = 0.32;
       const dlp = ctx.createBiquadFilter(); dlp.type = 'lowpass'; dlp.frequency.value = 900;
       lp.connect(delay); delay.connect(dlp); dlp.connect(fb); fb.connect(delay); dlp.connect(master);
-      const lfo = ctx.createOscillator(); lfo.frequency.value = 0.05; const lfoG = ctx.createGain(); lfoG.gain.value = 180; lfo.connect(lfoG).connect(lp.frequency); lfo.start();
-      music.master = master; music.lp = lp; music.lfo = lfo; music.on = true;
-      master.gain.exponentialRampToValueAtTime(0.11, ctx.currentTime + 4);
+      const lfo = ctx.createOscillator(); lfo.frequency.value = MUSIC.lfoHz[0]; const lfoG = ctx.createGain(); lfoG.gain.value = MUSIC.lfoDepth[0]; lfo.connect(lfoG).connect(lp.frequency); lfo.start();
+      // The pulse goes straight to the master, not through the pad's lowpass: it is meant to be felt under the
+      // harmony rather than washed into it.
+      const pulseOut = ctx.createGain(); pulseOut.gain.value = 1; pulseOut.connect(master);
+      music.master = master; music.intro = intro; music.lp = lp; music.lfo = lfo; music.lfoG = lfoG; music.fb = fb; music.pulseOut = pulseOut; music.on = true;
+      music.cur = 0; music.aim = 0; music.spike = 0; music.lastMove = performance.now();
+      // It comes in softly. Eight seconds from nothing to full is slow enough that a player who has just
+      // touched their first arrow does not hear it arrive, which is the point of starting it here rather than
+      // on the way in through the door.
+      intro.gain.exponentialRampToValueAtTime(1, ctx.currentTime + 8);
+      musicTick(); musicPulse();
       const playChord = () => {
         if (!music.on) return;
         const notes = CHORDS[music.step % CHORDS.length]; music.step++;
-        const t = ctx.currentTime, dur = 14;
+        const t = ctx.currentTime, dur = mix(MUSIC.chord, music.cur);
         notes.forEach((m, i) => {
           for (const det of [-6, 5]) {
             const o = ctx.createOscillator(); o.type = i === 0 ? 'triangle' : 'sine'; o.frequency.value = mtof(m - (i === 0 ? 12 : 0)); o.detune.value = det;
             const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t);
-            g.gain.exponentialRampToValueAtTime(i === 0 ? 0.5 : 0.28, t + 4 + i * 0.6);
-            g.gain.setValueAtTime(i === 0 ? 0.5 : 0.28, t + dur - 5);
+            // The envelope is written in seconds, and the chord is no longer always fourteen of them: hold the
+            // sustain until after the attack has actually arrived, or a quick chord sets its level before it
+            // has finished climbing to it.
+            const peak = i === 0 ? 0.5 : 0.28, rise = 4 + i * 0.6;
+            g.gain.exponentialRampToValueAtTime(peak, t + rise);
+            g.gain.setValueAtTime(peak, t + Math.max(rise + 0.4, dur - 5));
             g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
             o.connect(g).connect(lp); o.start(t); o.stop(t + dur + 0.1);
           }
         });
-        music.timer = setTimeout(playChord, (dur - 4) * 1000);
+        music.timer = setTimeout(playChord, Math.max(3, dur - 4) * 1000);
       };
       playChord();
     } catch { /* no audio, no problem */ }
   }
   function musicStop() {
     if (!music.on) return;
-    music.on = false; clearTimeout(music.timer);
-    try { const t = music.ctx.currentTime; music.master.gain.setValueAtTime(music.master.gain.value, t); music.master.gain.exponentialRampToValueAtTime(0.0001, t + 1.5); setTimeout(() => { try { music.master.disconnect(); music.lfo.stop(); } catch { /* ignore */ } }, 1700); } catch { /* ignore */ }
+    music.on = false; clearTimeout(music.timer); clearTimeout(music.tickTimer); clearTimeout(music.pulseTimer);
+    music.cur = 0; music.aim = 0; music.spike = 0; music.race = 0; music.raceTo = 0; music.heartAt = 0;
+    // The fade-out outlives this call by 1.7 seconds, and the nodes it tidies up afterwards must be THESE
+    // nodes. Reading them off the shared object when the timer fires was survivable while music only stopped on
+    // a hidden tab; now that leaving a board stops it, going back in and starting another one inside those 1.7
+    // seconds is an ordinary thing to do -- and it would have disconnected the master of the new graph and
+    // stopped its LFO, with music.on left true so nothing could ever start it again. Silence, permanently, from
+    // tapping the next level too quickly. They are held in locals now, so the timer can only reach its own.
+    const ctx = music.ctx, master = music.master, intro = music.intro, lfo = music.lfo;
+    try {
+      const t = ctx.currentTime;
+      intro.gain.cancelScheduledValues(t);
+      intro.gain.setValueAtTime(Math.max(0.0001, intro.gain.value), t);
+      intro.gain.exponentialRampToValueAtTime(0.0001, t + 1.5);
+      setTimeout(() => { try { master.disconnect(); intro.disconnect(); lfo.stop(); } catch { /* ignore */ } }, 1700);
+    } catch { /* ignore */ }
   }
+  // What the board is asking of the player, as one number between nothing and everything.
+  function musicAim() {
+    if (!music.on || state.finished) return 0;
+    let a = 0.06;                                        // the bed: awake, barely
+    const lm = state.livesMax || 0;
+    if (lm > 0) {
+      a += 0.40 * Math.pow(1 - Math.max(0, state.lives) / lm, 1.6);   // gentle for the first heart, steep for the last
+      // Being one heart away is news, and then it is the rest of the board. Reaching it early on eighty arrows
+      // would otherwise mean ten minutes at the top of the range, which is how a good idea becomes exhausting.
+      if (state.lives === 1) a += (performance.now() - (music.heartAt || 0)) / 1000 < 45 ? 0.16 : 0.06;
+    }
+    a += music.spike;                                    // a wrong tap, fading
+    a += music.race;                                     // somebody ahead of you, or already home
+    // Thinking only counts while the board is the thing in front of them. A sheet open over it, or the tab in
+    // the background, is not a long stare at arrows, and leaning on somebody reading the settings is unkind.
+    const away = document.hidden || (el.overlay && !el.overlay.hidden);
+    if (away) music.lastMove = performance.now();
+    const idle = (performance.now() - (music.lastMove || 0)) / 1000;
+    if (!away && idle > MUSIC.idleFrom) a += Math.min(0.26, (idle - MUSIC.idleFrom) / MUSIC.idleOver);   // a long look at a board that is not moving
+    const total = state.pieces?.length || 0;
+    if (total && state.left > 0 && (total - state.left) / total > 0.85) a += 0.12;  // the last few, with everything to lose
+    // And the thing that keeps an hour of calm play calm. Thinking and being deep into a board are the signals
+    // most likely to fire while nothing is actually wrong, so on their own they cannot take it past the middle:
+    // the top half of the range is unlocked by losing hearts or being behind in a race, and by nothing else.
+    const hurt = lm > 0 ? 1 - Math.max(0, state.lives) / lm : 0;
+    const cap = Math.min(1, 0.55 + 0.9 * Math.max(hurt, music.race));
+    const ceiling = Math.min(cap, calmer() ? MUSIC.reducedCeiling : 1);
+    return Math.max(0, Math.min(ceiling, a));
+  }
+  function musicTick() {
+    if (!music.on) return;
+    music.spike *= MUSIC.spikeDecay;
+    if (music.spike < 0.01) music.spike = 0;
+    music.race += ((music.raceTo || 0) - music.race) * 0.12;
+    if (music.race < 0.005) music.race = 0;
+    music.aim = musicAim();
+    music.cur += (music.aim - music.cur) * (music.aim > music.cur ? MUSIC.rise : MUSIC.fall);
+    try {
+      const ctx = music.ctx, t = ctx.currentTime, k = MUSIC.tick / 1000 * 1.6, i = music.cur;
+      // Every parameter is ramped over longer than a tick, so each one is still travelling when the next tick
+      // sets it moving again. Nothing here ever steps.
+      music.master.gain.linearRampToValueAtTime(mix(MUSIC.gain, i), t + k);
+      music.lp.frequency.linearRampToValueAtTime(mix(MUSIC.cutoff, i), t + k);
+      music.lfo.frequency.linearRampToValueAtTime(mix(MUSIC.lfoHz, i), t + k);
+      music.lfoG.gain.linearRampToValueAtTime(mix(MUSIC.lfoDepth, i), t + k);
+      music.fb.gain.linearRampToValueAtTime(mix(MUSIC.feedback, i), t + k);
+    } catch { /* the graph went away under us; the next start builds a new one */ }
+    music.tickTimer = setTimeout(musicTick, MUSIC.tick);
+  }
+  // A heartbeat, and only when there is something to have a heartbeat about. It keeps its own time so it can
+  // quicken without the pad having to.
+  function musicPulse() {
+    if (!music.on) return;
+    const i = music.cur;
+    if (i >= MUSIC.pulseFrom) {
+      try {
+        const ctx = music.ctx, t = ctx.currentTime;
+        const depth = Math.min(1, (i - MUSIC.pulseFrom) / (1 - MUSIC.pulseFrom));
+        const thump = (at, amp) => {
+          const o = ctx.createOscillator(), g = ctx.createGain();
+          o.type = 'sine'; o.frequency.setValueAtTime(66, at); o.frequency.exponentialRampToValueAtTime(42, at + 0.2);
+          g.gain.setValueAtTime(0.0001, at); g.gain.exponentialRampToValueAtTime(amp, at + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, at + 0.34);
+          o.connect(g).connect(music.pulseOut); o.start(at); o.stop(at + 0.38);
+        };
+        thump(t, 0.05 + 0.06 * depth);
+        if (i > 0.78) thump(t + 0.21, 0.03 + 0.03 * depth);   // the second beat only arrives when it is bad
+      } catch { /* ignore */ }
+    }
+    music.pulseTimer = setTimeout(musicPulse, 60000 / mix(MUSIC.pulseBpm, music.cur));
+  }
+  // The four things the board can say to the music.
+  const musicBegin = () => { if (!music.on) musicStart(); };
+  const musicMoved = () => { music.lastMove = performance.now(); };
+  const musicWrong = () => { music.spike = Math.min(MUSIC.spikeCap, music.spike + MUSIC.spikeWrong); music.heartAt = performance.now(); musicMoved(); };
+  const musicRight = () => { music.spike *= MUSIC.spikeFix; musicMoved(); };   // putting it right takes it back faster than it came
+  // renderRanks is called by the socket, by the REST poll and by starting a board, and it can only see places
+  // rather than distances -- so the same standing arrives again and again, and can flip on a poll boundary. The
+  // target is set here and the value is eased toward it in the ticker, so nothing flaps.
+  const musicRace = n => { music.raceTo = n; };
+
   const SFX = { shoot: () => beep([[880, 0, 0.07], [1320, 0.04, 0.08]]), cheer: lv => { const f = 587 * Math.pow(2, lv * 3 / 12); beep([[f, 0, 0.09], [f * 1.26, 0.07, 0.1], [f * 1.5, 0.14, 0.14], [f * 2, 0.21, 0.22, 'sine', 0.06]]); }, block: () => beep([[220, 0, 0.06, 'square', 0.05], [110, 0.05, 0.22, 'triangle', 0.06]]), win: () => beep([[523, 0, 0.12], [659, 0.1, 0.12], [784, 0.2, 0.12], [1047, 0.3, 0.35]]), lose: () => beep([[300, 0, 0.2, 'triangle'], [220, 0.2, 0.35, 'triangle']]), taken: () => beep([[784, 0, 0.1], [523, 0.09, 0.18, 'triangle', 0.05]]),
     // the room: a tap on anything, somebody arriving, somebody going, the last seconds, and the off
     tap: () => beep([[520, 0, 0.03, 'sine', 0.03], [760, 0.018, 0.035, 'sine', 0.022]]),
@@ -229,6 +378,23 @@
   // the tables, a stake, the prize ladder and the result sheet — so it reads as one currency, not five icons.
   const COIN = '<img class="aa-coin" src="/images/puzzle-coin.png" alt="" width="128" height="128" decoding="async">';
 
+  // A rule is explained while the player is still learning it, and then the game trusts them.
+  //
+  // "Blocked! It stays red and goes by itself once its lane clears." is true, and it is worth saying -- once.
+  // By the twentieth time it is a sentence over the board that the player has to wait out, saying what the red
+  // arrow, the lost heart, the shake and the sound have already said. So a teaching line shows every time while
+  // the first level is still uncleared, which is where a player meets these rules, and after that it has been
+  // said. The record is kept in storage, so it does not come back on the next visit; if storage is unavailable
+  // the helper falls back to showing it once per session, which is the safe way to be wrong.
+  const TAUGHT = store.get('taught', null) || {};
+  const learning = () => { try { return !cleared(0); } catch { return false; } };
+  function teach(k, msg, kind = 'hint', ms = 2800) {
+    const first = !TAUGHT[k];
+    if (first) { TAUGHT[k] = 1; store.set('taught', TAUGHT); }
+    if (!first && !learning()) return false;
+    toast(msg, kind, ms);
+    return true;
+  }
   function toast(msg, kind = '', ms = 2800) { el.toast.textContent = msg; el.toast.className = 'aa-toast' + (kind ? ' aa-toast--' + kind : ''); el.toast.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => { el.toast.hidden = true; }, ms); }
 
   // ── Data ──
@@ -718,6 +884,11 @@
       g.addEventListener('pointermove', e => { if (down && Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 12) { clearTimeout(holdTimer); down = null; } });
       g.addEventListener('pointerup', () => { clearTimeout(holdTimer); g.classList.remove('is-pressed'); if (!down) return; down = null; if (held) { held = false; return; } tapPiece(p); });
       g.addEventListener('pointercancel', () => { clearTimeout(holdTimer); g.classList.remove('is-pressed'); down = null; });
+      // A held mouse that slides off the arrow is no longer holding that arrow. The 12px move-cancel above
+      // catches most of it, but a thin arrow can be left without travelling twelve pixels, and a check that
+      // spends itself on an arrow the pointer is not over any more is a check taken for nothing. Mouse only:
+      // a touch keeps its pointer captured until release, so cancelling there would break the gesture itself.
+      g.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse') { clearTimeout(holdTimer); down = null; } });
       g.addEventListener('pointerleave', () => g.classList.remove('is-pressed'));
       g.addEventListener('contextmenu', e => e.preventDefault());
       g.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); tapPiece(p); } else if (e.key === 'l' || e.key === 'L') { e.preventDefault(); peek(p); } });
@@ -755,7 +926,7 @@
     const seed = (daily ? daily.seed : (i + 1) * 1000) + state.seedBump;
     const gen = bestBoard(state.maskInfo, state.tier, seed);
     const livesMax = livesFor(state.tier);
-    Object.assign(state, { W: gen.W, H: gen.H, pieces: gen.pieces, occ: gen.occ, land: gen.land, left: gen.pieces.length, hintsMax: hintsFor(state.tier), lives: livesMax, livesMax, elapsed: 0, startedAt: 0, raceBase: 0, finished: false, hintsUsed: 0, wrong: 0, busy: false, potGone: false, combo: 0, bestCombo: 0, lastShot: 0, cheerHold: 0, shown: new Set(), armed: new Set() });
+    Object.assign(state, { W: gen.W, H: gen.H, pieces: gen.pieces, occ: gen.occ, land: gen.land, left: gen.pieces.length, hintsMax: hintsFor(state.tier), checksUsed: 0, checksMax: CHECKS_PER_LEVEL, lives: livesMax, livesMax, elapsed: 0, startedAt: 0, raceBase: 0, finished: false, hintsUsed: 0, wrong: 0, busy: false, potGone: false, combo: 0, bestCombo: 0, lastShot: 0, cheerHold: 0, shown: new Set(), armed: new Set() });
     el.error.hidden = true; el.loading.hidden = true;
     if (daily) { if (history.replaceState) history.replaceState(null, '', location.pathname + location.search + (daily.hash ?? '#daily')); } else setHash(i);
     scrollToGame();
@@ -763,7 +934,7 @@
     state.diff = diff;
     resetZoom(); renderBoard(); renderHud();
     if (daily?.race && daily.match) { renderRanks(daily.match.players); syncRaceClock(daily.match); startProgressPoll(); }   // back on a race board is back in the match, on the match's own clock
-    if (i === 0 && !cleared(0) && !daily) toast('Tap an arrow to shoot it off the board. If another arrow is in its way, you lose a heart.', 'hint');
+    if (i === 0 && !cleared(0) && !daily) teach('tap', 'Tap an arrow to shoot it off the board. If another arrow is in its way, you lose a heart.');
     else if (state.disc) toast(`${state.disc.country.name}'s ${KIND_WORD[state.disc.kind]} · ${state.pieces.length} arrows · clear it to see what it is`, state.tier >= 2 ? 'hard' : '');
     else if (state.tier >= 2) toast(`${diff.toUpperCase()} LEVEL · ${state.pieces.length} arrows${daily ? '' : ' · you earned this'}`, 'hard');
     else if (daily?.race) toast(`Challenge board · ${state.pieces.length} arrows · clear it as fast as you can.`);
@@ -778,6 +949,12 @@
     const hintsLeft = (state.hintsMax ?? HINTS_PER_LEVEL) - state.hintsUsed;
     el.btnHint.textContent = `💡 ${Math.max(0, hintsLeft)}`;
     el.btnHint.disabled = state.finished || hintsLeft <= 0;
+    if (el.btnCheck) {
+      const left = checksLeftNow();
+      el.btnCheck.textContent = `${CHECK_ICON} ${Math.max(0, left)}`;
+      el.btnCheck.classList.toggle('is-spent', left <= 0);
+      el.btnCheck.setAttribute('aria-label', `${Math.max(0, left)} ${left === 1 ? CHECK_WORD : CHECK_WORD + 's'} left. Press and hold an arrow to check whether its lane is clear.`);
+    }
     const pct = state.pieces.length ? Math.round(((state.pieces.length - state.left) / state.pieces.length) * 100) : 0;
     el.hudPct.textContent = `${pct}%`;
     el.boardBar.style.width = `${pct}%`;
@@ -810,6 +987,10 @@
     el.hudTime.textContent = fmtTime(e);
   }
   function startTimer() {
+    // Play has begun. Dealing a board is not that -- a board can sit there untouched for as long as the player
+    // likes -- and the race clock takes the early return below without ever reaching the music, so the call
+    // goes above the guard.
+    musicBegin();
     if (state.startedAt || state.raceBase || state.finished) return;
     state.startedAt = performance.now();
     state.timerId = setInterval(renderTime, 500);
@@ -863,8 +1044,17 @@
     return svgEl('line', { x1, y1, x2: x1 + dc * Math.max(0, len), y2: y1 + dr * Math.max(0, len), class: 'aa-lane ' + cls, 'data-i': p.idx });
   }
   // Press and hold: show whether this arrow can go. Any tap afterwards clears it.
+  //
+  // A check is spent only when one actually happens -- not on a hold over an arrow that has already gone, not
+  // when the board is finished, and not on the hold that finds the counter empty. Checking the same arrow twice
+  // costs twice, which is the point: it is an allowance, not a mode.
+  const checksLeftNow = () => (state.checksMax ?? CHECKS_PER_LEVEL) - state.checksUsed;
   function peek(p) {
     if (state.finished || p.gone) return;
+    musicBegin();   // a hold is a player playing, the same as a tap is
+    if (checksLeftNow() <= 0) { clearPeek(); toast(`No ${CHECK_WORD}s left on this level.`, 'bad'); vibe(20); return; }
+    state.checksUsed++;
+    renderHud(); musicMoved();
     clearPeek();
     const free = !blockerOf(p);
     p.el.classList.add(free ? 'is-peek-free' : 'is-peek-blocked');
@@ -907,7 +1097,7 @@
     head.style.transform = `translate(${travel}px, 0)`; // local frame: the head group is already rotated to point forward
     head.style.opacity = '0';
     setTimeout(() => p.el.remove(), dur * 1000 + 80);
-    SFX.shoot(); vibe(12);
+    SFX.shoot(); vibe(12); musicRight();
     const now = performance.now();
     state.combo = now - state.lastShot < COMBO_WINDOW_MS ? state.combo + 1 : 1; state.lastShot = now; state.bestCombo = Math.max(state.bestCombo, state.combo);
     updateReveal(); renderHud();
@@ -924,16 +1114,22 @@
     else if (cheer >= 0) toast(`${COMBO_WORDS[cheer]} Combo x${state.combo}`, 'combo', 1400);
   }
   function blocked(p, blocker) {
-    if (state.armed.has(p)) { bounce(p); SFX.block(); toast('Still blocked. It will go by itself once its lane clears.', 'hint'); return; }
+    if (state.armed.has(p)) { bounce(p); SFX.block(); musicMoved(); teach('armed', 'Still blocked. It will go by itself once its lane clears.'); return; }
     state.lives--; state.wrong++; state.combo = 0;
-    arm(p);
+    arm(p); musicWrong();
     SFX.block(); vibe(60);
     bounce(p);
     blocker.el.classList.add('is-blocker');
     setTimeout(() => blocker.el.classList.remove('is-blocker'), 600);
     renderHud();
     if (state.lives <= 0) failLevel('Out of hearts.');
-    else toast(state.lives === 1 ? 'Blocked! Last heart. It stays red and goes by itself once its lane clears.' : 'Blocked! It stays red and goes by itself once its lane clears.', 'bad');
+    else {
+      // The explanation is taught. The warning is not: being down to one heart is news every single time.
+      const said = teach('blocked', state.lives === 1
+        ? 'Blocked! Last heart. It stays red and goes by itself once its lane clears.'
+        : 'Blocked! It stays red and goes by itself once its lane clears.', 'bad');
+      if (!said && state.lives === 1) toast('Last heart.', 'bad', 2000);
+    }
   }
   function hint() {
     if (state.finished) return;
@@ -946,7 +1142,10 @@
     $$('.aa-piece.is-hint', el.board).forEach(g => g.classList.remove('is-hint'));
     p.el.classList.add('is-hint');
     setTimeout(() => p.el.classList.remove('is-hint'), 2500);
-    toast(`Hint: the glowing arrow is free. ${(state.hintsMax ?? HINTS_PER_LEVEL) - state.hintsUsed} left.`, 'hint');
+    // The same split as everywhere else: what a hint IS gets said while the player is learning, and how many
+    // are left gets said every time, because that is the part that changes.
+    const hintsLeft = (state.hintsMax ?? HINTS_PER_LEVEL) - state.hintsUsed;
+    if (!teach('hint', `Hint: the glowing arrow is free. ${hintsLeft} left.`, 'hint')) toast(`${hintsLeft} hint${hintsLeft === 1 ? '' : 's'} left.`, 'hint', 1600);
     renderHud();
   }
 
@@ -1033,6 +1232,7 @@
   function stars() { const lost = state.livesMax - state.lives; return lost === 0 ? 3 : lost === 1 ? 2 : 1; }
   function winLevel() {
     stopTimer(); state.finished = true; state.busy = true;
+    music.spike = 0; musicRace(0);   // it is done: whatever was leaning on the player stops leaning
     state.outlineEl?.style.setProperty('fill-opacity', '0.9');
     SFX.win(); confetti();
     // Every board ends the same way: it tells you what you cleared. It used to stop a country board to ask
@@ -1123,6 +1323,7 @@
   function failLevel(reason) {
     if (state.finished) return;
     stopTimer(); state.finished = true; state.busy = true; state.fails++;
+    music.spike = 0; musicRace(0);
     store.set('streak', 0);
     SFX.lose(); renderHud();
     const learn = learnFrom(false);
@@ -1177,6 +1378,7 @@
     state.lives = LIVES; state.livesMax = LIVES;
     state.elapsed = 0; state.startedAt = 0; state.raceBase = 0;
     state.hintsUsed = 0; state.hintsMax = HINTS_PER_LEVEL;
+    state.checksUsed = 0; state.checksMax = CHECKS_PER_LEVEL;   // the same two lines as the hints, for the same reason
     state.finished = false; state.wrong = 0; state.fails = 0; state.potGone = false;
     state.combo = 0; state.bestCombo = 0; state.lastShot = 0; state.shown = new Set();
     state.daily = null; state.disc = null;
@@ -1185,7 +1387,7 @@
     renderHud();
   }
   function goToLevels() {
-    stopTimer(); stopMatchPoll(); stopProgressPoll(); stopResultWatch();
+    stopTimer(); stopMatchPoll(); stopProgressPoll(); stopResultWatch(); musicStop();
     live.leaveFeed();   // back in the lobby: nothing to watch, but the socket is how invitations arrive
     clearRun();
     if (el.ranks) el.ranks.hidden = true; el.game.hidden = true; el.overlay.hidden = true; el.select.hidden = false; setHash(-1); renderSelect();
@@ -1932,7 +2134,11 @@
   // The line-up over the board: first place first, and the order moves as they play.
   function renderRanks(players) {
     if (!el.ranks) return;
-    if (!players?.length) { el.ranks.hidden = true; return; }
+    if (!players?.length) { el.ranks.hidden = true; musicRace(0); return; }
+    // Being second is a different board to be on than being first, and the music is the only part of the game
+    // that can say so without taking the player's eyes off the arrows.
+    const you = players.find(x => x.you);
+    musicRace(players.some(x => x.won && !x.you) ? 0.3 : you && you.place > 1 ? 0.18 : 0);
     el.ranks.innerHTML = players.map(p => `<span class="aa-rank${p.you ? ' is-you' : ''}${p.won ? ' is-won' : ''}${p.ms === -1 ? ' is-out' : ''}${faceClass(p)}" title="${escapeHtml(p.name)}">${faceInner(p)}<span class="aa-rank-no">${p.place}</span></span>`).join('');
     el.ranks.setAttribute('aria-label', players.map(p => `${p.place}. ${p.name}`).join(', '));
     wireFaces(el.ranks);
@@ -2028,7 +2234,7 @@
         picks.set(id, name);
         inv.textContent = '\u2713 Picked'; inv.classList.add('is-on'); inv.setAttribute('aria-pressed', 'true');
         row?.classList.add('is-picked');
-        if (picks.size === 1) toast('Now choose a table, and they will be invited to it.', 'hint');
+        if (picks.size === 1) teach('tables', 'Now choose a table, and they will be invited to it.');
       }
       vibe(10);
       pickCaption();
@@ -2603,6 +2809,14 @@
 
   // ── Wiring ──
   el.btnHint.addEventListener('click', hint);
+  // The counter is not how a check is spent -- an arrow is. Tapping it says so, which is the only place in the
+  // game that teaches the gesture, so it answers every time rather than once.
+  el.btnCheck?.addEventListener('click', () => {
+    const left = checksLeftNow();
+    toast(left > 0
+      ? `Press and hold an arrow to see whether its lane is clear. ${left} ${left === 1 ? CHECK_WORD : CHECK_WORD + 's'} left.`
+      : `No ${CHECK_WORD}s left on this level.`, left > 0 ? 'hint' : 'bad');
+  });
   el.play.addEventListener('click', () => startLevel(+el.play.dataset.level || 0));
   // Sheets
   const openSheet = sh => { sh.hidden = false; document.body.style.overflow = 'hidden'; };
@@ -2645,10 +2859,19 @@
   });
   el.btnSound.addEventListener('click', () => { state.muted = !state.muted; store.set('muted', state.muted); renderSound(); if (!state.muted) SFX.shoot(); });
   el.btnVibe?.addEventListener('click', () => { state.vibe = !state.vibe; store.set('vibe', state.vibe); renderToggles(); vibe(20); });
-  el.btnMusic?.addEventListener('click', () => { state.music = !state.music; store.set('music', state.music); renderToggles(); if (state.music) musicStart(); else musicStop(); });
+  // Turning music on while standing in the lobby does not start it: it starts on the next board, the same as
+  // it would have if it had been on all along.
+  el.btnMusic?.addEventListener('click', () => { state.music = !state.music; store.set('music', state.music); renderToggles(); if (state.music) { if (!el.game.hidden) musicStart(); } else musicStop(); });
   // Browsers only allow sound after a gesture: the first tap anywhere starts the pad (if Music is on).
-  document.addEventListener('pointerdown', () => { if (state.music && !music.on) musicStart(); }, { passive: true });
-  document.addEventListener('visibilitychange', () => { if (document.hidden) musicStop(); });
+  // Not a start: a rescue. If the browser would not let the context run when the board began, the next tap on
+  // the board is a gesture it will accept, and the music that was built silently comes up then.
+  document.addEventListener('pointerdown', () => { try { if (music.on && audio?.state === 'suspended') audio.resume(); } catch { /* ignore */ } }, { passive: true });
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) { musicStop(); return; }
+    // Back on a board that was left mid-play. Nothing else restarts it now that music begins with a board
+    // rather than with the first tap anywhere, so coming back is its own beginning.
+    if (state.music && !el.game.hidden && !state.finished) musicStart();
+  });
   el.btnGuides?.addEventListener('click', () => { state.guides = !state.guides; store.set('guides', state.guides); renderToggles(); });
   const goAbout = () => { closeSheets(); if (!el.game.hidden) goToLevels(); document.getElementById('aaAbout')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); };
   el.howTo?.addEventListener('click', goAbout);

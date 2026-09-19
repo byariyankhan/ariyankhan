@@ -71,7 +71,7 @@
          set these two when the backend moves to a host of its own and the client follows without a change:
          <meta name="puzzle-api" content="https://api.example.com" />
          <meta name="puzzle-ws"  content="wss://api.example.com" /> -->
-    <link rel="stylesheet" href="/css/puzzle.css?v=3" />
+    <link rel="stylesheet" href="/css/puzzle.css?v=4" />
     <link rel="preload" href="/games/data/puzzle.json?v=11" as="fetch" crossorigin="anonymous" />
 
     <!-- SCHEMA -->
@@ -148,8 +148,8 @@
           "mainEntity": [
             { "@type": "Question", "name": "How do I play Puzzle?", "acceptedAnswer": { "@type": "Answer", "text": "Every arrow slides in the direction it points. Tap one and, if nothing is in its path, it shoots off the board. If another arrow is in the way it stays put and you lose a heart. Clear every arrow to reveal the country underneath, and the card tells you what you cleared." } },
             { "@type": "Question", "name": "Is it free and do I need an account?", "acceptedAnswer": { "@type": "Answer", "text": "Yes it is free and no account is needed. Progress, stars and best times are saved in your own browser. Nothing is uploaded." } },
-            { "@type": "Question", "name": "How does the difficulty work?", "acceptedAnswer": { "@type": "Answer", "text": "It follows you, not the level number. Boards come in five tiers, Easy, Normal, Hard, Expert and Master, from about 20 arrows on Easy to 80 and more on Master. Clear a board flawlessly and fast, no heart lost and no hint, and the next one steps up a tier at once. Two first-try clears in a row step up too, whatever hearts and hints you spent. Lose two boards in a row and they ease off a tier. There is no clock to beat: four hearts and three hints per level, that is all." } },
-            { "@type": "Question", "name": "Can a level become impossible?", "acceptedAnswer": { "@type": "Answer", "text": "No. Boards are generated so that a solution always exists, and removing an arrow can only free space for the others, so whatever order you tap in you can never get stuck. If you are out of ideas, use a hint: it lights up an arrow that is free right now and adds five seconds to your clock." } },
+            { "@type": "Question", "name": "How does the difficulty work?", "acceptedAnswer": { "@type": "Answer", "text": "It follows you, not the level number. Boards come in five tiers, Easy, Normal, Hard, Expert and Master, from about 20 arrows on Easy to 80 and more on Master. Clear a board flawlessly and fast, no heart lost and no hint, and the next one steps up a tier at once. Two first-try clears in a row step up too, whatever hearts and hints you spent. Lose two boards in a row and they ease off a tier. There is no clock to beat: four hearts, three hints and four checks per level, that is all. A check is a press and hold on any arrow, which says whether its lane is clear without costing you a heart to find out." } },
+            { "@type": "Question", "name": "Can a level become impossible?", "acceptedAnswer": { "@type": "Answer", "text": "No. Boards are generated so that a solution always exists, and removing an arrow can only free space for the others, so whatever order you tap in you can never get stuck. If you are out of ideas, use a hint: it lights up an arrow that is free right now and adds five seconds to your clock. Or press and hold an arrow you are wondering about: four of those a level, and they cost no time at all." } },
             { "@type": "Question", "name": "Are the puzzles the same for everyone?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. Each level has a fixed layout, so when you share a time on level 12 your friend faces exactly the same board. Choosing “New layout” after a fail gives you a fresh arrangement of the same country. Today's Country is likewise the same bonus board for everyone that day." } },
             { "@type": "Question", "name": "Why are the countries hidden until I finish?", "acceptedAnswer": { "@type": "Answer", "text": "That is the geography part. The board is the country's real outline and it fades in as you clear arrows, so you are quietly learning shapes while you play. The quiz at the end checks whether you spotted it, and the level card shows the capital, population and region. Then comes a second board shaped like something you would find in that country (its animal, its bird or a landmark), with a quiz of its own." } },
             { "@type": "Question", "name": "Can I install it as an app?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. On Android and desktop Chrome use “Install” or “Add to Home Screen”; on iPhone use Share → Add to Home Screen. After the first visit the levels are cached so the game works offline." } }
@@ -234,7 +234,7 @@
         <div class="aa-status">
           <span class="aa-status-left"><span id="aaHudLivesWrap"><b class="aa-lives" id="aaHudLives" role="img" aria-label="4 of 4 hearts"></b></span><b class="aa-time" id="aaHudTime" hidden>0:00</b></span>
           <span class="aa-status-mid"><b id="aaHudLeft">0</b> left · <b id="aaHudPct">0%</b></span>
-          <button type="button" class="aa-icon aa-hintbtn" id="aaHint" title="Light up a free arrow (H)">💡 3</button>
+          <button type="button" class="aa-icon aa-hintbtn aa-checkbtn" id="aaCheck" title="Press and hold an arrow to check its lane (L)">🔎 4</button><button type="button" class="aa-icon aa-hintbtn" id="aaHint" title="Light up a free arrow (H)">💡 3</button>
         </div>
         <div class="aa-board-wrap" id="aaBoardWrap">
             <div class="aa-ranks" id="aaRanks" hidden aria-label="Who is ahead"></div>
@@ -271,7 +271,7 @@
         <div class="tag-pill">How To Play</div>
         <h2 class="section-title">Tap, shoot, <span class="yl">reveal</span></h2>
         <ol class="aa-steps">
-          <li><strong>Look before you tap</strong>Every arrow slides the way it points. If the cells between its tip and the edge are empty, tapping it shoots it off the board. If another arrow sits in that path, the tap fails and you lose one of your four hearts. The blocker flashes red, and the arrow you tapped stays red: the moment its lane clears it goes by itself, no second tap needed. Not sure? Press and hold any arrow to see its lane, green if it can go, red if not.</li>
+          <li><strong>Look before you tap</strong>Every arrow slides the way it points. If the cells between its tip and the edge are empty, tapping it shoots it off the board. If another arrow sits in that path, the tap fails and you lose one of your four hearts. The blocker flashes red, and the arrow you tapped stays red: the moment its lane clears it goes by itself, no second tap needed. Not sure? Press and hold any arrow to see its lane, green if it can go, red if not — four of those a level, counted on the bar beside your hearts.</li>
           <li><strong>Peel the board from the outside in</strong>Arrows near the edge are usually free first. Clearing them opens lanes for the ones behind. There is always at least one free arrow, so if you cannot see it, press Hint: it lights one up for five seconds on the clock.</li>
           <li><strong>Name the country</strong>As the board empties, the country's real outline fades in underneath. Clear the last arrow, pick its name from three options, and the level card shows the capital, population and region. Then on to the next stop of the tour.</li>
         </ol>
@@ -295,7 +295,9 @@
           </p>
         </div>
         <p>
-          There is no clock to beat. Every level gives four hearts and three hints, and the difficulty follows you,
+          There is no clock to beat. Every level gives four hearts, three hints and four checks — press and hold any
+          arrow and it tells you whether its lane is clear, green for yes and red for no, without spending a heart to
+          find out. The difficulty follows you,
           not the level number: a flawless, fast clear (no heart lost, no hint) steps the boards up a tier at once,
           two first-try clears in a row step up too whatever hearts and hints you spent, and two losses in a row ease
           off a tier. Boards run from about 20
@@ -349,13 +351,13 @@
           <button class="faq-q" id="aa-faq-q-3" type="button" aria-expanded="false" aria-controls="aa-faq-a-3">
             <span class="faq-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2M9 3h6"/></svg></span><span class="faq-q-text">How does the difficulty work?</span><span class="faq-chevron" aria-hidden="true"></span>
           </button>
-          <div class="faq-a" id="aa-faq-a-3" role="region" aria-labelledby="aa-faq-q-3" aria-hidden="true"><p>It follows you, not the level number. Boards come in five tiers, Easy, Normal, Hard, Expert and Master, from about 20 arrows on Easy to 80 and more on Master. Clear a board flawlessly and fast, no heart lost and no hint, and the next one steps up a tier at once. Two first-try clears in a row step up too, whatever hearts and hints you spent. Lose two boards in a row and they ease off a tier. There is no clock to beat: four hearts and three hints per level, that is all.</p></div>
+          <div class="faq-a" id="aa-faq-a-3" role="region" aria-labelledby="aa-faq-q-3" aria-hidden="true"><p>It follows you, not the level number. Boards come in five tiers, Easy, Normal, Hard, Expert and Master, from about 20 arrows on Easy to 80 and more on Master. Clear a board flawlessly and fast, no heart lost and no hint, and the next one steps up a tier at once. Two first-try clears in a row step up too, whatever hearts and hints you spent. Lose two boards in a row and they ease off a tier. There is no clock to beat: four hearts, three hints and four checks per level, that is all. A check is a press and hold on any arrow, which says whether its lane is clear without costing you a heart to find out.</p></div>
         </div>
         <div class="faq-item">
           <button class="faq-q" id="aa-faq-q-4" type="button" aria-expanded="false" aria-controls="aa-faq-a-4">
             <span class="faq-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M4 12h16M12 4v16"/></svg></span><span class="faq-q-text">Can a level become impossible?</span><span class="faq-chevron" aria-hidden="true"></span>
           </button>
-          <div class="faq-a" id="aa-faq-a-4" role="region" aria-labelledby="aa-faq-q-4" aria-hidden="true"><p>No. Boards are generated so that a solution always exists, and removing an arrow can only free space for the others, so whatever order you tap in you can never get stuck. If you are out of ideas, use a hint: it lights up an arrow that is free right now and adds five seconds to your clock.</p></div>
+          <div class="faq-a" id="aa-faq-a-4" role="region" aria-labelledby="aa-faq-q-4" aria-hidden="true"><p>No. Boards are generated so that a solution always exists, and removing an arrow can only free space for the others, so whatever order you tap in you can never get stuck. If you are out of ideas, use a hint: it lights up an arrow that is free right now and adds five seconds to your clock. Or press and hold an arrow you are wondering about — four of those a level, and they cost no time at all.</p></div>
         </div>
         <div class="faq-item">
           <button class="faq-q" id="aa-faq-q-5" type="button" aria-expanded="false" aria-controls="aa-faq-a-5">
@@ -483,6 +485,6 @@
       </div>
     </div>
 
-    <script src="/js/puzzle.js?v=4"></script>
+    <script src="/js/puzzle.js?v=5"></script>
   </body>
 </html>
