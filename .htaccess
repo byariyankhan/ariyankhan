@@ -28,9 +28,12 @@ RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 #    descriptions and in the start_url of every copy of the game somebody has installed; a 301 is what
 #    keeps all three working and hands the search ranking to the new address. The fragment a share link
 #    carries (#b-050, #m=ABCD) is re-appended by the browser, so a challenge link survives the hop.
-RewriteRule ^arrow-atlas\.html$          /puzzle/ [R=301,L,NE]
-RewriteRule ^arrow-atlas-privacy\.html$  /puzzle/privacy.html [R=301,L,NE]
-RewriteRule ^arrow-atlas-terms\.html$    /puzzle/terms.html [R=301,L,NE]
+#    The target is written in full, https and host and all, for the same reason the rules above it are:
+#    behind a TLS-terminating proxy Apache only ever sees plain HTTP, so a bare path redirect answers
+#    http:// and costs every old link a second hop.
+RewriteRule ^arrow-atlas\.html$          https://%{HTTP_HOST}/puzzle/ [R=301,L,NE]
+RewriteRule ^arrow-atlas-privacy\.html$  https://%{HTTP_HOST}/puzzle/privacy.html [R=301,L,NE]
+RewriteRule ^arrow-atlas-terms\.html$    https://%{HTTP_HOST}/puzzle/terms.html [R=301,L,NE]
 
 # ── Never serve deploy/test tooling ──────────────
 RedirectMatch 404 ^/(deploy|tests)(/|$)
