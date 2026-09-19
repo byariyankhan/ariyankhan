@@ -199,7 +199,7 @@ jobs:
           # The variables are set on the remote side of the connection: an `env:` block here would only
           # reach the runner. base64 keeps the snippet on one line and out of the shell's way.
           "${SSH[@]}" "$VPS_USER@$VPS_HOST" \
-            "MODE='$MODE' DOMAIN='$DOMAIN' CONFIRM='$CONFIRM' SNIPPET_B64='$(cat /tmp/snippet.b64)' bash -s" \
+            "MODE='$MODE' DOMAIN='$DOMAIN' CONFIRM='$CONFIRM' SRC_SHA='$GITHUB_SHA' SNIPPET_B64='$(cat /tmp/snippet.b64)' bash -s" \
             < .github/scripts/puzzle-vps.sh
 
       - name: Remove the key
