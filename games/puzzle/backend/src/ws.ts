@@ -11,7 +11,7 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import type { FastifyInstance } from 'fastify';
 import type { IncomingMessage } from 'node:http';
-import { WS_PATH, config } from './config.js';
+import { LEGACY_WS_PATH, WS_PATH, config } from './config.js';
 import { pool, tx } from './db.js';
 import * as R from './rooms.js';
 import { userForToken, type User } from './auth.js';
@@ -81,7 +81,8 @@ export function attachWebSocket(app: FastifyInstance): void {
 
   app.server.on('upgrade', async (req, socket, head) => {
     const url = new URL(req.url ?? '/', 'http://localhost');
-    if (url.pathname !== WS_PATH) return;                 // not ours: leave it for anything else listening
+    // The old path is what an un-reloaded client still opens; both are ours.
+    if (url.pathname !== WS_PATH && url.pathname !== LEGACY_WS_PATH) return;   // not ours: leave it for anything else listening
 
     const ip = (req.headers['x-forwarded-for'] as string | undefined)?.split(',')[0]?.trim()
       || req.socket.remoteAddress || 'unknown';

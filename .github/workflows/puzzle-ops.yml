@@ -34,7 +34,7 @@
 #
 # No secret is ever printed: the PostgreSQL password is read inside the container from its own environment
 # and passed to psql through PGPASSWORD, which never reaches a log line.
-name: Arrow Atlas ops
+name: Puzzle ops
 
 on:
   workflow_dispatch:
@@ -136,14 +136,14 @@ jobs:
           # The nginx snippet from this checkout travels with the deploy so the VPS never has to hold a
           # git clone for it. Other modes send an empty file and never read it.
           SNIPPET=/dev/null
-          if [ "$MODE" = "deploy" ]; then SNIPPET=games/arrow-atlas/deploy/nginx-arrow-atlas.conf; fi
+          if [ "$MODE" = "deploy" ]; then SNIPPET=games/puzzle/deploy/nginx-puzzle.conf; fi
           base64 -w0 < "$SNIPPET" > /tmp/snippet.b64
 
           # The variables are set on the remote side of the connection: an `env:` block here would only
           # reach the runner. base64 keeps the snippet on one line and out of the shell's way.
           "${SSH[@]}" "$VPS_USER@$VPS_HOST" \
             "MODE='$MODE' DOMAIN='$DOMAIN' SNIPPET_B64='$(cat /tmp/snippet.b64)' bash -s" \
-            < .github/scripts/arrow-atlas-vps.sh
+            < .github/scripts/puzzle-vps.sh
 
       - name: Remove the key
         if: always()

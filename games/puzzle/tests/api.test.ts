@@ -11,7 +11,7 @@ import { online } from '../backend/src/presence.js';
 import { eq, finish, ok, reset, section } from './helpers.js';
 
 const BASE = process.env.AA_TEST_BASE ?? 'http://127.0.0.1:8760';
-const V = `${BASE}/api/arrow-atlas/v1`;
+const V = `${BASE}/api/puzzle/v1`;
 
 async function mint(name: string, gold = 200_000): Promise<{ id: number; token: string }> {
   return tx(async c => {
@@ -48,6 +48,14 @@ section('Health says which part is unwell');
   eq((h.json.postgres as { ok: boolean }).ok, true, 'and reports PostgreSQL up');
   eq((h.json.redis as { ok: boolean }).ok, true, 'and Redis up');
   eq(h.json.product, 'arrow-atlas', 'tagged with the product, not a generic name');
+
+  // The game was renamed; its wire was not renamed out from under the copies already running. A page held in
+  // a cache, or an installed app that has not fetched a new script, asks the old prefix and must be answered.
+  const legacy = await call('/lobby', { base: `${BASE}/api/arrow-atlas/v1` });
+  eq(legacy.status, 200, 'the prefix the game had before its rename still answers');
+  const now = await call('/lobby');
+  eq(JSON.stringify(Object.keys(legacy.json).sort()), JSON.stringify(Object.keys(now.json).sort()),
+     'and answers with the same thing as the name it goes by now');
   const live = await fetch(`${BASE}/health/live`);
   eq(live.status, 200, 'the liveness probe answers without touching the database');
 }

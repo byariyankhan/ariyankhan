@@ -4,19 +4,19 @@
 # testing here is about transactions and expiry. The image is published to GitHub's own registry, which needs
 # no credential beyond the token every workflow already has, and the VPS pulls it from there: a deploy becomes
 # `docker compose pull && up -d` rather than a build on the server.
-name: Arrow Atlas API
+name: Puzzle API
 
 on:
   push:
     branches: [main]
     paths:
-      - 'games/arrow-atlas/**'
+      - 'games/puzzle/**'
       - 'games/data/arrow-atlas.json'
-      - '.github/workflows/arrow-atlas-api.yml'
+      - '.github/workflows/puzzle-api.yml'
   pull_request:
     paths:
-      - 'games/arrow-atlas/**'
-      - '.github/workflows/arrow-atlas-api.yml'
+      - 'games/puzzle/**'
+      - '.github/workflows/puzzle-api.yml'
   workflow_dispatch:
 
 permissions:
@@ -60,30 +60,30 @@ jobs:
         with:
           node-version: '22'
           cache: npm
-          cache-dependency-path: games/arrow-atlas/backend/package-lock.json
+          cache-dependency-path: games/puzzle/backend/package-lock.json
 
       - name: Install
-        working-directory: games/arrow-atlas/backend
+        working-directory: games/puzzle/backend
         # --include=dev for the same reason the compose file needs it: the suites and the typecheck are
         # devDependencies, and this should not depend on NODE_ENV happening to be development.
         run: npm ci --include=dev --no-audit --no-fund
 
       - name: Typecheck
-        working-directory: games/arrow-atlas/backend
+        working-directory: games/puzzle/backend
         # The suites are included. tsx runs them by stripping types without checking any of them, so nothing
         # was checking those files at all — a call with the wrong arguments reached a test run and only failed
         # once that line executed.
         run: npm run typecheck && npx tsc -p tsconfig.tests.json
 
       - name: Migrate
-        working-directory: games/arrow-atlas/backend
+        working-directory: games/puzzle/backend
         run: npx tsx src/migrate.ts
 
       # The suites live beside the backend, so they may import its source but nothing by bare package name:
       # tests/ has no node_modules of its own and a bare import there fails to resolve. Saying so here beats
       # finding out from a module-not-found error halfway through a run.
       - name: No bare package imports in the suites
-        working-directory: games/arrow-atlas/tests
+        working-directory: games/puzzle/tests
         run: |
           if grep -nE "^import .* from '[^.n]" *.ts | grep -v "from 'node:"; then
             echo "::error::a test file imports a package by name; import it through ../backend/src instead, or use a Node built-in"
@@ -92,13 +92,13 @@ jobs:
           echo "none, as intended"
 
       - name: Start the API
-        working-directory: games/arrow-atlas/backend
+        working-directory: games/puzzle/backend
         run: |
           npx tsx src/server.ts & echo $! > /tmp/api.pid
           for i in $(seq 1 40); do curl -sf http://127.0.0.1:8760/health/live && break; sleep 0.5; done
 
       - name: Every suite
-        run: bash games/arrow-atlas/tests/run.sh
+        run: bash games/puzzle/tests/run.sh
 
       - name: Stop the API
         if: always()
@@ -120,7 +120,7 @@ jobs:
         with:
           # The repository root: the Dockerfile copies the board list from games/data as well as the backend.
           context: .
-          file: games/arrow-atlas/backend/Dockerfile
+          file: games/puzzle/backend/Dockerfile
           push: true
           tags: |
             ghcr.io/${{ github.repository_owner }}/arrow-atlas-api:main

@@ -16,9 +16,9 @@ tests/fixtures/
 
 # Arrow Atlas backend
 node_modules/
-games/arrow-atlas/backend/dist/
-games/arrow-atlas/deploy/.env
-games/arrow-atlas/backend/.env.dev
+games/puzzle/backend/dist/
+games/puzzle/deploy/.env
+games/puzzle/backend/.env.dev
 # load-test fixtures: these hold real session tokens for seeded players
-games/arrow-atlas/tests/load-tokens.txt
-games/arrow-atlas/tests/load-codes.txt
+games/puzzle/tests/load-tokens.txt
+games/puzzle/tests/load-codes.txt

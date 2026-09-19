@@ -193,7 +193,7 @@ can be handed to Hostinger as raw compose YAML: no registry, no credentials, not
 context on the server.
 
 ```bash
-cd games/arrow-atlas/deploy
+cd games/puzzle/deploy
 cp .env.example .env          # fill in the two passwords and GOOGLE_CLIENT_ID
 mkdir -p /var/backups/arrow-atlas
 
@@ -222,8 +222,8 @@ nginx, once:
 
 ```bash
 mkdir -p /etc/nginx/snippets
-cp games/arrow-atlas/deploy/nginx-arrow-atlas.conf     /etc/nginx/snippets/arrow-atlas.conf
-cp games/arrow-atlas/deploy/nginx-arrow-atlas-map.conf /etc/nginx/conf.d/arrow-atlas-map.conf
+cp games/puzzle/deploy/nginx-puzzle.conf     /etc/nginx/snippets/arrow-atlas.conf
+cp games/puzzle/deploy/nginx-puzzle-map.conf /etc/nginx/conf.d/arrow-atlas-map.conf
 cp deploy/nginx-ariyankhan.conf /etc/nginx/sites-available/ariyankhan.conf
 nginx -t && systemctl reload nginx
 ```
@@ -310,7 +310,7 @@ scratch database again. It is the only way to know a backup works.
 **The API misbehaves, the data is fine** — the fastest fix, and the usual one:
 
 ```bash
-cd games/arrow-atlas/deploy
+cd games/puzzle/deploy
 ARROW_ATLAS_IMAGE=ghcr.io/byariyankhan/arrow-atlas-api:<previous-sha> docker compose up -d arrow-atlas-api
 ```
 
@@ -331,7 +331,7 @@ The rollback that matters is the one above: a dump, verified, restored.
 
 The work this whole layout exists to make short:
 
-1. **Deploy the same project.** Copy `games/arrow-atlas/` to the new server, `cp .env.example .env`, fill in
+1. **Deploy the same project.** Copy `games/puzzle/` to the new server, `cp .env.example .env`, fill in
    fresh passwords, `docker compose up -d`. The image comes from ghcr; nothing is built on the server.
 2. **Carry the data across.** On the old server `backup.sh once`, copy the dump over, and on the new
    one `restore.sh live <dump>`. Verify it first with `restore.sh verify`.
@@ -344,7 +344,7 @@ The work this whole layout exists to make short:
    ```
    and set `ARROW_ATLAS_ALLOWED_ORIGINS` to the origins the page is served from, so the browser may send
    credentials cross-origin. No JavaScript changes.
-5. **nginx and DNS.** Include the same `nginx-arrow-atlas.conf` in the new server block — the file does not
+5. **nginx and DNS.** Include the same `nginx-puzzle.conf` in the new server block — the file does not
    change — point DNS at the new server, and get a certificate.
 6. **Verify**, then remove the include from `ariyankhan.conf`.
 
@@ -356,7 +356,7 @@ volumes, no other game's tables, and a client that never hardcoded a hostname.
 ## Working on it
 
 ```bash
-cd games/arrow-atlas/backend
+cd games/puzzle/backend
 npm install
 cp .env.example .env.dev       # point it at a local PostgreSQL and Redis
 npm run migrate
