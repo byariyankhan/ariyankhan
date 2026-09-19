@@ -472,6 +472,10 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-facts b{ color:var(--ink); }
 /* discoveries: four finds per cleared country */
 .aa-seo-credit{ font-size:12px; color:var(--muted); }
+/* The game's own policies, visible on the page. A reviewer should not have to open a settings sheet to find them. */
+.aa-seo-legal{ margin:10px 0 0; font-size:13px; font-weight:800; color:var(--muted); }
+.aa-seo-legal a{ color:var(--muted); text-decoration:underline; text-underline-offset:3px; }
+.aa-seo-legal a:hover{ color:var(--ink); }
 .aa-adapt{ font-size:13px; font-weight:800; color:var(--muted); margin:-6px 0 14px; }
 .aa-adapt--up{ color:var(--hard); }
 .aa-adapt--down{ color:var(--good); }
