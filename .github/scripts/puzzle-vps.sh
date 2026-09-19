@@ -529,7 +529,7 @@ BDIR
 
     say "4. one backup, to prove it lands there"
     n_before=$($SUDO find "$NEWB" -maxdepth 1 -name 'puzzle-*.dump' | wc -l | tr -d ' ')
-    aabackup once 2>&1 | tail -4 | sed 's/^/      /'
+    aabackup 'backup.sh once' 2>&1 | tail -4 | sed 's/^/      /'
     n_after=$($SUDO find "$NEWB" -maxdepth 1 -name 'puzzle-*.dump' | wc -l | tr -d ' ')
     if [ "$n_after" -gt "$n_before" ]; then
       ok "a new dump is on the host in $NEWB ($n_before -> $n_after)"
