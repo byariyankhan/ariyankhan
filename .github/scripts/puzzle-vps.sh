@@ -425,10 +425,13 @@ mode_web_revive() {
 # anchored on the name before the first '=', and the proof that no value moved is a hash of the values compared
 # before and after — never a value, never a line of the file, never the rendered configuration.
 #
-# The compose file in this checkout reads ${PUZZLE_*}, so it is installed in the same run: renaming one without
-# the other leaves a project compose cannot resolve. And no container is recreated, because none needs to be —
-# the names the containers see have been PUZZLE_* since the rename, so the rendered configuration is identical
-# before and after. That identity is the gate, checked as a hash; if it does not hold, both files go back.
+# The compose file on the host has to be renamed in the same run — renaming one without the other leaves a
+# project compose cannot resolve — and it is the live file that is edited, in place and only its ${ARROW_ATLAS_*}
+# references. Not the one from the checkout: that may carry changes nobody has deployed, and then this run would
+# have changed more than names. Which is what the gate would catch: no container is recreated, because none needs
+# to be — the names inside them have been PUZZLE_* since the rename — so the rendered configuration must be
+# identical before and after. That identity is the gate, checked as a hash. If it does not hold, both files go
+# back and nothing on the box has moved.
 env_rollback() {
   $SUDO cp -a "$EBK" "$ENVF" && note "the .env is back as it was"
   $SUDO cp -a "$CBK" "$COMP" && note "the compose file is back as it was"
@@ -438,7 +441,7 @@ mode_rename_env() {
   echo "Puzzle — the .env keys  ($(hostname), $(date -u))"
   TGZ=/tmp/puzzle-site.tgz
   command -v python3 >/dev/null || { bad "python3 is not on this host, and editing this file without it is not worth the risk"; return; }
-  [ -s "$TGZ" ] || { bad "no checkout arrived; the compose file that reads PUZZLE_* comes with it"; return; }
+  [ -s "$TGZ" ] || note "no checkout arrived; the comparison at the end will be skipped"
   have "$API" || { bad "no API container here"; return; }
   PROJ=$(docker inspect -f '{{index .Config.Labels "com.docker.compose.project.working_dir"}}' "$API" 2>/dev/null)
   [ -n "$PROJ" ] && $SUDO test -f "$PROJ/.env" || { bad "cannot find the .env behind $API"; return; }
@@ -502,13 +505,26 @@ else:
     print('      %d key(s) renamed, every value byte for byte the same' % len(renamed))
 ENVREN
 
-  say "4. the compose file that reads those names"
-  tar -xzf "$TGZ" -O ./games/puzzle/deploy/docker-compose.yml > /tmp/puzzle-compose.yml 2>/dev/null
-  [ -s /tmp/puzzle-compose.yml ] || { bad "the tarball has no compose file"; env_rollback; return; }
-  grep -q '${ARROW_ATLAS_' /tmp/puzzle-compose.yml \
-    && { bad "the compose file in this checkout still reads the old names; nothing to install"; env_rollback; rm -f /tmp/puzzle-compose.yml; return; }
-  $SUDO install -m 644 /tmp/puzzle-compose.yml "$COMP" && ok "installed" || { bad "could not install it"; env_rollback; return; }
-  rm -f /tmp/puzzle-compose.yml
+  say "4. the same names, in the compose file that is live"
+  # Not the compose file from the checkout: that one may carry changes nobody has deployed yet, and installing
+  # it here would mean this run changed more than names — which is exactly what the gate below would catch, and
+  # rightly. So the file on the host is edited in place, and only its ${ARROW_ATLAS_*} references. A $$-escaped
+  # name belongs to a container's own environment rather than to this .env and is left alone.
+  $SUDO grep -q '[$][$]{ARROW_ATLAS_' "$COMP" \
+    && { bad "that file escapes an old name into a container's environment; this mode is too blunt for it"; env_rollback; return; }
+  $SUDO python3 - "$COMP" <<'COMPREN' || { bad "the compose file was left alone"; env_rollback; return; }
+import io, re, sys
+path = sys.argv[1]
+s = io.open(path, encoding='utf-8').read()
+n = s.count('${ARROW_ATLAS_')
+s = s.replace('${ARROW_ATLAS_', '${PUZZLE_')
+# the message an unset required variable prints, so it names the key it now wants
+s = re.sub(r'set ARROW_ATLAS_([A-Za-z0-9_]+) in \.env', r'set PUZZLE_\1 in .env', s)
+io.open(path, 'w', encoding='utf-8').write(s)
+print('      %d reference(s) rewritten' % n)
+COMPREN
+  $SUDO grep -q '${ARROW_ATLAS_' "$COMP" && { bad "some of them are still there"; env_rollback; return; }
+  ok "it reads ${PUZZLE_*} now"
 
   say "5. compose must resolve every variable, and render the same thing as before"
   if ! ( cd "$PROJ" && $SUDO docker compose config -q ) >/dev/null 2>&1; then
@@ -525,7 +541,19 @@ ENVREN
     env_rollback; return
   fi
 
-  say "6. and the containers, untouched, still answering"
+  say "6. whether the live file is otherwise the one in this checkout"
+  # A count, not a diff: this says whether a deploy is still owed, without printing a line of either file.
+  tar -xzf "$TGZ" -O ./games/puzzle/deploy/docker-compose.yml > /tmp/puzzle-compose.yml 2>/dev/null
+  if [ -s /tmp/puzzle-compose.yml ]; then
+    $SUDO cat "$COMP" > /tmp/puzzle-compose.live 2>/dev/null
+    d=$(diff /tmp/puzzle-compose.yml /tmp/puzzle-compose.live 2>/dev/null | grep -c '^[<>]' || true)
+    rm -f /tmp/puzzle-compose.live
+    [ "${d:-0}" = "0" ] && ok "byte for byte the same as the checkout's" \
+      || note "${d} line(s) differ from the checkout's — a deploy would apply those as well"
+  fi
+  rm -f /tmp/puzzle-compose.yml
+
+  say "7. and the containers, untouched, still answering"
   # Key names only. A name is not a secret; a value is, and no value is read here.
   docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' "$API" 2>/dev/null \
     | cut -d= -f1 | grep -E '^(PUZZLE|ARROW_ATLAS)_' | sort | tr '\n' ' ' | fold -w 150 -s | sed 's/^/      /'
