@@ -46,6 +46,12 @@
 #   retire-site-data  Copies the one file out of ariyankhan_site_data to /var/backups/ariyankhan-site, checks
 #                  the copy, and then removes the volume. Says what it would take to remove ariyankhan_aa-data
 #                  and does not attempt it. Needs confirm=DELETE.
+#   web-drop-aa-mount  Removes the game's dead mount from the portfolio container — the ariyankhan_aa-data
+#                  volume at /var/lib/arrow-atlas, empty since the migration, and the AA_DATA_DIR variable —
+#                  then the volume itself. Edits hPanel's own compose file the way web-safe-fetch does: a
+#                  backup first, only lines naming those two, compose has to accept it, and because that
+#                  container's document root is not a volume the checkout is put straight back after the
+#                  recreate. If the site does not answer, the old file goes back. Needs confirm=DELETE.
 #   volumes        Reads. Every volume, what holds it and where, how big it is, and what is inside the
 #                  anonymous ones, so a volume nobody recognises can be identified before anyone deletes it.
 #   health         Reads. The four containers, the API, the socket, the backup timer, and that no legacy
@@ -63,7 +69,7 @@ on:
         type: choice
         required: true
         default: inspect
-        options: [inspect, logs, git-access, git-sync, backup-verify, cleanup, deploy, deploy-site, push-source, web-safe-fetch, rename-infra, finish-rename, drop-old-volumes, drop-orphan-volumes, retire-site-data, volumes, health]
+        options: [inspect, logs, git-access, git-sync, backup-verify, cleanup, deploy, deploy-site, push-source, web-safe-fetch, rename-infra, finish-rename, drop-old-volumes, drop-orphan-volumes, retire-site-data, web-drop-aa-mount, volumes, health]
       confirm:
         description: "Type DELETE for cleanup, DEPLOY for deploy, RENAME for rename-infra. Ignored by the read-only modes."
         required: false
@@ -87,7 +93,7 @@ jobs:
         run: |
           set -euo pipefail
           case "${{ inputs.mode }}" in
-            cleanup|drop-old-volumes|drop-orphan-volumes|retire-site-data) [ "${{ inputs.confirm }}" = "DELETE" ] || { echo "::error::${{ inputs.mode }} needs confirm=DELETE"; exit 1; } ;;
+            cleanup|drop-old-volumes|drop-orphan-volumes|retire-site-data|web-drop-aa-mount) [ "${{ inputs.confirm }}" = "DELETE" ] || { echo "::error::${{ inputs.mode }} needs confirm=DELETE"; exit 1; } ;;
             deploy|deploy-site|push-source|web-safe-fetch) [ "${{ inputs.confirm }}" = "DEPLOY" ] || { echo "::error::${{ inputs.mode }} needs confirm=DEPLOY"; exit 1; } ;;
             rename-infra|finish-rename) [ "${{ inputs.confirm }}" = "RENAME" ] || { echo "::error::${{ inputs.mode }} needs confirm=RENAME"; exit 1; } ;;
             *) echo "read-only mode, no confirmation needed" ;;
@@ -127,7 +133,7 @@ jobs:
       # is not, this connection is the way in. Everything but the working tree is left behind, and .git most
       # of all — the VPS has no business holding the history.
       - name: Send this checkout
-        if: inputs.mode == 'push-source' || inputs.mode == 'web-safe-fetch'
+        if: inputs.mode == 'push-source' || inputs.mode == 'web-safe-fetch' || inputs.mode == 'web-drop-aa-mount'
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
