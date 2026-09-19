@@ -288,6 +288,10 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-status-mid b{ color:var(--ink); }
 .aa-hintbtn{ width:auto; padding:0 12px; border-radius:22px; font-size:16px; background:var(--bg2); }
 .aa-hintbtn:disabled{ opacity:.4; }
+/* The check counter reads like the lamp beside it. It is never disabled: an empty one is still worth tapping,
+   because tapping it is how a player finds out the gesture exists at all. */
+.aa-checkbtn{ margin-right:6px; }
+.aa-checkbtn.is-spent{ opacity:.4; }
 /* A board needs air around it. Some countries are long and thin and some fill a phone corner to corner, and
    an arrow sitting on the edge of the glass is one the thumb cannot reach without the palm covering half the
    board. So the frame keeps a margin on every side, and a little more at the bottom, where the phone's own
