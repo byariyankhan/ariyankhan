@@ -1,18 +1,18 @@
-/* Piece the World + Arrow Atlas — service worker.
+/* Piece the World + Puzzle – Train Your Brain — service worker.
    Scope is the whole origin (it has to be, to control the game page), but the fetch
    handler only ever answers for the game's own files; every other request on the
    site is left to the network exactly as if no worker were installed. */
-const VERSION = 'ptw-cache-v64';
+const VERSION = 'ptw-cache-v65';
 const GAME_FILES = new Set([
   '/piece-the-world.html', '/css/style.css', '/css/piece-the-world.css',
   '/js/piece-the-world.js', '/js/site-nav.js', '/js/site-footer.js',
   '/games/piece-the-world.webmanifest', '/images/ariyan-khan-profile.webp',
-  '/arrow-atlas.html', '/css/arrow-atlas.css', '/js/arrow-atlas.js', '/games/arrow-atlas.webmanifest',
+  '/puzzle/', '/css/puzzle.css', '/js/puzzle.js', '/puzzle/app.webmanifest',
   // the game's own icon and its coin: installed from the home screen, with no network, the game still has a
   // face and its gold still has a face
-  '/games/icons/arrow-atlas-96.png', '/games/icons/arrow-atlas-180.png',
-  '/games/icons/arrow-atlas-192.png', '/games/icons/arrow-atlas-512.png',
-  '/images/arrow-atlas-coin.png',
+  '/puzzle/icons/puzzle-96.png', '/puzzle/icons/puzzle-180.png',
+  '/puzzle/icons/puzzle-192.png', '/puzzle/icons/puzzle-512.png',
+  '/puzzle/icons/puzzle-maskable-512.png', '/images/puzzle-coin.png',
   '/favicon/favicon.ico', '/favicon/favicon-96x96.png', '/favicon/apple-touch-icon.png',
 ]);
 const isLevelData = p => p.startsWith('/games/data/') && p.endsWith('.json');

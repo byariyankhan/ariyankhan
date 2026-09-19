@@ -1,10 +1,10 @@
 {
-  "id": "/arrow-atlas.html",
+  "id": "/puzzle/",
   "name": "Puzzle – Train Your Brain",
   "short_name": "Puzzle",
   "description": "A free arrow puzzle that trains your focus. Tap arrows to clear a board shaped like a real country, keep your hearts, and see how well you focused. 197 countries, adaptive difficulty, works offline.",
   "start_url": "/puzzle/?utm_source=pwa",
-  "scope": "/",
+  "scope": "/puzzle/",
   "display": "standalone",
   "orientation": "any",
   "background_color": "#F4EDE0",
@@ -14,23 +14,8 @@
     "education"
   ],
   "icons": [
-    {
-      "src": "/puzzle/icons/puzzle-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "/puzzle/icons/puzzle-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "/puzzle/icons/puzzle-maskable-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "maskable"
-    }
+    { "src": "/puzzle/icons/puzzle-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/puzzle/icons/puzzle-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/puzzle/icons/puzzle-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]
 }

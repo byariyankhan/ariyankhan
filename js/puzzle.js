@@ -1,6 +1,6 @@
 /* ══════════════════════════════════════════════════
-   ARROW ATLAS — tap-away arrow puzzle on country maps
-   No dependencies. Data: games/data/arrow-atlas.json
+   PUZZLE – TRAIN YOUR BRAIN — tap-away arrow puzzle on country maps
+   No dependencies. Data: /games/data/arrow-atlas.json
    Each level is a country: a grid mask (land cells) at one of five
    difficulty tiers plus the outline for the reveal. The puzzle itself is
    generated in the browser from a fixed seed, so level 12 is the same
@@ -20,7 +20,7 @@
   const STORE = 'aa:v1:';
 
   // ── Where the backend lives ──
-  // Arrow Atlas talks to its own service, which today answers on this origin and one day may answer on
+  // Puzzle – Train Your Brain talks to its own service, which today answers on this origin and one day may answer on
   // api.arrowatlas.com. Nothing below hardcodes a host: the bases come from a meta tag if the page sets one,
   // so moving the backend is a deploy change and not a client rewrite.
   const metaBase = n => document.querySelector(`meta[name="${n}"]`)?.content?.trim() || '';
@@ -227,14 +227,14 @@
   let toastTimer = 0;
   // The coin: one struck gold piece with the world on its face, used everywhere gold is named — the purse,
   // the tables, a stake, the prize ladder and the result sheet — so it reads as one currency, not five icons.
-  const COIN = '<img class="aa-coin" src="images/arrow-atlas-coin.png" alt="" width="128" height="128" decoding="async">';
+  const COIN = '<img class="aa-coin" src="/images/puzzle-coin.png" alt="" width="128" height="128" decoding="async">';
 
   function toast(msg, kind = '', ms = 2800) { el.toast.textContent = msg; el.toast.className = 'aa-toast' + (kind ? ' aa-toast--' + kind : ''); el.toast.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => { el.toast.hidden = true; }, ms); }
 
   // ── Data ──
   async function loadData() {
     if (DATA) return DATA;
-    const [r] = await Promise.all([fetch(`games/data/arrow-atlas.json?v=${DATA_VERSION}`, { cache: 'force-cache' }), loadDiscBoards()]);
+    const [r] = await Promise.all([fetch(`/games/data/arrow-atlas.json?v=${DATA_VERSION}`, { cache: 'force-cache' }), loadDiscBoards()]);
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     const d = await r.json(); d.canon = d.levels.slice();
     migrateProgress(d);
@@ -264,7 +264,7 @@
     const saved = store.get('home', null);
     if (saved != null) return saved;   // '' = keep the canonical order (chosen explicitly)
     let c = '';
-    try { const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), 2500); const r = await fetch('games/geo.php', { signal: ctrl.signal, cache: 'no-store' }); clearTimeout(t); if (r.ok) c = ((await r.json()).c || '').toUpperCase(); } catch { /* offline or local: fall back */ }
+    try { const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), 2500); const r = await fetch('/games/geo.php', { signal: ctrl.signal, cache: 'no-store' }); clearTimeout(t); if (r.ok) c = ((await r.json()).c || '').toUpperCase(); } catch { /* offline or local: fall back */ }
     if (!c) { const m = /-([A-Za-z]{2})$/.exec(navigator.language || ''); if (m) c = m[1].toUpperCase(); }
     if (!d.canon.some(L => L.a2 === c)) c = '';
     // A guess, not a choice. The distinction matters now that this travels: a new phone that guessed
@@ -285,7 +285,7 @@
   // the next level pulsing. Tap a country to play its level. Built by games/build-world-map.mjs.
   let MAP = null, mapPromise = null, mapDrawn = false;
   function loadMap() {
-    if (!mapPromise) mapPromise = fetch(`games/data/world-map.json?v=${MAP_VERSION}`, { cache: 'force-cache' }).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }).then(m => { MAP = m; return m; });
+    if (!mapPromise) mapPromise = fetch(`/games/data/world-map.json?v=${MAP_VERSION}`, { cache: 'force-cache' }).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }).then(m => { MAP = m; return m; });
     return mapPromise;
   }
   function renderWorld() {
@@ -401,7 +401,7 @@
   // one numbered list with the countries (see tourFor).
   let DISCB = null, discbPromise = null;
   function loadDiscBoards() {
-    if (!discbPromise) discbPromise = fetch(`games/data/discover-boards.json?v=${DISCB_VERSION}`, { cache: 'force-cache' }).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }).then(d => { DISCB = d; return d; });
+    if (!discbPromise) discbPromise = fetch(`/games/data/discover-boards.json?v=${DISCB_VERSION}`, { cache: 'force-cache' }).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }).then(d => { DISCB = d; return d; });
     return discbPromise;
   }
   const KIND_WORD = { a: 'animal', b: 'bird', p: 'place' };
@@ -1197,7 +1197,7 @@
     const n = DATA.levels.length, done = DATA.levels.filter((_, i) => cleared(i)).length;
     const D = state.disc, rec = state.daily ? store.get(`daily:${state.daily.key}`) : cleared(state.idx);
     const what = D ? `${D.country.name}'s ${KIND_WORD[D.kind]}, the ${state.level.name}` : state.level.name;
-    const text = `Arrow Atlas: I cleared ${what} (${state.daily ? 'daily board ' + state.daily.key : 'level ' + levelNo(state.idx)}) in ${fmtTime(rec?.t ?? state.elapsed, true)} ${'★'.repeat(rec?.stars || stars())} and ${done}/${n} countries so far.\nYour turn: https://ariyankhan.com/arrow-atlas.html${state.daily ? '#daily' : '#b-' + state.level.id}`;
+    const text = `Puzzle – Train Your Brain: I cleared ${what} (${state.daily ? 'daily board ' + state.daily.key : 'level ' + levelNo(state.idx)}) in ${fmtTime(rec?.t ?? state.elapsed, true)} ${'★'.repeat(rec?.stars || stars())} and ${done}/${n} countries so far.\nYour turn: https://ariyankhan.com/puzzle/${state.daily ? '#daily' : '#b-' + state.level.id}`;
     const flash = $('.aa-flash', el.card);
     try {
       if (navigator.share) { await navigator.share({ text }); return; }
@@ -1700,7 +1700,7 @@
   // corner as a badge rather than as a line of type: the number is the news, the word "waiting" is not.
   const stakeLive = n => n ? `<span class="aa-stake-live" title="${n} waiting">${n}</span>` : '';
   const stakesHtml = (gold, waiting) => STAKES.map(v =>
-    `<button type="button" class="aa-stake" data-stake="${v}"${gold < v ? ' disabled' : ''} aria-label="Play for ${gfmt(v)} gold"><span class="aa-stake-in"><img class="aa-coin aa-stake-coin" src="images/arrow-atlas-coin.png" alt="" width="128" height="128" decoding="async"><span class="aa-stake-amt">${gtiny(v)}</span></span>${stakeLive(waiting[v])}</button>`).join('');
+    `<button type="button" class="aa-stake" data-stake="${v}"${gold < v ? ' disabled' : ''} aria-label="Play for ${gfmt(v)} gold"><span class="aa-stake-in"><img class="aa-coin aa-stake-coin" src="/images/puzzle-coin.png" alt="" width="128" height="128" decoding="async"><span class="aa-stake-amt">${gtiny(v)}</span></span>${stakeLive(waiting[v])}</button>`).join('');
 
   // How many are sitting in a room at each stake. Shown under the coins so nobody waits at an empty one.
   // The same answer carries the server's list of tables, so a table added or retired there reaches the player
@@ -2001,7 +2001,7 @@
   async function sendInvite(m) {
     if (!m) return;
     const link = matchLink(m.code);
-    const text = `Arrow Atlas: I put ${gfmt(m.stake)} gold on a board. Match it, clear it before me and take the lot.\n${link}`;
+    const text = `Puzzle – Train Your Brain: I put ${gfmt(m.stake)} gold on a board. Match it, clear it before me and take the lot.\n${link}`;
     const flash = $('.aa-flash', el.overlay.hidden ? el.matchBody : el.card);
     try {
       if (navigator.share) { await navigator.share({ text }); return; }
@@ -2485,7 +2485,7 @@
   //
   // One table, the week's clock above it and the rules folded behind the question mark. Every row is a player
   // who played; the medals are on the places that are actually being paid, so a gold badge is a promise the
-  // settlement keeps rather than a decoration on the first line. The pieces are Arrow Atlas's own — its faces,
+  // settlement keeps rather than a decoration on the first line. The pieces are the game's own — its faces,
   // its cards, its palette — because a screen that borrowed another game's art would look like a different game.
   const MEDAL = r => r === 1 ? ' is-g1' : r === 2 ? ' is-g2' : r === 3 ? ' is-g3' : r <= 10 ? ' is-prize' : '';
   const leagueRow = (r, prize, paid) => `

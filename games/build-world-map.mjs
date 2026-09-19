@@ -1,7 +1,7 @@
 // Build the lobby world map for Arrow Atlas: every country as an SVG path in a 1000x520 box (Natural Earth
 // projection, Antarctica dropped), plus a label point per country (centroid of its main landmass).
 // Usage (from the repo root, one-off): npm i --no-save d3-geo topojson-client world-atlas && node games/build-world-map.mjs
-// Then bump MAP_VERSION in js/arrow-atlas.js so edges drop the old file.
+// Then bump MAP_VERSION in js/puzzle.js so edges drop the old file.
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);

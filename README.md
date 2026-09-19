@@ -161,8 +161,8 @@ uploaded to that old name is not served.
 | `js/piece-the-world.js`, `css/piece-the-world.css` | Game engine (drag/snap, modes, timer, stars, bests) + page styles |
 | `games/data/*.json`, `games/build-data.mjs` | Level data (piece paths per continent) and the script that builds it from Natural Earth |
 | `games/piece-the-world.webmanifest`, `piece-the-world-sw.js` | PWA manifest + service worker for both games (offline levels, installable) |
-| `arrow-atlas.html`, `js/arrow-atlas.js`, `css/arrow-atlas.css` | Tap-away arrow puzzle game on country maps — see "Arrow Atlas" section below |
-| `games/data/arrow-atlas.json`, `games/build-arrow-atlas.mjs`, `games/arrow-atlas.webmanifest` | Its level data (outlines + tier scales for 197 countries; masks are rasterised in the browser), build script and PWA manifest |
+| `puzzle/index.html`, `js/puzzle.js`, `css/puzzle.css` | Tap-away arrow puzzle game on country maps, served at `/puzzle/` — see "Puzzle – Train Your Brain" section below |
+| `games/data/arrow-atlas.json`, `games/build-arrow-atlas.mjs`, `puzzle/app.webmanifest` | Its level data (outlines + tier scales for 197 countries; masks are rasterised in the browser), build script and PWA manifest |
 | `games/arrow-atlas/` | Its backend service, which is a project of its own: Node 22 + TypeScript + Fastify, PostgreSQL, Redis and a WebSocket, with its migrations, test suites, compose file, backup and restore scripts and nginx snippet — see `games/arrow-atlas/README.md` |
 | `js/vendor/` | Local copies of d3-array, d3-geo, d3-geo-projection, topojson-client and Natural Earth country data (`countries-110m.json`, `countries-50m.json`); the site CSP forbids CDNs |
 
@@ -504,11 +504,11 @@ text, `#level-mode` deep links (`#africa-hard`). English only, continuous play
   level cards and page copy. Browser drag/tap/finish flow was checked with
   Playwright on desktop and a Pixel 5 profile.
 
-## Arrow Atlas (tap-away arrow puzzle on country maps)
+## Puzzle – Train Your Brain (tap-away arrow puzzle on country maps)
 
-`arrow-atlas.html` is the second game: the casual, addictive one. It is a
+`puzzle/index.html` is the second game: the casual, addictive one. It is a
 standalone game, not a site page: it does not load `css/style.css`, the nav or the
-footer, and has its own look (`css/arrow-atlas.css`: Nunito, cream “paper” theme
+footer, and has its own look (`css/puzzle.css`: Nunito, cream “paper” theme
 plus “night” and “mint” via `data-theme` on `<html>`, picked in Settings or with
 the palette button). Home = purse chip, settings, a card carousel (Today's
 Country, World Tour progress, Mode), title, a level path and a Continue button;
@@ -542,7 +542,7 @@ unlock (skip allowed after two fails), stars, best times and progress in
 phone picks the tour up where the last one left it; share text, `#level-N` deep
 links.
 
-- **Engine**: `js/arrow-atlas.js` (no libraries), styles in `css/arrow-atlas.css`
+- **Engine**: `js/puzzle.js` (no libraries), styles in `css/puzzle.css`
   (`.aa-` prefix). Puzzles are generated in the browser from a fixed seed per level
   and tier (`mulberry32`), in two stages, like a maze that is drawn first and
   signposted after. (1) Layout: a share of inland cells (`HOLE_OF`) is carved out
@@ -584,9 +584,9 @@ links.
   the level picker), its caption, then Play & Discover and Play with Friends. The
   old cards carousel, the level-path dots and the compact Today's Country / All
   levels buttons are all gone.
-- **SEO**: title/description/keywords around "Arrow Atlas", "arrow puzzle" and
-  "arrow game"; Open Graph/Twitter card `images/arrow-atlas-og.jpg` (1200×630,
-  rendered from `scratchpad/og/arrow-atlas-og.html`); schema.org WebPage +
+- **SEO**: title/description/keywords around "puzzle", "train your brain", "arrow puzzle" and
+  "arrow game"; Open Graph/Twitter card `images/puzzle-og.jpg` (1200×630,
+  drawn by `games/build-puzzle-og.mjs`; the app icon by `games/build-puzzle-icon.mjs`); schema.org WebPage +
   VideoGame/WebApplication (alternateNames, keywords, image, PlayAction) +
   BreadcrumbList + FAQPage; the About / how-to / FAQ copy is a visible
   `#aaAbout` section under the app (the settings "How to play" and "About"
@@ -693,7 +693,7 @@ links.
   Google sign-in is live only when `GOOGLE_CLIENT_ID` is set in the container's
   environment, otherwise the sheet says so. The OAuth client's **Authorized
   JavaScript origins** must list `https://ariyankhan.com`, or Google's library
-  refuses to show the button on the live site. `arrow-atlas.html` gets its own
+  refuses to show the button on the live site. `puzzle/.htaccess` gives the folder its own
   slightly wider CSP in `.htaccess` for Google's sign-in library. Deleting the
   account is in the dashboard because Google Play requires it. A new account is
   created with `ARROW_ATLAS_SIGNUP_GOLD` (10,000), written as a `signup` row in
@@ -909,8 +909,8 @@ links.
   the arrow; the next tap anywhere clears it (`clearPeek()`). Taps are handled on
   pointerdown/pointerup with a 12 px move tolerance; keyboard: Enter/Space tap,
   L peeks. Lanes live in the `.aa-lanes` group above the pieces.
-- **Legal**: the game has its own `arrow-atlas-privacy.html` and
-  `arrow-atlas-terms.html` (what is stored on the device, Google Analytics, fonts,
+- **Legal**: the game has its own `puzzle/privacy.html` and
+  `puzzle/terms.html` (what is stored on the device, Google Analytics, fonts,
   permissions, children, playing without an account), linked from the welcome gate
   and Settings. Clearing the site data wipes every `aa:v1:*` key; Settings →
   Delete account removes the account copy.
