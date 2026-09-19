@@ -25,6 +25,9 @@ export interface RecentPlayer {
 /** How many rooms back to look. Deep enough to remember last week, short enough to stay one index scan. */
 const ROOMS_BACK = 300;
 
+/** How fresh a room has to be for a seat in it to mean somebody is at a table. A race is over in minutes. */
+const AT_A_TABLE_MINUTES = 30;
+
 /**
  * Who this player has played with lately.
  *
@@ -51,12 +54,15 @@ export async function recentPlayers(sql: Sql, userId: number, limit = 24): Promi
   if (!r.rowCount) return [];
 
   const ids = r.rows.map(x => x.id);
-  // In a room that has not finished, and has not reported a result: that is "playing" rather than "online",
-  // and it is worth saying, because inviting somebody mid-match is how you get ignored.
+  // A seat in a room that has not finished. On its own this is not "in a match": a room nobody joined, or a
+  // race somebody walked out of, stays open for hours by design (the sweeper refunds it a day later), and
+  // reading that row alone told a player their friend was playing all night. So it is only half the answer —
+  // and the recent window keeps an old abandoned room from following somebody around even while they are here.
   const busy = await query<{ user_id: number }>(sql, `
     SELECT DISTINCT p.user_id FROM match_players p JOIN matches m ON m.code = p.code
-     WHERE p.user_id = ANY($1::bigint[]) AND p.ms IS NULL AND m.state IN ('open', 'playing')`, [ids]);
-  const playing = new Set(busy.rows.map(x => x.user_id));
+     WHERE p.user_id = ANY($1::bigint[]) AND p.ms IS NULL AND m.state IN ('open', 'playing')
+       AND m.created_at > now() - ($2 || ' minutes')::interval`, [ids, String(AT_A_TABLE_MINUTES)]);
+  const busySeat = new Set(busy.rows.map(x => x.user_id));
   const here = new Set<number>();
   // One Redis key each, in parallel: the list is at most a hundred names and each read is a single EXISTS.
   await Promise.all(ids.map(async id => { if (await online.is(id)) here.add(id); }));
@@ -67,7 +73,9 @@ export async function recentPlayers(sql: Sql, userId: number, limit = 24): Promi
     pic: x.pic ?? '',
     last_at: x.last_at.getTime(),
     matches: Number(x.matches),
-    status: playing.has(x.id) ? 'playing' : here.has(x.id) ? 'online' : 'offline',
+    // The other half: a live socket. Somebody with the game closed is not playing, whatever a half-finished
+    // row says, so presence decides first and the seat only chooses between "online" and "in a match".
+    status: here.has(x.id) ? (busySeat.has(x.id) ? 'playing' : 'online') : 'offline',
   }));
 }
 
