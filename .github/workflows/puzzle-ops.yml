@@ -41,6 +41,10 @@
 #                  database and role, and the host's backup directory all take the game's name. Takes and
 #                  restores a backup before it starts, copies the data rather than moving it, and deletes no
 #                  volume — going back is putting the old compose file back. Needs confirm=RENAME.
+#   drop-old-backup-dir  Removes /var/backups/arrow-atlas, the directory the dumps used to land in, once it has
+#                  proved it is not needed: the backup container must mount the new directory, every file in the
+#                  old one must exist in the new one and compare byte for byte, and the new one must hold a dump
+#                  newer than the old directory itself. Needs confirm=DELETE.
 #   rename-nginx   The last old names anywhere: snippets/arrow-atlas.conf becomes snippets/puzzle.conf,
 #                  conf.d/arrow-atlas-map.conf becomes conf.d/puzzle-map.conf, and the map variable the two share
 #                  becomes $puzzle_upgrade. The live files are what moves, in one step, because a second map of
@@ -95,7 +99,7 @@ on:
         type: choice
         required: true
         default: inspect
-        options: [inspect, logs, web-look, web-revive, git-access, git-sync, backup-verify, cleanup, deploy, deploy-site, push-source, web-safe-fetch, rename-infra, finish-rename, rename-env, rename-paths, rename-nginx, drop-old-volumes, drop-orphan-volumes, retire-site-data, web-drop-aa-mount, volumes, health]
+        options: [inspect, logs, web-look, web-revive, git-access, git-sync, backup-verify, cleanup, deploy, deploy-site, push-source, web-safe-fetch, rename-infra, finish-rename, rename-env, rename-paths, rename-nginx, drop-old-backup-dir, drop-old-volumes, drop-orphan-volumes, retire-site-data, web-drop-aa-mount, volumes, health]
       confirm:
         description: "Type DELETE for cleanup, DEPLOY for deploy, RENAME for rename-infra. Ignored by the read-only modes."
         required: false
@@ -119,7 +123,7 @@ jobs:
         run: |
           set -euo pipefail
           case "${{ inputs.mode }}" in
-            cleanup|drop-old-volumes|drop-orphan-volumes|retire-site-data|web-drop-aa-mount) [ "${{ inputs.confirm }}" = "DELETE" ] || { echo "::error::${{ inputs.mode }} needs confirm=DELETE"; exit 1; } ;;
+            cleanup|drop-old-volumes|drop-orphan-volumes|retire-site-data|web-drop-aa-mount|drop-old-backup-dir) [ "${{ inputs.confirm }}" = "DELETE" ] || { echo "::error::${{ inputs.mode }} needs confirm=DELETE"; exit 1; } ;;
             deploy|deploy-site|push-source|web-safe-fetch|web-revive) [ "${{ inputs.confirm }}" = "DEPLOY" ] || { echo "::error::${{ inputs.mode }} needs confirm=DEPLOY"; exit 1; } ;;
             rename-infra|finish-rename|rename-env|rename-paths|rename-nginx) [ "${{ inputs.confirm }}" = "RENAME" ] || { echo "::error::${{ inputs.mode }} needs confirm=RENAME"; exit 1; } ;;
             *) echo "read-only mode, no confirmation needed" ;;
