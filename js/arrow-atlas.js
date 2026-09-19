@@ -1492,7 +1492,7 @@
         <b>${escapeHtml(p.name || 'Player')}</b>
         <small class="aa-pl-when is-${p.status}">${p.status === 'playing' ? 'In a match' : p.status === 'online' ? 'Online' : 'Offline'}</small>
       </span>
-      <button type="button" class="aa-btn aa-btn--small aa-pl-go${picked ? ' is-on' : ''}" data-invite="${p.id}" data-name="${escapeHtml(p.name || 'Player')}"${mode === 'pick' ? ` aria-pressed="${picked}"` : ''}>${picked ? '\u2713 Picked' : 'Invite'}</button>
+      <button type="button" class="aa-btn aa-btn--small aa-pl-go${picked ? ' is-on' : ''}" data-invite="${p.id}" data-name="${escapeHtml(p.name || 'Player')}"${p.status === 'playing' ? ' disabled title="They are on a board right now"' : ''}${mode === 'pick' ? ` aria-pressed="${picked}"` : ''}>${picked ? '\u2713 Picked' : 'Invite'}</button>
     </div>`;
   };
 
@@ -1540,6 +1540,7 @@
     } catch (err) {
       if (btn) { btn.disabled = false; btn.textContent = 'Invite'; }
       if (!quiet) toast(err.code === 'not_played_together' ? 'You can only invite people you have played with.'
+        : err.code === 'in_a_match' ? `${name} is on a board right now. Try again when they are done.`
         : err.code === 'taken' ? 'That room has already started.'
         : err.code === 'already_in' ? `${name} is already in this room.`
         : 'Could not send that invitation.', 'bad');
@@ -2618,7 +2619,13 @@
     loadLeague().then(startLeagueTick).catch(() => {});
     const m = /^#level-(\d+)$/.exec(location.hash), mb = /^#b-([\w:]+)$/.exec(location.hash), mm = matchHash();
     if (mm) openMatchLink(mm);
-    else if (mb) { const j = DATA.levels.findIndex(L => L.id === mb[1]); startLevel(j < 0 ? 0 : j); }
+    else if (mb) {
+      // A link to a country somebody has not reached yet opens their own next board instead — which it did
+      // silently, and looked like the link was broken. It says so now.
+      const j = DATA.levels.findIndex(L => L.id === mb[1]);
+      if (j >= 0 && !unlocked(j)) toast(`${DATA.levels[j].name} is not open yet — it comes as your tour reaches it. Here is your next board.`, 'hint', 5000);
+      startLevel(j < 0 ? 0 : j);
+    }
     else if (m) startLevel(+m[1] - 1);   // older links: position in the list
     else if (location.hash === '#daily') { const d = dailyPick(); startLevel(d.idx, false, d); }
   }).catch(err => { el.loading.hidden = true; el.error.textContent = `Could not load the levels (${err.message}). Check your connection and reload.`; el.error.hidden = false; });

@@ -13,7 +13,7 @@ import { publish, publishToUser } from './events.js';
 import { cleanLevels, cleanState, mergeLevels, mergeState, readAll } from './progress.js';
 import * as L from './league.js';
 import { liveProgress, online, roomPresence } from './presence.js';
-import { havePlayedTogether, recentPlayers } from './players.js';
+import { havePlayedTogether, isRacing, recentPlayers } from './players.js';
 import { body, caller, clearSessionCookie, limited, noStore, setSessionCookie, shapeUser, type Caller } from './httpkit.js';
 import { log } from './log.js';
 
@@ -196,6 +196,9 @@ const H = {
     if (!seats.some(p => p.user_id === me.user!.id)) { await noStore(res).code(403).send({ error: 'not_yours' }); return; }
     if (seats.some(p => p.user_id === to)) { await noStore(res).code(409).send({ error: 'already_in' }); return; }
     if (!(await havePlayedTogether(pool, me.user.id, to))) { await noStore(res).code(403).send({ error: 'not_played_together' }); return; }
+    // And not while they are racing. A challenge landing on a board somebody is being timed on is the one
+    // notification this game must never send; it can be sent again in a minute, when their board is over.
+    if (await isRacing(pool, to)) { await noStore(res).code(409).send({ error: 'in_a_match' }); return; }
 
     await publishToUser(to, 'invited', {
       code: m.code, stake: m.stake, from: me.user.name, from_id: me.user.id, pic: me.user.pic ?? '',

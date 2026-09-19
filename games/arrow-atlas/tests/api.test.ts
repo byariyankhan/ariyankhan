@@ -328,6 +328,20 @@ section('The people you have played with, and inviting them without a link');
   eq(sent.json.ok, true, 'and is told it went');
   eq(sent.json.delivered, false, 'honestly, including that nobody was there to hear it');
 
+  // Not while they are racing: a challenge landing on a board somebody is being timed on is a notification
+  // over a game in progress, and the one thing this game must not send.
+  const busy = await call('/matches', { token: mate.token, body: { stake: config.game.stakes[0], open_to_all: false } });
+  const busyCode = (busy.json.match as { code: string }).code;
+  const third = await mint('inviteThird');
+  await call(`/matches/${busyCode}/join`, { token: third.token, body: {} });
+  await call(`/matches/${busyCode}/start`, { token: mate.token, body: {} });
+  const mid = await call(`/matches/${next}/invite`, { token: host.token, body: { user_id: mate.id } });
+  eq(mid.status, 409, 'somebody in the middle of a race is not interrupted');
+  eq(mid.json.error, 'in_a_match', 'and the sender is told why');
+  await call(`/matches/${busyCode}/result`, { token: mate.token, body: { ms: 4_000, cleared: true } });
+  eq((await call(`/matches/${next}/invite`, { token: host.token, body: { user_id: mate.id } })).status, 200,
+     'once their board is over they can be asked again');
+
   const spam = await call(`/matches/${next}/invite`, { token: host.token, body: { user_id: stranger.id } });
   eq(spam.status, 403, 'a stranger may not be invited');
   eq(spam.json.error, 'not_played_together', 'which is the only rule there is about who may be asked');
