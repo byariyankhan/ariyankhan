@@ -952,6 +952,41 @@
     store.set('lastRun', { level: levelNo(state.idx), disc: !!state.disc, tier: state.tier, won, ...run, points, at: Date.now() });
     return { before, after, points };
   }
+  // ── Focus ──
+  //
+  // A time on its own says nothing: is a minute and a half good on a board of ninety arrows? So the card reads
+  // the run the way a player would judge their own attention — how long each arrow took against the board's
+  // par, what it cost in hearts, and whether the board had to be pointed at. The three are weighted the way
+  // they matter: pace most, then a clean run, then doing it unaided.
+  //
+  // Nothing here is a diagnosis. The game cannot see the phone call, the bus, or the first ever Master board,
+  // so it says what it measured and leaves the reasons to the person who has them.
+  const PAR_SEC_PER_ARROW = FAST_SEC_PER_ARROW;      // the same par the difficulty ladder already judges by
+  const FOCUS_FLOOR = PAR_SEC_PER_ARROW * 2.2, FOCUS_CEIL = PAR_SEC_PER_ARROW * 0.8;
+  function focusOf(ms, arrows, heartsLost, hints) {
+    const per = arrows > 0 ? (ms / 1000) / arrows : FOCUS_FLOOR;
+    const pace = Math.max(0, Math.min(1, (FOCUS_FLOOR - per) / (FOCUS_FLOOR - FOCUS_CEIL)));
+    const clean = heartsLost <= 0 ? 1 : heartsLost === 1 ? 0.6 : heartsLost === 2 ? 0.3 : 0;
+    const unaided = Math.max(0, 1 - hints * 0.25);
+    return Math.round(100 * (0.5 * pace + 0.3 * clean + 0.2 * unaided));
+  }
+  // Four readings, and what each one says. The low one is the careful one: somebody who has just finished a
+  // hard board slowly is owed encouragement, not a verdict on their attention span.
+  const FOCUS_BANDS = [
+    { at: 85, name: 'Locked in',   note: 'Nothing got past you. Go again while you are in it.' },
+    { at: 70, name: 'Steady',      note: 'Steady work — that is the pace that clears boards.' },
+    { at: 50, name: 'Warming up',  note: 'Getting there. The next board is the practice.' },
+    { at: 0,  name: 'Took a while', note: 'These are won by looking rather than hurrying. Another go?' },
+  ];
+  const focusBand = v => FOCUS_BANDS.find(b => v >= b.at) ?? FOCUS_BANDS[FOCUS_BANDS.length - 1];
+  // Offered now and then rather than every time, and only when the reading was low: advice after every board
+  // is nagging, and advice after a good one is nonsense.
+  const FOCUS_TIPS = [
+    'A quiet minute with notifications off is usually worth ten seconds here.',
+    'Peel the board from the outside in — the edges open the lanes behind them.',
+    'The hint is for the stuck moment. It costs five seconds, not the run.',
+  ];
+
   function stars() { const lost = state.livesMax - state.lives; return lost === 0 ? 3 : lost === 1 ? 2 : 1; }
   function winLevel() {
     stopTimer(); state.finished = true; state.busy = true;
@@ -995,12 +1030,26 @@
     const n = levelNo(i), milestone = !state.daily && n % 10 === 0;
     const facts = D ? escapeHtml(D.rel.charAt(0).toUpperCase() + D.rel.slice(1)) : [L.cap ? `Capital: <b>${L.cap}</b>` : '', L.pop ? `Population: <b>${fmtPop(L.pop)}</b>` : '', L.sub ? `Region: <b>${L.sub}</b>` : ''].filter(Boolean).join(' · ');
     const nj = nextOpen(i), last = nj < 0;
+    // The reading, and what it is measured against: this player's own best on this board until enough other
+    // people have cleared it for their times to mean anything, and then theirs.
+    const focus = focusOf(t, state.pieces.length, state.livesMax - state.lives, state.hintsUsed);
+    const band = focusBand(focus);
+    const tip = focus < 50 && Math.random() < 0.34 ? FOCUS_TIPS[Math.floor(Math.random() * FOCUS_TIPS.length)] : '';
+    const before = prev?.t ?? 0;
+    const against = before
+      ? (t < before ? `${fmtTime(before - t, true)} faster than your best here.` : `${fmtTime(t - before, true)} off your best here.`)
+      : 'Your first time on this board.';
     el.card.innerHTML = `
       <p class="aa-card-kicker">${milestone ? `Milestone · level ${n} · ` : ''}You cleared</p>
       <h3>${escapeHtml(L.name)}</h3>
       <p class="aa-facts">${facts}</p>
       <p class="aa-stars" aria-label="${s} of 3 stars">${'★'.repeat(s)}${'☆'.repeat(3 - s)}</p>
       <div class="aa-stats"><span><b>${fmtTime(t, true)}</b>time</span><span><b>${state.livesMax - state.lives}</b>hearts lost</span><span><b>${state.hintsUsed}</b>hints</span><span><b>x${state.bestCombo}</b>best combo</span></div>
+      <div class="aa-focus${focus >= 70 ? ' is-good' : focus < 50 ? ' is-low' : ''}">
+        <p class="aa-focus-top"><span class="aa-focus-cap">Focus</span><b>${focus}</b><span class="aa-focus-band">${band.name}</span></p>
+        <p class="aa-focus-vs" id="aaFocusVs">${against}</p>
+        <p class="aa-focus-note">${band.note}${tip ? ` <span class="aa-focus-tip">${tip}</span>` : ''}</p>
+      </div>
       ${D && D.fact ? `<p class="aa-disc-fact">${escapeHtml(D.fact)}</p>` : ''}
       <div class="aa-actions">
         ${last || state.daily ? '' : `<button type="button" class="aa-btn aa-btn--primary" data-act="next">Next: Level ${levelNo(nj)} · ${DIFF_OF(TIER_OF())}</button>`}
@@ -1011,8 +1060,25 @@
       <p class="aa-yt">Curious about ${escapeHtml(C.name)}? I make geography, history and economy videos: <a href="https://www.youtube.com/@ariyankhan" target="_blank" rel="noopener">youtube.com/@ariyankhan</a></p>`;
     el.overlay.hidden = false;
     $('[data-act]', el.card)?.focus({ preventScroll: true });
+    showPace(DATA.levels[i].id, state.tier, t);
     if (typeof gtag === 'function') gtag('event', 'level_complete', { game: 'arrow_atlas', level: n, disc: D ? 1 : 0, mode: state.mode, tier: state.tier, arrows: state.pieces.length, time_ms: t, stars: s, tier_next: learn?.after.tier ?? state.tier });
   }
+  // Everybody else who has cleared this board at this difficulty. The server answers with a percentage only
+  // once there are enough of them to mean something; until then the card keeps the line it already has, which
+  // is the player's own best — a comparison that is always true and always theirs.
+  async function showPace(levelId, tier, ms) {
+    const node = $('#aaFocusVs', el.card);
+    if (!node) return;
+    try {
+      const d = await fetch(`${API_V1}/boards/pace?level_id=${encodeURIComponent(levelId)}&tier=${tier}&ms=${Math.round(ms)}`,
+        { credentials: 'include', cache: 'no-store' }).then(r => r.json());
+      if (typeof d.beats_pct !== 'number' || !node.isConnected) return;
+      node.textContent = d.beats_pct >= 50
+        ? `Faster than ${d.beats_pct}% of players on this board.`
+        : `${100 - d.beats_pct}% of players were quicker here.`;
+    } catch { /* offline, or the server has nothing to say: the line stays as it is */ }
+  }
+
   function failLevel(reason) {
     if (state.finished) return;
     stopTimer(); state.finished = true; state.busy = true; state.fails++;

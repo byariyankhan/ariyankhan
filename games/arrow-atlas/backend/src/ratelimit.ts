@@ -35,6 +35,8 @@ export const LIMITS = {
   // a hot path. The write limit is per account and generous enough for the first sync after a long spell
   // offline, which pushes the whole tour in one request rather than as two hundred.
   progress_read: { name: 'progress_read', limit: 60,  windowSeconds: 60,  by: 'user' },
+  // One read per board cleared, and a board takes a minute at least. Signed out it is counted by address.
+  board_pace:    { name: 'board_pace',   limit: 40,  windowSeconds: 60,  by: 'user' },
   progress_write:{ name: 'progress_write',limit: 60,  windowSeconds: 60,  by: 'user' },
   ws_connect:    { name: 'ws_connect',    limit: 60,  windowSeconds: 60,  by: 'ip'   },
   // The recent players list is read when the dashboard opens and when an invite panel is opened, so it is not

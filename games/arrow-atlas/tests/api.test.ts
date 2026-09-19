@@ -390,4 +390,59 @@ section('A player may choose the name the others see');
   ok(players.some(x => x.name === 'The Cartographer'), 'the room shows the name as it is now, not as it was');
 }
 
+section('How a cleared board went, against everybody else who cleared it');
+{
+  const me = await mint('paceMe');
+  const bad = await call(`/boards/pace?level_id=&tier=0&ms=1000`);
+  eq(bad.status, 400, 'a board nobody named is refused');
+  eq((await call('/boards/pace?level_id=050&tier=9&ms=1000')).status, 400, 'so is a difficulty that does not exist');
+  eq((await call('/boards/pace?level_id=050&tier=0&ms=0')).status, 400, 'and a time of nothing');
+
+  const quiet = await call('/boards/pace?level_id=pace-board&tier=1&ms=30000');
+  eq(quiet.status, 200, 'a board nobody has cleared still answers');
+  eq(quiet.json.n, 0, 'with nobody in it');
+  eq(quiet.json.beats_pct, undefined, 'and no percentage, because there is nothing to work one out from');
+
+  // Nineteen clears: still not enough to tell somebody where they stand.
+  const times: number[] = [];
+  for (let k = 0; k < 19; k++) times.push(10_000 + k * 1000);
+  await tx(async c => {
+    for (const [k, ms] of times.entries()) {
+      const u = await query<{ id: number }>(c,
+        `INSERT INTO users (provider, sub, name, gold) VALUES ('test', $1, $2, 0) RETURNING id`,
+        [`pace-${k}-${Date.now()}-${Math.random()}`, `pacer${k}`]);
+      await query(c, `INSERT INTO progress (user_id, level_id, cleared, ms, stars, tier, arrows)
+                      VALUES ($1, 'pace-board', true, $2, 3, 1, 40)`, [u.rows[0]!.id, ms]);
+    }
+  });
+  const nearly = await call('/boards/pace?level_id=pace-board&tier=1&ms=30000', { token: me.token });
+  eq(nearly.json.n, 19, 'nineteen clears are counted');
+  eq(nearly.json.beats_pct, undefined, 'but still no percentage: a share of nineteen is a guess dressed as a fact');
+
+  // The twentieth crosses the floor, and now the answer is worth saying.
+  await tx(async c => {
+    const u = await query<{ id: number }>(c,
+      `INSERT INTO users (provider, sub, name, gold) VALUES ('test', $1, 'pacer19', 0) RETURNING id`,
+      [`pace-19-${Date.now()}-${Math.random()}`]);
+    await query(c, `INSERT INTO progress (user_id, level_id, cleared, ms, stars, tier, arrows)
+                    VALUES ($1, 'pace-board', true, 29000, 3, 1, 40)`, [u.rows[0]!.id]);
+  });
+  const slow = await call('/boards/pace?level_id=pace-board&tier=1&ms=40000', { token: me.token });
+  eq(slow.json.n, 20, 'twenty clears are enough');
+  eq(slow.json.beats_pct, 0, 'a run slower than all of them beats none of them');
+  const quick = await call('/boards/pace?level_id=pace-board&tier=1&ms=9000', { token: me.token });
+  eq(quick.json.beats_pct, 100, 'and one faster than all of them beats them all');
+  const middling = await call('/boards/pace?level_id=pace-board&tier=1&ms=20000', { token: me.token });
+  ok((middling.json.beats_pct as number) > 40 && (middling.json.beats_pct as number) < 60,
+     `a middling run lands in the middle (${middling.json.beats_pct}%)`);
+
+  // The difficulty is part of the question: the same board on Master is a different board to compare against.
+  eq((await call('/boards/pace?level_id=pace-board&tier=3&ms=20000')).json.n, 0, 'another difficulty is another table');
+
+  // A player is never compared with themselves.
+  await call('/progress', { token: me.token, body: { levels: { 'pace-board': { cleared: true, ms: 1, stars: 3, tier: 1, arrows: 40 } } } });
+  eq((await call('/boards/pace?level_id=pace-board&tier=1&ms=20000', { token: me.token })).json.n, 20,
+     'their own row is left out of the count');
+}
+
 await finish();
