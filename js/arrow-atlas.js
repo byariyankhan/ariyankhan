@@ -756,7 +756,7 @@
     resetZoom(); renderBoard(); renderHud();
     if (daily?.race && daily.match) { renderRanks(daily.match.players); syncRaceClock(daily.match); startProgressPoll(); }   // back on a race board is back in the match, on the match's own clock
     if (i === 0 && !cleared(0) && !daily) toast('Tap an arrow to shoot it off the board. If another arrow is in its way, you lose a heart.', 'hint');
-    else if (state.disc) toast(`${state.disc.country.name}'s ${KIND_WORD[state.disc.kind]} · ${state.pieces.length} arrows · what is it?`, state.tier >= 2 ? 'hard' : '');
+    else if (state.disc) toast(`${state.disc.country.name}'s ${KIND_WORD[state.disc.kind]} · ${state.pieces.length} arrows · clear it to see what it is`, state.tier >= 2 ? 'hard' : '');
     else if (state.tier >= 2) toast(`${diff.toUpperCase()} LEVEL · ${state.pieces.length} arrows${daily ? '' : ' · you earned this'}`, 'hard');
     else if (daily?.race) toast(`Challenge board · ${state.pieces.length} arrows · clear it as fast as you can.`);
     else toast(`${daily ? 'Daily board' : 'Level ' + levelNo(i)} · ${state.pieces.length} arrows · which country is this?`);
@@ -957,41 +957,23 @@
     stopTimer(); state.finished = true; state.busy = true;
     state.outlineEl?.style.setProperty('fill-opacity', '0.9');
     SFX.win(); confetti();
-    // only a country gets the quiz; a discovery board simply tells what it was
-    setTimeout(state.disc || state.daily?.race ? () => showResult(null) : showQuiz, 700);
+    // Every board ends the same way: it tells you what you cleared. It used to stop a country board to ask
+    // which country it was, three names to choose from — a test at the end of a puzzle, which is a thing to
+    // get wrong in a game nobody is being marked in. The discovery boards never asked, and they read better
+    // for it.
+    setTimeout(() => showResult(), 700);
   }
-  function showQuiz() {
-    const L = state.level, D = state.disc;
-    const rnd = mulberry32(state.idx * 31 + 7 + (D ? 13 : 0));
-    const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
-    let others;
-    if (D) {
-      // same kind of find, other names: first another country's find with the very same silhouette (the shape gives
-      // nothing away, the player has to know the country), then the rest of the kind
-      // "Bengal tiger" is no distractor for "Royal Bengal tiger": names that contain one another are out
-      const norm = n => n.toLowerCase().replace(/[^a-z]/g, ''), me = norm(D.name), names = new Set();
-      const all = DATA.levels.filter(x => { if (!x.disc || x.kind !== D.kind) return false; const n = norm(x.name); if (n.includes(me) || me.includes(n) || names.has(n)) return false; names.add(n); return true; });
-      others = shuffle(all.filter(x => x.hex === D.hex)).slice(0, 1).concat(shuffle(all.filter(x => x.hex !== D.hex)));
-    } else { const pool = DATA.canon.filter(x => x !== L && x.cont === L.cont); others = shuffle((pool.length >= 2 ? pool : DATA.canon.filter(x => x !== L)).slice()); }
-    const options = shuffle([L, others[0], others[1]]);
-    el.card.innerHTML = `<h3>Board cleared!</h3><p class="aa-card-lead">${D ? `Which ${KIND_WORD[D.kind]} did you just clear?` : 'Which country did you just clear?'}</p><div class="aa-quiz"></div>`;
-    const box = $('.aa-quiz', el.card);
-    for (const o of options) {
-      const b = document.createElement('button'); b.type = 'button'; b.className = 'aa-btn aa-quiz-opt'; b.textContent = o.name;
-      b.addEventListener('click', () => { $$('.aa-quiz-opt', box).forEach(x => { x.disabled = true; x.classList.toggle('is-right', x.textContent === L.name); x.classList.toggle('is-wrong', x === b && o !== L); }); setTimeout(() => showResult(o === L), 650); });
-      box.appendChild(b);
-    }
-    el.overlay.hidden = false;
-    $('.aa-quiz-opt', box)?.focus({ preventScroll: true });
-  }
-  function showResult(quizRight) {
+  function showResult() {
     const L = state.level, i = state.idx, D = state.disc, C = D ? D.country : L;
     const t = Math.round(state.elapsed), s = stars();
     const learn = learnFrom(true);
     const R = state.daily?.race ? state.daily : null;
     const prev = R ? null : state.daily ? store.get(`daily:${state.daily.key}`) : cleared(i);
     const isBest = !prev || t < prev.t;
-    const rec = { t: isBest ? t : prev.t, stars: Math.max(s, prev?.stars || 0), quiz: !!D || !!(quizRight || prev?.quiz), tier: state.tier, arrows: state.pieces.length, at: Date.now() };
+    // `quiz` is what a board's record used to say about the question at the end. There is no question now, so
+    // every cleared board carries it: the name is on the card either way, and a row saved today should not
+    // read as poorer than one saved last week.
+    const rec = { t: isBest ? t : prev.t, stars: Math.max(s, prev?.stars || 0), quiz: true, tier: state.tier, arrows: state.pieces.length, at: Date.now() };
     if (R) { /* a race is not part of the tour: nothing is saved and the difficulty ladder does not move */ }
     else if (state.daily) {
       store.set(`daily:${state.daily.key}`, rec);
@@ -1014,7 +996,7 @@
     const facts = D ? escapeHtml(D.rel.charAt(0).toUpperCase() + D.rel.slice(1)) : [L.cap ? `Capital: <b>${L.cap}</b>` : '', L.pop ? `Population: <b>${fmtPop(L.pop)}</b>` : '', L.sub ? `Region: <b>${L.sub}</b>` : ''].filter(Boolean).join(' · ');
     const nj = nextOpen(i), last = nj < 0;
     el.card.innerHTML = `
-      <p class="aa-card-kicker">${milestone ? `Milestone · level ${n} · ` : ''}${D ? 'You cleared' : quizRight ? 'Correct!' : 'It was'}</p>
+      <p class="aa-card-kicker">${milestone ? `Milestone · level ${n} · ` : ''}You cleared</p>
       <h3>${escapeHtml(L.name)}</h3>
       <p class="aa-facts">${facts}</p>
       <p class="aa-stars" aria-label="${s} of 3 stars">${'★'.repeat(s)}${'☆'.repeat(3 - s)}</p>
@@ -1029,7 +1011,7 @@
       <p class="aa-yt">Curious about ${escapeHtml(C.name)}? I make geography, history and economy videos: <a href="https://www.youtube.com/@ariyankhan" target="_blank" rel="noopener">youtube.com/@ariyankhan</a></p>`;
     el.overlay.hidden = false;
     $('[data-act]', el.card)?.focus({ preventScroll: true });
-    if (typeof gtag === 'function') gtag('event', 'level_complete', { game: 'arrow_atlas', level: n, disc: D ? 1 : 0, mode: state.mode, tier: state.tier, arrows: state.pieces.length, time_ms: t, stars: s, quiz: quizRight ? 1 : 0, tier_next: learn?.after.tier ?? state.tier });
+    if (typeof gtag === 'function') gtag('event', 'level_complete', { game: 'arrow_atlas', level: n, disc: D ? 1 : 0, mode: state.mode, tier: state.tier, arrows: state.pieces.length, time_ms: t, stars: s, tier_next: learn?.after.tier ?? state.tier });
   }
   function failLevel(reason) {
     if (state.finished) return;

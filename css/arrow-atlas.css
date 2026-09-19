@@ -381,10 +381,6 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-card h3{ font-size:28px; font-weight:900; margin:0 0 6px; line-height:1.05; color:var(--ink); }
 .aa-card-kicker{ font-size:12px; font-weight:900; letter-spacing:1.5px; text-transform:uppercase; color:var(--accent); margin:0 0 4px; }
 .aa-card-lead{ font-size:15px; color:var(--muted); margin:0 0 14px; }
-.aa-quiz{ display:grid; gap:8px; }
-.aa-quiz-opt{ width:100%; border-radius:14px; padding:14px; font-size:16px; background:var(--bg2); color:var(--ink); box-shadow:none; }
-.aa-quiz-opt.is-right{ background:var(--good); color:#fff; opacity:1; }
-.aa-quiz-opt.is-wrong{ background:var(--bad); color:#fff; opacity:1; }
 .aa-stars{ font-size:34px; color:var(--accent); letter-spacing:6px; margin:0 0 10px; }
 .aa-stats{ display:grid; grid-template-columns:repeat(4,1fr); gap:6px; margin:0 0 12px; }
 .aa-stats span{ display:flex; flex-direction:column; font-size:10px; letter-spacing:1px; text-transform:uppercase; color:var(--muted); background:var(--bg2); border-radius:12px; padding:10px 4px; }
