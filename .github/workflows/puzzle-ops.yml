@@ -43,8 +43,8 @@
 #                  volume — going back is putting the old compose file back. Needs confirm=RENAME.
 #   rename-env     The last of the old names: the keys in the project's .env on the host. Copies the file first,
 #                  renames only the part of a line before the first '=', proves no value moved by comparing a
-#                  hash of the values, installs the compose file from this checkout that reads ${PUZZLE_*}, and
-#                  keeps both only if compose renders exactly what it rendered before. No container is recreated,
+#                  hash of the values, renames the same references in the live compose file in place, and keeps
+#                  both only if compose renders exactly what it rendered before. No container is recreated,
 #                  because the names inside them were renamed already. Needs confirm=RENAME.
 #   finish-rename  Renames the PostgreSQL role when rename-infra could not: a role cannot be renamed by a
 #                  session connected as it, so this does it from a temporary superuser and then restarts the
