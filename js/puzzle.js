@@ -1449,7 +1449,7 @@
         ${state.daily?.race ? `<button type="button" class="aa-btn" data-act="giveup">${ICON_FLAG}Give the board up</button>` : `<button type="button" class="aa-btn" data-act="shuffle">${ICON_SHUFFLE}${eased ? 'Easier layout' : 'New layout'}</button>`}
         ${canSkip ? `<button type="button" class="aa-btn" data-act="skip">${ICON_SKIP}Skip level</button>` : ''}
         ${adCanOffer('heart')
-          ? `<button type="button" class="aa-btn aa-btn--ad" data-act="adheart">${ICON_AD}Watch an ad</button>`
+          ? `<button type="button" class="aa-btn aa-btn--ad" data-act="adheart">${ads.isAd() ? ICON_AD + 'Watch an ad' : 'Free heart'}</button>`
           : `<button type="button" class="aa-btn" data-act="levels">${ICON_MAP}World Tour</button>`}
       </div>
       ${adCanOffer('heart') ? '<p class="aa-card-out"><button type="button" class="aa-linkbtn" data-act="levels">Back to the World Tour</button></p>' : ''}`;
@@ -1537,12 +1537,32 @@
   // What this layer promises the game: ads.show() resolves 'watched' only when the network says the ad was
   // watched to the end. Everything else -- dismissed, blocked, nothing to serve, an error -- resolves to
   // something that is not 'watched', and the caller gives nothing away.
+  // Two switches, and they answer different questions.
+  //
+  //   mode  -- off | test | h5 -- whether any of this exists at all.
+  //   give  -- ad | free       -- what the offer IS, and it is the important one.
+  //
+  // give:'ad' is production and it is strict. A real rewarded advertisement is requested, and the reward is
+  // handed over on one signal and one only: adViewed, the network saying the advertisement was watched through.
+  // A skip, a close, a failed load, a blocked request, nothing in stock -- all of them give nothing, and the
+  // player is told which it was. No other path grants anything.
+  //
+  // give:'free' is for the stretch before H5 Games Ads is approved for the domain, when no advertisement can
+  // fill and a button labelled "Watch an ad" that pays out anyway is a lie in two directions at once. In this
+  // mode the network is never asked, no advertising code runs for it, and the offer never calls itself an
+  // advertisement: it is a free lifeline, and it says so. It exists so the feature can be seen and used before
+  // approval without pretending to be something it is not.
+  //
+  // The day approval lands: data-give="ad" in the meta, or drop the attribute, and the strict path is live.
+  // Nothing else changes.
   const ads = {
     mode: 'off',
+    give: 'ad',
     client: '',
     showing: false,
     ready() { return this.mode !== 'off' && !this.showing; },
     on() { return this.mode !== 'off'; },
+    isAd() { return this.give === 'ad'; },
   };
   (function adsConfigure() {
     const meta = document.querySelector('meta[name="puzzle-ads"]');
@@ -1556,7 +1576,11 @@
     const local = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
     if (wanted && ['off', 'test', 'h5'].includes(wanted) && (wanted === 'off' || local || store.get('adsdev', false))) mode = wanted;
     ads.mode = ['off', 'test', 'h5'].includes(mode) ? mode : 'off';
-    if (ads.mode !== 'h5') return;
+    const give = (meta?.dataset.give || 'ad').trim();
+    ads.give = give === 'free' ? 'free' : 'ad';
+    // Nothing of the advertising library is wired up for a free lifeline: it is not an advertisement, so it
+    // does not ask for one, does not preload one, and does not report one.
+    if (ads.mode !== 'h5' || !ads.isAd()) return;
 
     // The page already carries the AdSense tag, so there is nothing to load: adding a second copy of the same
     // script with the same publisher is how a page ends up with two libraries arguing over one slot. Take the
@@ -1660,11 +1684,10 @@
 
   // Show one, and say whether it earned the reward. Never two at once.
   //
-  // A network that has nothing to show is not the player's fault. They said yes to a wait in exchange for a
-  // heart; if no advertisement fills -- because the domain is not approved yet, because the player is somewhere
-  // the network does not sell, because it is three in the morning -- they still get the wait and they still get
-  // the heart. The stand-in says plainly that it is a stand-in. The day real ads serve, this is the rare
-  // no-fill path and nothing else changes.
+  // 'watched' comes back from adViewed and from nothing else. Every other ending -- dismissed, no fill, a
+  // failed load, a request something blocked -- comes back as itself and grants nothing. This function has no
+  // consolation path on purpose: a reward handed out for an advertisement that did not run is an advertisement
+  // we were paid nothing for and a promise to the player that was not kept.
   async function adShow(name) {
     if (!ads.ready()) return 'unavailable';
     ads.showing = true;
@@ -1674,11 +1697,24 @@
       if (ads.mode === 'test') return await adTestShow(name);
       const looking = adLooking();
       const shut = () => looking.remove();
-      let how;
-      try { how = await adH5Show(name, shut); } finally { shut(); }
-      if (how !== 'unavailable') return how;
-      return await adTestShow(name, 'No advertisement available',
-        'Nothing came back from the network, so this one is on us. The wait is the same.');
+      try { return await adH5Show(name, shut); } finally { shut(); }
+    } finally {
+      ads.showing = false;
+      if (wasMusic && state.music && !el.game.hidden && !state.finished) musicStart();
+    }
+  }
+
+  // The free lifeline. Not an advertisement, never called one, and no advertising code runs for it. It keeps
+  // the shape of the offer -- a decision, a short wait, a reward -- so that switching to the real thing changes
+  // what happens and not how it feels.
+  async function freeShow(name) {
+    if (!ads.ready()) return 'unavailable';
+    ads.showing = true;
+    const wasMusic = music.on;
+    try {
+      if (wasMusic) musicStop();
+      return await adTestShow(name, 'Free lifeline',
+        'Advertising is not running in the game yet, so this one is on us. Take a moment, and it is yours.');
     } finally {
       ads.showing = false;
       if (wasMusic && state.music && !el.game.hidden && !state.finished) musicStart();
@@ -1691,14 +1727,16 @@
   const AD_REWARD = {
     heart: {
       title: 'One more heart',
-      lead: 'Watch a short advertisement and carry on with this board from where it stopped, with one heart.',
+      lead: 'Watch a short advertisement through and carry on with this board from where it stopped, with one heart.',
       cta: 'Watch for a heart',
+      free: { lead: 'Carry on with this board from where it stopped, with one heart. Free \u2014 advertising is not running in the game yet.', cta: 'Take a heart' },
       grant() { state.lives = 1; state.finished = false; state.busy = false; el.overlay.hidden = true; renderHud(); startTimer(); heartLost(); toast('One heart. Make it count.', 'good'); },
     },
     hint: {
       title: 'One more hint',
-      lead: 'Watch a short advertisement for one more hint on this board.',
+      lead: 'Watch a short advertisement through for one more hint on this board.',
       cta: 'Watch for a hint',
+      free: { lead: 'One more hint on this board, free \u2014 advertising is not running in the game yet.', cta: 'Take a hint' },
       // The hint is added, and nothing else. It used to light the arrow up the moment the advertisement closed,
       // which put a 2.5-second glow on screen while the player was still watching the ad panel disappear -- the
       // thing they had just spent half a minute on, missed. An advertisement buys the item; using it is a tap,
@@ -1707,14 +1745,16 @@
     },
     check: {
       title: `One more ${CHECK_WORD}`,
-      lead: `Watch a short advertisement for one more ${CHECK_WORD} on this board.`,
+      lead: `Watch a short advertisement through for one more ${CHECK_WORD} on this board.`,
       cta: `Watch for a ${CHECK_WORD}`,
+      free: { lead: `One more ${CHECK_WORD} on this board, free \u2014 advertising is not running in the game yet.`, cta: `Take a ${CHECK_WORD}` },
       grant() { state.checksMax = (state.checksMax ?? CHECKS_PER_LEVEL) + 1; renderHud(); toast(`One more ${CHECK_WORD}.`, 'good'); },
     },
     gold: {
       title: 'Gold for an advertisement',
-      lead: 'Watch a short advertisement and the gold is added to your purse.',
+      lead: 'Watch a short advertisement through and the gold is added to your purse.',
       cta: 'Watch for gold',
+      free: { title: 'Gold on the house', lead: 'Gold added to your purse, free \u2014 advertising is not running in the game yet.', cta: 'Take the gold' },
       needsAccount: true,
       async grant() { await adClaimGold(); },
     },
@@ -1725,13 +1765,16 @@
     const R = AD_REWARD[kind];
     if (!R || ads.showing) return;
     if (R.needsAccount && !auth.user) { openSignIn('Sign in first, so the gold has a purse to go into.'); return; }
+    // One sheet, two vocabularies. An advertisement is described as an advertisement; a free lifeline is
+    // described as a free lifeline. Neither borrows the other's words.
+    const C = ads.isAd() ? R : { ...R, ...(R.free || {}) };
     const wrap = document.createElement('div');
     wrap.className = 'aa-adoffer';
     wrap.innerHTML = `<div class="aa-adoffer-panel" role="dialog" aria-modal="true" aria-labelledby="aaAdTitle">
-      <h3 id="aaAdTitle">${escapeHtml(R.title)}</h3>
-      <p>${escapeHtml(note || R.lead)}</p>
+      <h3 id="aaAdTitle">${escapeHtml(C.title)}</h3>
+      <p>${escapeHtml((ads.isAd() && note) || C.lead)}</p>
       <div class="aa-actions aa-actions--stack">
-        <button type="button" class="aa-btn aa-btn--primary" data-ad="go">${ICON_AD}${escapeHtml(R.cta)}</button>
+        <button type="button" class="aa-btn aa-btn--primary" data-ad="go">${ads.isAd() ? ICON_AD : ''}${escapeHtml(C.cta)}</button>
         <button type="button" class="aa-btn" data-ad="no">No thanks</button>
       </div>
     </div>`;
@@ -1744,9 +1787,15 @@
       if (act === 'no') { close(); return; }
       const btn = e.target.closest('[data-ad]');
       btn.disabled = true;
-      const how = await adShow(`${PRODUCT_AD}-${kind}`);
+      const how = ads.isAd() ? await adShow(`${PRODUCT_AD}-${kind}`) : await freeShow(`${PRODUCT_AD}-${kind}`);
       close();
-      if (how !== 'watched') { toast(how === 'dismissed' ? 'The advertisement was not finished, so nothing was added.' : 'No advertisement was available. Try again in a moment.', 'hint'); return; }
+      // Watched through, or nothing. There is no third answer, and each of the others says which one it was.
+      if (how !== 'watched') {
+        toast(!ads.isAd() ? 'Nothing was added.'
+          : how === 'dismissed' ? 'The advertisement was not watched through, so nothing was added.'
+          : 'No advertisement was available, so nothing was added. Try again in a moment.', 'hint', 3200);
+        return;
+      }
       await R.grant();
     });
     $('[data-ad]', wrap)?.focus({ preventScroll: true });
@@ -2632,7 +2681,7 @@
       } catch (err) {
         btn.disabled = false;
         if (typeof err.gold === 'number') setGold(err.gold);
-        if (err.code === 'not_enough_gold' && ads.on() && auth.user) adOffer('gold', 'Not enough gold for that table. Watch a short advertisement and some is added to your purse.');
+        if (err.code === 'not_enough_gold' && ads.on() && auth.user) adOffer('gold', 'Not enough gold for that table. Watch a short advertisement through and some is added to your purse.');
         else toast(goldError(err), 'bad');
       }
       return;
@@ -2647,7 +2696,7 @@
       catch (err) {
         btn.disabled = false;
         if (typeof err.gold === 'number') setGold(err.gold);
-        if (err.code === 'not_enough_gold' && ads.on() && auth.user) adOffer('gold', 'Not enough gold for that table. Watch a short advertisement and some is added to your purse.');
+        if (err.code === 'not_enough_gold' && ads.on() && auth.user) adOffer('gold', 'Not enough gold for that table. Watch a short advertisement through and some is added to your purse.');
         else toast(goldError(err), 'bad');
       }
     }

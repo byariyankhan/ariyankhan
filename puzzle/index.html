@@ -3,14 +3,23 @@
   <head>
     <!-- Google AdSense: site verification only. No ad units and no Auto ads are enabled. -->
     <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1570944160084395" crossorigin="anonymous"></script>
-    <!-- Rewarded advertisements. "h5" is on: the offers are live — a heart when the hearts run out, a hint, a
-         check, and gold on the purse. The publisher is read from the AdSense tag above, so there is nothing to
-         fill in. H5 Games Ads is not approved for this domain yet, so nothing fills; when nothing fills the
-         player still waits and still gets what they were promised, and the stand-in says so. The day it is
-         approved, real advertisements serve through this same path and no file changes.
-         (Plain AdSense does not serve rewarded ads; H5 Games Ads, requested from the same account, is the one
-         that does.) "off" puts the whole thing back to sleep. -->
-    <meta name="puzzle-ads" content="h5" />
+    <!-- The offers: a heart when the hearts run out, a hint, a check, and gold on the purse. Two switches.
+         content : off | test | h5  — whether any of this exists.
+         data-give: ad | free       — what the offer IS.
+
+         data-give="ad" is production and it is strict. A real rewarded advertisement is requested and the
+         reward is handed over on adViewed alone — the network confirming it was watched through. A skip, a
+         close, a failed load, a blocked request or an empty one all give nothing, and the player is told which.
+
+         data-give="free" is what is set today, because H5 Games Ads is not approved for this domain yet and a
+         button labelled "Watch an ad" that pays out with no advertisement behind it is a lie in two directions.
+         In this mode no advertising code runs for the offer, the network is never asked, and nothing calls
+         itself an advertisement: it is a free lifeline and it says so, in the game and in the policy.
+
+         ON APPROVAL: change data-give to "ad", or delete the attribute. That is the whole switch.
+         The publisher id is read from the AdSense tag above. (Plain AdSense does not serve rewarded ads; H5
+         Games Ads, requested from the same account, is the one that does.) content="off" sleeps all of it. -->
+    <meta name="puzzle-ads" content="h5" data-give="free" />
     <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-8ZPSNG5X37"></script>
     <script>
@@ -501,6 +510,6 @@
       </div>
     </div>
 
-    <script src="/js/puzzle.js?v=12"></script>
+    <script src="/js/puzzle.js?v=13"></script>
   </body>
 </html>
