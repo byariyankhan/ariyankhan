@@ -458,6 +458,64 @@ env_rollback() {
   $SUDO cp -a "$EBK" "$ENVF" && note "the .env is back as it was"
   $SUDO cp -a "$CBK" "$COMP" && note "the compose file is back as it was"
 }
+# The directory the dumps used to land in, once nothing needs it.
+#
+# rename-paths copied every file out of /var/backups/arrow-atlas into /var/backups/puzzle and pointed the backup
+# container at the new one, but left the old directory exactly as it was: deleting a directory of backups is its
+# own decision. This is that decision, taken separately and gated on proof rather than on memory.
+#
+# Nothing is removed until each of these holds: the backup container mounts the new directory and not the old
+# one; every file in the old directory exists in the new one and compares byte for byte; and the new directory
+# holds a dump newer than anything in the old one, which is the proof that backups are actually arriving there.
+mode_drop_old_backup_dir() {
+  [ "$CONFIRM" = "DELETE" ] || { echo "::error::drop-old-backup-dir needs confirm=DELETE"; exit 2; }
+  echo "Puzzle — the directory the dumps used to land in  ($(hostname), $(date -u))"
+  OLDB=/var/backups/arrow-atlas
+  NEWB=/var/backups/puzzle
+  $SUDO test -d "$OLDB" || { ok "$OLDB is already gone"; return; }
+  $SUDO test -d "$NEWB" || { bad "$NEWB does not exist; not removing anything"; return; }
+
+  say "1. where the backup container writes now"
+  MOUNT=$(docker inspect -f '{{range .Mounts}}{{if eq .Destination "/backups-host"}}{{.Source}}{{end}}{{end}}' "$BKP" 2>/dev/null)
+  [ "$MOUNT" = "$NEWB" ] && ok "it mounts $NEWB" || { bad "it mounts ${MOUNT:-nothing}, not $NEWB; stopping"; return; }
+
+  say "2. everything in the old directory is in the new one, byte for byte"
+  n=0; miss=0
+  while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    n=$((n + 1))
+    if $SUDO test -f "$NEWB/$f" && $SUDO cmp -s "$OLDB/$f" "$NEWB/$f"; then
+      note "same in both: $f"
+    else
+      bad "$f is not in $NEWB, or differs"; miss=1
+    fi
+  done <<EOF
+$($SUDO find "$OLDB" -maxdepth 1 -type f -printf '%f\n' 2>/dev/null)
+EOF
+  sub=$($SUDO find "$OLDB" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l | tr -d ' ')
+  [ "$sub" = "0" ] || { bad "$OLDB holds $sub subdirectory/ies this check does not cover; stopping"; return; }
+  [ "$miss" = "0" ] || { bad "not removing a directory while a copy is in doubt"; return; }
+  ok "$n file(s), each one present and identical in $NEWB"
+
+  say "3. and backups are actually arriving in the new one"
+  newest_new=$($SUDO find "$NEWB" -maxdepth 1 -name '*.dump' -newer "$OLDB" -print 2>/dev/null | head -1)
+  if [ -n "$newest_new" ]; then
+    ok "$(basename "$newest_new") is newer than the old directory itself"
+  else
+    bad "no dump in $NEWB is newer than $OLDB; that is what would prove the move took, so stopping"
+    return
+  fi
+
+  say "4. removing it"
+  $SUDO rm -rf "$OLDB" && gone "$OLDB" || { bad "could not remove it"; return; }
+  $SUDO test -d "$OLDB" && bad "it is still there" || ok "it is gone"
+
+  say "what is in the one that is left"
+  $SUDO ls -lt "$NEWB" | head -8 | sed 's/^/      /'
+  du_h=$($SUDO du -sh "$NEWB" 2>/dev/null | cut -f1)
+  note "$NEWB holds $du_h"
+}
+
 # The last old names anywhere: the two nginx files.
 #
 #   /etc/nginx/snippets/arrow-atlas.conf    -> puzzle.conf
@@ -2085,6 +2143,7 @@ case "$MODE" in
   rename-env)    mode_rename_env ;;
   rename-paths)  mode_rename_paths ;;
   rename-nginx)  mode_rename_nginx ;;
+  drop-old-backup-dir) mode_drop_old_backup_dir ;;
   finish-rename) mode_finish_rename ;;
   drop-old-volumes) mode_drop_old_volumes ;;
   volumes)       mode_volumes ;;
