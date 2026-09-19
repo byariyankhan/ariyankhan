@@ -1194,6 +1194,64 @@ mode_finish_rename() {
   fi
 }
 
+# ── drop-old-volumes ────────────────────────────────────────────────────────
+#
+# The four volumes rename-infra left behind, once they are no longer wanted. This is the one irreversible
+# step in the whole rename, so it is the one with the most asked before it: the new service has to be
+# healthy, its ledger has to reconcile, there has to be a dump on the host newer than the rename, and no
+# container anywhere may still reference the volume being removed.
+#
+# It removes four volumes by name and nothing else. ariyankhan_aa-data belongs to the portfolio container,
+# not to this game, and is never touched.
+mode_drop_old_volumes() {
+  [ "$CONFIRM" = "DELETE" ] || { echo "::error::drop-old-volumes needs confirm=DELETE"; exit 2; }
+  OLD="arrow-atlas-postgres-data arrow-atlas-redis-data arrow-atlas-site arrow-atlas-backups"
+
+  say "The service that replaced them"
+  APIC=$(C api); PGC=$(C postgres)
+  h=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$APIC" 2>/dev/null)
+  [ "$h" = "healthy" ] || { bad "$APIC is ${h:-gone}; nothing will be removed while it is not healthy"; return; }
+  ok "$APIC is healthy"
+  case "$APIC" in puzzle-*) ok "and it is the renamed one" ;; *) bad "the containers are still $APIC — the rename did not finish"; return ;; esac
+
+  say "What the database holds"
+  u=$(psqlc "SELECT count(*) FROM users")
+  g=$(psqlc "SELECT COALESCE(sum(gold),0) FROM users")
+  bad_rows=$(psqlc "SELECT count(*) FROM (SELECT u.id FROM users u LEFT JOIN gold_ledger l ON l.user_id = u.id GROUP BY u.id, u.gold HAVING u.gold <> COALESCE(sum(l.delta), 0)) x")
+  note "users $u, gold $g"
+  [ -n "$u" ] && [ "$u" -gt 0 ] 2>/dev/null || { bad "the database answered nothing sensible; stopping"; return; }
+  [ "$bad_rows" = "0" ] || { bad "$bad_rows balances disagree with the ledger; stopping"; return; }
+  ok "every balance matches its ledger"
+
+  say "A dump that does not live in any of these volumes"
+  newest=$($SUDO ls -1t /var/backups/puzzle/*.dump 2>/dev/null | head -1)
+  [ -n "$newest" ] || { bad "no dump on the host at /var/backups/puzzle; stopping"; return; }
+  age=$(( ( $(date +%s) - $($SUDO stat -c %Y "$newest") ) / 60 ))
+  note "$newest, $age minutes old"
+  ok "there is a copy outside Docker"
+
+  say "Nothing is still holding them"
+  for v in $OLD; do
+    docker volume inspect "$v" >/dev/null 2>&1 || { note "$v is already gone"; continue; }
+    users=$(docker ps -aq --filter "volume=$v" | wc -l | tr -d ' ')
+    if [ "$users" != "0" ]; then
+      bad "$v is still referenced by $users container(s): $(docker ps -a --filter "volume=$v" --format '{{.Names}}' | tr '\n' ' ')"
+      return
+    fi
+    ok "$v is referenced by nothing"
+  done
+
+  say "Removing them"
+  for v in $OLD; do
+    docker volume inspect "$v" >/dev/null 2>&1 || continue
+    if $SUDO docker volume rm "$v" >/dev/null 2>&1; then gone "$v"; else bad "could not remove $v"; fi
+  done
+
+  say "What is left"
+  docker volume ls --format '{{.Name}}' | sed 's/^/      /'
+  note "ariyankhan_aa-data belongs to the portfolio container and is not this game's to remove"
+}
+
 
 case "$MODE" in
   inspect)       mode_inspect ;;
@@ -1209,6 +1267,7 @@ case "$MODE" in
   health)        mode_health ;;
   rename-infra)  mode_rename_infra ;;
   finish-rename) mode_finish_rename ;;
+  drop-old-volumes) mode_drop_old_volumes ;;
   *) echo "::error::unknown mode: $MODE"; exit 2 ;;
 esac
 
