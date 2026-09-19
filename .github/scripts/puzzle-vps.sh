@@ -38,6 +38,9 @@ note() { printf '      %s\n' "$*"; }
 gone() { printf 'GONE  %s\n' "$*"; }
 kept() { printf 'KEPT  %s\n' "$*"; }
 
+# Anything on its way to the log that could be a credential is masked: a GitHub token, a password in a URL.
+redact() { sed -E -e 's#gh[pousr]_[A-Za-z0-9]{8,}#***#g' -e 's#(https?://)[^/@[:space:]]+@#\1***@#g' -e 's#(token|password|PASSWORD|secret)([=:"[:space:]]+)[^[:space:]"]+#\1\2***#g'; }
+
 have() { docker inspect "$1" >/dev/null 2>&1; }
 running() { [ "$(docker inspect -f '{{.State.Running}}' "$1" 2>/dev/null)" = "true" ]; }
 
@@ -341,6 +344,110 @@ mode_logs() {
 # fetching, there was nothing left to fall back on and the container restarted forever. This sends the source
 # down the connection the ops workflow already has — no token on the host, nothing secret in the repository —
 # installs the compose file that came with it, and starts the API from what was sent. Needs confirm=DEPLOY.
+# Bring the site back after a recreate that started Apache before the files arrived.
+#
+# ariyankhan-web's start command fetches the branch, and when that fetch fails and the document root is empty
+# it writes a holding page and starts Apache bare — because the entrypoint it would otherwise exec is itself
+# part of the checkout. That entrypoint is what enables mod_rewrite, mod_headers and mod_expires and writes
+# the SMTP config; without it the first line of .htaccess is a directive Apache does not know, and every
+# request on the site answers 500. Putting the files in afterwards does not help: Apache is already running.
+#
+# So this puts the checkout in and then restarts the container. The restart re-runs the start command, which
+# now finds an index.html, keeps what is there, and execs the entrypoint — the site comes up as itself. If a
+# restart still does not answer, the modules are enabled in place as a last resort, which is repairing a
+# running container rather than fixing it, and it says so.
+mode_web_revive() {
+  echo "Bringing the site back  ($(hostname), $(date -u))"
+  have ariyankhan-web || { bad "no ariyankhan-web container here"; return; }
+  W=ariyankhan-web
+  TGZ=/tmp/arrow-atlas-site.tgz
+
+  say "1. the files the site is served from"
+  if [ -s "$TGZ" ]; then
+    rm -rf /tmp/aa-web && mkdir -p /tmp/aa-web && tar -xzf "$TGZ" -C /tmp/aa-web
+    if [ -f /tmp/aa-web/index.html ] && [ -f /tmp/aa-web/deploy/web-entrypoint.sh ]; then
+      docker cp /tmp/aa-web/. "$W":/var/www/html >/dev/null 2>&1 \
+        && ok "this checkout is in /var/www/html" || bad "could not copy the checkout in"
+    else
+      bad "what arrived is not the site; leaving the document root alone"
+    fi
+  else
+    note "no checkout arrived; working with what is in the container"
+  fi
+  docker exec "$W" sh -c 'for f in index.html deploy/web-entrypoint.sh puzzle/index.html; do [ -f "/var/www/html/$f" ] && echo "      have $f" || echo "      MISSING $f"; done'
+  docker exec "$W" test -f /var/www/html/deploy/web-entrypoint.sh \
+    || { bad "without deploy/web-entrypoint.sh a restart brings Apache up bare again; not restarting"; return; }
+
+  say "2. restarting it, so the entrypoint in that checkout is the thing that starts Apache"
+  $SUDO docker restart "$W" >/dev/null 2>&1 || note "docker restart reported trouble; checking anyway"
+  live=""
+  for i in $(seq 1 18); do
+    sleep 5
+    h=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$W" 2>/dev/null)
+    loop=$(docker exec "$W" sh -c 'curl -so /dev/null -w "%{http_code}" -m 8 http://127.0.0.1/' 2>/dev/null)
+    live=$(curl -fsS -m 10 "https://$DOMAIN/puzzle/" 2>/dev/null | grep -o 'js/puzzle\.js?v=[0-9]*' | head -1)
+    printf '      try %-2s  container %s, its own answer %s, page %s\n' "$i" "${h:-gone}" "${loop:-none}" "${live:-nothing}"
+    [ "$loop" = "200" ] && [ -n "$live" ] && break
+  done
+
+  if [ -n "$live" ]; then
+    ok "the site answers and serves $live"
+  else
+    say "3. last resort: the modules .htaccess needs, enabled in the container as it runs"
+    note "this repairs a running container rather than fixing it — the next recreate needs the entrypoint to run"
+    docker exec "$W" sh -c 'a2enmod rewrite headers expires deflate remoteip >/dev/null 2>&1; apache2ctl -k graceful 2>&1 | head -3' | sed 's/^/      /'
+    sleep 6
+    live=$(curl -fsS -m 10 "https://$DOMAIN/puzzle/" 2>/dev/null | grep -o 'js/puzzle\.js?v=[0-9]*' | head -1)
+    [ -n "$live" ] && ok "the site answers and serves $live (on enabled-in-place modules)" \
+      || bad "the site still does not answer; web-look is the mode that reads why"
+  fi
+
+  say "what it has loaded now"
+  docker exec "$W" sh -c 'apachectl -M 2>/dev/null | grep -E "rewrite|headers|expires|deflate|remoteip" | tr -d " " | tr "\n" " "; echo' | sed 's/^/      /'
+  docker exec "$W" sh -c '[ -f /var/www/html/mail-config.local.php ] && echo "the contact form has its configuration file" || echo "mail-config.local.php is not there — the contact form will not send"' | sed 's/^/      /'
+
+  say "and from outside"
+  for path in / /puzzle/ /404.html; do
+    printf '      %-12s %s\n' "$path" "$(curl -so /dev/null -w '%{http_code}' -m 10 "https://$DOMAIN$path")"
+  done
+}
+
+# Read-only: what the portfolio's own container is doing, for when the site answers an error and the reason is
+# in a log nobody here can otherwise read. Nothing is changed. Anything that could be a credential — a token
+# in a start command, a password in a URL — is masked before it is printed.
+mode_web_look() {
+  echo "The site container, as it is  ($(hostname), $(date -u))"
+  have ariyankhan-web || { bad "no ariyankhan-web container here"; return; }
+  W=ariyankhan-web
+
+  say "how it is running"
+  docker inspect -f 'state    {{.State.Status}}{{if .State.Health}}, health {{.State.Health.Status}}{{end}}, restarts {{.RestartCount}}, last exit {{.State.ExitCode}}{{"\n"}}started  {{.State.StartedAt}}{{"\n"}}image    {{.Config.Image}}' "$W" | sed 's/^/      /'
+  docker inspect -f 'entry    {{.Config.Entrypoint}}{{"\n"}}command  {{.Config.Cmd}}' "$W" | redact | sed 's/^/      /'
+
+  say "what is mounted into it"
+  docker inspect -f '{{range .Mounts}}{{.Type}} {{if .Name}}{{.Name}}{{else}}{{.Source}}{{end}} -> {{.Destination}}{{"\n"}}{{end}}' "$W" | sed 's/^/      /'
+
+  say "the document root"
+  docker exec "$W" sh -c 'ls -la /var/www/html | head -40' 2>&1 | sed 's/^/      /'
+  docker exec "$W" sh -c 'printf "%s files, %s .html, %s .json, %s .xml\n" "$(find /var/www/html -type f 2>/dev/null | wc -l)" "$(find /var/www/html -name "*.html" 2>/dev/null | wc -l)" "$(find /var/www/html -name "*.json" 2>/dev/null | wc -l)" "$(find /var/www/html -name "*.xml" 2>/dev/null | wc -l)"' 2>&1 | sed 's/^/      /'
+  for f in index.html 404.html .htaccess sitemap.xml puzzle/index.html puzzle/.htaccess js/puzzle.js css/puzzle.css; do
+    docker exec "$W" sh -c "if [ -e '/var/www/html/$f' ]; then ls -ld '/var/www/html/$f'; else echo 'MISSING  /var/www/html/$f'; fi" 2>&1 | sed 's/^/      /'
+  done
+
+  say "what it answers itself, without the proxy in front"
+  docker exec "$W" sh -c 'command -v curl >/dev/null && curl -si -m 10 http://127.0.0.1/ | head -14 || echo "no curl inside the container"' 2>&1 | sed 's/^/      /'
+  docker exec "$W" sh -c 'command -v curl >/dev/null && curl -so /dev/null -w "/ %{http_code}  /js/puzzle.js " -m 10 http://127.0.0.1/ && curl -so /dev/null -w "%{http_code}\n" -m 10 http://127.0.0.1/js/puzzle.js' 2>&1 | sed 's/^/      /'
+
+  say "whether Apache is happy with its own configuration"
+  docker exec "$W" sh -c 'apachectl -t 2>&1 | head -5; apachectl -M 2>/dev/null | tr -d " " | tr "\n" " "' 2>&1 | fold -w 160 -s | sed 's/^/      /'
+
+  say "the error log, last 40 lines"
+  docker exec "$W" sh -c 'tail -40 /var/log/apache2/error.log 2>/dev/null || echo "no /var/log/apache2/error.log"' 2>&1 | redact | sed 's/^/      /'
+
+  say "what Docker captured, last 60 lines"
+  docker logs --tail 60 "$W" 2>&1 | redact | sed 's/^/      /'
+}
+
 # Make the site container survive a restart it cannot fetch through.
 #
 # ariyankhan-web is defined by hPanel's own copy of a compose file, and its start command empties
@@ -1471,11 +1578,19 @@ AADROP
     $SUDO cp -a "$BK" "$PROJ/docker-compose.yml"; return
   fi
 
-  say "4. recreating it, and putting the site straight back"
-  ( cd "$PROJ" && $SUDO docker compose up -d --force-recreate "$SVC" ) >/dev/null 2>&1 \
-    || note "compose reported trouble bringing it up; checking anyway"
-  sleep 5
-  docker cp /tmp/aa-web/. ariyankhan-web:/var/www/html >/dev/null 2>&1 && note "the checkout is back in /var/www/html"
+  say "4. recreating it, and putting the site back before it starts"
+  # The order here is the whole thing. Recreating throws away the container's filesystem, and /var/www/html is
+  # part of that filesystem rather than a volume, so the new container starts with an empty document root. Its
+  # start command cannot fetch the branch without a key, and the entrypoint that enables the modules .htaccess
+  # needs is itself part of the checkout — so an already-started Apache is a bare Apache, and every page on the
+  # site answers 500 no matter what is copied in afterwards. `create` rather than `up`: the files go in while
+  # the container is still stopped, and `start` is what runs the entrypoint that finds them.
+  ( cd "$PROJ" && $SUDO docker compose create --force-recreate "$SVC" ) >/dev/null 2>&1 \
+    || note "compose reported trouble creating it; checking anyway"
+  docker cp /tmp/aa-web/. ariyankhan-web:/var/www/html >/dev/null 2>&1 \
+    && note "the checkout is in /var/www/html, before anything starts" \
+    || { bad "could not put the site back; starting it again on the old file"; $SUDO cp -a "$BK" "$PROJ/docker-compose.yml"; ( cd "$PROJ" && $SUDO docker compose up -d "$SVC" ) >/dev/null 2>&1; return; }
+  ( cd "$PROJ" && $SUDO docker compose start "$SVC" ) >/dev/null 2>&1
   live=""
   for _ in $(seq 1 24); do
     h=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' ariyankhan-web 2>/dev/null)
@@ -1489,10 +1604,10 @@ AADROP
   else
     bad "the site did not come back; putting the old compose file back"
     $SUDO cp -a "$BK" "$PROJ/docker-compose.yml"
-    ( cd "$PROJ" && $SUDO docker compose up -d --force-recreate "$SVC" ) >/dev/null 2>&1
-    sleep 5
+    ( cd "$PROJ" && $SUDO docker compose create --force-recreate "$SVC" ) >/dev/null 2>&1
     docker cp /tmp/aa-web/. ariyankhan-web:/var/www/html >/dev/null 2>&1
-    sleep 10
+    ( cd "$PROJ" && $SUDO docker compose start "$SVC" ) >/dev/null 2>&1
+    sleep 12
     live=$(curl -fsS -m 10 "https://$DOMAIN/puzzle/" 2>/dev/null | grep -o 'js/puzzle\.js?v=[0-9]*' | head -1)
     [ -n "$live" ] && note "it is back on the old file, serving $live" \
       || bad "it is still not answering — push-source is the mode that puts this checkout in"
@@ -1514,6 +1629,8 @@ AADROP
 case "$MODE" in
   inspect)       mode_inspect ;;
   logs)          mode_logs ;;
+  web-revive)    mode_web_revive ;;
+  web-look)      mode_web_look ;;
   git-access)    mode_git_access ;;
   git-sync)      mode_git_sync ;;
   push-source)   mode_push_source ;;
