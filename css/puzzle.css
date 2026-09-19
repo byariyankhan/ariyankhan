@@ -47,7 +47,7 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-error{ color:var(--bad); }
 
 /* ── Home ── */
-.aa-home{ gap:10px; }
+.aa-home{ gap:12px; }
 .aa-home-top{ display:flex; align-items:center; justify-content:flex-end; min-height:42px; }
 .aa-home-top{ gap:8px; }
 .aa-home-top .aa-chip--purse{ margin-right:auto; }
@@ -58,11 +58,36 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-coin{ width:1.3em; height:1.3em; flex:0 0 auto; vertical-align:-.28em; object-fit:contain; }
 .aa-chip--purse{ display:inline-flex; align-items:center; gap:6px; color:var(--ink); font-weight:900; font-size:16px; font-variant-numeric:tabular-nums; }
 .aa-chip--purse.is-won{ animation:aapop .5s ease-out 2; color:var(--accent); }
+/* A panel: the home screen is two of them, the brain and the map, so neither floats in the middle of nowhere. */
+.aa-panel{ background:var(--panel); border:1px solid var(--outline); border-radius:22px; padding:14px 14px 12px; }
+
+/* ── The brain ──
+   A board of this game, drawn at the player's own difficulty and lit from the bottom up by the boards they
+   have cleared. The arrows are the board's arrows, in the board's own line weights, one size down. */
+.aa-brainbox{ display:flex; flex-direction:column; align-items:center; gap:10px; padding-top:16px; }
+.aa-brain-art{ display:block; width:100%; max-width:min(74vw, 260px); max-height:32vh; height:auto; overflow:visible; }
+.aa-brain-p .aa-brain-track{ fill:none; stroke:var(--line); stroke-opacity:.22; stroke-width:.2; stroke-linecap:round; stroke-linejoin:round; }
+.aa-brain-p .aa-brain-head{ fill:var(--line); fill-opacity:.22; stroke:none; }
+.aa-brain-p.is-lit .aa-brain-track{ stroke:var(--accent2); stroke-opacity:1; stroke-width:.24; }
+.aa-brain-p.is-lit .aa-brain-head{ fill:var(--accent2); fill-opacity:1; }
+.aa-brain-art.is-full .aa-brain-p.is-lit .aa-brain-track{ stroke:var(--good); }
+.aa-brain-art.is-full .aa-brain-p.is-lit .aa-brain-head{ fill:var(--good); }
+.aa-brain-p{ transition:opacity .4s ease-out; }
+.aa-brain-art.is-drawing .aa-brain-p{ opacity:0; }
+.aa-brain-meta{ display:flex; flex-direction:column; align-items:center; gap:4px; width:100%; }
+.aa-brain-line{ display:flex; align-items:center; justify-content:center; gap:10px; margin:0; }
+.aa-brain-lv{ font-size:22px; font-weight:900; color:var(--line); letter-spacing:-.3px; }
+.aa-brain-diff{ font-size:12px; font-weight:900; letter-spacing:.6px; text-transform:uppercase; color:var(--muted); background:color-mix(in srgb, var(--muted) 12%, transparent); border-radius:30px; padding:4px 10px; }
+.aa-brain-diff--hard{ color:var(--hard); background:color-mix(in srgb, var(--hard) 12%, transparent); }
+.aa-brain-diff--expert{ color:var(--expert); background:color-mix(in srgb, var(--expert) 14%, transparent); }
+.aa-brain-diff--master{ color:var(--master); background:color-mix(in srgb, var(--master) 12%, transparent); }
+.aa-brain-note{ margin:0; font-size:13px; color:var(--muted); text-align:center; font-weight:800; }
+
 /* lobby world map: every country faint, tour countries outlined, cleared ones filled and numbered */
-/* the map fits the screen width (bleeding into the side gutters); the height left over in the lobby is split
-   evenly above and below it */
-.aa-world{ flex:1; display:flex; flex-direction:column; justify-content:center; margin:0; min-height:0; }
-.aa-world-scroll{ margin:0 -16px; }
+/* the map fills the panel's width, and the panel takes the height it needs rather than stretching to swallow
+   whatever the rest of the screen left over */
+.aa-world{ display:flex; flex-direction:column; justify-content:center; margin:0; min-height:0; padding:10px 8px 8px; }
+.aa-world-scroll{ margin:0; }
 .aa-world-map{ display:block; width:100%; height:auto; }
 .aa-world-land path{ fill:color-mix(in srgb, var(--line) 9%, var(--bg)); stroke:var(--bg); stroke-width:.7; stroke-linejoin:round; }
 .aa-world-land path.is-tour{ fill:color-mix(in srgb, var(--line) 18%, var(--bg)); stroke:color-mix(in srgb, var(--line) 45%, var(--bg)); stroke-width:1; cursor:pointer; }
@@ -73,10 +98,11 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-world-labels text{ font-family:inherit; font-weight:900; font-size:22px; fill:#fff; text-anchor:middle; dominant-baseline:central; pointer-events:none; paint-order:stroke; stroke:rgba(0,0,0,.28); stroke-width:3px; stroke-linejoin:round; }
 .aa-world-labels circle{ fill:var(--good); pointer-events:none; }
 .aa-world-labels .is-next circle{ fill:var(--accent2); }
-.aa-world-cap{ font-size:12px; color:var(--muted); text-align:center; margin:6px 0 0; font-weight:800; }
+.aa-world-cap{ font-size:12px; color:var(--muted); text-align:center; margin:8px 0 2px; font-weight:800; }
 @keyframes aa-next{ from{ filter:brightness(1); } to{ filter:brightness(1.25); } }
 @media(prefers-reduced-motion:reduce){ .aa-world-land path.is-next{ animation:none; } }
 .aa-hero{ text-align:center; margin:0; padding:0; }
+.aa-home .aa-play{ margin-top:auto; }   /* whatever height is left over goes above the buttons, not into the middle of the screen */
 .aa-title{ font-size:clamp(28px,7.5vw,40px); font-weight:900; margin:0; letter-spacing:-.5px; color:var(--line); }
 .aa-tagline{ margin:6px 0 0; color:var(--muted); font-size:15px; }
 /* compact secondary actions under the map: daily board and the level list */
@@ -96,6 +122,9 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-mini-sub{ font-size:12px; opacity:.85; line-height:1.3; }
 .aa-play{ display:flex; flex-direction:column; align-items:center; gap:2px; width:100%; padding:16px; border-radius:20px; border:none; background:var(--accent2); color:#fff; cursor:pointer; font-family:inherit; box-shadow:0 6px 0 color-mix(in srgb, var(--accent2) 70%, #000); transition:transform .1s; margin-top:8px; }
 .aa-play--ghost{ background:var(--card); color:var(--ink); box-shadow:0 3px 0 var(--line-soft); margin-top:10px; font-size:18px; padding:14px 22px; }
+/* the second button is the second button: its label was the same 30px as the first, which wrapped onto two
+   lines on a narrow phone and read as a second first button */
+.aa-play--ghost .aa-play-label{ font-size:23px; }
 .aa-play--ghost:active{ box-shadow:0 1px 0 var(--line-soft); }
 .aa-row--soon{ opacity:.55; }
 .aa-signin{ display:flex; justify-content:center; min-height:44px; margin:4px 0 12px; }

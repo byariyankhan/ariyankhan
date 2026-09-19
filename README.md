@@ -574,16 +574,29 @@ links.
   1000×520, Antarctica dropped, label point = centroid of the main landmass) is
   drawn on the home screen by `renderWorld()`: every country faint, the tour
   countries outlined and tappable (opens that level), cleared ones filled green
-  and numbered with their level, the next level pulsing purple. The map fits the
-  screen width (bleeding into the side gutters) and the height left over in the
-  lobby is split evenly above and below it.
+  and numbered with their level, the next level pulsing purple. The map sits in a
+  panel of its own and takes the height it needs; before the first country is
+  cleared its caption reads "197 countries ahead of you" rather than "0 of 197
+  discovered".
   Features world-atlas leaves without an id (Kosovo) get `n:<slug>` ids in both
   data files. Versioned with `MAP_VERSION`. There is no Restart button in the game any more (back out or
   fail and retry).
-- **Lobby layout**: purse, title, tagline, the world map (fills the space, and is
-  the level picker), its caption, then Play & Discover and Play with Friends. The
+- **Lobby layout**: purse, title, tagline, **the brain**, the world map panel (the
+  level picker) and its caption, then Play & Discover and Play with Friends. The
   old cards carousel, the level-path dots and the compact Today's Country / All
   levels buttons are all gone.
+- **The brain on the home screen** (`renderBrain`, `emblemFor`): a board of this
+  game and nothing else — the same rasteriser, the same generator, the same
+  arrows in the same line weights — drawn at the difficulty the player is
+  actually being dealt (`TIER_OF()`), from `emblem` in
+  `games/data/focus-boards.json` (the brain outline plus five scales of its own,
+  ~32 arrows on Easy to ~93 on Master). So the brain a player comes home to gets
+  finer and busier as they get better. Every board cleared lights another tenth
+  of it, **from the bottom up**, and the tenth lights the lot in green — the same
+  ten that makes a milestone. Under it: `Level <n>`, the difficulty in its own
+  colour, and one line saying how many boards are left to light it. Redrawn only
+  when the tier or the lit count changes (`brainKey`), and the fade-in wave is
+  skipped under `prefers-reduced-motion`.
 - **SEO**: title/description/keywords around "puzzle", "train your brain", "arrow puzzle" and
   "arrow game"; Open Graph/Twitter card `images/puzzle-og.jpg` (1200×630,
   drawn by `games/build-puzzle-og.mjs`; the app icon by `games/build-puzzle-icon.mjs`); schema.org WebPage +

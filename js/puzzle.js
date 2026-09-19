@@ -17,7 +17,7 @@
   const DATA_VERSION = '11';
   const MAP_VERSION = '3';
   const DISCB_VERSION = '4';  // games/data/discover-boards.json: the board shaped like each country's animal, bird or landmark
-  const FOCUS_VERSION = '1';  // games/data/focus-boards.json: the brain, the lightbulb, the key — the boards the game opens on
+  const FOCUS_VERSION = '2';  // games/data/focus-boards.json: the brain, the lightbulb, the key — the boards the game opens on
   const STORE = 'aa:v1:';
 
   // ── Where the backend lives ──
@@ -106,6 +106,7 @@
     loading: $('#aaLoading'), error: $('#aaError'),
     gate: $('#aaGate'), accept: $('#aaAccept'), splash: $('#aaSplash'), splashQuote: $('#aaSplashQuote'),
     worldMap: $('#aaWorldMap'), worldCap: $('#aaWorldCap'), worldScroll: $('#aaWorldScroll'),
+    brainArt: $('#aaBrainArt'), brainLv: $('#aaBrainLv'), brainDiff: $('#aaBrainDiff'), brainNote: $('#aaBrainNote'),
   };
   if (!el.board) return;
 
@@ -574,14 +575,81 @@
     // their own map does not need to be told a second time that the countries on it can be tapped. One
     // sentence in both states, including the first run — the tour opens on the player's own country, marked
     // and pulsing, so "tap the highlighted country" was explaining something the map already says.
-    el.worldCap.textContent = `${done} of ${n} countries discovered`;
+    // Before the world tour starts there is nothing on this map to count, and "0 of 197 discovered" reads like
+    // a failure rather than an invitation. It says what is ahead instead, until the first country is cleared.
+    el.worldCap.textContent = done ? `${done} of ${n} countries discovered` : `${n} countries ahead of you`;
 
+  }
+
+  // ── The brain on the home screen ──
+  // It is a board of this game and nothing else: the same rasteriser, the same generator, the same arrows in
+  // the same line weights, at the difficulty the player is actually being dealt. So a player who has got
+  // better comes home to a brain that is finer and busier than the one they started with — thirty-odd arrows
+  // on Easy, ninety on Master — and the shape of the thing is the reason the game has its name.
+  //
+  // What fills it is what they have done: every board cleared lights another tenth of it, from the bottom up,
+  // and the tenth board lights the lot. Ten is not a number picked for this — it is the game's own milestone.
+  const BRAIN_STEP = 10;
+  const emblemCache = new Map();
+  function emblemFor(tier) {
+    const em = FOCUS?.emblem; if (!em?.d || !em.k?.length) return null;
+    if (!emblemCache.has(tier)) {
+      const b = generate(rasterise(em.d, em.k[tier] ?? em.k[0]), MAXLEN_OF[tier], 7000 + tier * 131, GEN_OPTS(tier));
+      // the order they light in: lowest head first, so the brain fills the way a glass does
+      const order = b.pieces.map((_, i) => i).sort((a, c) => b.pieces[c].cells[0][0] - b.pieces[a].cells[0][0]);
+      emblemCache.set(tier, { W: b.W, H: b.H, pieces: b.pieces, order });
+    }
+    return emblemCache.get(tier);
+  }
+  let brainKey = '';
+  function renderBrain() {
+    const svg = el.brainArt; if (!svg || !DATA) return;
+    const tier = TIER_OF(), em = emblemFor(tier);
+    const done = DATA.levels.filter((_, i) => cleared(i)).length;
+    const step = done % BRAIN_STEP, full = done > 0 && step === 0;
+    if (el.brainLv) el.brainLv.textContent = `Level ${done + 1}`;
+    // the pill takes the difficulty's own colour, the same four the HUD uses
+    if (el.brainDiff) { const d = DIFF_OF(tier); el.brainDiff.textContent = d; el.brainDiff.className = 'aa-brain-diff aa-brain-diff--' + d.toLowerCase(); }
+    const togo = BRAIN_STEP - step;
+    if (el.brainNote) el.brainNote.textContent = !em ? ''
+      : done === 0 ? 'Clear a board to light your first arrows.'
+      : full ? `A whole brain — ${done} boards cleared.`
+      : `${togo} more board${togo === 1 ? ' lights' : 's light'} it up.`;
+    if (!em) { svg.hidden = true; return; }
+    svg.hidden = false;
+    const lit = full ? em.pieces.length : Math.round(em.pieces.length * step / BRAIN_STEP);
+    const key = `${tier}:${lit}:${full ? 1 : 0}`;
+    if (key === brainKey) return;
+    brainKey = key;
+    const rank = new Map(em.order.map((idx, r) => [idx, r]));
+    const litSet = new Set(em.order.slice(0, lit));
+    const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    svg.innerHTML = '';
+    svg.setAttribute('viewBox', `-0.6 -0.6 ${em.W + 1.2} ${em.H + 1.2}`);
+    svg.classList.toggle('is-full', full);
+    svg.classList.toggle('is-drawing', !still);
+    const g = svgEl('g', { class: 'aa-brain-pieces' });
+    em.pieces.forEach((p, i) => {
+      const [dr, dc] = DIRS[p.dir], head = p.cells[0];
+      const hx = head[1] + 0.5, hy = head[0] + 0.5, tipX = hx + dc * 0.32, tipY = hy + dr * 0.32;
+      const body = p.cells.slice().reverse().map(([y, x]) => `${x + 0.5} ${y + 0.5}`).join('L');
+      const pg = svgEl('g', { class: 'aa-brain-p' + (litSet.has(i) ? ' is-lit' : '') });
+      if (!still) pg.style.transitionDelay = `${Math.min(rank.get(i) ?? 0, 60) * 9}ms`;
+      pg.appendChild(svgEl('path', { class: 'aa-brain-track', d: `M${body}L${tipX} ${tipY}` }));
+      const headG = svgEl('g', { transform: `translate(${tipX} ${tipY}) rotate(${ARROW[p.dir]})` });
+      headG.appendChild(svgEl('path', { class: 'aa-brain-head', d: 'M-0.36 -0.3 L0.14 0 L-0.36 0.3 Z' }));
+      pg.appendChild(headG);
+      g.appendChild(pg);
+    });
+    svg.appendChild(g);
+    if (!still) requestAnimationFrame(() => requestAnimationFrame(() => svg.classList.remove('is-drawing')));
   }
 
   // ── Level select ──
   function renderSelect() {
     if (!DATA) return;
     renderWorld();
+    renderBrain();
     const n = DATA.levels.length;
     renderPurse();
     const nextIdx = DATA.levels.findIndex((_, j) => !cleared(j) && unlocked(j));
