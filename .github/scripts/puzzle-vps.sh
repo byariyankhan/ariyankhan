@@ -1109,6 +1109,7 @@ mode_rename_infra() {
   for _ in $(seq 1 60); do
     h=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' puzzle-api 2>/dev/null)
     [ "$h" = "healthy" ] && break
+    printf '      puzzle-api: %s\n' "${h:-gone}"   # and a line each time, so the ssh carrying this is never idle
     sleep 10
   done
   if [ "$h" = "healthy" ]; then
@@ -1133,6 +1134,67 @@ mode_rename_infra() {
 }
 
 
+# ── finish-rename ───────────────────────────────────────────────────────────
+#
+# rename-infra renamed the database and then could not rename the role: PostgreSQL will not rename the role
+# a session is connected as, and the only superuser on this instance was the one the script was connecting
+# as. The API then came up asking to be "puzzle", there was no such role, and the site answered 502.
+#
+# So the rename is done from a third session — a temporary superuser, with a password made inside the
+# container, never printed, and dropped by the renamed role a second later. Safe to run again: it asks the
+# database which of the two names exists rather than assuming.
+mode_finish_rename() {
+  [ "$CONFIRM" = "RENAME" ] || { echo "::error::finish-rename needs confirm=RENAME"; exit 2; }
+  PGC=$(C postgres); APIC=$(C api)
+  have "$PGC" || { bad "no postgres container here"; return; }
+
+  say "Which role the database answers to"
+  WHO=$(docker exec "$PGC" sh -c 'for r in puzzle arrow_atlas; do PGPASSWORD="$POSTGRES_PASSWORD" psql -Atq -U "$r" -d postgres -c "select current_user" 2>/dev/null && break; done' | head -1)
+  [ -n "$WHO" ] || { bad "cannot connect to PostgreSQL as either name"; return; }
+  note "it answers to: $WHO"
+
+  if [ "$WHO" = "puzzle" ]; then
+    ok "the role is already called puzzle"
+  else
+    say "Renaming the role, from a session that is not it"
+    docker exec "$PGC" sh -c "
+      set -e
+      P=\$(head -c 18 /dev/urandom | od -An -tx1 | tr -d ' \n')
+      PGPASSWORD=\"\$POSTGRES_PASSWORD\" psql -v ON_ERROR_STOP=1 -q -U arrow_atlas -d postgres \
+        -c \"DROP ROLE IF EXISTS rename_helper\" \
+        -c \"CREATE ROLE rename_helper LOGIN SUPERUSER PASSWORD '\$P'\"
+      PGPASSWORD=\"\$P\" psql -v ON_ERROR_STOP=1 -q -h 127.0.0.1 -U rename_helper -d postgres \
+        -c \"ALTER ROLE arrow_atlas RENAME TO puzzle\"
+      PGPASSWORD=\"\$POSTGRES_PASSWORD\" psql -v ON_ERROR_STOP=1 -q -U puzzle -d postgres \
+        -c \"DROP ROLE rename_helper\"
+    " 2>&1 | sed 's/^/      /'
+    WHO=$(docker exec "$PGC" sh -c 'for r in puzzle arrow_atlas; do PGPASSWORD="$POSTGRES_PASSWORD" psql -Atq -U "$r" -d postgres -c "select current_user" 2>/dev/null && break; done' | head -1)
+    [ "$WHO" = "puzzle" ] && ok "the role is puzzle now" || { bad "it is still $WHO"; return; }
+  fi
+
+  say "No helper left behind"
+  left=$(docker exec "$PGC" sh -c "PGPASSWORD=\"\$POSTGRES_PASSWORD\" psql -Atq -U puzzle -d postgres -c \"select count(*) from pg_roles where rolname = 'rename_helper'\"" 2>/dev/null)
+  [ "$left" = "0" ] && ok "the temporary superuser is gone" || bad "rename_helper is still there (count ${left:-?}) — drop it"
+
+  say "Starting the API on it"
+  $SUDO docker restart "$APIC" >/dev/null 2>&1 && note "restarted $APIC"
+  h=""
+  for _ in $(seq 1 40); do
+    h=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$APIC" 2>/dev/null)
+    [ "$h" = "healthy" ] && break
+    printf '      %s: %s\n' "$APIC" "${h:-gone}"
+    sleep 15
+  done
+  if [ "$h" = "healthy" ]; then
+    ok "$APIC is healthy"
+    docker exec "$APIC" sh -c 'wget -qO- http://127.0.0.1:8760/health' 2>/dev/null | sed 's/^/      /'
+  else
+    bad "$APIC is ${h:-gone}"
+    docker logs --tail 40 "$APIC" 2>&1 | sed 's/^/      /'
+  fi
+}
+
+
 case "$MODE" in
   inspect)       mode_inspect ;;
   logs)          mode_logs ;;
@@ -1146,6 +1208,7 @@ case "$MODE" in
   deploy-site)   mode_deploy_site ;;
   health)        mode_health ;;
   rename-infra)  mode_rename_infra ;;
+  finish-rename) mode_finish_rename ;;
   *) echo "::error::unknown mode: $MODE"; exit 2 ;;
 esac
 
