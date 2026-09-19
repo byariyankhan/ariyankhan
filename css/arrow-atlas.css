@@ -389,20 +389,20 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 /* The focus reading, as a bar anybody can read: red at one end, green at the other, and a brain sitting where
    this run landed. It sits on the card itself rather than in a panel of its own — a box around it only made
    the card busier, and the bar is loud enough without one. */
-.aa-focus{ --at:0%; margin:18px 0 0; text-align:left; }
-.aa-focus-cap{ margin:0; font-size:12px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); }
-.aa-focus-bar{ position:relative; height:14px; margin:26px 20px 0 0; border-radius:999px;
+.aa-focus{ --at:0%; margin:14px 0 0; text-align:left; }
+.aa-focus-cap{ display:inline-block; margin:0; font-size:10.5px; font-weight:800; letter-spacing:.09em; text-transform:uppercase; color:var(--muted); }
+.aa-focus-bar{ position:relative; height:14px; margin:20px 20px 0 0; border-radius:999px;
   background:linear-gradient(90deg, var(--bad) 0%, var(--accent) 52%, var(--good) 100%); }
 /* everything past the brain is still to come, so it is dimmed rather than coloured */
 .aa-focus-dim{ position:absolute; top:-1px; bottom:-1px; right:-1px; left:var(--at); border-radius:999px;
   background:color-mix(in srgb, var(--bg2) 82%, transparent); transition:left .06s linear; }
 .aa-focus-mark{ position:absolute; top:50%; left:var(--at); transform:translate(-50%, -50%); display:flex; flex-direction:column; align-items:center; gap:2px; transition:left .06s linear; }
 .aa-brain{ width:36px; height:36px; color:var(--line); filter:drop-shadow(0 2px 4px rgba(0,0,0,.25)); background:var(--panel); border-radius:50%; padding:2px; }
-.aa-focus-num{ position:absolute; top:-24px; font-size:13px; font-weight:900; color:var(--ink); font-variant-numeric:tabular-nums; }
+.aa-focus-num{ position:absolute; top:-19px; font-size:12px; font-weight:900; color:var(--ink); font-variant-numeric:tabular-nums; }
 .aa-focus.is-done .aa-brain{ animation:aapop .45s ease-out; }
-/* Empty until the server has enough players to compare against, but it keeps its height either way: the
-   number under the brain sits in this space, and the card must not change size when the line arrives. */
-.aa-focus-vs{ margin:14px 0 0; min-height:14px; font-size:13px; font-weight:800; color:var(--muted); }
+/* Empty until the server has enough players to compare against, and it keeps its height either way so the
+   card does not change size under the player's thumb when the line arrives. */
+.aa-focus-vs{ margin:10px 0 0; min-height:13px; font-size:13px; font-weight:800; color:var(--muted); }
 @media(prefers-reduced-motion:reduce){ .aa-focus.is-done .aa-brain{ animation:none; } }
 .aa-facts b{ color:var(--ink); }
 /* discoveries: four finds per cleared country */
@@ -416,14 +416,15 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 /* The cleared card's own row: what happens next runs the width of the card, and the two smaller offers share
    the line under it. The corners stay the game's corners — a pill here and a rounded rectangle everywhere
    else is two games in one screen. */
-.aa-actions--stack{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:8px; }
-.aa-actions--stack .aa-btn{ width:100%; min-width:0; padding:14px 16px; white-space:normal; line-height:1.2; }
+.aa-actions--stack{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:6px; }
+.aa-actions--stack .aa-btn{ width:100%; min-width:0; padding:14px 10px; gap:6px; white-space:normal; line-height:1.2; }
 .aa-actions--stack .aa-btn--primary{ grid-column:1 / -1; }
 /* An odd one out takes the whole line rather than sitting in half of it with a hole beside it. */
 .aa-actions--stack:has(.aa-btn--primary) .aa-btn:last-child:nth-child(even){ grid-column:1 / -1; }
 .aa-bi{ width:19px; height:19px; flex:none; }
-/* On a phone too narrow for two labels side by side, they take a line each rather than pushing out of the
-   card: one under the other still reads, a button hanging over the edge does not. */
+/* Narrow phones: the type comes down a step so an ordinary label still sits on one line, and under 360px
+   the two smaller offers take a line each rather than pushing out of the card. */
+@media (max-width:420px){ .aa-actions--stack .aa-btn{ font-size:14px; } .aa-actions--stack .aa-bi{ width:17px; height:17px; } }
 @media (max-width:359px){ .aa-actions--stack{ grid-template-columns:1fr; } }
 .aa-flash{ font-size:13px; color:var(--good); margin:12px 0 0; white-space:pre-wrap; }
 .aa-yt{ margin:20px 0 0; padding-top:16px; border-top:1px solid color-mix(in srgb, var(--muted) 28%, transparent); font-size:13px; color:var(--muted); }
