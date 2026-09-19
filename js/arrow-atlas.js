@@ -201,7 +201,15 @@
     join: () => beep([[523, 0, 0.08], [784, 0.07, 0.13]]),
     left: () => beep([[622, 0, 0.08, 'triangle', 0.055], [392, 0.07, 0.16, 'triangle', 0.05]]),
     tick: () => beep([[880, 0, 0.05, 'square', 0.035]]),
-    go: () => beep([[196, 0, 0.2, 'triangle', 0.07], [523, 0.05, 0.1], [784, 0.13, 0.12], [1047, 0.21, 0.26]]) };
+    go: () => beep([[196, 0, 0.2, 'triangle', 0.07], [523, 0.05, 0.1], [784, 0.13, 0.12], [1047, 0.21, 0.26]]),
+    // the focus bar filling: a run of small rising blips while it travels, and one note at the end whose pitch
+    // is the reading itself — high for a sharp run, low for a long one, so the ear hears what the bar shows
+    focus: pct => {
+      const step = 0.1, notes = 7, base = 294;
+      const seq = Array.from({ length: notes }, (_, k) => [base * Math.pow(2, (k * 2 + (pct / 100) * 3) / 12), k * step, 0.06, 'sine', 0.028]);
+      seq.push([base * Math.pow(2, (pct >= 85 ? 16 : pct >= 70 ? 12 : pct >= 50 ? 7 : 3) / 12), notes * step + 0.04, 0.34, 'sine', 0.06]);
+      beep(seq);
+    } };
   // Every button in the game answers back. The board's own arrows are not buttons, so they keep their own shot.
   document.addEventListener('pointerdown', e => {
     const b = e.target.closest('button, .aa-fill');
@@ -973,12 +981,43 @@
   // Four readings, and what each one says. The low one is the careful one: somebody who has just finished a
   // hard board slowly is owed encouragement, not a verdict on their attention span.
   const FOCUS_BANDS = [
-    { at: 85, name: 'Locked in',   note: 'Nothing got past you. Go again while you are in it.' },
-    { at: 70, name: 'Steady',      note: 'Steady work — that is the pace that clears boards.' },
-    { at: 50, name: 'Warming up',  note: 'Getting there. The next board is the practice.' },
+    { at: 85, name: 'Locked in',    note: 'Nothing got past you. Go again while you are in it.' },
+    { at: 70, name: 'Steady',       note: 'That is the pace that clears boards.' },
+    { at: 50, name: 'Warming up',   note: 'Getting there. The next board is the practice.' },
     { at: 0,  name: 'Took a while', note: 'These are won by looking rather than hurrying. Another go?' },
   ];
   const focusBand = v => FOCUS_BANDS.find(b => v >= b.at) ?? FOCUS_BANDS[FOCUS_BANDS.length - 1];
+  // Two lobes and the line between them: a picture of the thing being measured, for the player who cannot
+  // read the words beside it. It rides the bar, so how far along it sits is the whole reading.
+  const BRAIN = `<svg class="aa-brain" viewBox="0 0 32 32" aria-hidden="true">
+      <g fill="none" stroke="currentColor" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M15 7.5c-2.2-2-5.6-1.6-6.8.7-2.4.3-3.7 2.4-3 4.4-1.8 1.5-1.5 4.2.5 5.2-.4 2.3 1.5 4.2 3.8 4 .8 2 3.5 2.6 5.3 1.1"/>
+        <path d="M17 7.5c2.2-2 5.6-1.6 6.8.7 2.4.3 3.7 2.4 3 4.4 1.8 1.5 1.5 4.2-.5 5.2.4 2.3-1.5 4.2-3.8 4-.8 2-3.5 2.6-5.3 1.1"/>
+        <path d="M16 7.4v15.6"/>
+      </g>
+    </svg>`;
+  // The bar is filled in front of the player rather than handed to them finished: the brain travels, the
+  // number counts up with it, and the sound climbs alongside. That second is the whole point of the reading —
+  // it is the only part of the card that is worth watching happen.
+  function runFocusBar(value) {
+    const box = $('#aaFocus', el.card);
+    if (!box) return;
+    const mark = $('.aa-focus-mark', box), num = $('.aa-focus-num', box), dim = $('.aa-focus-dim', box);
+    const at = pct => { box.style.setProperty('--at', `${pct}%`); };
+    at(0);
+    if (!state.muted) SFX.focus(value);
+    const t0 = performance.now(), ms = 1100;
+    const step = now => {
+      const k = Math.min(1, (now - t0) / ms), eased = 1 - Math.pow(1 - k, 3);
+      const v = Math.round(value * eased);
+      at(value * eased);
+      if (num) num.textContent = String(v);
+      if (k < 1) requestAnimationFrame(step);
+      else { box.classList.add('is-done'); vibe(15); }
+    };
+    void mark; void dim;
+    requestAnimationFrame(() => requestAnimationFrame(step));
+  }
   // Offered now and then rather than every time, and only when the reading was low: advice after every board
   // is nagging, and advice after a good one is nonsense.
   const FOCUS_TIPS = [
@@ -1045,10 +1084,13 @@
       <p class="aa-facts">${facts}</p>
       <p class="aa-stars" aria-label="${s} of 3 stars">${'★'.repeat(s)}${'☆'.repeat(3 - s)}</p>
       <div class="aa-stats"><span><b>${fmtTime(t, true)}</b>time</span><span><b>${state.livesMax - state.lives}</b>hearts lost</span><span><b>${state.hintsUsed}</b>hints</span><span><b>x${state.bestCombo}</b>best combo</span></div>
-      <div class="aa-focus${focus >= 70 ? ' is-good' : focus < 50 ? ' is-low' : ''}">
-        <p class="aa-focus-top"><span class="aa-focus-cap">Focus</span><b>${focus}</b><span class="aa-focus-band">${band.name}</span></p>
+      <div class="aa-focus" id="aaFocus" role="img" aria-label="Focus ${focus} out of 100 — ${band.name}">
+        <div class="aa-focus-bar">
+          <span class="aa-focus-dim"></span>
+          <span class="aa-focus-mark">${BRAIN}<b class="aa-focus-num">0</b></span>
+        </div>
         <p class="aa-focus-vs" id="aaFocusVs">${against}</p>
-        <p class="aa-focus-note">${band.note}${tip ? ` <span class="aa-focus-tip">${tip}</span>` : ''}</p>
+        <p class="aa-focus-note">${band.name} · ${band.note}${tip ? ` <span class="aa-focus-tip">${tip}</span>` : ''}</p>
       </div>
       ${D && D.fact ? `<p class="aa-disc-fact">${escapeHtml(D.fact)}</p>` : ''}
       <div class="aa-actions">
@@ -1060,6 +1102,7 @@
       <p class="aa-yt">Curious about ${escapeHtml(C.name)}? I make geography, history and economy videos: <a href="https://www.youtube.com/@ariyankhan" target="_blank" rel="noopener">youtube.com/@ariyankhan</a></p>`;
     el.overlay.hidden = false;
     $('[data-act]', el.card)?.focus({ preventScroll: true });
+    runFocusBar(focus);
     showPace(DATA.levels[i].id, state.tier, t);
     if (typeof gtag === 'function') gtag('event', 'level_complete', { game: 'arrow_atlas', level: n, disc: D ? 1 : 0, mode: state.mode, tier: state.tier, arrows: state.pieces.length, time_ms: t, stars: s, tier_next: learn?.after.tier ?? state.tier });
   }

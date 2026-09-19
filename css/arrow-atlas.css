@@ -386,17 +386,22 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-stats span{ display:flex; flex-direction:column; font-size:10px; letter-spacing:1px; text-transform:uppercase; color:var(--muted); background:var(--bg2); border-radius:12px; padding:10px 4px; }
 .aa-stats b{ font-size:20px; font-weight:900; color:var(--ink); letter-spacing:0; text-transform:none; margin-bottom:2px; font-variant-numeric:tabular-nums; }
 .aa-facts{ font-size:14px; color:var(--muted); margin:0 0 12px; line-height:1.5; }
-/* the focus reading: a number, what it is called, what it is measured against, and one line of encouragement */
-.aa-focus{ margin:12px 0 0; padding:12px 14px; border-radius:16px; background:var(--bg2); text-align:left; }
-.aa-focus.is-good{ background:color-mix(in srgb, var(--good) 14%, var(--bg2)); }
-.aa-focus.is-low{ background:color-mix(in srgb, var(--accent) 12%, var(--bg2)); }
-.aa-focus-top{ display:flex; align-items:baseline; gap:8px; margin:0; }
-.aa-focus-cap{ font-size:11px; font-weight:900; letter-spacing:1px; text-transform:uppercase; color:var(--muted); }
-.aa-focus-top b{ font-size:22px; font-weight:900; color:var(--ink); font-variant-numeric:tabular-nums; }
-.aa-focus-band{ font-size:14px; font-weight:900; color:var(--ink); }
-.aa-focus-vs{ margin:4px 0 0; font-size:13px; font-weight:800; color:var(--muted); }
+/* The focus reading, as a bar anybody can read: red at one end, green at the other, and a brain sitting where
+   this run landed. The words beside it are for whoever wants them; the picture is the reading. */
+.aa-focus{ --at:0%; margin:14px 0 0; padding:16px 14px 12px; border-radius:16px; background:var(--bg2); text-align:center; }
+.aa-focus-bar{ position:relative; height:14px; margin:14px 24px 0; border-radius:999px;
+  background:linear-gradient(90deg, var(--bad) 0%, var(--accent) 52%, var(--good) 100%); }
+/* everything past the brain is still to come, so it is dimmed rather than coloured */
+.aa-focus-dim{ position:absolute; top:-1px; bottom:-1px; right:-1px; left:var(--at); border-radius:999px;
+  background:color-mix(in srgb, var(--bg2) 82%, transparent); transition:left .06s linear; }
+.aa-focus-mark{ position:absolute; top:50%; left:var(--at); transform:translate(-50%, -50%); display:flex; flex-direction:column; align-items:center; gap:2px; transition:left .06s linear; }
+.aa-brain{ width:36px; height:36px; color:var(--line); filter:drop-shadow(0 2px 4px rgba(0,0,0,.25)); background:var(--panel); border-radius:50%; padding:2px; }
+.aa-focus-num{ position:absolute; bottom:-25px; font-size:15px; font-weight:900; color:var(--ink); font-variant-numeric:tabular-nums; }
+.aa-focus.is-done .aa-brain{ animation:aapop .45s ease-out; }
+.aa-focus-vs{ margin:38px 0 0; font-size:13px; font-weight:800; color:var(--muted); }
 .aa-focus-note{ margin:6px 0 0; font-size:13px; font-weight:700; color:var(--ink); }
 .aa-focus-tip{ display:block; margin-top:4px; color:var(--muted); font-weight:700; }
+@media(prefers-reduced-motion:reduce){ .aa-focus.is-done .aa-brain{ animation:none; } }
 .aa-disc-fact{ font-size:13px; line-height:1.45; color:var(--ink); background:var(--bg2); border-radius:12px; padding:10px 12px; margin:0 0 14px; text-align:left; }
 .aa-facts b{ color:var(--ink); }
 /* discoveries: four finds per cleared country */
