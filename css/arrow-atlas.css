@@ -252,7 +252,10 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-pl-when{ display:block; font-size:12px; font-weight:800; color:var(--muted); }
 /* Online and in a match are different answers to "shall I ask them", so they do not look the same. */
 .aa-pl-when.is-online{ color:var(--good); }
-.aa-pl-when.is-online::before, .aa-pl-when.is-playing::before{ content:''; display:inline-block; width:7px; height:7px; border-radius:50%; margin-right:6px; vertical-align:middle; background:currentColor; }
+/* every state gets its dot now that the line is a state and not a date: a grey one reads as "not here" at a
+   glance, where a lone word had to be read */
+.aa-pl-when::before{ content:''; display:inline-block; width:7px; height:7px; border-radius:50%; margin-right:6px; vertical-align:middle; background:currentColor; opacity:.45; }
+.aa-pl-when.is-online::before, .aa-pl-when.is-playing::before{ opacity:1; }
 .aa-pl-when.is-playing{ color:var(--accent); }
 .aa-pl-go{ flex:0 0 auto; }
 .aa-pl-go:disabled{ opacity:.55; }
