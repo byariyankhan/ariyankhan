@@ -24,10 +24,10 @@
   // api.arrowatlas.com. Nothing below hardcodes a host: the bases come from a meta tag if the page sets one,
   // so moving the backend is a deploy change and not a client rewrite.
   const metaBase = n => document.querySelector(`meta[name="${n}"]`)?.content?.trim() || '';
-  const API_BASE = (metaBase('arrow-atlas-api') || location.origin).replace(/\/$/, '');
-  const WS_BASE = (metaBase('arrow-atlas-ws') || API_BASE.replace(/^http/, 'ws')).replace(/\/$/, '');
-  const API_V1 = `${API_BASE}/api/arrow-atlas/v1`;
-  const WS_URL = `${WS_BASE}/ws/arrow-atlas`;
+  const API_BASE = (metaBase('puzzle-api') || location.origin).replace(/\/$/, '');
+  const WS_BASE = (metaBase('puzzle-ws') || API_BASE.replace(/^http/, 'ws')).replace(/\/$/, '');
+  const API_V1 = `${API_BASE}/api/puzzle/v1`;
+  const WS_URL = `${WS_BASE}/ws/puzzle`;
   const store = {
     get(k, fb) { try { const v = localStorage.getItem(STORE + k); return v == null ? fb : JSON.parse(v); } catch { return fb; } },
     set(k, v) { try { localStorage.setItem(STORE + k, JSON.stringify(v)); } catch { /* ignore */ } },
