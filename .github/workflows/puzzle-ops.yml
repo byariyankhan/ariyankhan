@@ -40,6 +40,8 @@
 #                  the renamed service is healthy, that every balance still matches its ledger, that a dump
 #                  exists on the host outside Docker, and that no container references the volume. This is
 #                  the one step that cannot be undone. Needs confirm=DELETE.
+#   volumes        Reads. Every volume, what holds it and where, how big it is, and what is inside the
+#                  anonymous ones, so a volume nobody recognises can be identified before anyone deletes it.
 #   health         Reads. The four containers, the API, the socket, the backup timer, and that no legacy
 #                  artifact is left anywhere.
 #
@@ -55,7 +57,7 @@ on:
         type: choice
         required: true
         default: inspect
-        options: [inspect, logs, git-access, git-sync, backup-verify, cleanup, deploy, deploy-site, push-source, web-safe-fetch, rename-infra, finish-rename, drop-old-volumes, health]
+        options: [inspect, logs, git-access, git-sync, backup-verify, cleanup, deploy, deploy-site, push-source, web-safe-fetch, rename-infra, finish-rename, drop-old-volumes, volumes, health]
       confirm:
         description: "Type DELETE for cleanup, DEPLOY for deploy, RENAME for rename-infra. Ignored by the read-only modes."
         required: false
