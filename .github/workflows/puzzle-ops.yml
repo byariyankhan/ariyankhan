@@ -36,6 +36,10 @@
 #   finish-rename  Renames the PostgreSQL role when rename-infra could not: a role cannot be renamed by a
 #                  session connected as it, so this does it from a temporary superuser and then restarts the
 #                  API. Idempotent. Needs confirm=RENAME.
+#   drop-old-volumes  Removes the four volumes rename-infra left behind, and only those. Checks first that
+#                  the renamed service is healthy, that every balance still matches its ledger, that a dump
+#                  exists on the host outside Docker, and that no container references the volume. This is
+#                  the one step that cannot be undone. Needs confirm=DELETE.
 #   health         Reads. The four containers, the API, the socket, the backup timer, and that no legacy
 #                  artifact is left anywhere.
 #
@@ -51,7 +55,7 @@ on:
         type: choice
         required: true
         default: inspect
-        options: [inspect, logs, git-access, git-sync, backup-verify, cleanup, deploy, deploy-site, push-source, web-safe-fetch, rename-infra, finish-rename, health]
+        options: [inspect, logs, git-access, git-sync, backup-verify, cleanup, deploy, deploy-site, push-source, web-safe-fetch, rename-infra, finish-rename, drop-old-volumes, health]
       confirm:
         description: "Type DELETE for cleanup, DEPLOY for deploy, RENAME for rename-infra. Ignored by the read-only modes."
         required: false
@@ -75,7 +79,7 @@ jobs:
         run: |
           set -euo pipefail
           case "${{ inputs.mode }}" in
-            cleanup) [ "${{ inputs.confirm }}" = "DELETE" ] || { echo "::error::cleanup needs confirm=DELETE"; exit 1; } ;;
+            cleanup|drop-old-volumes) [ "${{ inputs.confirm }}" = "DELETE" ] || { echo "::error::${{ inputs.mode }} needs confirm=DELETE"; exit 1; } ;;
             deploy|deploy-site|push-source|web-safe-fetch) [ "${{ inputs.confirm }}" = "DEPLOY" ] || { echo "::error::${{ inputs.mode }} needs confirm=DEPLOY"; exit 1; } ;;
             rename-infra|finish-rename) [ "${{ inputs.confirm }}" = "RENAME" ] || { echo "::error::${{ inputs.mode }} needs confirm=RENAME"; exit 1; } ;;
             *) echo "read-only mode, no confirmation needed" ;;
