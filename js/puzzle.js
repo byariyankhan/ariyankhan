@@ -51,6 +51,10 @@
   // Press and hold an arrow and it says whether its lane is clear: green it goes, red it does not. That was free
   // and invisible -- nothing in the game mentioned it, and nothing counted it. Four a level makes it a choice
   // worth making and puts it on the bar where a player can see it, beside the hearts and the lamp.
+  // A drawn heart rather than the ♥ character. Nunito draws that one tall and narrow -- a spade that lost an
+  // argument -- and it was the only shape on the bar still coming out of a text font. This one is wider than it
+  // is high, which is the shape everybody means by a heart.
+  const HEART = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 20.7c-.42 0-.83-.15-1.15-.44C7.3 17.1 3 13.3 3 9.35 3 6.4 5.26 4.1 8.1 4.1c1.5 0 2.93.66 3.9 1.78A5.16 5.16 0 0 1 15.9 4.1c2.84 0 5.1 2.3 5.1 5.25 0 3.95-4.3 7.75-7.85 10.91-.32.29-.73.44-1.15.44z"/></svg>';
   const CHECKS_PER_LEVEL = 4;
   const CHECK_WORD = 'check';   // the icon is drawn in the markup now, beside the counter's value
   const hintsFor = tier => HINTS_OF[tier] ?? HINTS_PER_LEVEL;
@@ -1046,7 +1050,7 @@
     el.boardBar.style.width = `${pct}%`;
     el.hudLeft.textContent = String(state.left);
     const max = Number.isFinite(state.livesMax) ? state.livesMax : 0;
-    el.hudLives.innerHTML = Array.from({ length: max }, (_, k) => `<span class="${k < state.lives ? 'is-on' : 'is-off'}">♥</span>`).join('');
+    el.hudLives.innerHTML = Array.from({ length: max }, (_, k) => `<span class="${k < state.lives ? 'is-on' : 'is-off'}">${HEART}</span>`).join('');
     el.hudLives.setAttribute('aria-label', `${state.lives} of ${max} hearts`);
     el.hudLives.classList.toggle('is-last', max > 1 && state.lives === 1 && !state.finished);
     // The clock is shown in a challenge and nowhere else. A race is decided by it, so a player is owed the
