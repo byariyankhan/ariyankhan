@@ -47,9 +47,15 @@ psqlc() {
     'PGPASSWORD="$POSTGRES_PASSWORD" exec psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "$0"' "$1"
 }
 
-# backup.sh / restore.sh live in the checkout the api container fetched, mounted read-only into the
-# backup container. This is the same call the README documents.
-aabackup() { docker exec "$BKP" sh -c "sh \${PUZZLE_SCRIPTS_DIR:-\$ARROW_ATLAS_SCRIPTS_DIR}/$1" ; }
+# backup.sh / restore.sh live in the checkout the api container fetched, mounted read-only into the backup
+# container.
+#
+# Where that is has moved twice — the source tree was renamed, and the mount point is renamed by
+# rename-infra — and a container keeps the environment it was created with until something recreates it,
+# which a deploy of the API alone does not. A stale path in there was enough to stop a backup, so the
+# directory is found rather than trusted, and the container's own answer is still tried first.
+BKP_FIND='S=""; for c in "$PUZZLE_SCRIPTS_DIR" "$ARROW_ATLAS_SCRIPTS_DIR" /srv/puzzle/site/games/puzzle/deploy /srv/arrow-atlas/site/games/puzzle/deploy /srv/arrow-atlas/site/games/arrow-atlas/deploy; do [ -n "$c" ] && [ -f "$c/backup.sh" ] && { S="$c"; break; }; done; [ -n "$S" ] || { echo "no backup.sh anywhere this container can see" >&2; exit 1; };'
+aabackup() { docker exec "$BKP" sh -c "$BKP_FIND sh \$S/$1" ; }
 
 newest_dump() {
   docker exec "$BKP" sh -c \
@@ -670,7 +676,7 @@ mode_backup_verify() {
   say "restoring it into a scratch database and reading it back"
   # `verify` restores into a scratch database, counts every core table, reconciles the ledger inside the
   # restored copy, and drops the scratch database again. It is the only check that means anything.
-  if docker exec "$BKP" sh -c "sh \${PUZZLE_SCRIPTS_DIR:-\$ARROW_ATLAS_SCRIPTS_DIR}/restore.sh verify '$d'" 2>&1 | sed 's/^/  /'; then
+  if docker exec "$BKP" sh -c "$BKP_FIND sh \$S/restore.sh verify '$d'" 2>&1 | sed 's/^/  /'; then
     ok "the dump restores and the restored copy reconciles"
   else
     bad "the restore verification failed — nothing may be deleted"
@@ -695,7 +701,7 @@ mode_cleanup() {
   d=$(newest_dump)
   [ -n "$d" ] || { bad "there is no PostgreSQL dump; refusing to delete anything"; return; }
   note "checking $d"
-  if docker exec "$BKP" sh -c "sh \${PUZZLE_SCRIPTS_DIR:-\$ARROW_ATLAS_SCRIPTS_DIR}/restore.sh verify '$d'" >/tmp/aa-verify.log 2>&1; then
+  if docker exec "$BKP" sh -c "$BKP_FIND sh \$S/restore.sh verify '$d'" >/tmp/aa-verify.log 2>&1; then
     ok "$d restores and reconciles"
     tail -6 /tmp/aa-verify.log | sed 's/^/      /'
   else
