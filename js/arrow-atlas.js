@@ -1084,10 +1084,10 @@
       <p class="aa-stars" aria-label="${s} of 3 stars">${'★'.repeat(s)}${'☆'.repeat(3 - s)}</p>
       <div class="aa-stats"><span><b>${fmtTime(t, true)}</b>time</span><span><b>${state.livesMax - state.lives}</b>hearts lost</span><span><b>${state.hintsUsed}</b>hints</span><span><b>x${state.bestCombo}</b>best combo</span></div>
       <div class="aa-focus" id="aaFocus" role="img" aria-label="Focus ${focus} out of 100 — ${band.name}">
-        <p class="aa-focus-cap">Your focus level</p>
+        <p class="aa-focus-cap">Your focus level<b class="aa-focus-num">0</b></p>
         <div class="aa-focus-bar">
           <span class="aa-focus-dim"></span>
-          <span class="aa-focus-mark">${BRAIN}<b class="aa-focus-num">0</b></span>
+          <span class="aa-focus-mark">${BRAIN}</span>
         </div>
         <p class="aa-focus-vs" id="aaFocusVs"></p>
       </div>
