@@ -1264,8 +1264,9 @@ mode_drop_old_volumes() {
 
 # ── volumes ─────────────────────────────────────────────────────────────────
 #
-# Reads. Every volume on the box, what holds it and where, how big it is, and — for the anonymous ones
-# Docker names with a hash — enough of what is inside to say whose it is. Nothing is changed.
+# Reads. Every volume on the box: what holds it and where, how big it is, when it was made, and what is
+# at the top level inside it, which is how you tell whose a volume is when its name does not say. Nothing
+# is changed, and nothing but a directory listing is read.
 mode_volumes() {
   say "Every volume, and who holds it"
   for v in $(docker volume ls -q | sort); do
@@ -1280,15 +1281,14 @@ mode_volumes() {
     done)
     if [ -n "$holders" ]; then printf '%s\n' "$holders" | sed 's/^/      held by /'
     else note "held by nothing"; fi
-    # An anonymous volume is 64 hex characters. Those are the ones worth looking inside.
-    case "$v" in
-      *[!0-9a-f]*) ;;
-      ????????????????????????????????????????????????????????????????)
-        note "what is inside (top level):"
-        $SUDO ls -A "$mp" 2>/dev/null | head -12 | sed 's/^/        /'
-        [ -z "$($SUDO ls -A "$mp" 2>/dev/null)" ] && note "        (empty)"
-        ;;
-    esac
+    # The top level of every one of them. A volume is identified by what is in it more reliably than by its
+    # name, and this mode exists to answer "whose is this?" — which it cannot do while looking at only some.
+    n=$($SUDO ls -A "$mp" 2>/dev/null | wc -l | tr -d ' ')
+    if [ "${n:-0}" = "0" ]; then note "inside: empty"
+    else
+      note "inside ($n entries, first 12):"
+      $SUDO ls -A "$mp" 2>/dev/null | head -12 | sed 's/^/        /'
+    fi
   done
 }
 
