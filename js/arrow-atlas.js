@@ -44,6 +44,9 @@
   const RUSH_SECONDS = 90;
   const HINT_PENALTY_MS = 5000;
   const HINTS_PER_LEVEL = 3;
+  // How long an invitation that arrived mid-board is worth offering afterwards. A room waits minutes, not
+  // hours, and an invitation to one that has since filled up or been called off is worse than none.
+  const INVITE_KEEP_MS = 120_000;
   const HINTS_OF = [3, 3, 3, 3, 3];   // hints per tier: three everywhere (fewer hints or hearts is not how this game gets hard)
   const hintsFor = tier => HINTS_OF[tier] ?? HINTS_PER_LEVEL;
   const MODES = { classic: 'Classic' };  // one way to play: the tour ramps up, and the player's own form shifts it
@@ -1097,6 +1100,9 @@
     live.leaveFeed();   // back in the lobby: nothing to watch, but the socket is how invitations arrive
     clearRun();
     if (el.ranks) el.ranks.hidden = true; el.game.hidden = true; el.overlay.hidden = true; el.select.hidden = false; setHash(-1); renderSelect();
+    // Somebody asked for a match while this player was still on a board. Now they are not.
+    const waiting = state.inviteWaiting; state.inviteWaiting = null;
+    if (waiting && Date.now() - waiting.at < INVITE_KEEP_MS) setTimeout(() => onInvite({ data: waiting }), 400);
   }
   async function share() {
     const n = DATA.levels.length, done = DATA.levels.filter((_, i) => cleared(i)).length;
@@ -1544,7 +1550,10 @@
   async function onInvite(ev) {
     const d = ev?.data || {};
     if (!d.code || !auth.user) return;
-    if (state.daily?.race && !state.finished) return;          // mid-race: an invitation can wait
+    // Not while a race board is on screen — and that includes the card that asks whether to try again, where
+    // a challenge appearing under a thumb already on its way to a button is how somebody ends up in a match
+    // they never chose. It is kept instead, and offered when they are back in the lobby.
+    if (state.daily?.race) { state.inviteWaiting = { ...d, at: Date.now() }; toast(`${d.from || 'Somebody'} is challenging you. Finish here first.`, 'hint', 4000); return; }
     if (state.pendingMatch?.code === d.code) return;            // already looking at this room
     try {
       const r = await matchApi('get', { code: d.code });
@@ -1884,6 +1893,10 @@
 
   const matchBoardIndex = board => DATA.levels.findIndex(L => L.id === board);
   function playMatch(m) {
+    // Never deal this board again over a run that is already on screen. A poll that arrives late, a link
+    // opened twice, the back button — any of them used to restart the board under the player, which looked
+    // like the game had pressed Try again for them. Getting back onto a board is a tap, and only a tap.
+    if (state.daily?.race && state.daily.match?.code === m.code) return;
     const i = matchBoardIndex(m.board);
     if (i < 0) { toast('That board is not in this version of the game.', 'bad'); return; }
     closeSheets();
@@ -1980,6 +1993,7 @@
       const d = await matchApi('get', null, '&code=' + encodeURIComponent(code));
       const m = d.match;
       if (typeof d.gold === 'number') setGold(d.gold);
+      if (state.daily?.race && state.daily.match?.code === code) return;   // already on this board: leave it alone
       if (!auth.user) { state.pendingCode = code; openSignIn(`${m.host} put ${gfmt(m.stake)} gold on a board for you. Sign in to take the challenge.`); return; }
       if (m.you && m.state === 'playing') { if (m.your_ms == null && m.board) playMatch(m); else showMatchState(m); return; }
       if (m.you && m.state === 'done') { showMatchState(m); return; }

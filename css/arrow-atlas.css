@@ -287,11 +287,15 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-status-mid b{ color:var(--ink); }
 .aa-hintbtn{ width:auto; padding:0 12px; border-radius:22px; font-size:16px; background:var(--bg2); }
 .aa-hintbtn:disabled{ opacity:.4; }
-.aa-board-wrap{ position:relative; flex:1; min-height:0; display:flex; align-items:center; justify-content:center; padding:6px 0; overflow:hidden; touch-action:none; }
+/* A board needs air around it. Some countries are long and thin and some fill a phone corner to corner, and
+   an arrow sitting on the edge of the glass is one the thumb cannot reach without the palm covering half the
+   board. So the frame keeps a margin on every side, and a little more at the bottom, where the phone's own
+   gesture bar lives. */
+.aa-board-wrap{ position:relative; flex:1; min-height:0; display:flex; align-items:center; justify-content:center; padding:10px 14px calc(16px + env(safe-area-inset-bottom, 0px)); overflow:hidden; touch-action:none; }
 .aa-board-track{ position:absolute; left:0; right:0; top:0; height:4px; background:var(--bg2); border-radius:4px; }
 .aa-board-bar{ height:100%; width:0; background:var(--accent); border-radius:4px; transition:width .3s; }
-.aa-board{ display:block; width:100%; height:auto; max-height:calc(100dvh - 210px); touch-action:none; transform-origin:0 0; will-change:transform; user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; }
-.aa-board--tall{ max-height:calc(100dvh - 190px); }
+.aa-board{ display:block; width:100%; height:auto; max-height:calc(100dvh - 232px); touch-action:none; transform-origin:0 0; will-change:transform; user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; }
+.aa-board--tall{ max-height:calc(100dvh - 212px); }
 .aa-outline{ fill:var(--accent); fill-opacity:0; stroke:none; transition:fill-opacity .35s; pointer-events:none; }
 .aa-guides{ display:none; }
 .aa-board--guides .aa-guides{ display:block; }
