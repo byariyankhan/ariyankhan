@@ -55,25 +55,30 @@
 
   function renderFooterComponent(basePath) {
     const contactHref = contactHrefFor(basePath);
+    // Root-absolute, because most of the pages carrying this footer are not at the root. With basePath empty,
+    // "privacy-policy.html" resolves against the current folder -- so every page under /blog/, /service/ and
+    // /case-studies/ was linking its readers at /blog/privacy-policy.html and three dozen other 404s. A page
+    // that sets data-base-path keeps whatever it set.
+    const root = basePath || '/';
     return `
 <footer class="site-footer">
   <nav class="footer-social" data-social-links="footer" aria-label="Social media links"></nav>
   <p class="footer-legal">
-    <a href="${basePath}blog/">Blog</a>
+    <a href="${root}blog/">Blog</a>
     <span class="footer-divider" aria-hidden="true">|</span>
-    <a href="${basePath}case-studies/">Case Studies</a>
+    <a href="${root}case-studies/">Case Studies</a>
     <span class="footer-divider" aria-hidden="true">|</span>
-    <a href="${basePath}ai-metadata-remover.html">AI Metadata Remover</a>
+    <a href="${root}ai-metadata-remover.html">AI Metadata Remover</a>
     <span class="footer-divider" aria-hidden="true">|</span>
-    <a href="${basePath}map-maker.html">Map Maker</a>
-    <a href="${basePath}piece-the-world.html">Piece the World</a>
-    <a href="${basePath}puzzle/">Puzzle – Train Your Brain</a>
+    <a href="${root}map-maker.html">Map Maker</a>
+    <a href="${root}piece-the-world.html">Piece the World</a>
+    <a href="${root}puzzle/">Puzzle – Train Your Brain</a>
     <span class="footer-divider" aria-hidden="true">|</span>
-    <a href="${basePath}about.html">About</a>
+    <a href="${root}about.html">About</a>
     <span class="footer-divider" aria-hidden="true">|</span>
-    <a href="${basePath}privacy-policy.html">Privacy Policy</a>
+    <a href="${root}privacy-policy.html">Privacy Policy</a>
     <span class="footer-divider" aria-hidden="true">|</span>
-    <a href="${basePath}terms-and-conditions.html">Terms &amp; Conditions</a>
+    <a href="${root}terms-and-conditions.html">Terms &amp; Conditions</a>
     <span class="footer-divider" aria-hidden="true">|</span>
     <a href="${contactHref}">Contact</a>
   </p>
