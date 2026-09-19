@@ -436,6 +436,43 @@ env_rollback() {
   $SUDO cp -a "$EBK" "$ENVF" && note "the .env is back as it was"
   $SUDO cp -a "$CBK" "$COMP" && note "the compose file is back as it was"
 }
+env_verify() {
+  say "whether the live compose file is otherwise the one in this checkout"
+  # A count, not a diff: this says whether a deploy is still owed, without printing a line of either file.
+  tar -xzf "$TGZ" -O ./games/puzzle/deploy/docker-compose.yml > /tmp/puzzle-compose.yml 2>/dev/null
+  if [ -s /tmp/puzzle-compose.yml ]; then
+    $SUDO cat "$COMP" > /tmp/puzzle-compose.live 2>/dev/null
+    d=$(diff /tmp/puzzle-compose.yml /tmp/puzzle-compose.live 2>/dev/null | grep -c '^[<>]' || true)
+    rm -f /tmp/puzzle-compose.live
+    [ "${d:-0}" = "0" ] && ok "byte for byte the same as the checkout's" \
+      || note "${d} line(s) differ from the checkout's — a deploy would apply those as well"
+  fi
+  rm -f /tmp/puzzle-compose.yml
+
+  say "the containers, untouched, still answering"
+  # Key names only. A name is not a secret; a value is, and no value is read here.
+  docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' "$API" 2>/dev/null \
+    | cut -d= -f1 | grep -E '^(PUZZLE|ARROW_ATLAS)_' | sort | tr '\n' ' ' | fold -w 150 -s | sed 's/^/      /'
+  echo
+  for c in $AA_CONTAINERS; do
+    printf '      %-18s %s\n' "$c" "$(docker inspect -f '{{.State.Status}}{{if .State.Health}} ({{.State.Health.Status}}){{end}}' "$c" 2>/dev/null)"
+  done
+  hp=$(curl -so /dev/null -w '%{http_code}' -m 10 "https://$DOMAIN/api/puzzle/v1/health")
+  [ "$hp" = "200" ] && ok "the API answers through nginx" || bad "the API answered $hp"
+
+  # A path is not a secret, and this one is worth reading: if the .env still points the dumps at the directory
+  # the rename moved, they are landing somewhere nobody is looking.
+  say "where the dumps are actually written"
+  docker inspect -f '{{range .Mounts}}{{if eq .Destination "/backups-host"}}{{.Source}}{{end}}{{end}}' "$BKP" 2>/dev/null | sed 's/^/      /'
+  note "the host directory this script reads and writes is $HOST_BACKUPS"
+
+  case "$PROJ" in
+    *arrow-atlas*) say "one old name left on this host"
+                   note "the project directory is still $PROJ"
+                   note "that is where compose reads this .env and this compose file from, and it is the last of it" ;;
+  esac
+}
+
 mode_rename_env() {
   [ "$CONFIRM" = "RENAME" ] || { echo "::error::rename-env needs confirm=RENAME"; exit 2; }
   echo "Puzzle — the .env keys  ($(hostname), $(date -u))"
@@ -455,9 +492,14 @@ mode_rename_env() {
   oldrefs=$($SUDO grep -c '${ARROW_ATLAS_' "$COMP" 2>/dev/null || true)
   note "${oldkeys:-0} old key(s) in the .env, ${oldrefs:-0} old reference(s) in the compose file"
   if [ "${oldkeys:-0}" = "0" ] && [ "${oldrefs:-0}" = "0" ]; then
-    ( cd "$PROJ" && $SUDO docker compose config -q ) >/dev/null 2>&1 \
-      && { ok "both were renamed already, and compose resolves the project"; return; } \
-      || { bad "nothing carries the old names, but compose cannot resolve the project — that is a different problem"; return; }
+    if ( cd "$PROJ" && $SUDO docker compose config -q ) >/dev/null 2>&1; then
+      ok "both carry the new names already, and compose resolves the project with them"
+      env_verify; return
+    else
+      bad "nothing carries the old names, but compose cannot resolve the project — that is a different problem"
+      ( cd "$PROJ" && $SUDO docker compose config 2>&1 >/dev/null | head -5 | sed 's/^/      /' )
+      return
+    fi
   fi
 
   say "2. what the rendered configuration is now"
@@ -524,7 +566,7 @@ io.open(path, 'w', encoding='utf-8').write(s)
 print('      %d reference(s) rewritten' % n)
 COMPREN
   $SUDO grep -q '${ARROW_ATLAS_' "$COMP" && { bad "some of them are still there"; env_rollback; return; }
-  ok "it reads ${PUZZLE_*} now"
+  ok 'it reads the PUZZLE_ names now'
 
   say "5. compose must resolve every variable, and render the same thing as before"
   if ! ( cd "$PROJ" && $SUDO docker compose config -q ) >/dev/null 2>&1; then
@@ -541,34 +583,7 @@ COMPREN
     env_rollback; return
   fi
 
-  say "6. whether the live file is otherwise the one in this checkout"
-  # A count, not a diff: this says whether a deploy is still owed, without printing a line of either file.
-  tar -xzf "$TGZ" -O ./games/puzzle/deploy/docker-compose.yml > /tmp/puzzle-compose.yml 2>/dev/null
-  if [ -s /tmp/puzzle-compose.yml ]; then
-    $SUDO cat "$COMP" > /tmp/puzzle-compose.live 2>/dev/null
-    d=$(diff /tmp/puzzle-compose.yml /tmp/puzzle-compose.live 2>/dev/null | grep -c '^[<>]' || true)
-    rm -f /tmp/puzzle-compose.live
-    [ "${d:-0}" = "0" ] && ok "byte for byte the same as the checkout's" \
-      || note "${d} line(s) differ from the checkout's — a deploy would apply those as well"
-  fi
-  rm -f /tmp/puzzle-compose.yml
-
-  say "7. and the containers, untouched, still answering"
-  # Key names only. A name is not a secret; a value is, and no value is read here.
-  docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' "$API" 2>/dev/null \
-    | cut -d= -f1 | grep -E '^(PUZZLE|ARROW_ATLAS)_' | sort | tr '\n' ' ' | fold -w 150 -s | sed 's/^/      /'
-  echo
-  for c in $AA_CONTAINERS; do
-    printf '      %-18s %s\n' "$c" "$(docker inspect -f '{{.State.Status}}{{if .State.Health}} ({{.State.Health.Status}}){{end}}' "$c" 2>/dev/null)"
-  done
-  hp=$(curl -so /dev/null -w '%{http_code}' -m 10 "https://$DOMAIN/api/puzzle/v1/health")
-  [ "$hp" = "200" ] && ok "the API answers through nginx" || bad "the API answered $hp"
-
-  # A path is not a secret, and this one is worth reading: if the .env still points the dumps at the directory
-  # the rename moved, they are landing somewhere nobody is looking.
-  say "where the dumps are actually written"
-  docker inspect -f '{{range .Mounts}}{{if eq .Destination "/backups-host"}}{{.Source}}{{end}}{{end}}' "$BKP" 2>/dev/null | sed 's/^/      /'
-  note "the host directory this script reads and writes is $HOST_BACKUPS"
+  env_verify
 }
 
 # Read-only: what the portfolio's own container is doing, for when the site answers an error and the reason is
