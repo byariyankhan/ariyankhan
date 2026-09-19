@@ -1695,7 +1695,11 @@
       title: 'One more hint',
       lead: 'Watch a short advertisement for one more hint on this board.',
       cta: 'Watch for a hint',
-      grant() { state.hintsMax = (state.hintsMax ?? HINTS_PER_LEVEL) + 1; renderHud(); toast('One more hint.', 'good'); hint(); },
+      // The hint is added, and nothing else. It used to light the arrow up the moment the advertisement closed,
+      // which put a 2.5-second glow on screen while the player was still watching the ad panel disappear -- the
+      // thing they had just spent half a minute on, missed. An advertisement buys the item; using it is a tap,
+      // like every other hint.
+      grant() { state.hintsMax = (state.hintsMax ?? HINTS_PER_LEVEL) + 1; renderHud(); toast('One more hint.', 'good'); },
     },
     check: {
       title: `One more ${CHECK_WORD}`,
