@@ -31,7 +31,7 @@ export const config = {
   port: num('PORT', 8760),
   host: str('HOST', '0.0.0.0'),
   // Where the browser should reach this service. Empty means "same origin as the page", which is what
-  // ariyankhan.com wants today; set it to https://api.arrowatlas.com and the client follows without a rewrite.
+  // ariyankhan.com wants today; set it to a host of the game's own and the client follows without a rewrite.
   publicApiBase: str('PUZZLE_PUBLIC_API_BASE'),
   publicWsBase: str('PUZZLE_PUBLIC_WS_BASE'),
   // Which origins may call the API with credentials. Empty = same-origin only, which is the web case; a phone
@@ -42,10 +42,10 @@ export const config = {
 
   pg: {
     // The container names, not the product's name: renaming those is a separate job with a database in it.
-    host: str('PUZZLE_PG_HOST', 'arrow-atlas-postgres'),
+    host: str('PUZZLE_PG_HOST', 'puzzle-postgres'),
     port: num('PUZZLE_PG_PORT', 5432),
-    database: str('PUZZLE_PG_DATABASE', 'arrow_atlas'),
-    user: str('PUZZLE_PG_USER', 'arrow_atlas'),
+    database: str('PUZZLE_PG_DATABASE', 'puzzle'),
+    user: str('PUZZLE_PG_USER', 'puzzle'),
     password: str('PUZZLE_PG_PASSWORD'),
     max: num('PUZZLE_PG_POOL_MAX', 16),
     idleTimeoutMillis: num('PUZZLE_PG_IDLE_MS', 30_000),
@@ -54,7 +54,7 @@ export const config = {
   },
 
   redis: {
-    host: str('PUZZLE_REDIS_HOST', 'arrow-atlas-redis'),
+    host: str('PUZZLE_REDIS_HOST', 'puzzle-redis'),
     port: num('PUZZLE_REDIS_PORT', 6379),
     password: str('PUZZLE_REDIS_PASSWORD'),
     // Every key this product writes starts here, so a second game can never collide with this one.
@@ -79,7 +79,7 @@ export const config = {
     lonelySeconds: num('PUZZLE_LONELY_SECONDS', 120),
     matchHours: num('PUZZLE_MATCH_HOURS', 24),
     // The board list the server picks from, so no client can choose an easy country.
-    boardsFile: str('PUZZLE_BOARDS_FILE', '/srv/arrow-atlas/site/games/data/puzzle.json'),
+    boardsFile: str('PUZZLE_BOARDS_FILE', '/srv/puzzle/site/games/data/puzzle.json'),
   },
 
   // ── The league ──
