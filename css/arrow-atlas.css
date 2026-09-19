@@ -387,10 +387,11 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-stats b{ font-size:20px; font-weight:900; color:var(--ink); letter-spacing:0; text-transform:none; margin-bottom:2px; font-variant-numeric:tabular-nums; }
 .aa-facts{ font-size:14px; color:var(--muted); margin:0 0 12px; line-height:1.5; }
 /* The focus reading, as a bar anybody can read: red at one end, green at the other, and a brain sitting where
-   this run landed. The words beside it are for whoever wants them; the picture is the reading. */
-.aa-focus{ --at:0%; margin:14px 0 0; padding:12px 14px 8px; border-radius:16px; background:var(--bg2); text-align:center; }
+   this run landed. It sits on the card itself rather than in a panel of its own — a box around it only made
+   the card busier, and the bar is loud enough without one. */
+.aa-focus{ --at:0%; margin:18px 0 0; text-align:left; }
 .aa-focus-cap{ margin:0; font-size:12px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); }
-.aa-focus-bar{ position:relative; height:14px; margin:18px 24px 0; border-radius:999px;
+.aa-focus-bar{ position:relative; height:14px; margin:14px 20px 0 0; border-radius:999px;
   background:linear-gradient(90deg, var(--bad) 0%, var(--accent) 52%, var(--good) 100%); }
 /* everything past the brain is still to come, so it is dimmed rather than coloured */
 .aa-focus-dim{ position:absolute; top:-1px; bottom:-1px; right:-1px; left:var(--at); border-radius:999px;
@@ -401,7 +402,7 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-focus.is-done .aa-brain{ animation:aapop .45s ease-out; }
 /* Empty until the server has enough players to compare against, but it keeps its height either way: the
    number under the brain sits in this space, and the card must not change size when the line arrives. */
-.aa-focus-vs{ margin:36px 0 0; min-height:16px; font-size:13px; font-weight:800; color:var(--muted); }
+.aa-focus-vs{ margin:30px 0 0; min-height:14px; font-size:13px; font-weight:800; color:var(--muted); }
 @media(prefers-reduced-motion:reduce){ .aa-focus.is-done .aa-brain{ animation:none; } }
 .aa-facts b{ color:var(--ink); }
 /* discoveries: four finds per cleared country */
@@ -412,8 +413,18 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-actions{ display:flex; flex-wrap:wrap; justify-content:center; gap:8px; }
 .aa-actions .aa-btn{ background:var(--bg2); color:var(--ink); box-shadow:none; }
 .aa-actions .aa-btn--primary{ background:var(--accent2); color:#fff; }
+/* The cleared card's own row: what happens next runs the width of the card, and the two smaller offers share
+   the line under it. The corners stay the game's corners — a pill here and a rounded rectangle everywhere
+   else is two games in one screen. */
+.aa-actions--stack{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:10px; }
+.aa-actions--stack .aa-btn{ width:100%; min-width:0; padding:14px 16px; }
+.aa-actions--stack .aa-btn--primary{ grid-column:1 / -1; }
+.aa-bi{ width:19px; height:19px; flex:none; }
+/* On a phone too narrow for two labels side by side, they take a line each rather than pushing out of the
+   card: one under the other still reads, a button hanging over the edge does not. */
+@media (max-width:359px){ .aa-actions--stack{ grid-template-columns:1fr; } }
 .aa-flash{ font-size:13px; color:var(--good); margin:12px 0 0; white-space:pre-wrap; }
-.aa-yt{ margin:16px 0 0; font-size:13px; color:var(--muted); }
+.aa-yt{ margin:20px 0 0; padding-top:16px; border-top:1px solid color-mix(in srgb, var(--muted) 28%, transparent); font-size:13px; color:var(--muted); }
 .aa-yt a, .aa-credit a, .aa-page a{ color:var(--accent); }
 
 /* ── Settings page rows ── */
