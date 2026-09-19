@@ -24,8 +24,8 @@ RUN apk add --no-cache dumb-init && \
     addgroup -g 10001 arrowatlas && adduser -D -u 10001 -G arrowatlas arrowatlas
 WORKDIR /srv/arrow-atlas
 ENV NODE_ENV=production \
-    ARROW_ATLAS_BOARDS_FILE=/srv/arrow-atlas/data/arrow-atlas.json \
-    ARROW_ATLAS_MIGRATIONS_DIR=/srv/arrow-atlas/migrations
+    PUZZLE_BOARDS_FILE=/srv/puzzle/data/puzzle.json \
+    PUZZLE_MIGRATIONS_DIR=/srv/puzzle/migrations
 COPY --from=build /build/node_modules ./node_modules
 COPY --from=build /build/dist ./dist
 COPY games/puzzle/migrations ./migrations

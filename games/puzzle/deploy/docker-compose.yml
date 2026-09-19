@@ -22,7 +22,7 @@ services:
     environment:
       POSTGRES_DB: puzzle
       POSTGRES_USER: puzzle
-      POSTGRES_PASSWORD: ${ARROW_ATLAS_PG_PASSWORD:?set ARROW_ATLAS_PG_PASSWORD in .env}
+      POSTGRES_PASSWORD: ${PUZZLE_PG_PASSWORD:?set PUZZLE_PG_PASSWORD in .env}
       POSTGRES_INITDB_ARGS: "--data-checksums"
       TZ: UTC
     volumes:
@@ -44,9 +44,9 @@ services:
     # Ephemeral by design, but appendonly keeps a restart from dropping presence mid-match for no reason.
     command: >
       redis-server
-      --requirepass ${ARROW_ATLAS_REDIS_PASSWORD:?set ARROW_ATLAS_REDIS_PASSWORD in .env}
+      --requirepass ${PUZZLE_REDIS_PASSWORD:?set PUZZLE_REDIS_PASSWORD in .env}
       --appendonly yes
-      --maxmemory ${ARROW_ATLAS_REDIS_MAXMEMORY:-256mb}
+      --maxmemory ${PUZZLE_REDIS_MAXMEMORY:-256mb}
       --maxmemory-policy allkeys-lru
     volumes:
       - puzzle-redis-data:/data
@@ -58,7 +58,7 @@ services:
       retries: 6
       start_period: 10s
     environment:
-      REDIS_PASSWORD: ${ARROW_ATLAS_REDIS_PASSWORD}
+      REDIS_PASSWORD: ${PUZZLE_REDIS_PASSWORD}
     stop_grace_period: 15s
     logging: { driver: json-file, options: { max-size: "10m", max-file: "3" } }
 
@@ -68,8 +68,8 @@ services:
     # whole project can be handed over as raw YAML.
     #
     # Once GitHub Actions is enabled for the repository, .github/workflows/puzzle-api.yml publishes a real
-    # image and this becomes faster and reproducible. To switch: set ARROW_ATLAS_IMAGE in .env, replace the
-    # `image:` line below with `image: ${ARROW_ATLAS_IMAGE}`, and delete the `command:` block.
+    # image and this becomes faster and reproducible. To switch: set PUZZLE_IMAGE in .env, replace the
+    # `image:` line below with `image: ${PUZZLE_IMAGE}`, and delete the `command:` block.
     image: node:22-alpine
     container_name: puzzle-api
     restart: unless-stopped
@@ -80,23 +80,23 @@ services:
       NODE_ENV: production
       PORT: 8760
       SITE_BRANCH: ${SITE_BRANCH:-main}
-      PUZZLE_VERSION: ${ARROW_ATLAS_VERSION:-main}
+      PUZZLE_VERSION: ${PUZZLE_VERSION:-main}
       PUZZLE_BOARDS_FILE: /srv/puzzle/site/games/data/puzzle.json
       PUZZLE_MIGRATIONS_DIR: /srv/puzzle/site/games/puzzle/migrations
       PUZZLE_PG_HOST: puzzle-postgres
       PUZZLE_PG_DATABASE: puzzle
       PUZZLE_PG_USER: puzzle
-      PUZZLE_PG_PASSWORD: ${ARROW_ATLAS_PG_PASSWORD}
+      PUZZLE_PG_PASSWORD: ${PUZZLE_PG_PASSWORD}
       PUZZLE_REDIS_HOST: puzzle-redis
-      PUZZLE_REDIS_PASSWORD: ${ARROW_ATLAS_REDIS_PASSWORD}
-      PUZZLE_REDIS_PREFIX: ${ARROW_ATLAS_REDIS_PREFIX:-puzzle:}
+      PUZZLE_REDIS_PASSWORD: ${PUZZLE_REDIS_PASSWORD}
+      PUZZLE_REDIS_PREFIX: ${PUZZLE_REDIS_PREFIX:-puzzle:}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       # Only needed while the repository is private, and only ever set in the project's .env on the host:
       # a read-only token for contents. Empty, the start falls back to the public tarball.
       GITHUB_TOKEN: ${GITHUB_TOKEN:-}
-      PUZZLE_ALLOWED_ORIGINS: ${ARROW_ATLAS_ALLOWED_ORIGINS:-}
-      PUZZLE_COOKIE_SECURE: ${ARROW_ATLAS_COOKIE_SECURE:-true}
-      PUZZLE_LOG_LEVEL: ${ARROW_ATLAS_LOG_LEVEL:-info}
+      PUZZLE_ALLOWED_ORIGINS: ${PUZZLE_ALLOWED_ORIGINS:-}
+      PUZZLE_COOKIE_SECURE: ${PUZZLE_COOKIE_SECURE:-true}
+      PUZZLE_LOG_LEVEL: ${PUZZLE_LOG_LEVEL:-info}
     working_dir: /srv/puzzle
     command:
       - sh
@@ -180,7 +180,7 @@ services:
       - /var/www/ariyankhan-src:/srv/source:ro
     ports:
       # 127.0.0.1 only: the host nginx terminates TLS and is the single way in from outside.
-      - "127.0.0.1:${ARROW_ATLAS_PORT:-8760}:8760"
+      - "127.0.0.1:${PUZZLE_PORT:-8760}:8760"
     networks: [puzzle-data, puzzle-edge]
     healthcheck:
       test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:8760/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
@@ -209,16 +209,16 @@ services:
       PGHOST: puzzle-postgres
       PGDATABASE: puzzle
       PGUSER: puzzle
-      PGPASSWORD: ${ARROW_ATLAS_PG_PASSWORD}
+      PGPASSWORD: ${PUZZLE_PG_PASSWORD}
       PUZZLE_BACKUP_DIR: /backups
-      PUZZLE_BACKUP_KEEP_DAYS: ${ARROW_ATLAS_BACKUP_KEEP_DAYS:-14}
-      PUZZLE_BACKUP_AT_HOUR: ${ARROW_ATLAS_BACKUP_AT_HOUR:-3}
+      PUZZLE_BACKUP_KEEP_DAYS: ${PUZZLE_BACKUP_KEEP_DAYS:-14}
+      PUZZLE_BACKUP_AT_HOUR: ${PUZZLE_BACKUP_AT_HOUR:-3}
       PUZZLE_SCRIPTS_DIR: /srv/puzzle/site/games/puzzle/deploy
     volumes:
       # A named volume so the dumps never sit in the live PostgreSQL data directory, plus a bind mount so the
       # host (and whatever backs the host up) can see them without entering the container.
       - puzzle-backups:/backups
-      - ${ARROW_ATLAS_BACKUP_HOST_DIR:-/var/backups/puzzle}:/backups-host
+      - ${PUZZLE_BACKUP_HOST_DIR:-/var/backups/puzzle}:/backups-host
       # read-only: this container reads the scripts and must never be able to change the deployed code
       - puzzle-site:/srv/puzzle/site:ro
     networks: [puzzle-data]
@@ -230,7 +230,7 @@ services:
         # Wait for the checkout. On a first deploy the API is still fetching it, which takes seconds; on every
         # later start it is already there and this returns at once. Invoked through sh, so the file mode in the
         # tarball is not something backups depend on.
-        S="$${PUZZLE_SCRIPTS_DIR:-$$ARROW_ATLAS_SCRIPTS_DIR}"
+        S="$$PUZZLE_SCRIPTS_DIR"
         i=0
         while [ ! -f "$$S/backup.sh" ]; do
           i=$$((i + 1))

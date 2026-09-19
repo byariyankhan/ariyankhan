@@ -3,7 +3,7 @@
 #
 # Two rules hold everywhere below:
 #
-#   * Nothing addresses a container, path or volume that is not Arrow Atlas's or the portfolio's own web
+#   * Nothing addresses a container, path or volume that is not the game's or the portfolio's own web
 #     container. ASR and Bookween are never named, so no command here can reach them.
 #   * No secret is printed. The PostgreSQL password is read inside the container from its own environment
 #     and handed to psql through PGPASSWORD, which never appears in a log line.
@@ -24,6 +24,10 @@ C() {   # C api → the real name of the api container, whichever generation it 
   if docker inspect "puzzle-$1" >/dev/null 2>&1; then echo "puzzle-$1"; else echo "arrow-atlas-$1"; fi
 }
 API=$(C api); PG=$(C postgres); RDS=$(C redis); BKP=$(C backup)
+# Same question for the volume the API builds from: it is puzzle-site now, was arrow-atlas-site before, and
+# `docker run -v <a name that does not exist>` quietly creates an empty volume instead of failing — which is
+# how a push-source could report success while the API went on serving what it already had.
+SITEVOL=$(docker volume inspect puzzle-site >/dev/null 2>&1 && echo puzzle-site || echo arrow-atlas-site)
 AA_CONTAINERS="$API $PG $RDS $BKP"
 if [ -d /var/backups/puzzle ]; then HOST_BACKUPS=/var/backups/puzzle; else HOST_BACKUPS=/var/backups/arrow-atlas; fi
 fail=0
@@ -163,7 +167,7 @@ report_nginx() {
   fi
 
   echo
-  note "pre-cutover config backups (only Arrow Atlas's and the portfolio's own):"
+  note "pre-cutover config backups (only the game's and the portfolio's own):"
   $SUDO find /etc/nginx -maxdepth 3 \
     \( -name 'ariyankhan.conf.*' -o -name 'arrow-atlas*.conf.*' -o -name '*pre-cutover*' -o -name '*pre-arrow*' \) \
     -printf '    %p  %s bytes  %TY-%Tm-%Td\n' 2>/dev/null || true
@@ -216,12 +220,12 @@ report_backups() {
 # The point is Bookween: that project is private too, and it deploys by having the VPS pull the repository
 # itself over a read-only deploy key, then rebuilding from that checkout. Nothing there fetches a tarball over
 # an unauthenticated URL, which is why nothing there broke when a repository went private. If this host can
-# already read this repository the same way, Arrow Atlas can work exactly like it.
+# already read this repository the same way, the game can work exactly like it.
 # Give this host a key of its own for this repository, and pull with it.
 #
 # This is the shape Bookween already deploys in: the host holds a read-only deploy key, pulls the repository
 # itself, and builds from that checkout — so nothing reaches for a tarball at container start and a repository
-# going private breaks nothing. Arrow Atlas was the odd one out.
+# going private breaks nothing. the game was the odd one out.
 #
 # No token is involved anywhere. A token on a remote command line is readable in that host's process list, and
 # one that is pasted or stored outlives its usefulness; a key made here has its private half written once, by
@@ -230,7 +234,7 @@ report_backups() {
 #
 # Run it again after that, and it pulls.
 mode_git_sync() {
-  echo "Arrow Atlas — a key for this host, and a pull with it  ($(hostname), $(date -u))"
+  echo "Puzzle — a key for this host, and a pull with it  ($(hostname), $(date -u))"
   SRC=/var/www/ariyankhan-src
   KEY="$HOME/.ssh/ariyankhan_repo_deploy"
   ALIAS=ariyankhan-ssh
@@ -286,7 +290,7 @@ mode_git_sync() {
 }
 
 mode_git_access() {
-  echo "Arrow Atlas — what this host can read from GitHub  ($(hostname), $(date -u))"
+  echo "Puzzle — what this host can read from GitHub  ($(hostname), $(date -u))"
 
   say "the source directory the containers are configured from"
   SRC=/var/www/ariyankhan-src
@@ -325,7 +329,7 @@ mode_git_access() {
 }
 
 mode_logs() {
-  echo "Arrow Atlas — what the API says about itself  ($(hostname), $(date -u))"
+  echo "Puzzle — what the API says about itself  ($(hostname), $(date -u))"
   report_containers
   say "$API, as Docker sees it"
   docker inspect -f 'status={{.State.Status}}  restarts={{.RestartCount}}  last exit={{.State.ExitCode}}  health={{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' \
@@ -360,7 +364,7 @@ mode_web_revive() {
   echo "Bringing the site back  ($(hostname), $(date -u))"
   have ariyankhan-web || { bad "no ariyankhan-web container here"; return; }
   W=ariyankhan-web
-  TGZ=/tmp/arrow-atlas-site.tgz
+  TGZ=/tmp/puzzle-site.tgz
 
   say "1. the files the site is served from"
   if [ -s "$TGZ" ]; then
@@ -415,6 +419,130 @@ mode_web_revive() {
   done
 }
 
+# The last of the old names on the host: the keys in the project's .env.
+#
+# Nothing here reads a value. The file is copied to a backup first (mode 600), the keys are rewritten by a match
+# anchored on the name before the first '=', and the proof that no value moved is a hash of the values compared
+# before and after — never a value, never a line of the file, never the rendered configuration.
+#
+# The compose file in this checkout reads ${PUZZLE_*}, so it is installed in the same run: renaming one without
+# the other leaves a project compose cannot resolve. And no container is recreated, because none needs to be —
+# the names the containers see have been PUZZLE_* since the rename, so the rendered configuration is identical
+# before and after. That identity is the gate, checked as a hash; if it does not hold, both files go back.
+env_rollback() {
+  $SUDO cp -a "$EBK" "$ENVF" && note "the .env is back as it was"
+  $SUDO cp -a "$CBK" "$COMP" && note "the compose file is back as it was"
+}
+mode_rename_env() {
+  [ "$CONFIRM" = "RENAME" ] || { echo "::error::rename-env needs confirm=RENAME"; exit 2; }
+  echo "Puzzle — the .env keys  ($(hostname), $(date -u))"
+  TGZ=/tmp/puzzle-site.tgz
+  command -v python3 >/dev/null || { bad "python3 is not on this host, and editing this file without it is not worth the risk"; return; }
+  [ -s "$TGZ" ] || { bad "no checkout arrived; the compose file that reads PUZZLE_* comes with it"; return; }
+  have "$API" || { bad "no API container here"; return; }
+  PROJ=$(docker inspect -f '{{index .Config.Labels "com.docker.compose.project.working_dir"}}' "$API" 2>/dev/null)
+  [ -n "$PROJ" ] && $SUDO test -f "$PROJ/.env" || { bad "cannot find the .env behind $API"; return; }
+  ENVF="$PROJ/.env"; COMP="$PROJ/docker-compose.yml"
+  EBK="$HOST_BACKUPS/env.before-rename-$STAMP"; CBK="$HOST_BACKUPS/docker-compose.yml.before-rename-$STAMP"
+  note "$ENVF"
+
+  say "1. is there anything to do"
+  # Names only: this counts keys, it does not read them out.
+  oldkeys=$($SUDO grep -cE '^[[:space:]]*(export[[:space:]]+)?ARROW_ATLAS_[A-Za-z0-9_]*=' "$ENVF" 2>/dev/null || true)
+  oldrefs=$($SUDO grep -c '${ARROW_ATLAS_' "$COMP" 2>/dev/null || true)
+  note "${oldkeys:-0} old key(s) in the .env, ${oldrefs:-0} old reference(s) in the compose file"
+  if [ "${oldkeys:-0}" = "0" ] && [ "${oldrefs:-0}" = "0" ]; then
+    ( cd "$PROJ" && $SUDO docker compose config -q ) >/dev/null 2>&1 \
+      && { ok "both were renamed already, and compose resolves the project"; return; } \
+      || { bad "nothing carries the old names, but compose cannot resolve the project — that is a different problem"; return; }
+  fi
+
+  say "2. what the rendered configuration is now"
+  H1=$( cd "$PROJ" && $SUDO docker compose config 2>/dev/null | sha256sum | cut -d' ' -f1 )
+  case "$H1" in
+    ''|e3b0c44298fc1c149afbf4c8996fb924*) bad "compose cannot render the project as it stands; not touching anything"; return ;;
+  esac
+  note "sha256 $(printf '%.12s' "$H1")…  (the configuration itself is never printed: it holds every secret)"
+
+  say "3. the keys, renamed in place"
+  $SUDO install -m 600 "$ENVF" "$EBK" && kept "$EBK  (the way back, readable only by its owner)" || { bad "could not back the file up; stopping"; return; }
+  $SUDO cp -a "$COMP" "$CBK" && kept "$CBK"
+  $SUDO python3 - "$ENVF" <<'ENVREN' || { bad "the .env was left alone"; $SUDO cp -a "$EBK" "$ENVF"; return; }
+import hashlib, io, re, sys
+path = sys.argv[1]
+lines = io.open(path, encoding='utf-8').read().split('\n')
+KEY = re.compile(r'^(\s*(?:export\s+)?)([A-Za-z_][A-Za-z0-9_]*)(=)(.*)$')
+def value_hash(ls):
+    h = hashlib.sha256()
+    for l in ls:
+        m = KEY.match(l)
+        if m:
+            h.update(m.group(4).encode('utf-8') + b'\n')
+    return h.hexdigest()
+before = value_hash(lines)
+out, renamed = [], []
+for l in lines:
+    m = KEY.match(l)
+    if m and m.group(2).startswith('ARROW_ATLAS_'):
+        new = 'PUZZLE_' + m.group(2)[len('ARROW_ATLAS_'):]
+        renamed.append((m.group(2), new))
+        l = m.group(1) + new + m.group(3) + m.group(4)
+    out.append(l)
+# A comment naming an old key would be the only thing left saying it; only comment lines are touched here.
+out = [re.sub(r'\bARROW_ATLAS_([A-Za-z0-9_]+)\b', r'PUZZLE_\1', l) if l.lstrip().startswith('#') else l for l in out]
+if value_hash(out) != before:
+    print('a value would have changed; refusing to write', file=sys.stderr)
+    raise SystemExit(3)
+if not renamed:
+    print('      no ARROW_ATLAS_* key in this file')
+else:
+    io.open(path, 'w', encoding='utf-8').write('\n'.join(out))
+    for a, b in renamed:
+        print('      %-36s -> %s' % (a, b))
+    print('      %d key(s) renamed, every value byte for byte the same' % len(renamed))
+ENVREN
+
+  say "4. the compose file that reads those names"
+  tar -xzf "$TGZ" -O ./games/puzzle/deploy/docker-compose.yml > /tmp/puzzle-compose.yml 2>/dev/null
+  [ -s /tmp/puzzle-compose.yml ] || { bad "the tarball has no compose file"; env_rollback; return; }
+  grep -q '${ARROW_ATLAS_' /tmp/puzzle-compose.yml \
+    && { bad "the compose file in this checkout still reads the old names; nothing to install"; env_rollback; rm -f /tmp/puzzle-compose.yml; return; }
+  $SUDO install -m 644 /tmp/puzzle-compose.yml "$COMP" && ok "installed" || { bad "could not install it"; env_rollback; return; }
+  rm -f /tmp/puzzle-compose.yml
+
+  say "5. compose must resolve every variable, and render the same thing as before"
+  if ! ( cd "$PROJ" && $SUDO docker compose config -q ) >/dev/null 2>&1; then
+    bad "compose cannot resolve the project with the renamed keys; putting both files back"
+    ( cd "$PROJ" && $SUDO docker compose config 2>&1 >/dev/null | grep -o 'variable is not set[^"]*\|required variable [A-Z_]* is missing' | sort -u | sed 's/^/      /' )
+    env_rollback; return
+  fi
+  H2=$( cd "$PROJ" && $SUDO docker compose config 2>/dev/null | sha256sum | cut -d' ' -f1 )
+  if [ "$H1" = "$H2" ]; then
+    ok "identical — every container would be created with exactly the environment it is running with, so there is nothing to restart"
+  else
+    bad "the rendered configuration is not what it was, and only names were meant to change; putting both files back"
+    note "was $(printf '%.12s' "$H1")…, now $(printf '%.12s' "$H2")…"
+    env_rollback; return
+  fi
+
+  say "6. and the containers, untouched, still answering"
+  # Key names only. A name is not a secret; a value is, and no value is read here.
+  docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' "$API" 2>/dev/null \
+    | cut -d= -f1 | grep -E '^(PUZZLE|ARROW_ATLAS)_' | sort | tr '\n' ' ' | fold -w 150 -s | sed 's/^/      /'
+  echo
+  for c in $AA_CONTAINERS; do
+    printf '      %-18s %s\n' "$c" "$(docker inspect -f '{{.State.Status}}{{if .State.Health}} ({{.State.Health.Status}}){{end}}' "$c" 2>/dev/null)"
+  done
+  hp=$(curl -so /dev/null -w '%{http_code}' -m 10 "https://$DOMAIN/api/puzzle/v1/health")
+  [ "$hp" = "200" ] && ok "the API answers through nginx" || bad "the API answered $hp"
+
+  # A path is not a secret, and this one is worth reading: if the .env still points the dumps at the directory
+  # the rename moved, they are landing somewhere nobody is looking.
+  say "where the dumps are actually written"
+  docker inspect -f '{{range .Mounts}}{{if eq .Destination "/backups-host"}}{{.Source}}{{end}}{{end}}' "$BKP" 2>/dev/null | sed 's/^/      /'
+  note "the host directory this script reads and writes is $HOST_BACKUPS"
+}
+
 # Read-only: what the portfolio's own container is doing, for when the site answers an error and the reason is
 # in a log nobody here can otherwise read. Nothing is changed. Anything that could be a credential — a token
 # in a start command, a password in a URL — is masked before it is printed.
@@ -464,9 +592,9 @@ mode_web_look() {
 # command it finds is the one it expects, validates the result before applying it, and puts the backup back
 # if the container does not come up healthy.
 mode_web_safe_fetch() {
-  echo "Arrow Atlas — make the site survive a restart  ($(hostname), $(date -u))"
+  echo "Puzzle — make the site survive a restart  ($(hostname), $(date -u))"
   have ariyankhan-web || { bad "no ariyankhan-web container here"; return; }
-  TGZ=/tmp/arrow-atlas-site.tgz
+  TGZ=/tmp/puzzle-site.tgz
   command -v python3 >/dev/null || { bad "python3 is not on this host, and editing YAML without it is not worth the risk"; return; }
 
   PROJ=$(docker inspect -f '{{index .Config.Labels "com.docker.compose.project.working_dir"}}' ariyankhan-web 2>/dev/null)
@@ -637,8 +765,8 @@ PY
 }
 
 mode_push_source() {
-  echo "Arrow Atlas — send this checkout and start the API from it  ($(hostname), $(date -u))"
-  TGZ=/tmp/arrow-atlas-site.tgz
+  echo "Puzzle — send this checkout and start the API from it  ($(hostname), $(date -u))"
+  TGZ=/tmp/puzzle-site.tgz
   [ -s "$TGZ" ] || { bad "no source arrived at $TGZ"; return; }
   note "$(du -h "$TGZ" | cut -f1) arrived"
   tar -tzf "$TGZ" ./games/puzzle/backend/package.json >/dev/null 2>&1 \
@@ -646,9 +774,11 @@ mode_push_source() {
   ok "it carries the API's own package.json"
 
   say "1. into the volume the API builds from"
-  if docker run --rm -v arrow-atlas-site:/site -v "$TGZ":/src.tgz:ro alpine:3.20 \
+  docker volume inspect "$SITEVOL" >/dev/null 2>&1 \
+    || { bad "there is no volume called $SITEVOL; a deploy would write into an empty one and change nothing"; return; }
+  if docker run --rm -v "$SITEVOL":/site -v "$TGZ":/src.tgz:ro alpine:3.20 \
        sh -c 'find /site -mindepth 1 -maxdepth 1 -exec rm -rf {} + && tar -xzf /src.tgz -C /site'; then
-    ok "the checkout is in arrow-atlas-site"
+    ok "the checkout is in $SITEVOL"
   else
     bad "could not write the volume"; return
   fi
@@ -685,17 +815,17 @@ mode_push_source() {
   # the top has neither problem, and the page is read from disk on every request, so it takes effect at once.
   say "4. the client, into the portfolio container"
   if ! have ariyankhan-web; then note "no ariyankhan-web here; nothing to do"; return; fi
-  docker cp "$TGZ" ariyankhan-web:/tmp/arrow-atlas-site.tgz >/dev/null 2>&1 || { bad "could not hand it to ariyankhan-web"; return; }
+  docker cp "$TGZ" ariyankhan-web:/tmp/puzzle-site.tgz >/dev/null 2>&1 || { bad "could not hand it to ariyankhan-web"; return; }
   # mail-config.local.php is written at start from the container's environment and is in no checkout, so the
   # document root is written over rather than emptied: the contact form keeps the settings it is running with.
   if docker exec ariyankhan-web bash -c '
        set -e
        rm -rf /tmp/site && mkdir -p /tmp/site
-       tar -xzf /tmp/arrow-atlas-site.tgz -C /tmp/site
+       tar -xzf /tmp/puzzle-site.tgz -C /tmp/site
        [ -f /tmp/site/puzzle/index.html ] || { echo "that is not the site"; exit 1; }
        cp -a /tmp/site/. /var/www/html/
        chown -R www-data:www-data /var/www/html || true
-       rm -rf /tmp/site /tmp/arrow-atlas-site.tgz' >/dev/null 2>&1; then
+       rm -rf /tmp/site /tmp/puzzle-site.tgz' >/dev/null 2>&1; then
     ok "the client is in place"
   else
     bad "could not put the client in place"; return
@@ -707,7 +837,7 @@ mode_push_source() {
 }
 
 mode_inspect() {
-  echo "Arrow Atlas — inspect  ($(hostname), $(date -u))"
+  echo "Puzzle — inspect  ($(hostname), $(date -u))"
   report_containers
   report_data
   report_legacy
@@ -765,7 +895,7 @@ mode_inspect() {
 }
 
 mode_backup_verify() {
-  echo "Arrow Atlas — one fresh backup, then prove it restores  ($(date -u))"
+  echo "Puzzle — one fresh backup, then prove it restores  ($(date -u))"
   running "$PG" || { bad "PostgreSQL is not running; not taking a backup of nothing"; return; }
   running "$BKP"   || { bad "the backup container is not running"; return; }
 
@@ -802,7 +932,7 @@ mode_backup_verify() {
 }
 
 mode_cleanup() {
-  echo "Arrow Atlas — deleting the legacy artifacts, and only those  ($(date -u))"
+  echo "Puzzle — deleting the legacy artifacts, and only those  ($(date -u))"
 
   # The gate, again, here: a verified dump must exist before anything is deleted. backup-verify is a
   # separate run and this cannot see its result, so it re-establishes the fact rather than assuming it.
@@ -948,7 +1078,7 @@ EOF
 }
 
 mode_deploy() {
-  echo "Arrow Atlas — deploy  ($(date -u))"
+  echo "Puzzle — deploy  ($(date -u))"
 
   say "1. the nginx snippet from the repository"
   [ -n "$SNIPPET_B64" ] || { bad "no snippet was sent"; return; }
@@ -998,7 +1128,7 @@ mode_deploy() {
 }
 
 mode_deploy_site() {
-  echo "Arrow Atlas — ship the client  ($(date -u))"
+  echo "Puzzle — ship the client  ($(date -u))"
   # Only the portfolio container, which re-fetches main at start. The game's backend keeps running throughout:
   # a change to the page, the stylesheet or the client has no business interrupting a match in progress.
   have ariyankhan-web || { bad "ariyankhan-web is not here"; return; }
@@ -1027,12 +1157,12 @@ mode_deploy_site() {
     running/healthy|running) ok "$API untouched and still $s" ;;
     *)                       bad "$API is $s" ;;
   esac
-  hc_code=$(curl -sS -m 20 -o /dev/null -w '%{http_code}' --resolve "$DOMAIN:443:127.0.0.1" "https://$DOMAIN/api/arrow-atlas/v1/lobby" 2>/dev/null || echo 000)
+  hc_code=$(curl -sS -m 20 -o /dev/null -w '%{http_code}' --resolve "$DOMAIN:443:127.0.0.1" "https://$DOMAIN/api/puzzle/v1/lobby" 2>/dev/null || echo 000)
   [ "$hc_code" = "200" ] && ok "and the game's API still answers (200)" || bad "the game's API answered $hc_code"
 }
 
 mode_health() {
-  echo "Arrow Atlas — health  ($(hostname), $(date -u))"
+  echo "Puzzle — health  ($(hostname), $(date -u))"
   R=(--resolve "$DOMAIN:443:127.0.0.1")
 
   say "the four containers"
@@ -1057,8 +1187,8 @@ mode_health() {
   hc "home page"                  200 "https://$DOMAIN/"
   hc "the Puzzle page"           200 "https://$DOMAIN/puzzle/"
   hc "the client itself"          200 "https://$DOMAIN/js/puzzle.js"
-  hc "v1 auth/me"                 200 "https://$DOMAIN/api/arrow-atlas/v1/auth/me"
-  hc "v1 lobby"                   200 "https://$DOMAIN/api/arrow-atlas/v1/lobby"
+  hc "v1 auth/me"                 200 "https://$DOMAIN/api/puzzle/v1/auth/me"
+  hc "v1 lobby"                   200 "https://$DOMAIN/api/puzzle/v1/lobby"
   hc "the legacy PHP path is gone" 404 "https://$DOMAIN/games/api/auth.php?a=me"
   hc "and so is the PHP file"     404 "https://$DOMAIN/games/api/match.php"
   hc "other PHP still runs"       405 "https://$DOMAIN/send-mail.php"
@@ -1072,7 +1202,7 @@ mode_health() {
   # and denies everything else on the real peer address — so being served here is the allowlist working. That
   # it is refused from off the machine is a different question, asked from a GitHub runner by vps-smoke.yml,
   # because only a request that actually crosses the internet can answer it.
-  hc "health answers the host"    200 "https://$DOMAIN/api/arrow-atlas/health"
+  hc "health answers the host"    200 "https://$DOMAIN/api/puzzle/v1/health"
 
   say "the client the page actually asks for"
   curl -sS -m 20 "${R[@]}" "https://$DOMAIN/puzzle/" | grep -o 'js/puzzle.js?v=[0-9]*' | head -1 | sed 's/^/  /'
@@ -1082,10 +1212,10 @@ mode_health() {
   code=$(curl -sS -m 20 -o /dev/null -w '%{http_code}' "${R[@]}" \
       -H 'Connection: Upgrade' -H 'Upgrade: websocket' -H 'Sec-WebSocket-Version: 13' \
       -H 'Sec-WebSocket-Key: AAAAAAAAAAAAAAAAAAAAAA==' \
-      "https://$DOMAIN/ws/arrow-atlas" 2>/dev/null || echo 000)
+      "https://$DOMAIN/ws/puzzle" 2>/dev/null || echo 000)
   case "$code" in
     401) ok "the route is there and refuses an unauthenticated handshake (401)" ;;
-    404) bad "404 — nginx has no /ws/arrow-atlas route" ;;
+    404) bad "404 - nginx has no /ws/puzzle route" ;;
     *)   note "handshake answered $code" ;;
   esac
 
@@ -1517,7 +1647,7 @@ mode_retire_site_data() {
 mode_web_drop_aa_mount() {
   [ "$CONFIRM" = "DELETE" ] || { echo "::error::web-drop-aa-mount needs confirm=DELETE"; exit 2; }
   V=ariyankhan_aa-data
-  TGZ=/tmp/arrow-atlas-site.tgz
+  TGZ=/tmp/puzzle-site.tgz
   BK="$HOST_BACKUPS/web-compose.yml.before-aa-$STAMP"
   have ariyankhan-web || { bad "no ariyankhan-web container here"; return; }
   command -v python3 >/dev/null || { bad "python3 is not on this host, and editing YAML without it is not worth the risk"; return; }
@@ -1644,6 +1774,7 @@ case "$MODE" in
   deploy-site)   mode_deploy_site ;;
   health)        mode_health ;;
   rename-infra)  mode_rename_infra ;;
+  rename-env)    mode_rename_env ;;
   finish-rename) mode_finish_rename ;;
   drop-old-volumes) mode_drop_old_volumes ;;
   volumes)       mode_volumes ;;

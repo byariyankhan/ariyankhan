@@ -1,15 +1,15 @@
-# Arrow Atlas operations on the VPS, over SSH, one mode at a time.
+# Puzzle operations on the VPS, over SSH, one mode at a time.
 #
 # This exists so the post-migration work is done by something reviewable and repeatable rather than by
 # pasted shell. Every mode is explicit about what it touches, and nothing here names a container, path or
-# volume that is not Arrow Atlas's: ASR, Bookween and the portfolio are never addressed by any command below.
+# volume that is not the game's: ASR, Bookween and the portfolio are never addressed by any command below.
 #
 #   inspect        Reads. Containers, PostgreSQL row counts, gold and ledger agreement, where the legacy
 #                  SQLite data still is, what backups exist, what nginx currently serves. Changes nothing.
 #   backup-verify  Takes one fresh pg_dump and restores it into a scratch database to prove it works.
 #                  This is the gate: no deletion happens until it passes.
 #   cleanup        Deletes the legacy artifacts, and only those. Needs confirm=DELETE.
-#   deploy         Recreates arrow-atlas-api (it re-fetches the repository at start) and installs the
+#   deploy         Recreates the API container (it re-fetches the repository at start) and installs the
 #                  nginx snippet from this checkout, after `nginx -t` accepts it and the current one is
 #                  backed up. Needs confirm=DEPLOY.
 #   deploy-site    Ships the page, the stylesheet and the client by restarting ariyankhan-web alone, which
@@ -24,7 +24,7 @@
 #                  root, what it answers on its own loopback, whether Apache accepts its configuration, and the
 #                  tail of its error log. For when the site answers an error and the reason is in a log nobody
 #                  here can otherwise read. Anything that could be a credential is masked. Changes nothing.
-#   logs           Reads. What arrow-atlas-api says about itself: its state, its restart count and last exit
+#   logs           Reads. What the API container says about itself: its state, its restart count and last exit
 #                  code, the tail of its log and its last health probes. For when inspect says "restarting"
 #                  and the reason is in a log nobody here can otherwise read.
 #   push-source    Sends this checkout to the VPS over the same connection, unpacks it into the volume the
@@ -41,6 +41,11 @@
 #                  database and role, and the host's backup directory all take the game's name. Takes and
 #                  restores a backup before it starts, copies the data rather than moving it, and deletes no
 #                  volume — going back is putting the old compose file back. Needs confirm=RENAME.
+#   rename-env     The last of the old names: the keys in the project's .env on the host. Copies the file first,
+#                  renames only the part of a line before the first '=', proves no value moved by comparing a
+#                  hash of the values, installs the compose file from this checkout that reads ${PUZZLE_*}, and
+#                  keeps both only if compose renders exactly what it rendered before. No container is recreated,
+#                  because the names inside them were renamed already. Needs confirm=RENAME.
 #   finish-rename  Renames the PostgreSQL role when rename-infra could not: a role cannot be renamed by a
 #                  session connected as it, so this does it from a temporary superuser and then restarts the
 #                  API. Idempotent. Needs confirm=RENAME.
@@ -77,7 +82,7 @@ on:
         type: choice
         required: true
         default: inspect
-        options: [inspect, logs, web-look, web-revive, git-access, git-sync, backup-verify, cleanup, deploy, deploy-site, push-source, web-safe-fetch, rename-infra, finish-rename, drop-old-volumes, drop-orphan-volumes, retire-site-data, web-drop-aa-mount, volumes, health]
+        options: [inspect, logs, web-look, web-revive, git-access, git-sync, backup-verify, cleanup, deploy, deploy-site, push-source, web-safe-fetch, rename-infra, finish-rename, rename-env, drop-old-volumes, drop-orphan-volumes, retire-site-data, web-drop-aa-mount, volumes, health]
       confirm:
         description: "Type DELETE for cleanup, DEPLOY for deploy, RENAME for rename-infra. Ignored by the read-only modes."
         required: false
@@ -103,7 +108,7 @@ jobs:
           case "${{ inputs.mode }}" in
             cleanup|drop-old-volumes|drop-orphan-volumes|retire-site-data|web-drop-aa-mount) [ "${{ inputs.confirm }}" = "DELETE" ] || { echo "::error::${{ inputs.mode }} needs confirm=DELETE"; exit 1; } ;;
             deploy|deploy-site|push-source|web-safe-fetch|web-revive) [ "${{ inputs.confirm }}" = "DEPLOY" ] || { echo "::error::${{ inputs.mode }} needs confirm=DEPLOY"; exit 1; } ;;
-            rename-infra|finish-rename) [ "${{ inputs.confirm }}" = "RENAME" ] || { echo "::error::${{ inputs.mode }} needs confirm=RENAME"; exit 1; } ;;
+            rename-infra|finish-rename|rename-env) [ "${{ inputs.confirm }}" = "RENAME" ] || { echo "::error::${{ inputs.mode }} needs confirm=RENAME"; exit 1; } ;;
             *) echo "read-only mode, no confirmation needed" ;;
           esac
 
@@ -141,17 +146,17 @@ jobs:
       # is not, this connection is the way in. Everything but the working tree is left behind, and .git most
       # of all — the VPS has no business holding the history.
       - name: Send this checkout
-        if: inputs.mode == 'push-source' || inputs.mode == 'web-safe-fetch' || inputs.mode == 'web-drop-aa-mount' || inputs.mode == 'web-revive'
+        if: inputs.mode == 'push-source' || inputs.mode == 'web-safe-fetch' || inputs.mode == 'web-drop-aa-mount' || inputs.mode == 'web-revive' || inputs.mode == 'rename-env'
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
         run: |
           set -euo pipefail
-          tar -czf /tmp/arrow-atlas-site.tgz --exclude=./.git .
-          ls -lh /tmp/arrow-atlas-site.tgz | sed 's/^/  /'
+          tar -czf /tmp/puzzle-site.tgz --exclude=./.git .
+          ls -lh /tmp/puzzle-site.tgz | sed 's/^/  /'
           scp -i ~/.ssh/vps -o IdentitiesOnly=yes -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \
               -o StrictHostKeyChecking=yes -o BatchMode=yes -o ConnectTimeout=20 \
-              /tmp/arrow-atlas-site.tgz "$VPS_USER@$VPS_HOST:/tmp/arrow-atlas-site.tgz"
+              /tmp/puzzle-site.tgz "$VPS_USER@$VPS_HOST:/tmp/puzzle-site.tgz"
           echo "  sent"
 
       - name: ${{ inputs.mode }}

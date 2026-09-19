@@ -104,7 +104,7 @@ jobs:
           check "/deploy hidden -> 404"             404 "https://$DOMAIN/deploy/docker-compose.yml" "${RESOLVE[@]}" "${TLS[@]}"
 
           echo
-          echo "== Arrow Atlas, from off the machine"
+          echo "== The game, from off the machine"
           # These four belong here rather than in the ops workflow's health mode, because each is about what
           # the internet can reach. A check run on the VPS itself comes from 127.0.0.1 and gets a different,
           # flattering answer: the health endpoint's allowlist admits the host on purpose.
