@@ -7,6 +7,7 @@ import { redis } from '../backend/src/redis.js';
 import { config } from '../backend/src/config.js';
 import { give, idem } from '../backend/src/gold.js';
 import { startSession } from '../backend/src/auth.js';
+import { online } from '../backend/src/presence.js';
 import { eq, finish, ok, reset, section } from './helpers.js';
 
 const BASE = process.env.AA_TEST_BASE ?? 'http://127.0.0.1:8760';
@@ -302,12 +303,19 @@ section('The people you have played with, and inviting them without a link');
   eq(list[0]?.name, 'inviteMate', 'by name, so a row can be drawn without a second call');
   eq(list[0]?.matches, 1, 'with how many times they have played');
   ok(typeof list[0]?.last_at === 'number' && list[0].last_at > 0, 'and when it last happened');
-  // The other seat has not reported a result, so that match is still being played — and "in a match" is a
-  // different answer from "online" to somebody deciding whether to invite them.
-  eq(list[0]?.status, 'playing', 'somebody still sitting in an unfinished match reads as playing');
+  // The other seat has not reported a result, so that match is open in the database — but a room nobody
+  // finished stays that way for hours, and somebody with the game shut is not playing anything. Presence
+  // decides, and only then does the seat choose between "online" and "in a match".
+  eq(list[0]?.status, 'offline', 'a half-finished room does not make somebody who is not here look busy');
+  await online.seen(mate.id);
+  eq(((await call('/players/recent', { token: host.token })).json.players as { status: string }[])[0]?.status, 'playing',
+     'with the game open and a race unfinished, they are in a match');
   await call(`/matches/${code}/result`, { token: mate.token, body: { ms: 9_000, cleared: true } });
+  eq(((await call('/players/recent', { token: host.token })).json.players as { status: string }[])[0]?.status, 'online',
+     'once that race is over they are simply here');
+  await online.gone(mate.id);
   eq(((await call('/players/recent', { token: host.token })).json.players as { status: string }[])[0]?.status, 'offline',
-     'and once that match is over, somebody with no socket open is offline');
+     'and when they close the game they are offline again');
   eq(((await call('/players/recent', { token: mate.token })).json.players as { id: number }[])[0]?.id, host.id,
      'and the list reads the same way round from the other seat');
 
