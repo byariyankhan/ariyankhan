@@ -1,5 +1,5 @@
 #!/bin/sh
-# Arrow Atlas PostgreSQL backups.
+# Puzzle PostgreSQL backups.
 #
 #   puzzle-backup once     take one backup now and exit
 #   puzzle-backup loop     take one every day at PUZZLE_BACKUP_AT_HOUR (what the container runs)
@@ -19,7 +19,7 @@ HOST_DIR="/backups-host"
 KEEP_DAYS="${PUZZLE_BACKUP_KEEP_DAYS:-14}"
 AT_HOUR="${PUZZLE_BACKUP_AT_HOUR:-3}"
 AT_HOUR="${AT_HOUR#0}"; [ -n "$AT_HOUR" ] || AT_HOUR=0   # "03" is an illegal octal number in POSIX arithmetic
-DB="${PGDATABASE:-arrow_atlas}"
+DB="${PGDATABASE:-puzzle}"
 STATUS="$DIR/last-run.json"
 # The tables a dump of this game must contain. Checked by name, in both this script and restore.sh, so the two
 # never disagree about what a good backup looks like.

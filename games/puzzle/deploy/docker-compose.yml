@@ -1,8 +1,8 @@
-# Arrow Atlas, as its own Docker project.
+# Puzzle – Train Your Brain, as its own Docker project.
 #
 # Nothing here is shared with anything else on the box: its own network, its own volumes, its own database and
 # credentials, its own backup schedule, its own logs. A second game gets its own copy of this file with its own
-# names, and the two cannot reach each other. Moving Arrow Atlas to a VPS of its own is this file, the image,
+# names, and the two cannot reach each other. Moving the game to a VPS of its own is this file, the image,
 # and a restored dump — see ../README.md.
 #
 #   docker compose -p puzzle --env-file .env up -d

@@ -104,14 +104,18 @@ jobs:
         if: always()
         run: kill "$(cat /tmp/api.pid)" 2>/dev/null || true
 
+  # The image is built on every pull request and pushed only from main. Building it here is not ceremony: the
+  # Dockerfile copies a file by name from games/data, that file was renamed with the game, and because this job
+  # used to be skipped on pull requests nothing noticed until a push to main went red. A build that never runs
+  # before the merge is not a check.
   publish:
     needs: test
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -121,7 +125,7 @@ jobs:
           # The repository root: the Dockerfile copies the board list from games/data as well as the backend.
           context: .
           file: games/puzzle/backend/Dockerfile
-          push: true
+          push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
           tags: |
             ghcr.io/${{ github.repository_owner }}/puzzle-api:main
             ghcr.io/${{ github.repository_owner }}/puzzle-api:${{ github.sha }}

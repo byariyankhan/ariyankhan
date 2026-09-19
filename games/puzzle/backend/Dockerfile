@@ -1,7 +1,7 @@
-# arrow-atlas-api. Built from the repository root, so the one board list the game owns is baked in rather than
-# duplicated: the client reads games/data/arrow-atlas.json over HTTP, the server reads the same file from here.
+# The puzzle API. Built from the repository root, so the one board list the game owns is baked in rather than
+# duplicated: the client reads games/data/puzzle.json over HTTP, the server reads the same file from here.
 #
-#   docker build -f games/puzzle/backend/Dockerfile -t arrow-atlas-api .
+#   docker build -f games/puzzle/backend/Dockerfile -t puzzle-api .
 FROM node:22-alpine AS build
 WORKDIR /build
 COPY games/puzzle/backend/package.json games/puzzle/backend/package-lock.json* ./
@@ -21,18 +21,18 @@ FROM node:22-alpine AS run
 RUN apk add --no-cache dumb-init && \
     (apk add --no-cache postgresql16-client || apk add --no-cache postgresql-client) && \
     pg_dump --version && \
-    addgroup -g 10001 arrowatlas && adduser -D -u 10001 -G arrowatlas arrowatlas
-WORKDIR /srv/arrow-atlas
+    addgroup -g 10001 puzzle && adduser -D -u 10001 -G puzzle puzzle
+WORKDIR /srv/puzzle
 ENV NODE_ENV=production \
     PUZZLE_BOARDS_FILE=/srv/puzzle/data/puzzle.json \
     PUZZLE_MIGRATIONS_DIR=/srv/puzzle/migrations
 COPY --from=build /build/node_modules ./node_modules
 COPY --from=build /build/dist ./dist
 COPY games/puzzle/migrations ./migrations
-COPY games/data/arrow-atlas.json ./data/arrow-atlas.json
+COPY games/data/puzzle.json ./data/puzzle.json
 COPY games/puzzle/deploy/backup.sh games/puzzle/deploy/restore.sh ./bin/
-RUN chmod +x ./bin/*.sh && chown -R arrowatlas:arrowatlas /srv/arrow-atlas
-USER arrowatlas
+RUN chmod +x ./bin/*.sh && chown -R puzzle:puzzle /srv/puzzle
+USER puzzle
 EXPOSE 8760
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
   CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||8760)+'/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"

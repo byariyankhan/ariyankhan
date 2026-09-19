@@ -1,5 +1,5 @@
 #!/bin/sh
-# Restore Arrow Atlas from a dump.
+# Restore the puzzle database from a dump.
 #
 #   puzzle-restore verify  <dump>              restore into a scratch database and check it, changing nothing
 #   puzzle-restore into    <dump> <database>   restore into a database you name
@@ -11,7 +11,7 @@ set -eu
 log()  { printf '{"ts":"%s","product":"puzzle","component":"restore","msg":"%s"}\n' "$(date -u +%FT%TZ)" "$1"; }
 fail() { printf '{"ts":"%s","product":"puzzle","component":"restore","level":"error","msg":"%s"}\n' "$(date -u +%FT%TZ)" "$1" >&2; }
 
-LIVE_DB="${PGDATABASE:-arrow_atlas}"
+LIVE_DB="${PGDATABASE:-puzzle}"
 # The same list backup.sh checks, so a dump it accepted is a dump this will accept.
 CORE_TABLES="users sessions matches match_players gold_ledger"
 
@@ -41,7 +41,7 @@ restore_into() {   # restore_into <dump> <database>
 case "${1:-}" in
   verify)
     dump="${2:?usage: $0 verify <dump>}"
-    scratch="arrow_atlas_restore_check_$$"
+    scratch="puzzle_restore_check_$$"
     restore_into "$dump" "$scratch"
     echo "--- row counts in the restored copy ---"
     counts "$scratch"
