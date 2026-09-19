@@ -23,6 +23,9 @@ export const LIMITS = {
   auth_read:     { name: 'auth_read',     limit: 120, windowSeconds: 60,  by: 'ip'   },
   auth_write:    { name: 'auth_write',    limit: 20,  windowSeconds: 300, by: 'user' },
   account_delete:{ name: 'account_delete',limit: 5,   windowSeconds: 3600,by: 'user' },
+  // An ad takes about thirty seconds to watch, and the daily cap is the real bound; this is only here to stop
+  // a script hammering the endpoint between caps.
+  ad_reward:     { name: 'ad_reward',     limit: 20,  windowSeconds: 600, by: 'user' },
   match_create:  { name: 'match_create',  limit: 20,  windowSeconds: 60,  by: 'user' },
   match_join:    { name: 'match_join',    limit: 40,  windowSeconds: 60,  by: 'user' },
   match_read:    { name: 'match_read',    limit: 240, windowSeconds: 60,  by: 'ip'   },

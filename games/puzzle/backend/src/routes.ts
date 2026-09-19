@@ -7,7 +7,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { API_PREFIX, config } from './config.js';
 import { pool, tx } from './db.js';
 import * as R from './rooms.js';
-import { balance } from './gold.js';
+import { adClaim, balance } from './gold.js';
 import { deleteUser, endSession, googleVerify, providers, startSession, upsertUser, cleanName } from './auth.js';
 import { publish, publishToUser } from './events.js';
 import { boardPace, cleanLevels, cleanState, mergeLevels, mergeState, readAll } from './progress.js';
@@ -157,6 +157,23 @@ const H = {
       return readAll(c, userId);
     });
     await noStore(res).send(merged);
+  },
+
+  // Gold for having watched an advertisement.
+  //
+  // The client cannot be trusted with this and is not asked to be: it reports that an ad finished, and the
+  // server decides what that is worth, how often, and whether it counts at all. The rule itself lives beside
+  // the ledger in gold.ts, where it can be tested without a web server.
+  async adReward(req: Req, res: Res, me: Caller) {
+    if (!me.user) { await noStore(res).code(401).send({ error: 'signed_out' }); return; }
+    if (!(await limited('ad_reward', req, res, me.user.id))) return;
+    const amount = Math.max(0, Math.round(config.game.adGold));
+    const perDay = Math.max(0, Math.round(config.game.adGoldPerDay));
+    if (amount <= 0 || perDay <= 0) { await noStore(res).code(503).send({ error: 'ads_off' }); return; }
+
+    const out = await tx(c => adClaim(c, me.user!.id, amount, perDay));
+    if (out.capped) { await noStore(res).code(429).send({ error: 'ad_cap', gold: out.gold, left: 0, per_day: perDay }); return; }
+    await noStore(res).send({ gold: out.gold, granted: out.granted, left: out.left, per_day: perDay, amount });
   },
 
   // How a cleared board went, against everybody else who has cleared it. Readable signed out: a player who has
@@ -369,6 +386,8 @@ export function registerRoutes(app: FastifyInstance): void {
   app.post(`${v1}/progress`, withCaller(H.progressPush));
 
   app.get(`${v1}/boards/pace`, withCaller(H.pace));
+
+  app.post(`${v1}/ads/reward`, withCaller(H.adReward));
 
   app.get(`${v1}/league`, withCaller(H.league));
 

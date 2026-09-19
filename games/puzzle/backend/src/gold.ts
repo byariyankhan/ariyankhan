@@ -8,7 +8,7 @@
 import type { PoolClient } from 'pg';
 import { query } from './db.js';
 
-export type GoldReason = 'signup' | 'stake' | 'leave_refund' | 'expire_refund' | 'draw_refund' | 'payout' | 'league' | 'admin';
+export type GoldReason = 'signup' | 'stake' | 'leave_refund' | 'expire_refund' | 'draw_refund' | 'payout' | 'league' | 'ad_reward' | 'admin';
 
 /** Keys are deterministic, so the same real-world event always produces the same key. */
 export const idem = {
@@ -19,6 +19,10 @@ export const idem = {
   drawRefund: (code: string, userId: number) => `draw_refund:${code}:${userId}`,
   payout: (code: string) => `payout:${code}`,
   league: (season: string, userId: number) => `league:${season}:${userId}`,
+  // The day and the claim's number within it. Two requests racing for the same nth claim of the same day
+  // collide on the unique index, so a double-tapped button mints once -- and the key doubles as the counter
+  // the daily cap reads back.
+  adReward: (userId: number, day: string, n: number) => `ad:${userId}:${day}:${n}`,
   admin: (ref: string) => `admin:${ref}`,
 };
 
@@ -67,6 +71,49 @@ export const take = (c: PoolClient, userId: number, amount: number, idemKey: str
 
 export const give = (c: PoolClient, userId: number, amount: number, reason: GoldReason, idemKey: string, code: string | null = null) =>
   move(c, userId, Math.abs(amount), reason, idemKey, code);
+
+export interface AdClaim {
+  /** true when the day's allowance is already spent: nothing was granted and nothing is wrong */
+  capped: boolean;
+  gold: number;
+  granted: number;
+  used: number;
+  left: number;
+}
+
+/**
+ * Gold for having watched an advertisement.
+ *
+ * There is no server-side verification to be had for rewarded ads on the web: the network tells the page, and
+ * the page tells us. So this is not built as proof, it is built as a bound. The day's allowance is counted from
+ * the ledger rather than from anything the caller says, the key is derived from the day and the count so a
+ * retry or a double-tapped button mints exactly once, and the reason is its own so these rows can be found,
+ * kept out of the league, and reversed if the reward is ever withdrawn.
+ *
+ * The count and the insert are in the caller's transaction, so two requests racing see the same count and the
+ * second one collides on the unique index rather than granting twice.
+ */
+export async function adClaim(c: PoolClient, userId: number, amount: number, perDay: number): Promise<AdClaim> {
+  // Midnight UTC as PostgreSQL sees it, so every process agrees on when the day turned.
+  const r = await query<{ day: string; used: string }>(c,
+    `SELECT to_char(now() AT TIME ZONE 'utc', 'YYYY-MM-DD') AS day,
+            (SELECT count(*) FROM gold_ledger
+              WHERE user_id = $1 AND reason = 'ad_reward'
+                AND created_at >= date_trunc('day', now() AT TIME ZONE 'utc')) AS used`,
+    [userId]);
+  const day = r.rows[0]!.day;
+  const used = Number(r.rows[0]!.used);
+  if (used >= perDay) return { capped: true, gold: await balance(c, userId), granted: 0, used, left: 0 };
+
+  const moved = await give(c, userId, amount, 'ad_reward', idem.adReward(userId, day, used + 1));
+  return {
+    capped: false,
+    gold: moved?.gold ?? await balance(c, userId),
+    granted: moved?.applied ? amount : 0,     // applied === false is a retry of a claim that landed: success
+    used: used + 1,
+    left: Math.max(0, perDay - used - 1),
+  };
+}
 
 export async function balance(c: PoolClient | import('pg').Pool, userId: number): Promise<number> {
   const r = await query<{ gold: number }>(c, 'SELECT gold FROM users WHERE id = $1', [userId]);

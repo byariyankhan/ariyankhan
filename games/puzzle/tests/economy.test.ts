@@ -2,7 +2,7 @@
 import { pool, query, tx } from '../backend/src/db.js';
 import { config } from '../backend/src/config.js';
 import * as R from '../backend/src/rooms.js';
-import { give, idem, move } from '../backend/src/gold.js';
+import { adClaim, give, idem, move } from '../backend/src/gold.js';
 import { deleteUser } from '../backend/src/auth.js';
 import { eq, finish, goldOf, ok, player, reset, section, stake } from './helpers.js';
 
@@ -250,6 +250,47 @@ section('A finished match remembers who won it after they leave');
   const view = await R.matchView(pool, m, b.id);
   eq(view.draw, false, 'the result is not rewritten as a draw');
   eq(view.winner, 'zara', 'and it still names the winner');
+}
+
+section('Gold for an advertisement is bounded, not trusted');
+{
+  const a = await player('adam');
+  const before = await goldOf(a.id);
+  const AMOUNT = 500, PER_DAY = 3;
+
+  const first = await tx(c => adClaim(c, a.id, AMOUNT, PER_DAY));
+  eq(first.capped, false, 'the first claim of the day is allowed');
+  eq(first.granted, AMOUNT, 'and it grants exactly what an ad is worth');
+  eq(await goldOf(a.id), before + AMOUNT, 'the purse has it');
+  eq(first.left, PER_DAY - 1, 'and the day has one fewer left');
+
+  // The whole point of the deterministic key: a retried request, or a button tapped twice, is one grant.
+  await tx(c => query(c, `INSERT INTO gold_ledger (user_id, delta, reason, match_code, idem_key)
+                          VALUES ($1, $2, 'ad_reward', NULL, $3) ON CONFLICT (idem_key) DO NOTHING`,
+                      [a.id, AMOUNT, idem.adReward(a.id, new Date().toISOString().slice(0, 10), 2)]));
+  const dup = await tx(c => adClaim(c, a.id, AMOUNT, PER_DAY));
+  eq(dup.granted, 0, 'a claim whose key is already in the ledger grants nothing');
+
+  // Spend the day out, then ask once more.
+  while (true) {
+    const r = await tx(c => adClaim(c, a.id, AMOUNT, PER_DAY));
+    if (r.capped) { eq(r.granted, 0, 'the claim past the cap grants nothing'); break; }
+  }
+  const spent = await goldOf(a.id);
+  const over = await tx(c => adClaim(c, a.id, AMOUNT, PER_DAY));
+  eq(over.capped, true, 'and it stays capped for the rest of the day');
+  eq(over.left, 0, 'with nothing left to claim');
+  eq(await goldOf(a.id), spent, 'the purse does not move past the cap');
+
+  const rows = await query<{ n: string }>(pool,
+    `SELECT count(*) AS n FROM gold_ledger WHERE user_id = $1 AND reason = 'ad_reward'`, [a.id]);
+  eq(Number(rows.rows[0]!.n), PER_DAY, 'exactly one ledger row per claim the cap allowed');
+
+  // An ad is not play, so it must not be able to climb the league.
+  const inLeague = await query<{ n: string }>(pool,
+    `SELECT count(*) AS n FROM gold_ledger
+      WHERE user_id = $1 AND reason IN ('stake', 'payout', 'leave_refund', 'expire_refund', 'draw_refund')`, [a.id]);
+  eq(Number(inLeague.rows[0]!.n), 0, 'and none of it counts as a match played');
 }
 
 await finish();

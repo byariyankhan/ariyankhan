@@ -3,6 +3,13 @@
   <head>
     <!-- Google AdSense: site verification only. No ad units and no Auto ads are enabled. -->
     <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1570944160084395" crossorigin="anonymous"></script>
+    <!-- Rewarded advertisements. "off" is no ad anywhere and no ad code running: the game behaves exactly as it
+         did before any of this existed. Change it to "h5" the day H5 Games Ads is approved for this domain, and
+         the offers appear by themselves — a heart when the hearts run out, a hint, a check, and gold. The
+         publisher is read from the AdSense tag above, so there is nothing else to fill in.
+         (Plain AdSense does not serve rewarded ads; H5 Games Ads, requested from the same account, is the one
+         that does.) -->
+    <meta name="puzzle-ads" content="off" />
     <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-8ZPSNG5X37"></script>
     <script>
@@ -71,7 +78,7 @@
          set these two when the backend moves to a host of its own and the client follows without a change:
          <meta name="puzzle-api" content="https://api.example.com" />
          <meta name="puzzle-ws"  content="wss://api.example.com" /> -->
-    <link rel="stylesheet" href="/css/puzzle.css?v=4" />
+    <link rel="stylesheet" href="/css/puzzle.css?v=5" />
     <link rel="preload" href="/games/data/puzzle.json?v=11" as="fetch" crossorigin="anonymous" />
 
     <!-- SCHEMA -->
@@ -199,7 +206,7 @@
       <!-- ── HOME ── -->
       <section class="aa-screen aa-home" id="aaSelect" aria-label="Home">
         <header class="aa-home-top">
-          <span class="aa-chip aa-chip--purse" id="aaPurse" hidden title="Your gold"><img class="aa-coin" src="/images/puzzle-coin.png" alt="" width="128" height="128" decoding="async"><b id="aaPurseNo">0</b></span>
+          <span class="aa-chip aa-chip--purse" id="aaPurse" hidden title="Your gold"><img class="aa-coin" src="/images/puzzle-coin.png" alt="" width="128" height="128" decoding="async"><b id="aaPurseNo">0</b><button type="button" class="aa-purse-add" id="aaGoldAd" hidden aria-label="Watch an advertisement for gold">+</button></span>
           <button type="button" class="aa-chip aa-chip--league" id="aaLeague" hidden aria-label="This week's league"><span aria-hidden="true">🏆</span><b id="aaLeagueEnds"></b></button>
           <button type="button" class="aa-icon" id="aaSettings" aria-label="Settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5 19.4 7.7v8.6L12 20.5 4.6 16.3V7.7z"/><circle cx="12" cy="12" r="3"/></svg></button>
         </header>
@@ -232,9 +239,9 @@
           </div>
         </header>
         <div class="aa-status">
-          <span class="aa-status-left"><span id="aaHudLivesWrap"><b class="aa-lives" id="aaHudLives" role="img" aria-label="4 of 4 hearts"></b></span><b class="aa-time" id="aaHudTime" hidden>0:00</b></span>
-          <span class="aa-status-mid"><b id="aaHudLeft">0</b> left · <b id="aaHudPct">0%</b></span>
-          <button type="button" class="aa-icon aa-hintbtn aa-checkbtn" id="aaCheck" title="Press and hold an arrow to check its lane (L)">🔎 4</button><button type="button" class="aa-icon aa-hintbtn" id="aaHint" title="Light up a free arrow (H)">💡 3</button>
+          <span class="aa-status-left"><b class="aa-time" id="aaHudTime" hidden>0:00</b><span class="aa-status-mid"><b id="aaHudLeft">0</b> left · <b id="aaHudPct">0%</b></span></span>
+          <span class="aa-status-right"><span id="aaHudLivesWrap"><b class="aa-lives" id="aaHudLives" role="img" aria-label="4 of 4 hearts"></b></span>
+          <button type="button" class="aa-icon aa-hintbtn aa-checkbtn" id="aaCheck" title="Press and hold an arrow to check its lane (L)">🔎 4</button><button type="button" class="aa-icon aa-hintbtn" id="aaHint" title="Light up a free arrow (H)">💡 3</button></span>
         </div>
         <div class="aa-board-wrap" id="aaBoardWrap">
             <div class="aa-ranks" id="aaRanks" hidden aria-label="Who is ahead"></div>
@@ -485,6 +492,6 @@
       </div>
     </div>
 
-    <script src="/js/puzzle.js?v=5"></script>
+    <script src="/js/puzzle.js?v=6"></script>
   </body>
 </html>
