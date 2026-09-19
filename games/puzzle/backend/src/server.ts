@@ -62,7 +62,7 @@ async function health() {
   return {
     ok: db.ok,                    // Redis being down degrades the game; PostgreSQL being down stops it
     product: config.product,
-    version: process.env.ARROW_ATLAS_VERSION || 'dev',
+    version: config.version,
     uptime_seconds: Math.round(process.uptime()),
     postgres: db,
     redis: cache,

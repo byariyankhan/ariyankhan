@@ -27,6 +27,9 @@ export const WS_PATH = '/ws/puzzle';
 
 export const config = {
   product: PRODUCT,
+  version: str('PUZZLE_VERSION', 'dev'),
+  migrationsDir: str('PUZZLE_MIGRATIONS_DIR'),
+  rateMultiplier: Math.max(1, num('PUZZLE_RATE_MULTIPLIER', 1)),
   env: str('NODE_ENV', 'production'),
   port: num('PORT', 8760),
   host: str('HOST', '0.0.0.0'),
