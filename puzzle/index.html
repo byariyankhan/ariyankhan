@@ -3,13 +3,14 @@
   <head>
     <!-- Google AdSense: site verification only. No ad units and no Auto ads are enabled. -->
     <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1570944160084395" crossorigin="anonymous"></script>
-    <!-- Rewarded advertisements. "off" is no ad anywhere and no ad code running: the game behaves exactly as it
-         did before any of this existed. Change it to "h5" the day H5 Games Ads is approved for this domain, and
-         the offers appear by themselves — a heart when the hearts run out, a hint, a check, and gold. The
-         publisher is read from the AdSense tag above, so there is nothing else to fill in.
+    <!-- Rewarded advertisements. "h5" is on: the offers are live — a heart when the hearts run out, a hint, a
+         check, and gold on the purse. The publisher is read from the AdSense tag above, so there is nothing to
+         fill in. H5 Games Ads is not approved for this domain yet, so nothing fills; when nothing fills the
+         player still waits and still gets what they were promised, and the stand-in says so. The day it is
+         approved, real advertisements serve through this same path and no file changes.
          (Plain AdSense does not serve rewarded ads; H5 Games Ads, requested from the same account, is the one
-         that does.) -->
-    <meta name="puzzle-ads" content="off" />
+         that does.) "off" puts the whole thing back to sleep. -->
+    <meta name="puzzle-ads" content="h5" />
     <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-8ZPSNG5X37"></script>
     <script>
@@ -78,7 +79,7 @@
          set these two when the backend moves to a host of its own and the client follows without a change:
          <meta name="puzzle-api" content="https://api.example.com" />
          <meta name="puzzle-ws"  content="wss://api.example.com" /> -->
-    <link rel="stylesheet" href="/css/puzzle.css?v=5" />
+    <link rel="stylesheet" href="/css/puzzle.css?v=6" />
     <link rel="preload" href="/games/data/puzzle.json?v=11" as="fetch" crossorigin="anonymous" />
 
     <!-- SCHEMA -->
@@ -492,6 +493,6 @@
       </div>
     </div>
 
-    <script src="/js/puzzle.js?v=8"></script>
+    <script src="/js/puzzle.js?v=9"></script>
   </body>
 </html>

@@ -292,6 +292,13 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
    because tapping it is how a player finds out the gesture exists at all. */
 .aa-checkbtn{ margin-right:2px; }
 .aa-checkbtn.is-spent{ opacity:.4; }
+/* Empty, but not finished: an advertisement can still buy one. The counter becomes a plus and wears the accent,
+   so the eye reads it as something on offer rather than something used up. */
+.aa-hintbtn.is-ad, .aa-checkbtn.is-ad{ background:var(--accent); color:var(--accent-ink); opacity:1; font-weight:900; }
+@media(prefers-reduced-motion:no-preference){
+  .aa-hintbtn.is-ad, .aa-checkbtn.is-ad{ animation:aaAdPulse 2.2s ease-in-out 3; }   /* three times, to be noticed once, not forever */
+}
+@keyframes aaAdPulse{ 0%,100%{ transform:scale(1); } 50%{ transform:scale(1.06); } }
 /* Two sides, and each one answers a different question. On the left, how the board is going: the clock when
    there is one, and how much is left. On the right, everything the player still has to spend -- hearts, checks,
    hints -- grouped so the eye reads them as one row of resources rather than three separate widgets. The hearts
@@ -322,6 +329,7 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-adoffer-panel p{ margin:0 0 16px; color:var(--muted); font-size:15px; line-height:1.45; }
 .aa-adtest-tag{ margin:0; font-size:11px; font-weight:800; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); }
 .aa-adtest-name{ margin:6px 0 0; font-size:13px; color:var(--muted); }
+.aa-adtest-why{ margin:8px 0 0; font-size:13px; line-height:1.45; color:var(--ink); }
 .aa-adtest-count{ margin:14px 0; font-size:44px; font-weight:900; color:var(--ink); font-variant-numeric:tabular-nums; }
 @media(prefers-reduced-motion:reduce){ .aa-adoffer, .aa-adtest{ animation:none; } }
 /* A board needs air around it. Some countries are long and thin and some fill a phone corner to corner, and

@@ -183,6 +183,11 @@
     idleFrom: 18, idleOver: 90, // a long think is the point of this game: 18s before it tells at all, 41s to the top
     spikeWrong: 0.3, spikeCap: 0.5, spikeDecay: 0.93, spikeFix: 0.55,
     reducedCeiling: 0.55,
+    // The heartbeat is a sound, not a chord, and it lives in the same low register the pad does. When it is
+    // beating the pad comes down to a little under half, so what the player hears is their own hearts rather
+    // than a wash with something buried in it. It is ramped like every other parameter here, so it ducks and
+    // lifts over about a second rather than snapping.
+    duckHeart: 0.42,
   };
   const music = { ctx: null, master: null, timer: 0, step: 0, on: false, aim: 0, cur: 0, spike: 0, race: 0, raceTo: 0, heartAt: 0, lastMove: 0, tickTimer: 0, pulseTimer: 0 };
   const mix = (r, i) => r[0] + (r[1] - r[0]) * i;
@@ -305,7 +310,7 @@
       const ctx = music.ctx, t = ctx.currentTime, k = MUSIC.tick / 1000 * 1.6, i = music.cur;
       // Every parameter is ramped over longer than a tick, so each one is still travelling when the next tick
       // sets it moving again. Nothing here ever steps.
-      music.master.gain.linearRampToValueAtTime(mix(MUSIC.gain, i), t + k);
+      music.master.gain.linearRampToValueAtTime(mix(MUSIC.gain, i) * (heart.on ? MUSIC.duckHeart : 1), t + k);
       music.lp.frequency.linearRampToValueAtTime(mix(MUSIC.cutoff, i), t + k);
       music.lfo.frequency.linearRampToValueAtTime(mix(MUSIC.lfoHz, i), t + k);
       music.lfoG.gain.linearRampToValueAtTime(mix(MUSIC.lfoDepth, i), t + k);
@@ -1014,14 +1019,27 @@
     const diffLabel = state.diff || DIFF_OF(state.tier);
     el.hudDiff.textContent = diffLabel;
     el.hudDiff.className = 'aa-hud-diff aa-hud-diff--' + diffLabel.toLowerCase().replace(' ', '-');
+    // An empty counter is not the end of the sentence any more. Where an advertisement can still be offered for
+    // one, the number becomes a plus and the button stays live: the plus IS the offer, which is why the lamp is
+    // no longer switched off at zero -- a disabled button cannot be asked for anything, and that is exactly what
+    // it was, so the offer behind it could never be reached.
     const hintsLeft = (state.hintsMax ?? HINTS_PER_LEVEL) - state.hintsUsed;
-    el.btnHint.textContent = `💡 ${Math.max(0, hintsLeft)}`;
-    el.btnHint.disabled = state.finished || hintsLeft <= 0;
+    const hintAd = hintsLeft <= 0 && !state.finished && adCanOffer('hint');
+    el.btnHint.textContent = hintAd ? '💡 +' : `💡 ${Math.max(0, hintsLeft)}`;
+    el.btnHint.disabled = state.finished || (hintsLeft <= 0 && !hintAd);
+    el.btnHint.classList.toggle('is-ad', !!hintAd);
+    el.btnHint.setAttribute('aria-label', hintAd
+      ? 'No hints left. Watch an advertisement for one more.'
+      : `${Math.max(0, hintsLeft)} hint${hintsLeft === 1 ? '' : 's'} left`);
     if (el.btnCheck) {
       const left = checksLeftNow();
-      el.btnCheck.textContent = `${CHECK_ICON} ${Math.max(0, left)}`;
-      el.btnCheck.classList.toggle('is-spent', left <= 0);
-      el.btnCheck.setAttribute('aria-label', `${Math.max(0, left)} ${left === 1 ? CHECK_WORD : CHECK_WORD + 's'} left. Press and hold an arrow to check whether its lane is clear.`);
+      const checkAd = left <= 0 && !state.finished && adCanOffer('check');
+      el.btnCheck.textContent = checkAd ? `${CHECK_ICON} +` : `${CHECK_ICON} ${Math.max(0, left)}`;
+      el.btnCheck.classList.toggle('is-spent', left <= 0 && !checkAd);
+      el.btnCheck.classList.toggle('is-ad', !!checkAd);
+      el.btnCheck.setAttribute('aria-label', checkAd
+        ? `No ${CHECK_WORD}s left. Watch an advertisement for one more.`
+        : `${Math.max(0, left)} ${left === 1 ? CHECK_WORD : CHECK_WORD + 's'} left. Press and hold an arrow to check whether its lane is clear.`);
     }
     const pct = state.pieces.length ? Math.round(((state.pieces.length - state.left) / state.pieces.length) * 100) : 0;
     el.hudPct.textContent = `${pct}%`;
@@ -1563,17 +1581,18 @@
   // who has put gold on a table is racing people who put in the same gold; letting one of them buy an extra
   // heart with thirty seconds of their attention is not a lifeline, it is a different game. The daily board and
   // the tour have nothing at stake but pride, and there it is a kindness.
-  const adCanOffer = kind => ads.on() && !state.daily?.race && !state.adKinds?.has(kind);
+  function adCanOffer(kind) { return ads.on() && !state.daily?.race && !state.adKinds?.has(kind); }
   const adSpend = kind => { (state.adKinds = state.adKinds || new Set()).add(kind); };
 
   // A stand-in ad: the same shape as the real one, long enough to be a real decision, skippable like the real
   // one, and it resolves exactly the way the real one does.
-  function adTestShow(name) {
+  function adTestShow(name, tag = 'Test advertisement', why = '') {
     return new Promise(resolve => {
       const wrap = document.createElement('div');
       wrap.className = 'aa-adtest';
-      wrap.innerHTML = `<div class="aa-adtest-panel" role="dialog" aria-modal="true" aria-label="Test advertisement">
-        <p class="aa-adtest-tag">Test advertisement</p>
+      wrap.innerHTML = `<div class="aa-adtest-panel" role="dialog" aria-modal="true" aria-label="${escapeHtml(tag)}">
+        <p class="aa-adtest-tag">${escapeHtml(tag)}</p>
+        ${why ? `<p class="aa-adtest-why">${escapeHtml(why)}</p>` : ''}
         <p class="aa-adtest-name">${escapeHtml(name)}</p>
         <p class="aa-adtest-count"><b>5</b></p>
         <button type="button" class="aa-btn aa-adtest-skip">Close</button>
@@ -1593,7 +1612,7 @@
 
   // The real one. adBreak hands back a function to call when the player has agreed; adViewed is the only
   // callback that means the ad was seen through, and it is the only one that resolves 'watched'.
-  function adH5Show(name) {
+  function adH5Show(name, onStart = () => {}) {
     return new Promise(resolve => {
       if (typeof window.adBreak !== 'function') { resolve('unavailable'); return; }
       let settled = false, started = false;
@@ -1602,13 +1621,17 @@
       // seconds there is nothing to show and the player should not be left looking at a spinner. Once it has
       // fired an ad is actually running, and a rewarded one is allowed to be a minute long.
       let waitEnd = 0;
-      const waitAd = setTimeout(() => { if (!started) done('unavailable'); }, 8000);
+      const waitAd = setTimeout(() => { if (!started) done('unavailable'); }, 5000);
       try {
         window.adBreak({
           type: 'reward',
           name,
           beforeReward(showAdFn) {
             started = true; clearTimeout(waitAd);
+            // The waiting panel goes now, not when this promise settles: an advertisement is about to take the
+            // screen, and leaving "looking for one" on top of the thing it was looking for is worse than no
+            // panel at all.
+            try { onStart(); } catch { /* it was only a panel */ }
             waitEnd = setTimeout(() => done('unavailable'), 120000);
             try { showAdFn(); } catch { done('unavailable'); }
           },
@@ -1620,15 +1643,36 @@
     });
   }
 
+  // Asking the network takes a moment, and a moment of nothing at all reads as a button that did not work.
+  function adLooking() {
+    const wrap = document.createElement('div');
+    wrap.className = 'aa-adtest';
+    wrap.innerHTML = '<div class="aa-adtest-panel"><p class="aa-adtest-tag">Advertisement</p><p class="aa-adtest-name">Looking for one\u2026</p></div>';
+    document.body.appendChild(wrap);
+    return wrap;
+  }
+
   // Show one, and say whether it earned the reward. Never two at once.
+  //
+  // A network that has nothing to show is not the player's fault. They said yes to a wait in exchange for a
+  // heart; if no advertisement fills -- because the domain is not approved yet, because the player is somewhere
+  // the network does not sell, because it is three in the morning -- they still get the wait and they still get
+  // the heart. The stand-in says plainly that it is a stand-in. The day real ads serve, this is the rare
+  // no-fill path and nothing else changes.
   async function adShow(name) {
     if (!ads.ready()) return 'unavailable';
     ads.showing = true;
     const wasMusic = music.on;
     try {
       if (wasMusic) musicStop();                     // an ad has its own sound; the pad does not talk over it
-      const how = await (ads.mode === 'test' ? adTestShow(name) : adH5Show(name));
-      return how;
+      if (ads.mode === 'test') return await adTestShow(name);
+      const looking = adLooking();
+      const shut = () => looking.remove();
+      let how;
+      try { how = await adH5Show(name, shut); } finally { shut(); }
+      if (how !== 'unavailable') return how;
+      return await adTestShow(name, 'No advertisement available',
+        'Nothing came back from the network, so this one is on us. The wait is the same.');
     } finally {
       ads.showing = false;
       if (wasMusic && state.music && !el.game.hidden && !state.finished) musicStart();
@@ -1652,10 +1696,10 @@
       grant() { state.hintsMax = (state.hintsMax ?? HINTS_PER_LEVEL) + 1; renderHud(); toast('One more hint.', 'good'); hint(); },
     },
     check: {
-      title: `Two more ${CHECK_WORD}s`,
-      lead: `Watch a short advertisement for two more ${CHECK_WORD}s on this board.`,
-      cta: `Watch for ${CHECK_WORD}s`,
-      grant() { state.checksMax = (state.checksMax ?? CHECKS_PER_LEVEL) + 2; renderHud(); toast(`Two more ${CHECK_WORD}s.`, 'good'); },
+      title: `One more ${CHECK_WORD}`,
+      lead: `Watch a short advertisement for one more ${CHECK_WORD} on this board.`,
+      cta: `Watch for a ${CHECK_WORD}`,
+      grant() { state.checksMax = (state.checksMax ?? CHECKS_PER_LEVEL) + 1; renderHud(); toast(`One more ${CHECK_WORD}.`, 'good'); },
     },
     gold: {
       title: 'Gold for an advertisement',
@@ -3140,6 +3184,7 @@
   // game that teaches the gesture, so it answers every time rather than once.
   el.btnCheck?.addEventListener('click', () => {
     const left = checksLeftNow();
+    if (left <= 0 && adCanOffer('check')) { adOffer('check'); return; }   // the plus is the offer; tapping it takes it
     toast(left > 0
       ? `Press and hold an arrow to see whether its lane is clear. ${left} ${left === 1 ? CHECK_WORD : CHECK_WORD + 's'} left.`
       : `No ${CHECK_WORD}s left on this level.`, left > 0 ? 'hint' : 'bad');
