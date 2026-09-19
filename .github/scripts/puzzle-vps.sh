@@ -15,9 +15,17 @@ set -uo pipefail
 MODE="${MODE:-inspect}"
 DOMAIN="${DOMAIN:-ariyankhan.com}"
 SNIPPET_B64="${SNIPPET_B64:-}"
+CONFIRM="${CONFIRM:-}"
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
-AA_CONTAINERS="arrow-atlas-api arrow-atlas-postgres arrow-atlas-redis arrow-atlas-backup"
-HOST_BACKUPS=/var/backups/arrow-atlas
+# The containers were called arrow-atlas-* before the game was renamed. Which set is on the box is a
+# question with an answer, so it is asked rather than assumed: every mode then works before the rename and
+# after it, and rename-infra itself can talk about both.
+C() {   # C api → the real name of the api container, whichever generation it belongs to
+  if docker inspect "puzzle-$1" >/dev/null 2>&1; then echo "puzzle-$1"; else echo "arrow-atlas-$1"; fi
+}
+API=$(C api); PG=$(C postgres); RDS=$(C redis); BKP=$(C backup)
+AA_CONTAINERS="$API $PG $RDS $BKP"
+if [ -d /var/backups/puzzle ]; then HOST_BACKUPS=/var/backups/puzzle; else HOST_BACKUPS=/var/backups/arrow-atlas; fi
 fail=0
 
 SUDO=""
@@ -35,17 +43,17 @@ running() { [ "$(docker inspect -f '{{.State.Running}}' "$1" 2>/dev/null)" = "tr
 
 # One SQL statement, answered without the password ever leaving the container.
 psqlc() {
-  docker exec arrow-atlas-postgres sh -c \
+  docker exec "$PG" sh -c \
     'PGPASSWORD="$POSTGRES_PASSWORD" exec psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "$0"' "$1"
 }
 
-# backup.sh / restore.sh live in the checkout that arrow-atlas-api fetched, mounted read-only into the
+# backup.sh / restore.sh live in the checkout the api container fetched, mounted read-only into the
 # backup container. This is the same call the README documents.
-aabackup() { docker exec arrow-atlas-backup sh -c "sh \${PUZZLE_SCRIPTS_DIR:-\$ARROW_ATLAS_SCRIPTS_DIR}/$1" ; }
+aabackup() { docker exec "$BKP" sh -c "sh \${PUZZLE_SCRIPTS_DIR:-\$ARROW_ATLAS_SCRIPTS_DIR}/$1" ; }
 
 newest_dump() {
-  docker exec arrow-atlas-backup sh -c \
-    'ls -1t /backups/arrow-atlas-*.dump 2>/dev/null | head -1'
+  docker exec "$BKP" sh -c \
+    'ls -1t /backups/puzzle-*.dump /backups/arrow-atlas-*.dump 2>/dev/null | head -1'
 }
 
 # ─────────────────────────────────────────────────────────────────────── shared reports
@@ -63,7 +71,7 @@ report_containers() {
 
 report_data() {
   say "what PostgreSQL actually holds"
-  if ! running arrow-atlas-postgres; then bad "arrow-atlas-postgres is not running"; return; fi
+  if ! running "$PG"; then bad "$PG is not running"; return; fi
   psqlc "select 'users        ' || count(*) from users
          union all select 'sessions     ' || count(*) from sessions
          union all select 'matches      ' || count(*) from matches
@@ -117,7 +125,7 @@ report_legacy() {
   echo
   note "legacy copies left in /tmp:"
   $SUDO ls -la /tmp 2>/dev/null | grep -iE 'sqlite|legacy' | sed 's/^/    host  /' || note "    host: none"
-  for c in arrow-atlas-api ariyankhan-web; do
+  for c in "$API" ariyankhan-web; do
     have "$c" || continue
     docker exec "$c" sh -c 'ls -la /tmp 2>/dev/null' 2>/dev/null | grep -iE 'sqlite|legacy' \
       | sed "s/^/    $c  /" || note "    $c: none"
@@ -158,7 +166,7 @@ report_nginx() {
 
 report_backups() {
   say "the PostgreSQL backup system"
-  if ! running arrow-atlas-backup; then bad "arrow-atlas-backup is not running"; return; fi
+  if ! running "$BKP"; then bad "$BKP is not running"; return; fi
   aabackup 'backup.sh list' | sed 's/^/  /' || bad "backup.sh list failed"
   d=$(newest_dump)
   if [ -n "$d" ]; then ok "newest dump: $d"; else bad "there is no dump at all"; fi
@@ -166,11 +174,11 @@ report_backups() {
   # Whether the automatic path works, asserted rather than eyeballed. The container's own healthcheck fails if
   # the newest dump is more than a day old, so a healthy backup container and a dump younger than 25 hours are
   # the same guarantee said twice — and neither of them is satisfied by a backup somebody took by hand once.
-  h=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' arrow-atlas-backup 2>/dev/null)
+  h=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$BKP" 2>/dev/null)
   [ "$h" = "healthy" ] && ok "the backup container reports healthy, which is its own way of saying the newest dump is under a day old" \
                        || bad "the backup container is $h"
   if [ -n "$d" ]; then
-    mtime=$(docker exec arrow-atlas-backup stat -c %Y "$d" 2>/dev/null)
+    mtime=$(docker exec "$BKP" stat -c %Y "$d" 2>/dev/null)
     if [ -n "$mtime" ]; then
       age=$(( ( $(date -u +%s) - mtime ) / 60 ))
       if [ "$age" -lt 1500 ]; then ok "and it is $age minutes old, inside the 25-hour guarantee"
@@ -179,10 +187,10 @@ report_backups() {
       bad "could not read the newest dump's age"
     fi
   fi
-  hour=$(docker exec arrow-atlas-backup sh -c 'echo "${PUZZLE_BACKUP_AT_HOUR:-${ARROW_ATLAS_BACKUP_AT_HOUR:-3}}"' 2>/dev/null)
-  keep=$(docker exec arrow-atlas-backup sh -c 'echo "${PUZZLE_BACKUP_KEEP_DAYS:-${ARROW_ATLAS_BACKUP_KEEP_DAYS:-14}}"' 2>/dev/null)
+  hour=$(docker exec "$BKP" sh -c 'echo "${PUZZLE_BACKUP_AT_HOUR:-${ARROW_ATLAS_BACKUP_AT_HOUR:-3}}"' 2>/dev/null)
+  keep=$(docker exec "$BKP" sh -c 'echo "${PUZZLE_BACKUP_KEEP_DAYS:-${ARROW_ATLAS_BACKUP_KEEP_DAYS:-14}}"' 2>/dev/null)
   note "the schedule: daily at ${hour}:00 UTC, once more on every container start, keeping ${keep} days"
-  docker exec arrow-atlas-backup sh -c 'cat /backups/last-run.json' 2>/dev/null | sed 's/^/      last recorded run: /'
+  docker exec "$BKP" sh -c 'cat /backups/last-run.json' 2>/dev/null | sed 's/^/      last recorded run: /'
   echo
   note "and the copies kept on the host, outside Docker:"
   $SUDO ls -la "$HOST_BACKUPS"/*.dump 2>/dev/null | sed 's/^/    /' || note "    none on the host yet"
@@ -310,14 +318,14 @@ mode_git_access() {
 mode_logs() {
   echo "Arrow Atlas — what the API says about itself  ($(hostname), $(date -u))"
   report_containers
-  say "arrow-atlas-api, as Docker sees it"
+  say "$API, as Docker sees it"
   docker inspect -f 'status={{.State.Status}}  restarts={{.RestartCount}}  last exit={{.State.ExitCode}}  health={{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' \
-    arrow-atlas-api 2>&1 | sed 's/^/      /'
+    "$API" 2>&1 | sed 's/^/      /'
   say "the last of its log"
-  docker logs --tail 150 arrow-atlas-api 2>&1 | sed 's/^/      /'
+  docker logs --tail 150 "$API" 2>&1 | sed 's/^/      /'
   say "and what the health probe last got back"
   docker inspect -f '{{if .State.Health}}{{range .State.Health.Log}}{{.End}} exit={{.ExitCode}} {{.Output}}
-{{end}}{{end}}' arrow-atlas-api 2>&1 | tail -6 | sed 's/^/      /'
+{{end}}{{end}}' "$API" 2>&1 | tail -6 | sed 's/^/      /'
 }
 
 # Put this checkout on the VPS and start the API from it.
@@ -530,8 +538,8 @@ mode_push_source() {
   fi
 
   say "2. the compose file that came with it"
-  PROJ=$(docker inspect -f '{{index .Config.Labels "com.docker.compose.project.working_dir"}}' arrow-atlas-api 2>/dev/null)
-  [ -n "$PROJ" ] && $SUDO test -d "$PROJ" || { bad "cannot find the project directory of arrow-atlas-api"; return; }
+  PROJ=$(docker inspect -f '{{index .Config.Labels "com.docker.compose.project.working_dir"}}' "$API" 2>/dev/null)
+  [ -n "$PROJ" ] && $SUDO test -d "$PROJ" || { bad "cannot find the project directory of $API"; return; }
   note "$PROJ"
   $SUDO cp -a "$PROJ/docker-compose.yml" "$HOST_BACKUPS/docker-compose.yml.before-$STAMP" 2>/dev/null \
     && kept "$HOST_BACKUPS/docker-compose.yml.before-$STAMP  (the way back)"
@@ -543,17 +551,17 @@ mode_push_source() {
   rm -f /tmp/aa-compose.yml
 
   say "3. and the API, started from what is now on disk"
-  ( cd "$PROJ" && $SUDO docker compose up -d --force-recreate arrow-atlas-api ) >/dev/null 2>&1 \
-    || { bad "docker compose refused to bring it up"; docker logs --tail 30 arrow-atlas-api 2>&1 | sed 's/^/      /'; return; }
+  ( cd "$PROJ" && $SUDO docker compose up -d --force-recreate "$API" ) >/dev/null 2>&1 \
+    || { bad "docker compose refused to bring it up"; docker logs --tail 30 "$API" 2>&1 | sed 's/^/      /'; return; }
   note "it still installs and builds TypeScript, which takes a couple of minutes on 2 vCPU"
   h=""
   for i in $(seq 1 60); do
-    h=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' arrow-atlas-api 2>/dev/null)
+    h=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$API" 2>/dev/null)
     [ "$h" = "healthy" ] && break
     sleep 10
   done
-  [ "$h" = "healthy" ] && ok "arrow-atlas-api is healthy" || bad "arrow-atlas-api is $h after ten minutes"
-  docker logs --tail 20 arrow-atlas-api 2>&1 | sed 's/^/      /'
+  [ "$h" = "healthy" ] && ok "$API is healthy" || bad "$API is $h after ten minutes"
+  docker logs --tail 20 "$API" 2>&1 | sed 's/^/      /'
 
   # And the client, into the container that serves the site. Not by restarting it: that container is defined
   # by hPanel's own copy of a compose file, which still empties the document root before fetching — restarting
@@ -635,15 +643,15 @@ mode_inspect() {
   fi
 
   say "and the Arrow Atlas project"
-  wd=$(docker inspect -f '{{index .Config.Labels "com.docker.compose.project.working_dir"}}' arrow-atlas-api 2>/dev/null)
+  wd=$(docker inspect -f '{{index .Config.Labels "com.docker.compose.project.working_dir"}}' "$API" 2>/dev/null)
   note "compose working_dir: ${wd:-<none>}"
   [ -n "$wd" ] && { $SUDO ls -la "$wd" 2>/dev/null | sed 's/^/    /' || true; }
 }
 
 mode_backup_verify() {
   echo "Arrow Atlas — one fresh backup, then prove it restores  ($(date -u))"
-  running arrow-atlas-postgres || { bad "PostgreSQL is not running; not taking a backup of nothing"; return; }
-  running arrow-atlas-backup   || { bad "the backup container is not running"; return; }
+  running "$PG" || { bad "PostgreSQL is not running; not taking a backup of nothing"; return; }
+  running "$BKP"   || { bad "the backup container is not running"; return; }
 
   report_data
 
@@ -657,12 +665,12 @@ mode_backup_verify() {
   d=$(newest_dump)
   [ -n "$d" ] || { bad "no dump appeared"; return; }
   ok "took $d"
-  note "size: $(docker exec arrow-atlas-backup sh -c "stat -c %s '$d'") bytes"
+  note "size: $(docker exec "$BKP" sh -c "stat -c %s '$d'") bytes"
 
   say "restoring it into a scratch database and reading it back"
   # `verify` restores into a scratch database, counts every core table, reconciles the ledger inside the
   # restored copy, and drops the scratch database again. It is the only check that means anything.
-  if docker exec arrow-atlas-backup sh -c "sh \${PUZZLE_SCRIPTS_DIR:-\$ARROW_ATLAS_SCRIPTS_DIR}/restore.sh verify '$d'" 2>&1 | sed 's/^/  /'; then
+  if docker exec "$BKP" sh -c "sh \${PUZZLE_SCRIPTS_DIR:-\$ARROW_ATLAS_SCRIPTS_DIR}/restore.sh verify '$d'" 2>&1 | sed 's/^/  /'; then
     ok "the dump restores and the restored copy reconciles"
   else
     bad "the restore verification failed — nothing may be deleted"
@@ -683,11 +691,11 @@ mode_cleanup() {
   # The gate, again, here: a verified dump must exist before anything is deleted. backup-verify is a
   # separate run and this cannot see its result, so it re-establishes the fact rather than assuming it.
   say "the gate: there must be a dump that restores"
-  running arrow-atlas-backup || { bad "the backup container is not running; refusing to delete anything"; return; }
+  running "$BKP" || { bad "the backup container is not running; refusing to delete anything"; return; }
   d=$(newest_dump)
   [ -n "$d" ] || { bad "there is no PostgreSQL dump; refusing to delete anything"; return; }
   note "checking $d"
-  if docker exec arrow-atlas-backup sh -c "sh \${PUZZLE_SCRIPTS_DIR:-\$ARROW_ATLAS_SCRIPTS_DIR}/restore.sh verify '$d'" >/tmp/aa-verify.log 2>&1; then
+  if docker exec "$BKP" sh -c "sh \${PUZZLE_SCRIPTS_DIR:-\$ARROW_ATLAS_SCRIPTS_DIR}/restore.sh verify '$d'" >/tmp/aa-verify.log 2>&1; then
     ok "$d restores and reconciles"
     tail -6 /tmp/aa-verify.log | sed 's/^/      /'
   else
@@ -778,7 +786,7 @@ mode_cleanup() {
   for f in /tmp/legacy.sqlite /tmp/arrow-atlas.sqlite /tmp/aa.sqlite /tmp/pre-migration-*.sqlite; do
     [ -e "$f" ] && { $SUDO rm -f "$f" && gone "host $f"; }
   done
-  for c in arrow-atlas-api ariyankhan-web; do
+  for c in "$API" ariyankhan-web; do
     have "$c" || continue
     docker exec "$c" sh -c 'rm -f /tmp/legacy.sqlite /tmp/arrow-atlas.sqlite /tmp/aa.sqlite /tmp/pre-migration-*.sqlite' 2>/dev/null \
       && gone "$c:/tmp legacy copies"
@@ -851,15 +859,15 @@ mode_deploy() {
   fi
 
   say "2. the API re-fetches the repository when it restarts"
-  docker restart arrow-atlas-api >/dev/null && ok "restarting" || { bad "could not restart arrow-atlas-api"; return; }
+  docker restart "$API" >/dev/null && ok "restarting" || { bad "could not restart $API"; return; }
   note "its first start after a fetch builds TypeScript, which takes a couple of minutes on 2 vCPU"
   for i in $(seq 1 60); do
-    h=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' arrow-atlas-api 2>/dev/null)
+    h=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$API" 2>/dev/null)
     [ "$h" = "healthy" ] && break
     sleep 10
   done
-  [ "$h" = "healthy" ] && ok "arrow-atlas-api is healthy again" || bad "arrow-atlas-api is $h after ten minutes"
-  docker logs --tail 15 arrow-atlas-api 2>&1 | sed 's/^/      /'
+  [ "$h" = "healthy" ] && ok "$API is healthy again" || bad "$API is $h after ten minutes"
+  docker logs --tail 15 "$API" 2>&1 | sed 's/^/      /'
 
   say "3. and the portfolio re-fetches main, which is what ships the client"
   if have ariyankhan-web; then
@@ -898,10 +906,10 @@ mode_deploy_site() {
   [ -n "$after" ] || bad "the page no longer names a client at all"
 
   # The game itself was not restarted, so it should not have noticed any of this.
-  s=$(docker inspect -f '{{.State.Status}}{{if .State.Health}}/{{.State.Health.Status}}{{end}}' arrow-atlas-api 2>/dev/null || echo absent)
+  s=$(docker inspect -f '{{.State.Status}}{{if .State.Health}}/{{.State.Health.Status}}{{end}}' "$API" 2>/dev/null || echo absent)
   case "$s" in
-    running/healthy|running) ok "arrow-atlas-api untouched and still $s" ;;
-    *)                       bad "arrow-atlas-api is $s" ;;
+    running/healthy|running) ok "$API untouched and still $s" ;;
+    *)                       bad "$API is $s" ;;
   esac
   hc_code=$(curl -sS -m 20 -o /dev/null -w '%{http_code}' --resolve "$DOMAIN:443:127.0.0.1" "https://$DOMAIN/api/arrow-atlas/v1/lobby" 2>/dev/null || echo 000)
   [ "$hc_code" = "200" ] && ok "and the game's API still answers (200)" || bad "the game's API answered $hc_code"
@@ -981,12 +989,143 @@ mode_health() {
   else ok "no SQLite backup left on the host"; fi
   if $SUDO grep -qs 'games/api' /etc/nginx/snippets/arrow-atlas.conf; then bad "nginx still proxies /games/api/"
   else ok "nginx has no /games/api/ route"; fi
-  if docker exec arrow-atlas-api sh -c 'ls /srv/arrow-atlas/site/games/puzzle/backend/dist/import-sqlite.js' >/dev/null 2>&1; then
+  if docker exec "$API" sh -c 'ls /srv/arrow-atlas/site/games/puzzle/backend/dist/import-sqlite.js' >/dev/null 2>&1; then
     bad "the SQLite importer is still in the deployed build"
   else ok "the SQLite importer is not in the deployed build"; fi
 
   report_nginx
 }
+
+# ── rename-infra ────────────────────────────────────────────────────────────
+#
+# The last of the rename, and the only part with a database in it: arrow-atlas-* containers, volumes,
+# networks, the compose project, the PostgreSQL database and role, and the host's backup directory all take
+# the game's name.
+#
+# What makes this safe to run rather than clever:
+#
+#   * It will not start without a backup it has taken and restored into a scratch database in this run. The
+#     existing backup-verify does exactly that, so it is the gate rather than a comment saying "back up first".
+#   * Nothing is deleted. The PostgreSQL data is COPIED into the new volume; the old volume stays exactly as
+#     it was, so going back is bringing back the old compose file. The old containers are removed — they are
+#     containers, they hold nothing — and every volume is left where it is for you to delete when you are
+#     satisfied, with the commands printed at the end.
+#   * A role rename clears an MD5 password, because MD5 uses the role name as its salt. The password is in a
+#     file on this host that nothing here reads. So the verifier is checked first, and if it is MD5 the role
+#     keeps its name and the run says so rather than locking the service out of its own database.
+#   * Each step checks the one before it. The first failure stops the run with the database intact.
+mode_rename_infra() {
+  [ "$CONFIRM" = "RENAME" ] || { echo "::error::rename-infra needs confirm=RENAME"; exit 2; }
+
+  say "Where we are starting from"
+  have "arrow-atlas-api" || { bad "there is no arrow-atlas-api here; nothing to rename"; return; }
+  for c in $AA_CONTAINERS; do
+    note "$c  $(docker inspect -f '{{.State.Status}}' "$c" 2>/dev/null || echo absent)"
+  done
+  PROJ=$(docker inspect -f '{{index .Config.Labels "com.docker.compose.project.working_dir"}}' "$API" 2>/dev/null)
+  [ -n "$PROJ" ] && $SUDO test -d "$PROJ" || { bad "cannot find the compose project directory"; return; }
+  note "compose project at $PROJ"
+  NEW_COMPOSE=/var/www/ariyankhan-src/games/puzzle/deploy/docker-compose.yml
+  $SUDO test -f "$NEW_COMPOSE" || { bad "no renamed compose file at $NEW_COMPOSE — run git-sync first"; return; }
+  grep -q 'container_name: puzzle-api' "$NEW_COMPOSE" || { bad "$NEW_COMPOSE is not the renamed one"; return; }
+
+  say "A backup, taken and restored, before anything moves"
+  mode_backup_verify
+  [ "$fail" -eq 0 ] || { bad "the backup did not verify; nothing has been touched"; return; }
+
+  say "What the database is called today"
+  DB=$(docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' "$PG" | sed -n 's/^POSTGRES_DB=//p' | head -1)
+  DBUSER=$(docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' "$PG" | sed -n 's/^POSTGRES_USER=//p' | head -1)
+  [ -n "$DB" ] && [ -n "$DBUSER" ] || { bad "could not read the database name and role from $PG"; return; }
+  note "database $DB, role $DBUSER"
+  VERIFIER=$(psqlc "SELECT COALESCE(substring(rolpassword from 1 for 13), 'none') FROM pg_authid WHERE rolname = '$DBUSER'" 2>/dev/null)
+  note "the role's password is stored as: ${VERIFIER:-unreadable}"
+  case "$VERIFIER" in
+    SCRAM-SHA-256) RENAME_ROLE=yes; ok "SCRAM, so a rename keeps the password" ;;
+    *)             RENAME_ROLE=no ;;
+  esac
+  if [ "$RENAME_ROLE" != yes ] && [ "$DBUSER" != "puzzle" ]; then
+    # The renamed compose file connects as "puzzle". If the role cannot take that name the service would come
+    # up against a role that does not exist, so this stops here, with everything exactly as it was.
+    bad "the role $DBUSER stores an MD5 password, which a rename would clear, and the password is in a file on this host that nothing here reads"
+    note "nothing has been changed. To go ahead: set that role's password again with SCRAM (ALTER ROLE $DBUSER PASSWORD '<the one in .env>' after setting password_encryption = scram-sha-256), then run this again"
+    return
+  fi
+
+  say "Closing the database to everything but this script"
+  for c in "$API" "$BKP"; do running "$c" && $SUDO docker stop "$c" >/dev/null 2>&1 && note "stopped $c"; done
+  left=$(psqlc "SELECT count(*) FROM pg_stat_activity WHERE datname = '$DB' AND pid <> pg_backend_pid()")
+  note "connections still on $DB: ${left:-?}"
+
+  say "Renaming the database and the role"
+  if [ "$DB" = "puzzle" ]; then ok "the database is already called puzzle"; else
+    docker exec "$PG" sh -c "PGPASSWORD=\"\$POSTGRES_PASSWORD\" psql -v ON_ERROR_STOP=1 -U \"\$POSTGRES_USER\" -d postgres -c 'ALTER DATABASE \"$DB\" RENAME TO puzzle'" >/dev/null 2>&1 \
+      && ok "$DB is now puzzle" || { bad "could not rename the database; nothing else has been done"; return; }
+  fi
+  if [ "$RENAME_ROLE" = yes ] && [ "$DBUSER" != "puzzle" ]; then
+    docker exec "$PG" sh -c "PGPASSWORD=\"\$POSTGRES_PASSWORD\" psql -v ON_ERROR_STOP=1 -U \"\$POSTGRES_USER\" -d postgres -c 'ALTER ROLE \"$DBUSER\" RENAME TO puzzle'" >/dev/null 2>&1 \
+      && ok "the role $DBUSER is now puzzle" || bad "could not rename the role; the database is renamed and the old role still owns it"
+  fi
+
+  say "Copying the data into a volume with the new name"
+  $SUDO docker stop "$PG" "$RDS" >/dev/null 2>&1 || true
+  if docker volume inspect puzzle-postgres-data >/dev/null 2>&1; then
+    note "puzzle-postgres-data is already here; leaving it alone"
+  else
+    $SUDO docker volume create puzzle-postgres-data >/dev/null
+    $SUDO docker run --rm -v arrow-atlas-postgres-data:/from:ro -v puzzle-postgres-data:/to alpine:3.20 \
+      sh -c 'cp -a /from/. /to/ && test -f /to/PG_VERSION' >/dev/null 2>&1 \
+      && ok "the data directory is copied, and the original is untouched" \
+      || { bad "the copy failed; the old volume and the old compose file will bring it all back"; return; }
+  fi
+  # The dumps are worth carrying over; the checkout and the Redis volume refill themselves on start.
+  if ! docker volume inspect puzzle-backups >/dev/null 2>&1; then
+    $SUDO docker volume create puzzle-backups >/dev/null
+    $SUDO docker run --rm -v arrow-atlas-backups:/from:ro -v puzzle-backups:/to alpine:3.20 sh -c 'cp -a /from/. /to/' >/dev/null 2>&1 \
+      && note "the dumps came too" || note "no dumps to carry over"
+  fi
+  if $SUDO test -d /var/backups/arrow-atlas && ! $SUDO test -d /var/backups/puzzle; then
+    $SUDO mv /var/backups/arrow-atlas /var/backups/puzzle && note "/var/backups/arrow-atlas is now /var/backups/puzzle"
+  fi
+
+  say "Starting the new set"
+  $SUDO cp -a "$PROJ/docker-compose.yml" "$HOST_BACKUPS/docker-compose.yml.before-rename-$STAMP" 2>/dev/null \
+    && note "the old compose file is kept as docker-compose.yml.before-rename-$STAMP"
+  $SUDO cp "$NEW_COMPOSE" "$PROJ/docker-compose.yml" || { bad "could not install the renamed compose file"; return; }
+  ( cd "$PROJ" && $SUDO docker compose up -d ) >/dev/null 2>&1 \
+    || { bad "compose refused to bring the renamed set up"; ( cd "$PROJ" && $SUDO docker compose logs --tail 30 2>&1 | sed 's/^/      /' ); return; }
+  for c in puzzle-postgres puzzle-redis puzzle-api puzzle-backup; do
+    note "$c  $(docker inspect -f '{{.State.Status}}' "$c" 2>/dev/null || echo absent)"
+  done
+
+  say "Waiting for the API to say it is well"
+  h=""
+  for _ in $(seq 1 60); do
+    h=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' puzzle-api 2>/dev/null)
+    [ "$h" = "healthy" ] && break
+    sleep 10
+  done
+  if [ "$h" = "healthy" ]; then
+    ok "puzzle-api is healthy on the renamed database"
+    docker exec puzzle-api sh -c 'wget -qO- http://127.0.0.1:8760/health' 2>/dev/null | sed 's/^/      /'
+  else
+    bad "puzzle-api is ${h:-gone}; the old volume, the old compose file and this run's verified dump are all still here"
+    docker logs --tail 40 puzzle-api 2>&1 | sed 's/^/      /'
+    return
+  fi
+
+  say "Taking the old containers away"
+  for c in arrow-atlas-api arrow-atlas-backup arrow-atlas-redis arrow-atlas-postgres; do
+    have "$c" && $SUDO docker rm -f "$c" >/dev/null 2>&1 && gone "$c"
+  done
+
+  say "What is left for you to delete, once you are happy"
+  note "docker volume rm arrow-atlas-postgres-data   # the database as it was before this run"
+  note "docker volume rm arrow-atlas-redis-data arrow-atlas-site arrow-atlas-backups"
+  note "and in $PROJ, docker-compose.yml.before-rename-$STAMP"
+  note "nothing above is removed by this script, on purpose"
+}
+
 
 case "$MODE" in
   inspect)       mode_inspect ;;
@@ -1000,6 +1139,7 @@ case "$MODE" in
   deploy)        mode_deploy ;;
   deploy-site)   mode_deploy_site ;;
   health)        mode_health ;;
+  rename-infra)  mode_rename_infra ;;
   *) echo "::error::unknown mode: $MODE"; exit 2 ;;
 esac
 

@@ -29,6 +29,10 @@
 #                  byte as it is, it refuses unless the command is the one it expects, it validates before
 #                  applying, and it puts the backup back if the container does not come up. Needs
 #                  confirm=DEPLOY, and is a no-op once done.
+#   rename-infra   The last of the rename: the containers, volumes, networks, compose project, PostgreSQL
+#                  database and role, and the host's backup directory all take the game's name. Takes and
+#                  restores a backup before it starts, copies the data rather than moving it, and deletes no
+#                  volume — going back is putting the old compose file back. Needs confirm=RENAME.
 #   health         Reads. The four containers, the API, the socket, the backup timer, and that no legacy
 #                  artifact is left anywhere.
 #
@@ -44,9 +48,9 @@ on:
         type: choice
         required: true
         default: inspect
-        options: [inspect, logs, git-access, git-sync, backup-verify, cleanup, deploy, deploy-site, push-source, web-safe-fetch, health]
+        options: [inspect, logs, git-access, git-sync, backup-verify, cleanup, deploy, deploy-site, push-source, web-safe-fetch, rename-infra, health]
       confirm:
-        description: "Type DELETE for cleanup, DEPLOY for deploy. Ignored by the read-only modes."
+        description: "Type DELETE for cleanup, DEPLOY for deploy, RENAME for rename-infra. Ignored by the read-only modes."
         required: false
         default: ""
       domain:
@@ -70,6 +74,7 @@ jobs:
           case "${{ inputs.mode }}" in
             cleanup) [ "${{ inputs.confirm }}" = "DELETE" ] || { echo "::error::cleanup needs confirm=DELETE"; exit 1; } ;;
             deploy|deploy-site|push-source|web-safe-fetch) [ "${{ inputs.confirm }}" = "DEPLOY" ] || { echo "::error::${{ inputs.mode }} needs confirm=DEPLOY"; exit 1; } ;;
+            rename-infra) [ "${{ inputs.confirm }}" = "RENAME" ] || { echo "::error::rename-infra needs confirm=RENAME"; exit 1; } ;;
             *) echo "read-only mode, no confirmation needed" ;;
           esac
 
@@ -126,6 +131,7 @@ jobs:
           VPS_USER: ${{ secrets.VPS_USER }}
           MODE: ${{ inputs.mode }}
           DOMAIN: ${{ inputs.domain }}
+          CONFIRM: ${{ inputs.confirm }}
         run: |
           # -e and pipefail both matter: without them `ssh ... | tee` reports tee's status and a failed remote
           # command leaves the job green. A check that cannot fail is not a check.
@@ -142,7 +148,7 @@ jobs:
           # The variables are set on the remote side of the connection: an `env:` block here would only
           # reach the runner. base64 keeps the snippet on one line and out of the shell's way.
           "${SSH[@]}" "$VPS_USER@$VPS_HOST" \
-            "MODE='$MODE' DOMAIN='$DOMAIN' SNIPPET_B64='$(cat /tmp/snippet.b64)' bash -s" \
+            "MODE='$MODE' DOMAIN='$DOMAIN' CONFIRM='$CONFIRM' SNIPPET_B64='$(cat /tmp/snippet.b64)' bash -s" \
             < .github/scripts/puzzle-vps.sh
 
       - name: Remove the key

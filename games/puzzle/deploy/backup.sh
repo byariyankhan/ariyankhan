@@ -1,9 +1,9 @@
 #!/bin/sh
 # Arrow Atlas PostgreSQL backups.
 #
-#   arrow-atlas-backup once     take one backup now and exit
-#   arrow-atlas-backup loop     take one every day at PUZZLE_BACKUP_AT_HOUR (what the container runs)
-#   arrow-atlas-backup list     what we have
+#   puzzle-backup once     take one backup now and exit
+#   puzzle-backup loop     take one every day at PUZZLE_BACKUP_AT_HOUR (what the container runs)
+#   puzzle-backup list     what we have
 #
 # Three things this does that a bare pg_dump in a cron line does not:
 #   * it verifies every dump it writes, by reading the archive's table of contents back. A backup nobody has
@@ -25,8 +25,8 @@ STATUS="$DIR/last-run.json"
 # never disagree about what a good backup looks like.
 CORE_TABLES="users sessions matches match_players gold_ledger"
 
-log() { printf '{"ts":"%s","product":"arrow-atlas","component":"backup","msg":"%s"}\n' "$(date -u +%FT%TZ)" "$1"; }
-fail() { printf '{"ts":"%s","product":"arrow-atlas","component":"backup","level":"error","msg":"%s"}\n' "$(date -u +%FT%TZ)" "$1" >&2; }
+log() { printf '{"ts":"%s","product":"puzzle","component":"backup","msg":"%s"}\n' "$(date -u +%FT%TZ)" "$1"; }
+fail() { printf '{"ts":"%s","product":"puzzle","component":"backup","level":"error","msg":"%s"}\n' "$(date -u +%FT%TZ)" "$1" >&2; }
 
 status() {   # status <ok|failed> <file> <bytes> <detail>
   mkdir -p "$DIR"
@@ -37,7 +37,7 @@ status() {   # status <ok|failed> <file> <bytes> <detail>
 once() {
   mkdir -p "$DIR"
   stamp="$(date -u +%Y%m%dT%H%M%SZ)"
-  out="$DIR/arrow-atlas-$stamp.dump"
+  out="$DIR/puzzle-$stamp.dump"
   tmp="$out.partial"
 
   log "starting backup of $DB"
@@ -75,8 +75,9 @@ once() {
   fi
 
   # Retention, applied to both copies. -mtime +N deletes what is older than N days.
-  find "$DIR" -name 'arrow-atlas-*.dump' -mtime "+$KEEP_DAYS" -print -delete 2>/dev/null | while read -r old; do log "aged out $old"; done
-  [ -d "$HOST_DIR" ] && find "$HOST_DIR" -name 'arrow-atlas-*.dump' -mtime "+$KEEP_DAYS" -delete 2>/dev/null || true
+  # Both spellings: dumps taken before the game was renamed age out on the same schedule as the new ones.
+  find "$DIR" \( -name 'puzzle-*.dump' -o -name 'arrow-atlas-*.dump' \) -mtime "+$KEEP_DAYS" -print -delete 2>/dev/null | while read -r old; do log "aged out $old"; done
+  [ -d "$HOST_DIR" ] && find "$HOST_DIR" \( -name 'puzzle-*.dump' -o -name 'arrow-atlas-*.dump' \) -mtime "+$KEEP_DAYS" -delete 2>/dev/null || true
 
   status ok "$out" "$bytes" "$tables tables"
   return 0
@@ -85,7 +86,7 @@ once() {
 case "${1:-once}" in
   once) once ;;
   list)
-    ls -lh "$DIR"/arrow-atlas-*.dump 2>/dev/null || echo "no backups yet in $DIR"
+    ls -lh "$DIR"/puzzle-*.dump "$DIR"/arrow-atlas-*.dump 2>/dev/null || echo "no backups yet in $DIR"
     [ -f "$STATUS" ] && { echo "last run:"; cat "$STATUS"; } || true
     ;;
   loop)

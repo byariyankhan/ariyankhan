@@ -5,29 +5,29 @@
 # names, and the two cannot reach each other. Moving Arrow Atlas to a VPS of its own is this file, the image,
 # and a restored dump — see ../README.md.
 #
-#   docker compose -p arrow-atlas --env-file .env up -d
+#   docker compose -p puzzle --env-file .env up -d
 #
 # Reachability, deliberately:
-#   * arrow-atlas-postgres and arrow-atlas-redis sit on an internal network. They publish no ports, and that
+#   * puzzle-postgres and puzzle-redis sit on an internal network. They publish no ports, and that
 #     network has no route out, so they are unreachable from the internet and cannot themselves call out.
-#   * arrow-atlas-api sits on both networks: the internal one to reach its data, the edge one for Google's
+#   * puzzle-api sits on both networks: the internal one to reach its data, the edge one for Google's
 #     token endpoint. It publishes to 127.0.0.1 only, so the host nginx is the single way in.
-name: arrow-atlas
+name: puzzle
 
 services:
-  arrow-atlas-postgres:
+  puzzle-postgres:
     image: postgres:16-alpine
-    container_name: arrow-atlas-postgres
+    container_name: puzzle-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${ARROW_ATLAS_PG_DATABASE:-arrow_atlas}
-      POSTGRES_USER: ${ARROW_ATLAS_PG_USER:-arrow_atlas}
+      POSTGRES_DB: puzzle
+      POSTGRES_USER: puzzle
       POSTGRES_PASSWORD: ${ARROW_ATLAS_PG_PASSWORD:?set ARROW_ATLAS_PG_PASSWORD in .env}
       POSTGRES_INITDB_ARGS: "--data-checksums"
       TZ: UTC
     volumes:
-      - arrow-atlas-postgres-data:/var/lib/postgresql/data
-    networks: [arrow-atlas-data]
+      - puzzle-postgres-data:/var/lib/postgresql/data
+    networks: [puzzle-data]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB} -q"]
       interval: 10s
@@ -37,9 +37,9 @@ services:
     stop_grace_period: 30s
     logging: { driver: json-file, options: { max-size: "10m", max-file: "5" } }
 
-  arrow-atlas-redis:
+  puzzle-redis:
     image: redis:7-alpine
-    container_name: arrow-atlas-redis
+    container_name: puzzle-redis
     restart: unless-stopped
     # Ephemeral by design, but appendonly keeps a restart from dropping presence mid-match for no reason.
     command: >
@@ -49,8 +49,8 @@ services:
       --maxmemory ${ARROW_ATLAS_REDIS_MAXMEMORY:-256mb}
       --maxmemory-policy allkeys-lru
     volumes:
-      - arrow-atlas-redis-data:/data
-    networks: [arrow-atlas-data]
+      - puzzle-redis-data:/data
+    networks: [puzzle-data]
     healthcheck:
       test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" ping | grep -q PONG"]
       interval: 10s
@@ -62,32 +62,32 @@ services:
     stop_grace_period: 15s
     logging: { driver: json-file, options: { max-size: "10m", max-file: "3" } }
 
-  arrow-atlas-api:
+  puzzle-api:
     # Fetches this repository at start, builds, and runs — the same pattern ariyankhan-web already uses on this
     # VPS, and the reason it works here today: no registry, no credentials, and nothing to bind-mount, so the
     # whole project can be handed over as raw YAML.
     #
-    # Once GitHub Actions is enabled for the repository, .github/workflows/arrow-atlas-api.yml publishes a real
+    # Once GitHub Actions is enabled for the repository, .github/workflows/puzzle-api.yml publishes a real
     # image and this becomes faster and reproducible. To switch: set ARROW_ATLAS_IMAGE in .env, replace the
     # `image:` line below with `image: ${ARROW_ATLAS_IMAGE}`, and delete the `command:` block.
     image: node:22-alpine
-    container_name: arrow-atlas-api
+    container_name: puzzle-api
     restart: unless-stopped
     depends_on:
-      arrow-atlas-postgres: { condition: service_healthy }
-      arrow-atlas-redis: { condition: service_healthy }
+      puzzle-postgres: { condition: service_healthy }
+      puzzle-redis: { condition: service_healthy }
     environment:
       NODE_ENV: production
       PORT: 8760
       SITE_BRANCH: ${SITE_BRANCH:-main}
       PUZZLE_VERSION: ${ARROW_ATLAS_VERSION:-main}
-      PUZZLE_BOARDS_FILE: /srv/arrow-atlas/site/games/data/puzzle.json
-      PUZZLE_MIGRATIONS_DIR: /srv/arrow-atlas/site/games/puzzle/migrations
-      PUZZLE_PG_HOST: arrow-atlas-postgres
-      PUZZLE_PG_DATABASE: ${ARROW_ATLAS_PG_DATABASE:-arrow_atlas}
-      PUZZLE_PG_USER: ${ARROW_ATLAS_PG_USER:-arrow_atlas}
+      PUZZLE_BOARDS_FILE: /srv/puzzle/site/games/data/puzzle.json
+      PUZZLE_MIGRATIONS_DIR: /srv/puzzle/site/games/puzzle/migrations
+      PUZZLE_PG_HOST: puzzle-postgres
+      PUZZLE_PG_DATABASE: puzzle
+      PUZZLE_PG_USER: puzzle
       PUZZLE_PG_PASSWORD: ${ARROW_ATLAS_PG_PASSWORD}
-      PUZZLE_REDIS_HOST: arrow-atlas-redis
+      PUZZLE_REDIS_HOST: puzzle-redis
       PUZZLE_REDIS_PASSWORD: ${ARROW_ATLAS_REDIS_PASSWORD}
       PUZZLE_REDIS_PREFIX: ${ARROW_ATLAS_REDIS_PREFIX:-puzzle:}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
@@ -97,15 +97,15 @@ services:
       PUZZLE_ALLOWED_ORIGINS: ${ARROW_ATLAS_ALLOWED_ORIGINS:-}
       PUZZLE_COOKIE_SECURE: ${ARROW_ATLAS_COOKIE_SECURE:-true}
       PUZZLE_LOG_LEVEL: ${ARROW_ATLAS_LOG_LEVEL:-info}
-    working_dir: /srv/arrow-atlas
+    working_dir: /srv/puzzle
     command:
       - sh
       - -c
       - |
         set -e
         apk add --no-cache curl tar >/dev/null
-        SITE=/srv/arrow-atlas/site
-        NEXT=/srv/arrow-atlas/.next
+        SITE=/srv/puzzle/site
+        NEXT=/srv/puzzle/.next
         SRC=/srv/source
         # Two ways in, because the repository is not always readable without a key: with a token in the
         # environment it is GitHub's API, and without one the public tarball. The token is never in this file
@@ -123,7 +123,7 @@ services:
         # start of a container is not the moment anything depends on GitHub being reachable, readable, or in a
         # good mood. Deploying is then two plain steps: the host pulls, the container restarts.
         #
-        # The checkout lives in a named volume, so arrow-atlas-backup can read the two shell scripts it needs
+        # The checkout lives in a named volume, so puzzle-backup can read the two shell scripts it needs
         # without a network of its own. Whichever source is used, it is staged beside the volume and swapped in
         # only once it is whole: clearing the volume and then fetching is how a 404 at GitHub turned into an
         # API that could not start at all, with nothing left on disk to start from. The contents are cleared
@@ -136,29 +136,29 @@ services:
         mkdir -p "$$SITE"
         rm -rf "$$NEXT" && mkdir -p "$$NEXT"
         if BE "$$SRC"; then
-          echo "[arrow-atlas] taking the source this host already holds"
+          echo "[puzzle] taking the source this host already holds"
           (cd "$$SRC" && tar -cf - --exclude=./.git .) | (cd "$$NEXT" && tar -xf -)
           find "$$SITE" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
           (cd "$$NEXT" && tar -cf - .) | (cd "$$SITE" && tar -xf -)
           rm -rf "$$NEXT"
-        elif echo "[arrow-atlas] no checkout mounted; fetching $$SITE_BRANCH" \
+        elif echo "[puzzle] no checkout mounted; fetching $$SITE_BRANCH" \
              && fetch | tar -xz --strip-components=1 -C "$$NEXT" && BE "$$NEXT"; then
           find "$$SITE" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
           (cd "$$NEXT" && tar -cf - .) | (cd "$$SITE" && tar -xf -)
           rm -rf "$$NEXT"
-          echo "[arrow-atlas] fetched"
+          echo "[puzzle] fetched"
         elif BE "$$SITE"; then
           # An old version answering is better than none: the service comes up on what is already here and
           # says so, rather than restarting forever over a network that will be back in a minute.
           rm -rf "$$NEXT"
-          echo "[arrow-atlas] could not fetch $$SITE_BRANCH; starting from the checkout already in the volume"
+          echo "[puzzle] could not fetch $$SITE_BRANCH; starting from the checkout already in the volume"
         else
           rm -rf "$$NEXT"
-          echo "[arrow-atlas] could not fetch $$SITE_BRANCH and there is nothing here to fall back on"
+          echo "[puzzle] could not fetch $$SITE_BRANCH and there is nothing here to fall back on"
           exit 1
         fi
         cd "$$(BEDIR "$$SITE")"
-        echo "[arrow-atlas] installing and building"
+        echo "[puzzle] installing and building"
         # --include=dev is not optional here: NODE_ENV is production, which makes npm ci skip
         # devDependencies, and typescript is one of them. Without it the build dies on "sh: tsc: not found"
         # and the container restarts forever. The prune afterwards takes the build tools back out, so what
@@ -169,19 +169,19 @@ services:
         # The migrations live beside the backend, so they are found wherever it was found rather than at a
         # path written down twice.
         export PUZZLE_MIGRATIONS_DIR="$$(cd .. && pwd)/migrations"
-        echo "[arrow-atlas] starting"
+        echo "[puzzle] starting"
         exec node dist/server.js
     volumes:
-      # The checkout the API builds from, shared read-only with arrow-atlas-backup so that container needs no
+      # The checkout the API builds from, shared read-only with puzzle-backup so that container needs no
       # network of its own to get the two shell scripts it runs.
-      - arrow-atlas-site:/srv/arrow-atlas/site
+      - puzzle-site:/srv/puzzle/site
       # And the host's own git checkout, read-only: the source of truth when it is there, and simply absent on
       # a machine that does not keep one — the start handles both.
       - /var/www/ariyankhan-src:/srv/source:ro
     ports:
       # 127.0.0.1 only: the host nginx terminates TLS and is the single way in from outside.
       - "127.0.0.1:${ARROW_ATLAS_PORT:-8760}:8760"
-    networks: [arrow-atlas-data, arrow-atlas-edge]
+    networks: [puzzle-data, puzzle-edge]
     healthcheck:
       test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:8760/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
       interval: 30s
@@ -192,36 +192,36 @@ services:
     stop_grace_period: 30s
     logging: { driver: json-file, options: { max-size: "20m", max-file: "5" } }
 
-  arrow-atlas-backup:
+  puzzle-backup:
     # postgres:16-alpine is what actually carries pg_dump and pg_restore.
     #
-    # It gets its two shell scripts from the checkout arrow-atlas-api already fetched, mounted read-only, and so
-    # reaches no network at all — which it could not do anyway: it sits only on arrow-atlas-data, which is
+    # It gets its two shell scripts from the checkout puzzle-api already fetched, mounted read-only, and so
+    # reaches no network at all — which it could not do anyway: it sits only on puzzle-data, which is
     # internal, and this image ships no curl. An earlier version of this file tried to fetch them at start and
     # would have failed on both counts. Nothing is bind-mounted from beside this file either, so the whole
     # project still deploys as raw compose YAML.
     image: postgres:16-alpine
-    container_name: arrow-atlas-backup
+    container_name: puzzle-backup
     restart: unless-stopped
     depends_on:
-      arrow-atlas-postgres: { condition: service_healthy }
+      puzzle-postgres: { condition: service_healthy }
     environment:
-      PGHOST: arrow-atlas-postgres
-      PGDATABASE: ${ARROW_ATLAS_PG_DATABASE:-arrow_atlas}
-      PGUSER: ${ARROW_ATLAS_PG_USER:-arrow_atlas}
+      PGHOST: puzzle-postgres
+      PGDATABASE: puzzle
+      PGUSER: puzzle
       PGPASSWORD: ${ARROW_ATLAS_PG_PASSWORD}
-      ARROW_ATLAS_BACKUP_DIR: /backups
+      PUZZLE_BACKUP_DIR: /backups
       PUZZLE_BACKUP_KEEP_DAYS: ${ARROW_ATLAS_BACKUP_KEEP_DAYS:-14}
       PUZZLE_BACKUP_AT_HOUR: ${ARROW_ATLAS_BACKUP_AT_HOUR:-3}
-      PUZZLE_SCRIPTS_DIR: /srv/arrow-atlas/site/games/puzzle/deploy
+      PUZZLE_SCRIPTS_DIR: /srv/puzzle/site/games/puzzle/deploy
     volumes:
       # A named volume so the dumps never sit in the live PostgreSQL data directory, plus a bind mount so the
       # host (and whatever backs the host up) can see them without entering the container.
-      - arrow-atlas-backups:/backups
-      - ${ARROW_ATLAS_BACKUP_HOST_DIR:-/var/backups/arrow-atlas}:/backups-host
+      - puzzle-backups:/backups
+      - ${ARROW_ATLAS_BACKUP_HOST_DIR:-/var/backups/puzzle}:/backups-host
       # read-only: this container reads the scripts and must never be able to change the deployed code
-      - arrow-atlas-site:/srv/arrow-atlas/site:ro
-    networks: [arrow-atlas-data]
+      - puzzle-site:/srv/puzzle/site:ro
+    networks: [puzzle-data]
     user: root   # the dumps are written to a host directory this container does not own
     entrypoint:
       - /bin/sh
@@ -234,9 +234,9 @@ services:
         i=0
         while [ ! -f "$$S/backup.sh" ]; do
           i=$$((i + 1))
-          [ $$((i % 6)) -eq 1 ] && echo "{\"product\":\"arrow-atlas\",\"component\":\"backup\",\"msg\":\"waiting for $$S/backup.sh\"}"
+          [ $$((i % 6)) -eq 1 ] && echo "{\"product\":\"puzzle\",\"component\":\"backup\",\"msg\":\"waiting for $$S/backup.sh\"}"
           if [ "$$i" -gt 360 ]; then
-            echo "{\"product\":\"arrow-atlas\",\"component\":\"backup\",\"level\":\"error\",\"msg\":\"the checkout never appeared at $$S; is arrow-atlas-api running?\"}" >&2
+            echo "{\"product\":\"puzzle\",\"component\":\"backup\",\"level\":\"error\",\"msg\":\"the checkout never appeared at $$S; is puzzle-api running?\"}" >&2
             exit 1
           fi
           sleep 5
@@ -245,7 +245,7 @@ services:
     healthcheck:
       # Unhealthy when the newest dump is older than a day and a bit: a backup that quietly stopped is the
       # failure this whole service exists to prevent.
-      test: ["CMD-SHELL", "find /backups -name 'arrow-atlas-*.dump' -mtime -1 | grep -q . || exit 1"]
+      test: ["CMD-SHELL", "find /backups -name 'puzzle-*.dump' -mtime -1 | grep -q . || exit 1"]
       interval: 1h
       timeout: 10s
       retries: 2
@@ -254,21 +254,21 @@ services:
 
 networks:
   # No route to or from the internet: only the containers attached to it can talk to each other.
-  arrow-atlas-data:
-    name: arrow-atlas-data
+  puzzle-data:
+    name: puzzle-data
     internal: true
-  arrow-atlas-edge:
-    name: arrow-atlas-edge
+  puzzle-edge:
+    name: puzzle-edge
 
 volumes:
-  # The repository checkout arrow-atlas-api fetches at start. It is a volume rather than container-local storage
-  # for one reason: arrow-atlas-backup reads its two shell scripts from here, which is how that container gets
+  # The repository checkout puzzle-api fetches at start. It is a volume rather than container-local storage
+  # for one reason: puzzle-backup reads its two shell scripts from here, which is how that container gets
   # them without a network — it sits only on the internal network and its image ships no curl.
-  arrow-atlas-site:
-    name: arrow-atlas-site
-  arrow-atlas-postgres-data:
-    name: arrow-atlas-postgres-data
-  arrow-atlas-redis-data:
-    name: arrow-atlas-redis-data
-  arrow-atlas-backups:
-    name: arrow-atlas-backups
+  puzzle-site:
+    name: puzzle-site
+  puzzle-postgres-data:
+    name: puzzle-postgres-data
+  puzzle-redis-data:
+    name: puzzle-redis-data
+  puzzle-backups:
+    name: puzzle-backups
