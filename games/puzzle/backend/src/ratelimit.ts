@@ -8,11 +8,12 @@
 // matters, and the outage is logged loudly enough to act on.
 import { redis, k } from './redis.js';
 import { log } from './log.js';
+import { config } from './config.js';
 
 // Every limit below is multiplied by this. It exists so the limits can be loosened on a busy day, or lifted
 // out of the way when load-testing the service itself rather than the limiter, without editing the table.
 // Production leaves it at 1.
-const SCALE = Math.max(1, Number(process.env.ARROW_ATLAS_RATE_MULTIPLIER ?? 1) || 1);
+const SCALE = config.rateMultiplier;
 
 export interface Limit { name: string; limit: number; windowSeconds: number; by: 'ip' | 'user'; }
 

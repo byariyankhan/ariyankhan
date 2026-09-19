@@ -6,12 +6,13 @@ import { readdir, readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { pool, tx } from './db.js';
+import { config } from './config.js';
 import { log } from './log.js';
 
 const LOCK_ID = 0x4141_0001;   // "AA" + 1: this product's migration lock, not shared with any other game
 
 export function migrationsDir(): string {
-  if (process.env.ARROW_ATLAS_MIGRATIONS_DIR) return process.env.ARROW_ATLAS_MIGRATIONS_DIR;
+  if (config.migrationsDir) return config.migrationsDir;
   // src/ at dev time, dist/ once built: the migrations sit beside the backend either way
   return join(dirname(dirname(fileURLToPath(import.meta.url))), '..', 'migrations');
 }
