@@ -10,7 +10,7 @@ import * as R from './rooms.js';
 import { balance } from './gold.js';
 import { deleteUser, endSession, googleVerify, providers, startSession, upsertUser, cleanName } from './auth.js';
 import { publish, publishToUser } from './events.js';
-import { cleanLevels, cleanState, mergeLevels, mergeState, readAll } from './progress.js';
+import { boardPace, cleanLevels, cleanState, mergeLevels, mergeState, readAll } from './progress.js';
 import * as L from './league.js';
 import { liveProgress, online, roomPresence } from './presence.js';
 import { havePlayedTogether, isRacing, recentPlayers } from './players.js';
@@ -157,6 +157,22 @@ const H = {
       return readAll(c, userId);
     });
     await noStore(res).send(merged);
+  },
+
+  // How a cleared board went, against everybody else who has cleared it. Readable signed out: a player who has
+  // not made an account still cleared the board, and the answer is about the board rather than about them.
+  async pace(req: Req, res: Res, me: Caller) {
+    if (!(await limited('board_pace', req, res, me.user?.id ?? null))) return;
+    const q = (req.query ?? {}) as { level_id?: string; tier?: string; ms?: string };
+    const levelId = String(q.level_id ?? '').slice(0, 64);
+    const tier = Number(q.tier ?? NaN);
+    const ms = Number(q.ms ?? NaN);
+    if (!levelId || !Number.isInteger(tier) || tier < 0 || tier > 3
+        || !Number.isFinite(ms) || ms <= 0 || ms > 86_400_000) {
+      await noStore(res).code(400).send({ error: 'bad_board' });
+      return;
+    }
+    await noStore(res).send(await boardPace(pool, levelId, tier, Math.round(ms), me.user?.id ?? null));
   },
 
   async lobby(req: Req, res: Res, me: Caller) {
@@ -351,6 +367,8 @@ export function registerRoutes(app: FastifyInstance): void {
 
   app.get(`${v1}/progress`, withCaller(H.progressRead));
   app.post(`${v1}/progress`, withCaller(H.progressPush));
+
+  app.get(`${v1}/boards/pace`, withCaller(H.pace));
 
   app.get(`${v1}/league`, withCaller(H.league));
 

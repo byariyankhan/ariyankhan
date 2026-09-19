@@ -92,6 +92,37 @@ export async function readLevels(c: Sql, userId: number): Promise<Levels> {
   return out;
 }
 
+/**
+ * How this run compares with everybody else's on the same board.
+ *
+ * The result card used to say nothing about anyone but the player. A time on its own means little — is a
+ * minute and a half good on a board of ninety arrows? — and the one comparison that answers it is the rest of
+ * the people who have cleared that same board at that same difficulty.
+ *
+ * It is only offered once enough of them exist. A percentage worked out from four clears is a made-up number
+ * dressed as a fact, and the game would rather say nothing than flatter somebody with arithmetic. Below the
+ * floor the answer carries the count alone, and the card falls back to the player's own history.
+ *
+ * Nobody is named and nothing identifies a row: what comes back is a count and a percentage.
+ */
+export const PACE_FLOOR = 20;
+
+export interface BoardPace {
+  n: number;                 // recorded clears of this board at this difficulty, this player's own excluded
+  beats_pct?: number;        // how many of them were slower, as a percentage — only above the floor
+}
+
+export async function boardPace(c: Sql, levelId: string, tier: number, ms: number, exceptUser: number | null): Promise<BoardPace> {
+  const r = await query<{ n: string; slower: string }>(c, `
+    SELECT count(*) AS n, count(*) FILTER (WHERE ms > $3) AS slower
+      FROM progress
+     WHERE level_id = $1 AND tier = $2 AND cleared AND ms IS NOT NULL
+       AND ($4::bigint IS NULL OR user_id <> $4)`, [levelId, tier, ms, exceptUser]);
+  const n = Number(r.rows[0]?.n ?? 0);
+  if (n < PACE_FLOOR) return { n };
+  return { n, beats_pct: Math.round((Number(r.rows[0]!.slower) / n) * 100) };
+}
+
 export async function readState(c: Sql, userId: number): Promise<PlayerState> {
   const r = await query<{ state: PlayerState }>(c, `SELECT state FROM users WHERE id = $1`, [userId]);
   return r.rows[0]?.state ?? {};
