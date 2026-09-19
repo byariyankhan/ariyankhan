@@ -1003,6 +1003,10 @@
   const ICON_NEXT  = ICO('<path d="M4.5 12h14"/><path d="M12.5 6l6 6-6 6"/>');
   const ICON_AGAIN = ICO('<path d="M20 12a8 8 0 1 1-2.5-5.8"/><path d="M20 3.6V9h-5.4"/>');
   const ICON_SHARE = ICO('<circle cx="17.5" cy="5.5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="17.5" cy="18.5" r="2.6"/><path d="M8.4 10.7l6.8-3.9"/><path d="M8.4 13.3l6.8 3.9"/>');
+  const ICON_SHUFFLE = ICO('<path d="M3.5 6.5h3.2l10.6 11h3.2"/><path d="M3.5 17.5h3.2l10.6-11h3.2"/><path d="M17.6 3.6l2.9 2.9-2.9 2.9"/><path d="M17.6 14.6l2.9 2.9-2.9 2.9"/>');
+  const ICON_SKIP  = ICO('<path d="M5.5 5.5l9 6.5-9 6.5z"/><path d="M18 5.5v13"/>');
+  const ICON_FLAG  = ICO('<path d="M6 21V4"/><path d="M6 5h11l-2.2 3.4L17 12H6z"/>');
+  const ICON_MAP   = ICO('<circle cx="12" cy="12" r="8.6"/><path d="M3.4 12h17.2"/><path d="M12 3.4c2.7 2.9 2.7 14 0 17.2"/><path d="M12 3.4c-2.7 2.9-2.7 14 0 17.2"/>');
   // The bar is filled in front of the player rather than handed to them finished: the brain travels, the
   // number counts up with it, and the sound climbs alongside. That second is the whole point of the reading —
   // it is the only part of the card that is worth watching happen.
@@ -1129,11 +1133,11 @@
       <h3>${reason}</h3>
       <p class="aa-card-lead">${state.left} of ${state.pieces.length} arrows were still on the board.${state.daily?.race ? ' You are still in the challenge: Try again puts you back on the same board with your hearts back, to clear from the start. Nothing is lost until somebody else clears it.' : ''}</p>
       ${eased ? `<p class="aa-adapt aa-adapt--down">Two losses in a row. A new layout eases to ${DIFF_OF(learn.after.tier)}; Try again keeps this board.</p>` : learn && learn.after.losses === 1 && state.tier > 0 ? '<p class="aa-adapt">One more loss and the boards ease off a step.</p>' : ''}
-      <div class="aa-actions">
-        <button type="button" class="aa-btn aa-btn--primary" data-act="retry">Try again</button>
-        ${state.daily?.race ? '<button type="button" class="aa-btn" data-act="giveup">Give the board up</button>' : `<button type="button" class="aa-btn" data-act="shuffle">${eased ? 'Easier layout' : 'New layout'}</button>`}
-        ${canSkip ? '<button type="button" class="aa-btn" data-act="skip">Skip level</button>' : ''}
-        <button type="button" class="aa-btn" data-act="levels">World Tour</button>
+      <div class="aa-actions aa-actions--stack">
+        <button type="button" class="aa-btn aa-btn--primary" data-act="retry">${ICON_AGAIN}Try again</button>
+        ${state.daily?.race ? `<button type="button" class="aa-btn" data-act="giveup">${ICON_FLAG}Give the board up</button>` : `<button type="button" class="aa-btn" data-act="shuffle">${ICON_SHUFFLE}${eased ? 'Easier layout' : 'New layout'}</button>`}
+        ${canSkip ? `<button type="button" class="aa-btn" data-act="skip">${ICON_SKIP}Skip level</button>` : ''}
+        <button type="button" class="aa-btn" data-act="levels">${ICON_MAP}World Tour</button>
       </div>`;
     el.overlay.hidden = false;
     $('[data-act]', el.card)?.focus({ preventScroll: true });
