@@ -93,7 +93,7 @@
   const PALETTE = ['#FFED54', '#5CD6FF', '#8CFF7A', '#FF9AD5', '#C79BFF', '#FFB347', '#6EE7B7', '#FDBA74', '#F97373', '#38BDF8'];
 
   const el = {
-    select: $('#aaSelect'), tagline: $('#aaTagline'), homeSel: $('#aaHome'), purse: $('#aaPurse'), purseNo: $('#aaPurseNo'), hudDiff: $('#aaHudDiff'), play: $('#aaPlay'), path: $('#aaPath'), btnVibe: $('#aaVibe'), btnGuides: $('#aaGuides'), btnMusic: $('#aaMusic'), howTo: $('#aaHowTo'),
+    select: $('#aaSelect'), tagline: $('#aaTagline'), homeSel: $('#aaHome'), purse: $('#aaPurse'), purseNo: $('#aaPurseNo'), goldAd: $('#aaGoldAd'), hudDiff: $('#aaHudDiff'), play: $('#aaPlay'), path: $('#aaPath'), btnVibe: $('#aaVibe'), btnGuides: $('#aaGuides'), btnMusic: $('#aaMusic'), howTo: $('#aaHowTo'),
     sheet: $('#aaSheet'), friends: $('#aaFriends'), signInSheet: $('#aaSignInSheet'), googleBtn: $('#aaGoogleBtn'), signInNote: $('#aaSignInNote'), ranks: $('#aaRanks'), league: $('#aaLeague'), leagueEnds: $('#aaLeagueEnds'), leagueSheet: $('#aaLeagueSheet'), leagueBody: $('#aaLeagueBody'), leagueInfo: $('#aaLeagueInfo'), matchSheet: $('#aaMatchSheet'), matchBody: $('#aaMatchBody'), matchTitle: $('#aaMatchTitle'), accountGroup: $('#aaAccountGroup'), accountCap: $('#aaAccountCap'), accountRow: $('#aaAccountRow'), accountName: $('#aaAccountName'), accountWho: $('#aaAccountWho'), accountGold: $('#aaAccountGold'), accountFace: $('#aaAccountFace'), sessionGroup: $('#aaSessionGroup'), sessionCap: $('#aaSessionCap'), signOutBtn: $('#aaSignOut'), deleteAccBtn: $('#aaDeleteAcc'), settingsBtns: $$('#aaSettings, #aaSettingsG'), themeBtn: $('#aaTheme'), themes: $('#aaThemes'),
     game: $('#aaGame'), boardWrap: $('#aaBoardWrap'), board: $('#aaBoard'), toast: $('#aaToast'), confetti: $('#aaConfetti'),
     hudLevel: $('#aaHudLevel'), hudMode: $('#aaHudMode'), hudTime: $('#aaHudTime'), hudLeft: $('#aaHudLeft'), hudLives: $('#aaHudLives'), hudLivesWrap: $('#aaHudLivesWrap'), hudPct: $('#aaHudPct'), boardBar: $('#aaBoardBar'),
@@ -388,10 +388,15 @@
   // the helper falls back to showing it once per session, which is the safe way to be wrong.
   const TAUGHT = store.get('taught', null) || {};
   const learning = () => { try { return !cleared(0); } catch { return false; } };
-  function teach(k, msg, kind = 'hint', ms = 2800) {
+  // Should this rule be explained at all, right now? True while the player is still on their first level, and
+  // true once ever after that -- and it records that it has been said, so the next time it is false.
+  function sayOnce(k) {
     const first = !TAUGHT[k];
     if (first) { TAUGHT[k] = 1; store.set('taught', TAUGHT); }
-    if (!first && !learning()) return false;
+    return first || learning();
+  }
+  function teach(k, msg, kind = 'hint', ms = 2800) {
+    if (!sayOnce(k)) return false;
     toast(msg, kind, ms);
     return true;
   }
@@ -926,7 +931,7 @@
     const seed = (daily ? daily.seed : (i + 1) * 1000) + state.seedBump;
     const gen = bestBoard(state.maskInfo, state.tier, seed);
     const livesMax = livesFor(state.tier);
-    Object.assign(state, { W: gen.W, H: gen.H, pieces: gen.pieces, occ: gen.occ, land: gen.land, left: gen.pieces.length, hintsMax: hintsFor(state.tier), checksUsed: 0, checksMax: CHECKS_PER_LEVEL, lives: livesMax, livesMax, elapsed: 0, startedAt: 0, raceBase: 0, finished: false, hintsUsed: 0, wrong: 0, busy: false, potGone: false, combo: 0, bestCombo: 0, lastShot: 0, cheerHold: 0, shown: new Set(), armed: new Set() });
+    Object.assign(state, { W: gen.W, H: gen.H, pieces: gen.pieces, occ: gen.occ, land: gen.land, left: gen.pieces.length, hintsMax: hintsFor(state.tier), checksUsed: 0, checksMax: CHECKS_PER_LEVEL, adKinds: new Set(), lives: livesMax, livesMax, elapsed: 0, startedAt: 0, raceBase: 0, finished: false, hintsUsed: 0, wrong: 0, busy: false, potGone: false, combo: 0, bestCombo: 0, lastShot: 0, cheerHold: 0, shown: new Set(), armed: new Set() });
     el.error.hidden = true; el.loading.hidden = true;
     if (daily) { if (history.replaceState) history.replaceState(null, '', location.pathname + location.search + (daily.hash ?? '#daily')); } else setHash(i);
     scrollToGame();
@@ -1052,7 +1057,11 @@
   function peek(p) {
     if (state.finished || p.gone) return;
     musicBegin();   // a hold is a player playing, the same as a tap is
-    if (checksLeftNow() <= 0) { clearPeek(); toast(`No ${CHECK_WORD}s left on this level.`, 'bad'); vibe(20); return; }
+    if (checksLeftNow() <= 0) {
+      clearPeek();
+      if (adCanOffer('check')) { adOffer('check'); return; }
+      toast(`No ${CHECK_WORD}s left on this level.`, 'bad'); vibe(20); return;
+    }
     state.checksUsed++;
     renderHud(); musicMoved();
     clearPeek();
@@ -1133,7 +1142,10 @@
   }
   function hint() {
     if (state.finished) return;
-    if (state.hintsUsed >= (state.hintsMax ?? HINTS_PER_LEVEL)) { toast('No hints left on this level.', 'bad'); return; }
+    if (state.hintsUsed >= (state.hintsMax ?? HINTS_PER_LEVEL)) {
+      if (adCanOffer('hint')) { adOffer('hint'); return; }
+      toast('No hints left on this level.', 'bad'); return;
+    }
     const p = state.pieces.find(q => !q.gone && !blockerOf(q));
     if (!p) return;
     startTimer();
@@ -1203,6 +1215,7 @@
   const ICON_AGAIN = ICO('<path d="M20 12a8 8 0 1 1-2.5-5.8"/><path d="M20 3.6V9h-5.4"/>');
   const ICON_SHARE = ICO('<circle cx="17.5" cy="5.5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="17.5" cy="18.5" r="2.6"/><path d="M8.4 10.7l6.8-3.9"/><path d="M8.4 13.3l6.8 3.9"/>');
   const ICON_SHUFFLE = ICO('<path d="M3.5 6.5h3.2l10.6 11h3.2"/><path d="M3.5 17.5h3.2l10.6-11h3.2"/><path d="M17.6 3.6l2.9 2.9-2.9 2.9"/><path d="M17.6 14.6l2.9 2.9-2.9 2.9"/>');
+  const ICON_AD    = ICO('<rect x="2.8" y="4.8" width="18.4" height="14.4" rx="2.4"/><path d="M10.2 9.4l4.6 2.6-4.6 2.6z"/>');
   const ICON_SKIP  = ICO('<path d="M5.5 5.5l9 6.5-9 6.5z"/><path d="M18 5.5v13"/>');
   const ICON_FLAG  = ICO('<path d="M6 21V4"/><path d="M6 5h11l-2.2 3.4L17 12H6z"/>');
   const ICON_MAP   = ICO('<circle cx="12" cy="12" r="8.6"/><path d="M3.4 12h17.2"/><path d="M12 3.4c2.7 2.9 2.7 14 0 17.2"/><path d="M12 3.4c-2.7 2.9-2.7 14 0 17.2"/>');
@@ -1332,14 +1345,17 @@
     el.card.innerHTML = `
       <p class="aa-card-kicker">${state.daily ? (state.daily.race ? `Gold match · ${gpurse(state.daily.match?.stake || 0)}` : 'Daily board') : hudLabel()} · ${DIFF_OF(state.tier)}</p>
       <h3>${reason}</h3>
-      <p class="aa-card-lead">${state.left} of ${state.pieces.length} arrows were still on the board.${state.daily?.race ? ' You are still in the challenge: Try again puts you back on the same board with your hearts back, to clear from the start. Nothing is lost until somebody else clears it.' : ''}</p>
-      ${eased ? `<p class="aa-adapt aa-adapt--down">Two losses in a row. A new layout eases to ${DIFF_OF(learn.after.tier)}; Try again keeps this board.</p>` : learn && learn.after.losses === 1 && state.tier > 0 ? '<p class="aa-adapt">One more loss and the boards ease off a step.</p>' : ''}
+      <p class="aa-card-lead">${state.left} of ${state.pieces.length} arrows were still on the board.</p>
+      ${state.daily?.race && sayOnce('race-retry') ? '<p class="aa-adapt">Try again puts you back on the same board with your hearts back. Nothing is lost until somebody else clears it.</p>' : ''}
       <div class="aa-actions aa-actions--stack">
         <button type="button" class="aa-btn aa-btn--primary" data-act="retry">${ICON_AGAIN}Try again</button>
         ${state.daily?.race ? `<button type="button" class="aa-btn" data-act="giveup">${ICON_FLAG}Give the board up</button>` : `<button type="button" class="aa-btn" data-act="shuffle">${ICON_SHUFFLE}${eased ? 'Easier layout' : 'New layout'}</button>`}
         ${canSkip ? `<button type="button" class="aa-btn" data-act="skip">${ICON_SKIP}Skip level</button>` : ''}
-        <button type="button" class="aa-btn" data-act="levels">${ICON_MAP}World Tour</button>
-      </div>`;
+        ${adCanOffer('heart')
+          ? `<button type="button" class="aa-btn aa-btn--ad" data-act="adheart">${ICON_AD}Watch an ad</button>`
+          : `<button type="button" class="aa-btn" data-act="levels">${ICON_MAP}World Tour</button>`}
+      </div>
+      ${adCanOffer('heart') ? '<p class="aa-card-out"><button type="button" class="aa-linkbtn" data-act="levels">Back to the World Tour</button></p>' : ''}`;
     el.overlay.hidden = false;
     $('[data-act]', el.card)?.focus({ preventScroll: true });
   }
@@ -1347,6 +1363,7 @@
     const inv = e.target.closest('[data-invite]');
     if (inv) { invitePlayer(inv.dataset.invite, inv.dataset.name, inv); return; }
     const act = e.target.closest('[data-act]')?.dataset.act; if (!act) return;
+    if (act === 'adheart') { adOffer('heart'); return; }
     if (act === 'next') { const j = nextOpen(state.idx); if (j < 0) goToLevels(); else startLevel(j); }
     else if (act === 'again' || act === 'retry') startLevel(state.idx, false, state.daily, state.tier);
     else if (act === 'shuffle') startLevel(state.idx, true, state.daily);
@@ -1379,6 +1396,7 @@
     state.elapsed = 0; state.startedAt = 0; state.raceBase = 0;
     state.hintsUsed = 0; state.hintsMax = HINTS_PER_LEVEL;
     state.checksUsed = 0; state.checksMax = CHECKS_PER_LEVEL;   // the same two lines as the hints, for the same reason
+    state.adKinds = new Set();
     state.finished = false; state.wrong = 0; state.fails = 0; state.potGone = false;
     state.combo = 0; state.bestCombo = 0; state.lastShot = 0; state.shown = new Set();
     state.daily = null; state.disc = null;
@@ -1406,6 +1424,223 @@
       await navigator.clipboard.writeText(text);
       if (flash) { flash.textContent = 'Copied. Paste it anywhere.'; flash.hidden = false; }
     } catch { if (flash) { flash.textContent = text; flash.hidden = false; } }
+  }
+
+  // ── Rewarded advertisements ──
+  //
+  // Off until the domain is approved, and built so that turning it on is one line in the page rather than a
+  // change in here: <meta name="puzzle-ads" content="h5" data-client="ca-pub-XXXXXXXX">.
+  //
+  // Three modes. `off` shows no ad anywhere and every offer below simply does not appear, so the game today is
+  // the game as it was. `h5` is Google's H5 Games Ads placement API, which is the product that actually does
+  // rewarded ads in a browser -- plain AdSense does not, whatever its dashboard implies. `test` is a five
+  // second stand-in with the same shape and the same promise, so the whole flow can be walked through and
+  // filmed before a single real ad exists.
+  //
+  // What this layer promises the game: ads.show() resolves 'watched' only when the network says the ad was
+  // watched to the end. Everything else -- dismissed, blocked, nothing to serve, an error -- resolves to
+  // something that is not 'watched', and the caller gives nothing away.
+  const ads = {
+    mode: 'off',
+    client: '',
+    showing: false,
+    ready() { return this.mode !== 'off' && !this.showing; },
+    on() { return this.mode !== 'off'; },
+  };
+  (function adsConfigure() {
+    const meta = document.querySelector('meta[name="puzzle-ads"]');
+    let mode = (meta?.content || 'off').trim();
+    ads.client = (meta?.dataset.client || '').trim();
+    // The test mode is a developer's switch, not a URL anybody can find: on the live site it needs a flag set
+    // by hand on that device first. The server's daily cap is the real defence either way -- it can only ever
+    // hand out a few hundred gold a day, whatever the page claims to have shown -- but a free-gold link in a
+    // share sheet is not a thing to leave lying about.
+    const wanted = new URLSearchParams(location.search).get('ads');
+    const local = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+    if (wanted && ['off', 'test', 'h5'].includes(wanted) && (wanted === 'off' || local || store.get('adsdev', false))) mode = wanted;
+    ads.mode = ['off', 'test', 'h5'].includes(mode) ? mode : 'off';
+    if (ads.mode !== 'h5') return;
+
+    // The page already carries the AdSense tag, so there is nothing to load: adding a second copy of the same
+    // script with the same publisher is how a page ends up with two libraries arguing over one slot. Take the
+    // publisher from the tag that is there, and only add one if there is none.
+    const tag = document.querySelector('script[src*="adsbygoogle.js"]');
+    if (!ads.client && tag) { try { ads.client = new URL(tag.src).searchParams.get('client') || ''; } catch { /* leave it */ } }
+    if (!tag && ads.client) {
+      const sc = document.createElement('script');
+      sc.async = true; sc.crossOrigin = 'anonymous';
+      sc.dataset.adFrequencyHint = '30s';
+      sc.src = `https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${encodeURIComponent(ads.client)}`;
+      document.head.appendChild(sc);
+    }
+    // adBreak and adConfig are the page's to define, not the library's: they push onto the queue the library
+    // drains once it is ready, which is what makes a break requested before the script loads still work.
+    window.adsbygoogle = window.adsbygoogle || [];
+    if (typeof window.adBreak !== 'function') window.adBreak = o => window.adsbygoogle.push(o);
+    if (typeof window.adConfig !== 'function') window.adConfig = o => window.adsbygoogle.push(o);
+    try { window.adConfig({ preloadAdBreaks: 'on', sound: state.muted ? 'off' : 'on' }); } catch { /* the library decides */ }
+  })();
+
+  // When an ad may be offered for a lifeline.
+  //
+  // Once per board per kind, so a board cannot be watched into submission -- and never in a gold match. Somebody
+  // who has put gold on a table is racing people who put in the same gold; letting one of them buy an extra
+  // heart with thirty seconds of their attention is not a lifeline, it is a different game. The daily board and
+  // the tour have nothing at stake but pride, and there it is a kindness.
+  const adCanOffer = kind => ads.on() && !state.daily?.race && !state.adKinds?.has(kind);
+  const adSpend = kind => { (state.adKinds = state.adKinds || new Set()).add(kind); };
+
+  // A stand-in ad: the same shape as the real one, long enough to be a real decision, skippable like the real
+  // one, and it resolves exactly the way the real one does.
+  function adTestShow(name) {
+    return new Promise(resolve => {
+      const wrap = document.createElement('div');
+      wrap.className = 'aa-adtest';
+      wrap.innerHTML = `<div class="aa-adtest-panel" role="dialog" aria-modal="true" aria-label="Test advertisement">
+        <p class="aa-adtest-tag">Test advertisement</p>
+        <p class="aa-adtest-name">${escapeHtml(name)}</p>
+        <p class="aa-adtest-count"><b>5</b></p>
+        <button type="button" class="aa-btn aa-adtest-skip">Close</button>
+      </div>`;
+      document.body.appendChild(wrap);
+      const num = $('b', wrap), skip = $('.aa-adtest-skip', wrap);
+      let left = 5, done = false;
+      const end = how => { if (done) return; done = true; clearInterval(t); wrap.remove(); resolve(how); };
+      skip.addEventListener('click', () => end(left <= 0 ? 'watched' : 'dismissed'));
+      const t = setInterval(() => {
+        left--; num.textContent = String(Math.max(0, left));
+        if (left <= 0) { skip.textContent = 'Claim'; $('.aa-adtest-count', wrap).textContent = 'Done'; clearInterval(t); }
+      }, 1000);
+      setTimeout(() => { if (!done && left <= 0) end('watched'); }, 5600);
+    });
+  }
+
+  // The real one. adBreak hands back a function to call when the player has agreed; adViewed is the only
+  // callback that means the ad was seen through, and it is the only one that resolves 'watched'.
+  function adH5Show(name) {
+    return new Promise(resolve => {
+      if (typeof window.adBreak !== 'function') { resolve('unavailable'); return; }
+      let settled = false, started = false;
+      const done = how => { if (!settled) { settled = true; clearTimeout(waitAd); clearTimeout(waitEnd); resolve(how); } };
+      // Two clocks, because the two silences mean different things. If beforeReward has not fired in eight
+      // seconds there is nothing to show and the player should not be left looking at a spinner. Once it has
+      // fired an ad is actually running, and a rewarded one is allowed to be a minute long.
+      let waitEnd = 0;
+      const waitAd = setTimeout(() => { if (!started) done('unavailable'); }, 8000);
+      try {
+        window.adBreak({
+          type: 'reward',
+          name,
+          beforeReward(showAdFn) {
+            started = true; clearTimeout(waitAd);
+            waitEnd = setTimeout(() => done('unavailable'), 120000);
+            try { showAdFn(); } catch { done('unavailable'); }
+          },
+          adViewed() { done('watched'); },
+          adDismissed() { done('dismissed'); },
+          adBreakDone() { done('unavailable'); },    // fires last; only lands if nothing above did
+        });
+      } catch { done('unavailable'); }
+    });
+  }
+
+  // Show one, and say whether it earned the reward. Never two at once.
+  async function adShow(name) {
+    if (!ads.ready()) return 'unavailable';
+    ads.showing = true;
+    const wasMusic = music.on;
+    try {
+      if (wasMusic) musicStop();                     // an ad has its own sound; the pad does not talk over it
+      const how = await (ads.mode === 'test' ? adTestShow(name) : adH5Show(name));
+      return how;
+    } finally {
+      ads.showing = false;
+      if (wasMusic && state.music && !el.game.hidden && !state.finished) musicStart();
+    }
+  }
+
+  // What each kind of reward is, in one table: what to call it, what the ad is named in the network's own
+  // reporting, and what happens when it is earned. Gold is the odd one out and says so -- it is the only one
+  // the client cannot grant, because gold is real and the server is the only thing allowed to make it.
+  const AD_REWARD = {
+    heart: {
+      title: 'One more heart',
+      lead: 'Watch a short advertisement and carry on with this board from where it stopped, with one heart.',
+      cta: 'Watch for a heart',
+      grant() { state.lives = 1; state.finished = false; state.busy = false; el.overlay.hidden = true; renderHud(); startTimer(); toast('One heart. Make it count.', 'good'); },
+    },
+    hint: {
+      title: 'One more hint',
+      lead: 'Watch a short advertisement for one more hint on this board.',
+      cta: 'Watch for a hint',
+      grant() { state.hintsMax = (state.hintsMax ?? HINTS_PER_LEVEL) + 1; renderHud(); toast('One more hint.', 'good'); hint(); },
+    },
+    check: {
+      title: `Two more ${CHECK_WORD}s`,
+      lead: `Watch a short advertisement for two more ${CHECK_WORD}s on this board.`,
+      cta: `Watch for ${CHECK_WORD}s`,
+      grant() { state.checksMax = (state.checksMax ?? CHECKS_PER_LEVEL) + 2; renderHud(); toast(`Two more ${CHECK_WORD}s.`, 'good'); },
+    },
+    gold: {
+      title: 'Gold for an advertisement',
+      lead: 'Watch a short advertisement and the gold is added to your purse.',
+      cta: 'Watch for gold',
+      needsAccount: true,
+      async grant() { await adClaimGold(); },
+    },
+  };
+
+  // The offer. One sheet, one decision, and nothing is spent before the ad has actually been watched.
+  function adOffer(kind, note) {
+    const R = AD_REWARD[kind];
+    if (!R || ads.showing) return;
+    if (R.needsAccount && !auth.user) { openSignIn('Sign in first, so the gold has a purse to go into.'); return; }
+    const wrap = document.createElement('div');
+    wrap.className = 'aa-adoffer';
+    wrap.innerHTML = `<div class="aa-adoffer-panel" role="dialog" aria-modal="true" aria-labelledby="aaAdTitle">
+      <h3 id="aaAdTitle">${escapeHtml(R.title)}</h3>
+      <p>${escapeHtml(note || R.lead)}</p>
+      <div class="aa-actions aa-actions--stack">
+        <button type="button" class="aa-btn aa-btn--primary" data-ad="go">${ICON_AD}${escapeHtml(R.cta)}</button>
+        <button type="button" class="aa-btn" data-ad="no">No thanks</button>
+      </div>
+    </div>`;
+    document.body.appendChild(wrap);
+    const close = () => wrap.remove();
+    wrap.addEventListener('click', async e => {
+      if (e.target === wrap) { close(); return; }
+      const act = e.target.closest('[data-ad]')?.dataset.ad;
+      if (!act) return;
+      if (act === 'no') { close(); return; }
+      const btn = e.target.closest('[data-ad]');
+      btn.disabled = true;
+      const how = await adShow(`${PRODUCT_AD}-${kind}`);
+      close();
+      if (how !== 'watched') { toast(how === 'dismissed' ? 'The advertisement was not finished, so nothing was added.' : 'No advertisement was available. Try again in a moment.', 'hint'); return; }
+      // Only now, and only once per board for the lifelines.
+      if (kind !== 'gold') adSpend(kind);
+      await R.grant();
+    });
+    $('[data-ad]', wrap)?.focus({ preventScroll: true });
+  }
+  const PRODUCT_AD = 'puzzle';
+
+  // Gold is the server's to give. The client says an advertisement finished; the server decides what that is
+  // worth, counts the day's claims from the ledger and answers with the balance it now holds.
+  async function adClaimGold() {
+    try {
+      const r = await fetch(`${API_V1}/ads/reward`, { method: 'POST', credentials: 'include', cache: 'no-store', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        if (d.error === 'ad_cap') toast('That is all the gold advertisements give today. Come back tomorrow.', 'hint', 4000);
+        else if (d.error === 'signed_out') openSignIn('Sign in first, so the gold has a purse to go into.');
+        else toast('The gold could not be added. Try again in a moment.', 'bad');
+        if (typeof d.gold === 'number') setGold(d.gold);
+        return;
+      }
+      setGold(d.gold);
+      toast(d.granted ? `${gfmt(d.granted)} gold. ${d.left} more advertisement${d.left === 1 ? '' : 's'} today.` : 'That one was already counted.', 'good', 3500);
+    } catch { toast('The gold could not be added. Try again in a moment.', 'bad'); }
   }
 
   // ── Accounts ──
@@ -2216,6 +2451,11 @@
     } catch { if (flash) { flash.textContent = link; flash.hidden = false; } }
   }
 
+  el.goldAd?.addEventListener('click', e => {
+    e.stopPropagation();   // the chip itself opens the dashboard; the plus does not
+    adOffer('gold');
+  });
+
   const goldError = e => e.code === 'not_enough_gold' ? 'You do not have that much gold.' : e.code === 'taken' ? 'Someone already took that match.' : e.code === 'own_match' ? 'That is your own invitation.' : e.code === 'signed_out' ? 'Please sign in again.' : 'Something went wrong. Please try again.';
 
   el.matchBody?.addEventListener('change', e => {
@@ -2261,7 +2501,12 @@
           else if (here.length) toast(asked, 'good');
           else toast(missed, 'hint');
         }
-      } catch (err) { btn.disabled = false; toast(goldError(err), 'bad'); if (typeof err.gold === 'number') setGold(err.gold); }
+      } catch (err) {
+        btn.disabled = false;
+        if (typeof err.gold === 'number') setGold(err.gold);
+        if (err.code === 'not_enough_gold' && ads.on() && auth.user) adOffer('gold', 'Not enough gold for that table. Watch a short advertisement and some is added to your purse.');
+        else toast(goldError(err), 'bad');
+      }
       return;
     }
     if (!act) return;
@@ -2271,7 +2516,12 @@
     else if (act === 'join' && m) {
       const btn = e.target.closest('[data-mact]'); btn.disabled = true;
       try { const d = await matchApi('join', { code: m.code, tier: TIER_OF() }); setGold(d.gold); showRoom(d.match); }
-      catch (err) { btn.disabled = false; toast(goldError(err), 'bad'); if (typeof err.gold === 'number') setGold(err.gold); }
+      catch (err) {
+        btn.disabled = false;
+        if (typeof err.gold === 'number') setGold(err.gold);
+        if (err.code === 'not_enough_gold' && ads.on() && auth.user) adOffer('gold', 'Not enough gold for that table. Watch a short advertisement and some is added to your purse.');
+        else toast(goldError(err), 'bad');
+      }
     }
   });
 
@@ -2314,6 +2564,7 @@
     const win = purseWin && purseWin.to === gold ? purseWin : null;
     purseWin = null;
     el.purse.className = 'aa-chip aa-chip--purse';
+    if (el.goldAd) el.goldAd.hidden = !ads.on();
     el.purse.title = `${gfmt(gold)} gold`;
     el.purseNo.textContent = gpurse(win ? win.from : gold);
     if (!win) { el.purse.classList.remove('is-won'); return; }

@@ -2,7 +2,7 @@
 import { pool, query, tx } from '../backend/src/db.js';
 import { config } from '../backend/src/config.js';
 import * as R from '../backend/src/rooms.js';
-import { give, idem, move } from '../backend/src/gold.js';
+import { adClaim, give, idem, move } from '../backend/src/gold.js';
 import { deleteUser } from '../backend/src/auth.js';
 import { eq, finish, goldOf, ok, player, reset, section, stake } from './helpers.js';
 
@@ -250,6 +250,58 @@ section('A finished match remembers who won it after they leave');
   const view = await R.matchView(pool, m, b.id);
   eq(view.draw, false, 'the result is not rewritten as a draw');
   eq(view.winner, 'zara', 'and it still names the winner');
+}
+
+section('Gold for an advertisement is bounded, not trusted');
+{
+  const AMOUNT = 500, PER_DAY = 3;
+  const a = await player('adam');
+  const before = await goldOf(a.id);
+
+  const first = await tx(c => adClaim(c, a.id, AMOUNT, PER_DAY));
+  eq(first.capped, false, 'the first claim of the day is allowed');
+  eq(first.granted, AMOUNT, 'and it grants exactly what an ad is worth');
+  eq(await goldOf(a.id), before + AMOUNT, 'the purse has it');
+  eq(first.left, PER_DAY - 1, 'and the day has one fewer left');
+}
+
+{
+  // The deterministic key is what protects a double-tapped button and two requests racing: both compute the
+  // same claim number for the same day, and only one of them can write the row.
+  const b = await player('bea');
+  const before = await goldOf(b.id);
+  const key = idem.adReward(b.id, new Date().toISOString().slice(0, 10), 1);
+  const one = await tx(c => give(c, b.id, 500, 'ad_reward', key));
+  const two = await tx(c => give(c, b.id, 500, 'ad_reward', key));
+  eq(one?.applied, true, 'the first of two racing claims is the one that lands');
+  eq(two?.applied, false, 'the second finds the key taken and grants nothing');
+  eq(await goldOf(b.id), before + 500, 'so the purse moved exactly once');
+}
+
+{
+  // And the day runs out.
+  const c2 = await player('cass');
+  const before = await goldOf(c2.id);
+  const AMOUNT = 500, PER_DAY = 3;
+  let granted = 0;
+  for (let i = 0; i < PER_DAY + 2; i++) {
+    const r = await tx(c => adClaim(c, c2.id, AMOUNT, PER_DAY));
+    if (!r.capped) { granted += r.granted; continue; }
+    eq(r.granted, 0, 'a claim past the cap grants nothing');
+    eq(r.left, 0, 'with nothing left to claim');
+  }
+  eq(granted, AMOUNT * PER_DAY, 'a day is worth exactly the cap and no more');
+  eq(await goldOf(c2.id), before + AMOUNT * PER_DAY, 'and that is what the purse holds');
+
+  const rows = await query<{ n: string }>(pool,
+    `SELECT count(*) AS n FROM gold_ledger WHERE user_id = $1 AND reason = 'ad_reward'`, [c2.id]);
+  eq(Number(rows.rows[0]!.n), PER_DAY, 'one ledger row per claim the cap allowed, and no more');
+
+  // An advertisement is not play, so it must never be able to climb the league.
+  const asPlay = await query<{ n: string }>(pool,
+    `SELECT count(*) AS n FROM gold_ledger
+      WHERE user_id = $1 AND reason IN ('stake', 'payout', 'leave_refund', 'expire_refund', 'draw_refund')`, [c2.id]);
+  eq(Number(asPlay.rows[0]!.n), 0, 'and none of it counts as a match played');
 }
 
 await finish();

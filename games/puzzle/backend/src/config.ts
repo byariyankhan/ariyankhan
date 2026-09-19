@@ -71,6 +71,11 @@ export const config = {
   // ── Game rules, carried over unchanged from the PHP service ──
   game: {
     signupGold: num('PUZZLE_SIGNUP_GOLD', 10_000),
+    // What watching an advertisement is worth, and how many a day count. 500 is exactly one seat at the
+    // smallest table, which is the whole intent: an ad buys a game, not a fortune. Ten a day is 5,000 -- half
+    // a signup grant -- so the faucet cannot inflate an economy whose top table is 10,000,000.
+    adGold: num('PUZZLE_AD_GOLD', 500),
+    adGoldPerDay: num('PUZZLE_AD_GOLD_PER_DAY', 10),
     // The tables a player can sit at. Five of them, three orders of magnitude apart at the top, so a new
     // account and one that has been winning for a month both have somewhere to play.
     stakes: str('PUZZLE_STAKES', '500,1000,10000,1000000,10000000').split(',').map(s => Number(s.trim())).filter(n => n > 0),
