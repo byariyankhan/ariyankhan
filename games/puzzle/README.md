@@ -67,8 +67,8 @@ Settings does.
 ### The league
 
 Every week the gold won at the gold tables is counted and the ten best are paid. Tenth place takes the base
-prize and every place above it doubles it, so with the defaults (`ARROW_ATLAS_LEAGUE_BASE_GOLD` 10,000 and
-`ARROW_ATLAS_LEAGUE_RANKS` 10): 10th 10K, 9th 20K, 8th 40K … 1st 5.12M, and the whole ladder comes to 10.23M
+prize and every place above it doubles it, so with the defaults (`PUZZLE_LEAGUE_BASE_GOLD` 10,000 and
+`PUZZLE_LEAGUE_RANKS` 10): 10th 10K, 9th 20K, 8th 40K … 1st 5.12M, and the whole ladder comes to 10.23M
 gold a week.
 
 Three decisions hold it up:
@@ -93,7 +93,7 @@ off for a fortnight comes back, fills in the weeks it missed and settles them ol
 **On the size of the prizes.** The tables run 500, 1K, 10K, 1M and 10M, so the biggest pot is seven seats at
 10M — 70M gold to the winner, against 5.12M for first place in the league. The league is a bonus on top of a
 week's play rather than the main way gold enters the game, which is the right way round. If the ladder ever
-needs to keep pace with the tables, `ARROW_ATLAS_LEAGUE_BASE_GOLD` moves all ten places at once, in
+needs to keep pace with the tables, `PUZZLE_LEAGUE_BASE_GOLD` moves all ten places at once, in
 proportion, without a deploy of anything but the environment.
 
 ---
@@ -181,7 +181,7 @@ has turned a degraded service into an outage.
 | `progress_write` | 60 / min | account |
 | `ws_connect` | 60 / min | IP |
 
-`ARROW_ATLAS_RATE_MULTIPLIER` scales all of them. Production leaves it at 1.
+`PUZZLE_RATE_MULTIPLIER` scales all of them. Production leaves it at 1.
 
 ---
 
@@ -205,8 +205,8 @@ curl -s localhost:8760/health
 
 **The faster alternative, now that the image exists.** `.github/workflows/puzzle-api.yml` runs every suite
 against real PostgreSQL and Redis service containers on each push and pull request, and on a push to `main` it
-builds the image and publishes it to `ghcr.io`. Switching to it is three things: set `ARROW_ATLAS_IMAGE` in
-`.env`, replace the API service's `image:` line with `image: ${ARROW_ATLAS_IMAGE}`, and delete its `command:`
+builds the image and publishes it to `ghcr.io`. Switching to it is three things: set `PUZZLE_IMAGE` in
+`.env`, replace the API service's `image:` line with `image: ${PUZZLE_IMAGE}`, and delete its `command:`
 block. A deploy then becomes `docker compose pull` rather than a two-to-four minute build on a 2-vCPU box at
 every restart. Production still fetches and builds, because that is what it was cut over with and it works;
 this is the next thing to change, not an urgent one.
@@ -273,16 +273,16 @@ read-only from the `puzzle-site` volume. That is how it gets the script without 
 sits only on the internal network, and `postgres:16-alpine` ships no `curl`. On a first deploy it waits for the
 checkout to appear, which takes seconds, and logs while it waits.
 
-It takes a backup on boot and then daily at `ARROW_ATLAS_BACKUP_AT_HOUR` UTC. Each dump is written
+It takes a backup on boot and then daily at `PUZZLE_BACKUP_AT_HOUR` UTC. Each dump is written
 with `pg_dump -Fc`, **read back with `pg_restore --list` before it is accepted** — by name, so a dump missing
 `users`, `sessions`, `matches`, `match_players` or `gold_ledger` is refused and says which — and copied to
 `/var/backups/puzzle` on the host so losing the Docker volume does not lose the history. Dumps older than
-`ARROW_ATLAS_BACKUP_KEEP_DAYS` are removed. The container's healthcheck goes red if the newest dump is more
+`PUZZLE_BACKUP_KEEP_DAYS` are removed. The container's healthcheck goes red if the newest dump is more
 than a day old, so a backup that has quietly stopped shows up as an unhealthy container.
 
 ```bash
-docker exec puzzle-backup sh -c 'sh $ARROW_ATLAS_SCRIPTS_DIR/backup.sh list'   # what we have
-docker exec puzzle-backup sh -c 'sh $ARROW_ATLAS_SCRIPTS_DIR/backup.sh once'   # take one now
+docker exec puzzle-backup sh -c 'sh $PUZZLE_SCRIPTS_DIR/backup.sh list'   # what we have
+docker exec puzzle-backup sh -c 'sh $PUZZLE_SCRIPTS_DIR/backup.sh once'   # take one now
 ```
 
 ### Restoring
@@ -292,11 +292,11 @@ docker exec puzzle-backup sh -c 'sh $ARROW_ATLAS_SCRIPTS_DIR/backup.sh once'   #
 docker exec puzzle-backup sh -c 'sh $PUZZLE_SCRIPTS_DIR/restore.sh verify /backups/puzzle-20260917T030000Z.dump'
 
 # Restore into a database you name, to look at it.
-docker exec puzzle-backup sh -c 'sh $ARROW_ATLAS_SCRIPTS_DIR/restore.sh into /backups/....dump puzzle_yesterday'
+docker exec puzzle-backup sh -c 'sh $PUZZLE_SCRIPTS_DIR/restore.sh into /backups/....dump puzzle_yesterday'
 
 # Replace the live database. Saves the current one first, to /backups/pre-restore-<stamp>.dump.
 docker compose stop puzzle-api
-docker exec -e CONFIRM=yes puzzle-backup sh -c 'sh $ARROW_ATLAS_SCRIPTS_DIR/restore.sh live /backups/....dump'
+docker exec -e CONFIRM=yes puzzle-backup sh -c 'sh $PUZZLE_SCRIPTS_DIR/restore.sh live /backups/....dump'
 docker compose start puzzle-api
 ```
 
@@ -311,7 +311,7 @@ scratch database again. It is the only way to know a backup works.
 
 ```bash
 cd games/puzzle/deploy
-ARROW_ATLAS_IMAGE=ghcr.io/byariyankhan/puzzle-api:<previous-sha> docker compose up -d puzzle-api
+PUZZLE_IMAGE=ghcr.io/byariyankhan/puzzle-api:<previous-sha> docker compose up -d puzzle-api
 ```
 
 **The data is wrong** — restore the newest good dump, as above.
@@ -342,7 +342,7 @@ The work this whole layout exists to make short:
    <meta name="puzzle-api" content="https://api.arrowatlas.com" />
    <meta name="puzzle-ws"  content="wss://api.example.com" />
    ```
-   and set `ARROW_ATLAS_ALLOWED_ORIGINS` to the origins the page is served from, so the browser may send
+   and set `PUZZLE_ALLOWED_ORIGINS` to the origins the page is served from, so the browser may send
    credentials cross-origin. No JavaScript changes.
 5. **nginx and DNS.** Include the same `nginx-puzzle.conf` in the new server block — the file does not
    change — point DNS at the new server, and get a certificate.
@@ -392,5 +392,5 @@ npx tsx ../tests/load.ts write 60 8
 npx tsx ../tests/load.ts ws    2800 10
 ```
 
-Raise `ARROW_ATLAS_RATE_MULTIPLIER` when load testing, or you will be measuring the rate limiter. The runner
+Raise `PUZZLE_RATE_MULTIPLIER` when load testing, or you will be measuring the rate limiter. The runner
 says so if more than a hundredth of its requests failed, which is how that mistake gets caught.

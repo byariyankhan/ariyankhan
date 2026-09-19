@@ -696,7 +696,7 @@ links.
   refuses to show the button on the live site. `puzzle/.htaccess` gives the folder its own
   slightly wider CSP in `.htaccess` for Google's sign-in library. Deleting the
   account is in the dashboard because Google Play requires it. A new account is
-  created with `ARROW_ATLAS_SIGNUP_GOLD` (10,000), written as a `signup` row in
+  created with `PUZZLE_SIGNUP_GOLD` (10,000), written as a `signup` row in
   the gold ledger, so the welcome purse lands exactly once: signing out and back
   in never tops it up. The balance rides along in every `user` object and shows
   on the dashboard.
@@ -761,7 +761,7 @@ links.
   timer in the service rather than on the back of somebody's request: it starts
   the rooms whose clock has run out with more than one player in them, and hands
   the stake back to anyone still sitting alone after two minutes
-  (`ARROW_ATLAS_LONELY_SECONDS`) rather than leaving them to wait out the day. With the
+  (`PUZZLE_LONELY_SECONDS`) rather than leaving them to wait out the day. With the
   switch off none of this applies: no clock, no strangers, nothing at all until
   the host says go.
   **The first player to clear the board takes the whole pot, and is paid the

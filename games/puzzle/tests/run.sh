@@ -1,5 +1,5 @@
 #!/bin/bash
-# Run the Arrow Atlas test suites.
+# Run the puzzle test suites.
 #
 #   ./run.sh                      all of them
 #   ./run.sh economy api          just those
@@ -14,7 +14,7 @@ BE="$HERE/../backend"
 [ -d "$BE/node_modules" ] || { echo "run 'npm install' in $BE first"; exit 1; }
 
 # Local runs read backend/.env.dev; CI and the container pass the same variables in the environment.
-if [ -f "$BE/.env.dev" ] && [ -z "${ARROW_ATLAS_PG_HOST:-}" ]; then set -a; . "$BE/.env.dev"; set +a; fi
+if [ -f "$BE/.env.dev" ] && [ -z "${PUZZLE_PG_HOST:-}" ]; then set -a; . "$BE/.env.dev"; set +a; fi
 
 SUITES=("${@}")
 if [ ${#SUITES[@]} -eq 0 ]; then SUITES=(economy progress league api ws); fi

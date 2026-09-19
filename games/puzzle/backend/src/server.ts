@@ -84,7 +84,7 @@ registerRoutes(app);
 // ── Boot ──
 
 async function main(): Promise<void> {
-  if (!config.pg.password && config.env === 'production') throw new Error('ARROW_ATLAS_PG_PASSWORD is not set');
+  if (!config.pg.password && config.env === 'production') throw new Error('PUZZLE_PG_PASSWORD is not set');
   await migrate();
   attachWebSocket(app);
   startSweeper();

@@ -2,12 +2,9 @@
 // migrated player finds the game they left; the infrastructure values come from the environment, so the same
 // image runs on this VPS today and on a VPS of the game's own later without a rebuild.
 //
-// Every variable is PUZZLE_*, and every one of them also answers to the PUZZLE_* name it had before the
-// game was renamed. That is not indecision: those names are in a .env file on the host, beside secrets, and a
-// rename in here must not be able to stop the service starting on a box nobody has edited yet. Rename them
-// there whenever it suits; until then both work, and the day the old ones are gone this reads one name.
-const envOf = (name: string): string | undefined =>
-  process.env[name] ?? process.env[name.replace(/^PUZZLE_/, 'ARROW_ATLAS_')];
+// Every variable is PUZZLE_*. They answered to ARROW_ATLAS_* as well for as long as that was what the .env on
+// the host called them; the host has been renamed, so this reads one name again.
+const envOf = (name: string): string | undefined => process.env[name];
 const num = (name: string, fallback: number): number => {
   const raw = envOf(name);
   if (raw === undefined || raw.trim() === '') return fallback;
