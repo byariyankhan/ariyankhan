@@ -1157,7 +1157,7 @@ mode_deploy_site() {
     running/healthy|running) ok "$API untouched and still $s" ;;
     *)                       bad "$API is $s" ;;
   esac
-  hc_code=$(curl -sS -m 20 -o /dev/null -w '%{http_code}' --resolve "$DOMAIN:443:127.0.0.1" "https://$DOMAIN/api/arrow-atlas/v1/lobby" 2>/dev/null || echo 000)
+  hc_code=$(curl -sS -m 20 -o /dev/null -w '%{http_code}' --resolve "$DOMAIN:443:127.0.0.1" "https://$DOMAIN/api/puzzle/v1/lobby" 2>/dev/null || echo 000)
   [ "$hc_code" = "200" ] && ok "and the game's API still answers (200)" || bad "the game's API answered $hc_code"
 }
 
@@ -1187,8 +1187,8 @@ mode_health() {
   hc "home page"                  200 "https://$DOMAIN/"
   hc "the Puzzle page"           200 "https://$DOMAIN/puzzle/"
   hc "the client itself"          200 "https://$DOMAIN/js/puzzle.js"
-  hc "v1 auth/me"                 200 "https://$DOMAIN/api/arrow-atlas/v1/auth/me"
-  hc "v1 lobby"                   200 "https://$DOMAIN/api/arrow-atlas/v1/lobby"
+  hc "v1 auth/me"                 200 "https://$DOMAIN/api/puzzle/v1/auth/me"
+  hc "v1 lobby"                   200 "https://$DOMAIN/api/puzzle/v1/lobby"
   hc "the legacy PHP path is gone" 404 "https://$DOMAIN/games/api/auth.php?a=me"
   hc "and so is the PHP file"     404 "https://$DOMAIN/games/api/match.php"
   hc "other PHP still runs"       405 "https://$DOMAIN/send-mail.php"
@@ -1202,7 +1202,7 @@ mode_health() {
   # and denies everything else on the real peer address — so being served here is the allowlist working. That
   # it is refused from off the machine is a different question, asked from a GitHub runner by vps-smoke.yml,
   # because only a request that actually crosses the internet can answer it.
-  hc "health answers the host"    200 "https://$DOMAIN/api/arrow-atlas/health"
+  hc "health answers the host"    200 "https://$DOMAIN/api/puzzle/v1/health"
 
   say "the client the page actually asks for"
   curl -sS -m 20 "${R[@]}" "https://$DOMAIN/puzzle/" | grep -o 'js/puzzle.js?v=[0-9]*' | head -1 | sed 's/^/  /'
@@ -1212,10 +1212,10 @@ mode_health() {
   code=$(curl -sS -m 20 -o /dev/null -w '%{http_code}' "${R[@]}" \
       -H 'Connection: Upgrade' -H 'Upgrade: websocket' -H 'Sec-WebSocket-Version: 13' \
       -H 'Sec-WebSocket-Key: AAAAAAAAAAAAAAAAAAAAAA==' \
-      "https://$DOMAIN/ws/arrow-atlas" 2>/dev/null || echo 000)
+      "https://$DOMAIN/ws/puzzle" 2>/dev/null || echo 000)
   case "$code" in
     401) ok "the route is there and refuses an unauthenticated handshake (401)" ;;
-    404) bad "404 — nginx has no /ws/arrow-atlas route" ;;
+    404) bad "404 - nginx has no /ws/puzzle route" ;;
     *)   note "handshake answered $code" ;;
   esac
 
