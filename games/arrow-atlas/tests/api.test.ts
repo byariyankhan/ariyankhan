@@ -341,4 +341,39 @@ section('The people you have played with, and inviting them without a link');
      'and a signed-out caller may invite nobody');
 }
 
+section('A player may choose the name the others see');
+{
+  const me = await mint('apiNamed');
+  eq((await call('/auth/name', { body: { name: 'Ariyan Khan' } })).status, 401, 'a signed-out caller may rename nobody');
+
+  const ok1 = await call('/auth/name', { token: me.token, body: { name: '  Ariyan Khan  ' } });
+  eq(ok1.status, 200, 'their own name is theirs to change');
+  eq((ok1.json.user as { name: string }).name, 'Ariyan Khan', 'and it comes back trimmed');
+  eq(((await call('/auth/me', { token: me.token })).json.user as { name: string }).name, 'Ariyan Khan',
+     'the change is the account, not the answer to one call');
+
+  const empty = await call('/auth/name', { token: me.token, body: { name: '   ' } });
+  eq(empty.status, 400, 'a name of nothing but spaces is refused');
+  eq(empty.json.error, 'empty_name', 'and says so');
+  eq(((await call('/auth/me', { token: me.token })).json.user as { name: string }).name, 'Ariyan Khan',
+     'leaving the name they had');
+
+  // Whatever arrives, what is stored is one line of at most 24 characters: this name is drawn in a row on
+  // somebody else's screen, and a wall of text or a newline in it is their problem, not this player's joke.
+  const long = await call('/auth/name', { token: me.token, body: { name: 'A'.repeat(80) } });
+  eq((long.json.user as { name: string }).name.length, 24, 'a very long name is cut to twenty-four characters');
+  const messy = await call('/auth/name', { token: me.token, body: { name: 'Ari\nyan\tKhan' } });
+  eq((messy.json.user as { name: string }).name, 'Ari yan Khan', 'and newlines and tabs come back as single spaces');
+
+  // and the table shows the new one, because names are read from the account rather than copied into a match
+  const mate = await mint('apiNamedMate');
+  const made = await call('/matches', { token: me.token, body: { stake: config.game.stakes[0], open_to_all: false } });
+  const code = (made.json.match as { code: string }).code;
+  await call(`/matches/${code}/join`, { token: mate.token, body: {} });
+  await call('/auth/name', { token: me.token, body: { name: 'The Cartographer' } });
+  const seen = await call(`/matches/${code}`, { token: mate.token });
+  const players = (seen.json.match as { players: { name: string }[] }).players;
+  ok(players.some(x => x.name === 'The Cartographer'), 'the room shows the name as it is now, not as it was');
+}
+
 await finish();

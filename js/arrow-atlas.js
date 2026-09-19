@@ -85,7 +85,7 @@
 
   const el = {
     select: $('#aaSelect'), tagline: $('#aaTagline'), homeSel: $('#aaHome'), purse: $('#aaPurse'), purseNo: $('#aaPurseNo'), hudDiff: $('#aaHudDiff'), play: $('#aaPlay'), path: $('#aaPath'), btnVibe: $('#aaVibe'), btnGuides: $('#aaGuides'), btnMusic: $('#aaMusic'), howTo: $('#aaHowTo'),
-    sheet: $('#aaSheet'), friends: $('#aaFriends'), signInSheet: $('#aaSignInSheet'), googleBtn: $('#aaGoogleBtn'), signInNote: $('#aaSignInNote'), ranks: $('#aaRanks'), league: $('#aaLeague'), leagueEnds: $('#aaLeagueEnds'), leagueSheet: $('#aaLeagueSheet'), leagueBody: $('#aaLeagueBody'), leagueInfo: $('#aaLeagueInfo'), matchSheet: $('#aaMatchSheet'), matchBody: $('#aaMatchBody'), matchTitle: $('#aaMatchTitle'), accountGroup: $('#aaAccountGroup'), accountCap: $('#aaAccountCap'), accountWho: $('#aaAccountWho'), accountGold: $('#aaAccountGold'), accountFace: $('#aaAccountFace'), sessionGroup: $('#aaSessionGroup'), sessionCap: $('#aaSessionCap'), signOutBtn: $('#aaSignOut'), deleteAccBtn: $('#aaDeleteAcc'), settingsBtns: $$('#aaSettings, #aaSettingsG'), themeBtn: $('#aaTheme'), themes: $('#aaThemes'),
+    sheet: $('#aaSheet'), friends: $('#aaFriends'), signInSheet: $('#aaSignInSheet'), googleBtn: $('#aaGoogleBtn'), signInNote: $('#aaSignInNote'), ranks: $('#aaRanks'), league: $('#aaLeague'), leagueEnds: $('#aaLeagueEnds'), leagueSheet: $('#aaLeagueSheet'), leagueBody: $('#aaLeagueBody'), leagueInfo: $('#aaLeagueInfo'), matchSheet: $('#aaMatchSheet'), matchBody: $('#aaMatchBody'), matchTitle: $('#aaMatchTitle'), accountGroup: $('#aaAccountGroup'), accountCap: $('#aaAccountCap'), accountRow: $('#aaAccountRow'), accountName: $('#aaAccountName'), accountWho: $('#aaAccountWho'), accountGold: $('#aaAccountGold'), accountFace: $('#aaAccountFace'), sessionGroup: $('#aaSessionGroup'), sessionCap: $('#aaSessionCap'), signOutBtn: $('#aaSignOut'), deleteAccBtn: $('#aaDeleteAcc'), settingsBtns: $$('#aaSettings, #aaSettingsG'), themeBtn: $('#aaTheme'), themes: $('#aaThemes'),
     game: $('#aaGame'), boardWrap: $('#aaBoardWrap'), board: $('#aaBoard'), toast: $('#aaToast'), confetti: $('#aaConfetti'),
     hudLevel: $('#aaHudLevel'), hudMode: $('#aaHudMode'), hudTime: $('#aaHudTime'), hudLeft: $('#aaHudLeft'), hudLives: $('#aaHudLives'), hudLivesWrap: $('#aaHudLivesWrap'), hudPct: $('#aaHudPct'), boardBar: $('#aaBoardBar'),
     btnHint: $('#aaHint'), btnLevels: $('#aaBackToLevels'), btnSound: $('#aaSound'),
@@ -1037,7 +1037,7 @@
     const canSkip = !state.daily && state.fails >= 2 && state.idx < DATA.levels.length - 1;
     const eased = !!learn && learn.after.tier < learn.before.tier;
     el.card.innerHTML = `
-      <p class="aa-card-kicker">${state.daily ? (state.daily.race ? `Gold match · ${gfmt(state.daily.match?.stake || 0)}` : 'Daily board') : hudLabel()} · ${DIFF_OF(state.tier)}</p>
+      <p class="aa-card-kicker">${state.daily ? (state.daily.race ? `Gold match · ${gpurse(state.daily.match?.stake || 0)}` : 'Daily board') : hudLabel()} · ${DIFF_OF(state.tier)}</p>
       <h3>${reason}</h3>
       <p class="aa-card-lead">${state.left} of ${state.pieces.length} arrows were still on the board.${state.daily?.race ? ' You are still in the challenge: Try again puts you back on the same board with your hearts back, to clear from the start. Nothing is lost until somebody else clears it.' : ''}</p>
       ${eased ? `<p class="aa-adapt aa-adapt--down">Two losses in a row. A new layout eases to ${DIFF_OF(learn.after.tier)}; Try again keeps this board.</p>` : learn && learn.after.losses === 1 && state.tier > 0 ? '<p class="aa-adapt">One more loss and the boards ease off a step.</p>' : ''}
@@ -1280,13 +1280,25 @@
   // A table is called 10K, not 10,000: on a row of five buttons the digits are what makes them hard to tell apart.
   const gtiny = n => {
     const v = Math.abs(Number(n) || 0);
-    if (v >= 1e6) return `${+(v / 1e6).toFixed(v % 1e6 ? 1 : 0)}M`;
-    if (v >= 1000) return `${+(v / 1000).toFixed(v % 1000 ? 1 : 0)}K`;
+    if (v >= 1e6) return `${+(v / 1e6).toFixed(v % 1e6 ? 1 : 0)}m`;
+    if (v >= 1000) return `${+(v / 1000).toFixed(v % 1000 ? 1 : 0)}k`;
     return gfmt(v);
   };
-  // A purse holds anything from nothing to a number with a dozen digits in it, so the badge is not a fixed box:
-  // the longer the number, the smaller the type, and it never spills over the name beside it or off the page.
-  const goldFit = v => { const w = gfmt(v).length; return w > 12 ? ' is-vast' : w > 9 ? ' is-big' : ''; };
+  // How a purse is written. "1,000,004,500" is twelve characters of arithmetic nobody does: what a player wants
+  // from their own gold is its size, and from somebody else's, whether it is bigger than theirs. So 1b, 12.4m,
+  // 340k — short enough to be set in type you can actually read, and the exact figure rides in the title for
+  // anyone who wants to count it.
+  const gpurse = n => {
+    const v = Number(n) || 0, a = Math.abs(v), sign = v < 0 ? '-' : '';
+    const cut = (div, unit) => {
+      const x = a / div;
+      return `${sign}${+(x < 10 ? x.toFixed(2) : x < 100 ? x.toFixed(1) : x.toFixed(0))}${unit}`;
+    };
+    if (a >= 1e9) return cut(1e9, 'b');
+    if (a >= 1e6) return cut(1e6, 'm');
+    if (a >= 1000) return cut(1000, 'k');
+    return `${sign}${gfmt(a)}`;
+  };
   // The old service took an action in the query string; the new one has a path per action. The call sites keep
   // the shape they had — matchApi('join', { code }) — and this turns it into the right request.
   function matchUrl(a, body, query) {
@@ -1410,7 +1422,7 @@
       <span class="aa-me-face${faceClass(u)}">${faceInner(u)}</span>
       <span class="aa-me-id">
         <span class="aa-me-name">${escapeHtml(u.name || 'Player')}</span>
-        <span class="aa-gold${goldFit(u.gold)}" title="Your gold">${COIN}${gfmt(u.gold)}</span>
+        <span class="aa-gold" title="${gfmt(u.gold)} gold">${COIN}${gpurse(u.gold)}</span>
       </span>
     </div>`;
   }
@@ -1472,7 +1484,7 @@
     state.pendingMatch = m;
     const draw = list => {
       el.card.innerHTML = `
-        <p class="aa-card-kicker">Gold match · ${gfmt(m.stake)}</p>
+        <p class="aa-card-kicker">Gold match · ${gpurse(m.stake)}</p>
         <h3>Invite</h3>
         ${list === null ? '<p class="aa-loading">Looking…</p>' : playersHtml(list)}
         <div class="aa-actions">
@@ -1537,8 +1549,7 @@
       <div class="aa-stakes">${stakesHtml(gold, waiting)}</div>
       <label class="aa-fill"><input type="checkbox" id="aaFillOnline"${fill ? ' checked' : ''}><span>Fill from online</span></label>
       <p class="aa-cap" id="aaRecentCap" hidden>Played with lately</p>
-      <div id="aaRecentBox"></div>
-      <button type="button" class="aa-lg-open" data-mact="league"><span aria-hidden="true">🏆</span><span class="aa-lg-open-t">League<small>${league.data ? `Ends in ${fmtLeft(leagueLeft())} · ${gshort((league.data.prizes || [0])[0])} for first` : 'The week\u2019s gold, ranked'}</small></span><span class="aa-lg-open-go" aria-hidden="true">\u203A</span></button>`;
+      <div id="aaRecentBox"></div>`;
     openSheet(el.matchSheet);
     wireFaces(el.matchBody);
     refreshLobby();
@@ -1618,7 +1629,7 @@
     const host = m.you === 'host';
     state.pendingMatch = m;
     el.card.innerHTML = `
-      <p class="aa-card-kicker">Gold match · ${gfmt(m.stake)}</p>
+      <p class="aa-card-kicker">Gold match · ${gpurse(m.stake)}</p>
       <h3>${m.count} of ${m.seats} joined</h3>
       <div class="aa-ranks aa-ranks--card">${faces(m.players)}</div>
       <p class="aa-wait">${roomWait(m, host)}</p>
@@ -1735,8 +1746,8 @@
         <span class="aa-rank aa-vs-face${faceClass({ name: m.host, pic: m.host_pic })}" aria-hidden="true">${faceInner({ name: m.host, pic: m.host_pic })}</span>
         <span class="aa-vs-who"><b>${escapeHtml(m.host)}</b> challenges you.</span>
       </div>
-      <p class="aa-purse"><span>Stake</span><span class="aa-gold">${COIN}${gfmt(m.stake)}</span></p>
-      <p class="aa-sheet-note">Everyone puts in ${gfmt(m.stake)} gold and plays the very same board. Clear it first and you take the lot.${short ? ` <b>You have only ${gfmt(gold)}.</b>` : ''}</p>
+      <p class="aa-purse"><span>Stake</span><span class="aa-gold" title="${gfmt(m.stake)} gold">${COIN}${gpurse(m.stake)}</span></p>
+      <p class="aa-sheet-note">Everyone puts in ${gpurse(m.stake)} gold and plays the very same board. Clear it first and you take the lot.${short ? ` <b>You have only ${gpurse(gold)}.</b>` : ''}</p>
       <div class="aa-actions">
         <button type="button" class="aa-btn aa-btn--primary" data-mact="join"${short ? ' disabled' : ''}>Confirm game</button>
         <button type="button" class="aa-btn" data-mact="close">Not now</button>
@@ -1762,10 +1773,10 @@
       <span class="aa-rank aa-vs-face${faceClass(p)}" aria-hidden="true">${faceInner(p)}</span>
       <span class="aa-vs-who">${p.ms > 0 ? `${p.place}. ` : ''}${escapeHtml(p.you ? 'You' : p.name)}</span>
       <b>${p.ms == null ? 'still playing' : p.ms < 0 ? 'ran out of hearts' : fmtTime(p.race_ms ?? p.ms, true)}</b></div>`;
-    const purse = m.you_won ? `You won ${gfmt(m.pot)}` : m.winner ? `You lost ${gfmt(m.stake)}` : m.draw ? 'Every stake came back' : 'Your stake is held';
+    const purse = m.you_won ? `You won ${gpurse(m.pot)}` : m.winner ? `You lost ${gpurse(m.stake)}` : m.draw ? 'Every stake came back' : 'Your stake is held';
     el.matchBody.innerHTML = `
       <div class="aa-vs">${(m.players || []).map(row).join('')}</div>
-      <p class="aa-purse"><span>${purse}</span><span class="aa-gold${m.you_won ? ' is-won' : ''}${goldFit(auth.user?.gold ?? 0)}">${COIN}<span id="aaPurseCount">${gfmt(auth.user?.gold ?? 0)}</span></span></p>
+      <p class="aa-purse"><span>${purse}</span><span class="aa-gold${m.you_won ? ' is-won' : ''}" title="${gfmt(auth.user?.gold ?? 0)} gold">${COIN}<span id="aaPurseCount">${gpurse(auth.user?.gold ?? 0)}</span></span></p>
       ${m.state === 'done' ? '' : '<p class="aa-sheet-note">The others are still playing for their place.</p>'}
       <div class="aa-actions"><button type="button" class="aa-btn aa-btn--primary" data-mact="stakes">Play another</button><button type="button" class="aa-btn" data-mact="close">Close</button></div>`;
     wireFaces(el.matchBody);
@@ -1926,7 +1937,6 @@
     }
     if (!act) return;
     const m = state.pendingMatch;
-    if (act === 'league') { openLeague(); return; }
     if (act === 'stakes') openFriends();
     else if (act === 'close') { closeSheets(); if (state.daily?.race && state.finished) goToLevels(); }
     else if (act === 'join' && m) {
@@ -1973,8 +1983,9 @@
     const gold = auth.user.gold ?? 0;
     const win = purseWin && purseWin.to === gold ? purseWin : null;
     purseWin = null;
-    el.purse.className = 'aa-chip aa-chip--purse' + goldFit(gold);
-    el.purseNo.textContent = gfmt(win ? win.from : gold);
+    el.purse.className = 'aa-chip aa-chip--purse';
+    el.purse.title = `${gfmt(gold)} gold`;
+    el.purseNo.textContent = gpurse(win ? win.from : gold);
     if (!win) { el.purse.classList.remove('is-won'); return; }
     el.purse.classList.add('is-won');
     SFX.win(); vibe([0, 40, 60, 120]); goldRain(80, true);
@@ -2012,10 +2023,65 @@
       el.accountFace.innerHTML = faceInner(auth.user);
       wireFaces(el.accountFace);
     }
-    el.accountWho.textContent = `${auth.user.name} · ${(auth.user.provider || 'google').replace(/^./, c => c.toUpperCase())}`;   // the caption above already says Account
-    el.accountGold.className = 'aa-gold' + goldFit(auth.user.gold);
-    el.accountGold.innerHTML = `${COIN}${gfmt(auth.user.gold)}`;
+    // The name is the headline, because it is the name everybody else sees and the one thing here a player can
+    // change; how they signed in is the small print under it.
+    if (el.accountName) el.accountName.textContent = auth.user.name || 'Player';
+    el.accountWho.textContent = `Signed in with ${(auth.user.provider || 'google').replace(/^./, c => c.toUpperCase())}`;
+    el.accountGold.className = 'aa-gold';
+    el.accountGold.title = `${gfmt(auth.user.gold)} gold`;
+    el.accountGold.innerHTML = `${COIN}${gpurse(auth.user.gold)}`;
   }
+  // Google supplies a name; it is not always the one somebody wants over a board. This is the only thing in
+  // the game a player types, and it happens where they are already looking — the row itself opens into a field,
+  // rather than a card over a screen they are not on.
+  function showRenameRow() {
+    if (!auth.user || !el.accountGroup || $('#aaNameEdit', el.accountGroup)) return;
+    if (el.accountRow) el.accountRow.hidden = true;
+    el.accountGroup.insertAdjacentHTML('beforeend', `
+      <div class="aa-row aa-row--edit" id="aaNameEdit">
+        <input class="aa-input" id="aaNameIn" type="text" maxlength="24" value="${escapeHtml(auth.user.name || '')}" aria-label="Your name" autocomplete="off" spellcheck="false">
+        <small>The name over the board, on the result sheet and in the league.</small>
+        <span class="aa-edit-go">
+          <button type="button" class="aa-btn aa-btn--small aa-btn--primary" id="aaNameSave">Save</button>
+          <button type="button" class="aa-btn aa-btn--small aa-btn--ghost" id="aaNameCancel">Cancel</button>
+        </span>
+      </div>`);
+    const input = $('#aaNameIn', el.accountGroup);
+    input?.focus({ preventScroll: true });
+    input?.select();
+    input?.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); saveName(); }
+      if (e.key === 'Escape') closeRenameRow();
+    });
+    $('#aaNameSave', el.accountGroup)?.addEventListener('click', saveName);
+    $('#aaNameCancel', el.accountGroup)?.addEventListener('click', closeRenameRow);
+  }
+  function closeRenameRow() {
+    $('#aaNameEdit', el.accountGroup)?.remove();
+    if (el.accountRow) el.accountRow.hidden = false;
+  }
+  async function saveName() {
+    const input = $('#aaNameIn', el.accountGroup), btn = $('#aaNameSave', el.accountGroup);
+    const name = (input?.value || '').trim();
+    if (!name) { toast('A name cannot be empty.', 'bad'); input?.focus(); return; }
+    if (name === auth.user?.name) { closeRenameRow(); return; }
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+    try {
+      const d = await authApi('name', { name });
+      if (d.user) auth.user = d.user;
+      closeRenameRow();
+      renderAccountRow(); renderPurse();
+      forgetRecent();                       // the name on everybody else's list is this one
+      toast('That is your name now.', 'good');
+    } catch (err) {
+      if (btn) { btn.disabled = false; btn.textContent = 'Save'; }
+      toast(err.code === 'empty_name' ? 'A name cannot be empty.'
+        : err.code === 'rate_limited' ? 'Too many changes just now. Try again in a minute.'
+        : 'Could not save that name.', 'bad');
+    }
+  }
+  el.accountRow?.addEventListener('click', () => { if (auth.user) showRenameRow(); });
+
   el.signOutBtn?.addEventListener('click', async () => {
     try { await authApi('logout', {}); } catch { /* the cookie may already be gone */ }
     auth.user = null; live.close(); renderAccountRow(); closeSheets(); toast('Signed out.');
@@ -2086,7 +2152,7 @@
       store.set(PENDING, null);
       if (typeof d.gold === 'number') setGold(d.gold);
       if (loud) { el.overlay.hidden = true; showMatchState(d.match, (auth.user?.gold ?? 0) - (d.match?.you_won ? d.match.pot : 0)); }
-      else if (d.match?.you_won) toast(`Your time got through. You won ${gfmt(d.match.pot)} gold.`, 'good', 5000);
+      else if (d.match?.you_won) toast(`Your time got through. You won ${gpurse(d.match.pot)} gold.`, 'good', 5000);
       return true;
     } catch (err) {
       if (loud) { const n = $('.aa-card-lead', el.card); if (n) n.textContent = resultTrouble(err); }
@@ -2119,8 +2185,8 @@
     const step = now => {
       const k = Math.min(1, (now - t0) / ms), eased = 1 - Math.pow(1 - k, 3);
       const v = Math.round(from + span * eased);
-      node.textContent = gfmt(v);
-      if (box) box.className = box.className.replace(/ is-(big|vast)\b/g, '') + goldFit(v);   // it grows as it counts
+      node.textContent = gpurse(v);
+      if (box) box.title = `${gfmt(v)} gold`;
       if (k < 1) requestAnimationFrame(step);
     };
     requestAnimationFrame(step);
@@ -2255,9 +2321,9 @@
   // A table of ten seven-digit numbers is a wall. 5.12M is a prize.
   const gshort = n => {
     const v = Number(n) || 0, a = Math.abs(v), sign = v < 0 ? '-' : '';
-    if (a >= 1e9) return `${sign}${(a / 1e9).toFixed(2).replace(/\.?0+$/, '')}B`;
-    if (a >= 1e6) return `${sign}${(a / 1e6).toFixed(2).replace(/\.?0+$/, '')}M`;
-    if (a >= 10000) return `${sign}${Math.round(a / 1000)}K`;
+    if (a >= 1e9) return `${sign}${(a / 1e9).toFixed(2).replace(/\.?0+$/, '')}b`;
+    if (a >= 1e6) return `${sign}${(a / 1e6).toFixed(2).replace(/\.?0+$/, '')}m`;
+    if (a >= 10000) return `${sign}${Math.round(a / 1000)}k`;
     return `${sign}${gfmt(a)}`;
   };
   // "2d 18h", then "18h 40m", then "9m": always two units while there are two, so the size of what is left
@@ -2278,8 +2344,10 @@
     if (!el.league) return;
     if (!league.data) { el.league.hidden = true; return; }
     el.league.hidden = false;
-    el.leagueEnds.textContent = fmtLeft(leagueLeft());
-    el.league.title = `League · ends in ${fmtLeft(leagueLeft())}`;
+    // It used to count down here as well as inside. Two clocks for one week is one too many, and the word is
+    // what a player is looking for when they want the table.
+    el.leagueEnds.textContent = 'League';
+    el.league.title = 'This week\u2019s league';
   }
   async function loadLeague(force) {
     if (!force && league.data && Date.now() - league.at < 30000) return league.data;
