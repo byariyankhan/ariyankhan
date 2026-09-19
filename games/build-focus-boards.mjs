@@ -230,5 +230,25 @@ for (const s of SHAPES) {
   boards.push({ id: s.id, name: s.name, d: s.d, k: masks.map(m => m.k) });
 }
 if (bad) throw new Error(bad + ' shape(s) do not make a playable board at every tier');
-fs.writeFileSync(OUT, JSON.stringify({ version: 1, boards }));
+
+// ── The emblem ───────────────────────────────────────────────────────────────────────────────────
+// The brain on the home screen is the same brain, drawn by the same generator, at its own five scales: a
+// board nobody plays, so it is coarser than one that is dealt (thirty-odd arrows at Easy, ninety at Master).
+// What it says is the player's own difficulty — the better they get, the finer their brain is drawn.
+const EMBLEM_TARGETS = [150, 220, 300, 400, 520], EMBLEM_MAX = 34;
+const brainShape = SHAPES.find(s => s.id === 'brain');
+const emblemMasks = EMBLEM_TARGETS.map(t => {
+  let lo = 0.06, hi = EMBLEM_MAX / REF, best = null;
+  for (let i = 0; i < 18; i++) {
+    const k = Math.round((lo + hi) / 2 * 1000) / 1000, m = rasterise(brainShape.d, k);
+    if (m.count < t) lo = k; else hi = k;
+    if (m.w <= EMBLEM_MAX && m.h <= EMBLEM_MAX && (!best || Math.abs(m.count - t) < Math.abs(best.count - t))) best = m;
+    if (hi - lo < 0.0015) break;
+  }
+  return best;
+});
+console.log('emblem    ', emblemMasks.map(m => `${m.count} ${m.w}x${m.h}`).join(' | '));
+const emblem = { d: brainShape.d, k: emblemMasks.map(m => m.k) };
+
+fs.writeFileSync(OUT, JSON.stringify({ version: 2, boards, emblem }));
 console.log(boards.length, 'focus boards, bytes', fs.statSync(OUT).size);

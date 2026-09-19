@@ -129,6 +129,18 @@ test('focus-boards.json: the boards a new player starts on, M/L/Z paths with fiv
     for (let t = 0; t < 5; t++) { const m = rasterise(b.d, b.k[t]); assert.ok(m.count >= 60, `${b.id} tier ${t}: only ${m.count} cells`); assert.ok(m.w <= 50 && m.h <= 58, `${b.id} tier ${t}: ${m.w}x${m.h} too big`); if (t) assert.ok(m.count >= rasterise(b.d, b.k[t - 1]).count, `${b.id} tier ${t} smaller than tier ${t - 1}`); }
   }
   assert.ok(fs.statSync(path.join(root, 'games/data/focus-boards.json')).size < 40 * 1024, 'focus boards file under 40 KB');
+  // the brain on the home screen: the same shape, its own five scales, coarse enough that nobody waits for it
+  const em = fb.emblem;
+  assert.ok(em && typeof em.d === 'string', 'no emblem');
+  assert.match(em.d, /^[MLZ0-9 .-]+$/, 'emblem path is not M/L/Z');
+  assert.equal(em.k.length, 5, 'emblem has five scales');
+  let prev = 0;
+  for (let t = 0; t < 5; t++) {
+    const b = generate(rasterise(em.d, em.k[t]), MAXLEN_OF[t], 7000 + t * 131, GEN_OPTS(t));
+    assert.ok(b.pieces.length >= 25 && b.pieces.length <= 140, `emblem tier ${t}: ${b.pieces.length} arrows`);
+    assert.ok(b.pieces.length >= prev, `emblem tier ${t} is not finer than tier ${t - 1}`);
+    prev = b.pieces.length;
+  }
 });
 test('focus boards generate and are solvable at every tier', () => {
   const fb = JSON.parse(fs.readFileSync(path.join(root, 'games/data/focus-boards.json'), 'utf8'));
