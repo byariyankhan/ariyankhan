@@ -46,7 +46,15 @@
     });
   }
 
+  // The contact form lives on the homepage, so the link is an anchor there and a trip home from anywhere else --
+  // the same rule the navigation already uses, rather than a "#contact" that points at nothing on this page.
+  function contactHrefFor(basePath) {
+    const onHome = location.pathname === '/' || /\/index\.html$/.test(location.pathname);
+    return onHome ? '#contact' : `${basePath || '/'}#contact`;
+  }
+
   function renderFooterComponent(basePath) {
+    const contactHref = contactHrefFor(basePath);
     return `
 <footer class="site-footer">
   <nav class="footer-social" data-social-links="footer" aria-label="Social media links"></nav>
@@ -66,6 +74,8 @@
     <a href="${basePath}privacy-policy.html">Privacy Policy</a>
     <span class="footer-divider" aria-hidden="true">|</span>
     <a href="${basePath}terms-and-conditions.html">Terms &amp; Conditions</a>
+    <span class="footer-divider" aria-hidden="true">|</span>
+    <a href="${contactHref}">Contact</a>
   </p>
   <p class="footer-copy">&copy; ${new Date().getFullYear()} <a href="/" class="footer-copy-link">Ariyan Khan</a>. All Rights Reserved.</p>
 </footer>`.trim();
