@@ -1230,6 +1230,16 @@ mode_drop_old_volumes() {
   note "$newest, $age minutes old"
   ok "there is a copy outside Docker"
 
+  say "The containers of the old generation"
+  # rename-infra removes these at the end of its run, and the run that did the rename was cut by a broken
+  # pipe before it got there. They are stopped, they hold nothing, and while they exist the volumes cannot
+  # go. Only these four names, and only if they are not running.
+  for c in arrow-atlas-api arrow-atlas-backup arrow-atlas-redis arrow-atlas-postgres; do
+    have "$c" || { note "$c is already gone"; continue; }
+    if running "$c"; then bad "$c is running — that is not the old generation, stopping"; return; fi
+    $SUDO docker rm "$c" >/dev/null 2>&1 && gone "$c" || bad "could not remove $c"
+  done
+
   say "Nothing is still holding them"
   for v in $OLD; do
     docker volume inspect "$v" >/dev/null 2>&1 || { note "$v is already gone"; continue; }
