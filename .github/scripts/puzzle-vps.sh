@@ -1262,6 +1262,36 @@ mode_drop_old_volumes() {
   note "ariyankhan_aa-data belongs to the portfolio container and is not this game's to remove"
 }
 
+# ── volumes ─────────────────────────────────────────────────────────────────
+#
+# Reads. Every volume on the box, what holds it and where, how big it is, and — for the anonymous ones
+# Docker names with a hash — enough of what is inside to say whose it is. Nothing is changed.
+mode_volumes() {
+  say "Every volume, and who holds it"
+  for v in $(docker volume ls -q | sort); do
+    mp=$(docker volume inspect -f '{{.Mountpoint}}' "$v" 2>/dev/null)
+    size=$($SUDO du -sh "$mp" 2>/dev/null | cut -f1)
+    made=$(docker volume inspect -f '{{.CreatedAt}}' "$v" 2>/dev/null | cut -c1-19)
+    printf '\n  %s\n' "$v"
+    printf '      %s, created %s\n' "${size:-size unknown}" "${made:-?}"
+    holders=$(docker ps -a --format '{{.Names}}' | while read -r c; do
+      dest=$(docker inspect -f "{{range .Mounts}}{{if eq .Name \"$v\"}}{{.Destination}}{{end}}{{end}}" "$c" 2>/dev/null)
+      [ -n "$dest" ] && printf '%s -> %s (%s, %s)\n' "$c" "$dest" "$(docker inspect -f '{{.Config.Image}}' "$c" 2>/dev/null)" "$(docker inspect -f '{{.State.Status}}' "$c" 2>/dev/null)"
+    done)
+    if [ -n "$holders" ]; then printf '%s\n' "$holders" | sed 's/^/      held by /'
+    else note "held by nothing"; fi
+    # An anonymous volume is 64 hex characters. Those are the ones worth looking inside.
+    case "$v" in
+      *[!0-9a-f]*) ;;
+      ????????????????????????????????????????????????????????????????)
+        note "what is inside (top level):"
+        $SUDO ls -A "$mp" 2>/dev/null | head -12 | sed 's/^/        /'
+        [ -z "$($SUDO ls -A "$mp" 2>/dev/null)" ] && note "        (empty)"
+        ;;
+    esac
+  done
+}
+
 
 case "$MODE" in
   inspect)       mode_inspect ;;
@@ -1278,6 +1308,7 @@ case "$MODE" in
   rename-infra)  mode_rename_infra ;;
   finish-rename) mode_finish_rename ;;
   drop-old-volumes) mode_drop_old_volumes ;;
+  volumes)       mode_volumes ;;
   *) echo "::error::unknown mode: $MODE"; exit 2 ;;
 esac
 
