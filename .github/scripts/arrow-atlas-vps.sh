@@ -483,7 +483,7 @@ PY
   ( cd "$PROJ" && $SUDO docker compose create --force-recreate "$SVC" ) 2>&1 | sed 's/^/      /'
   running ariyankhan-web && note "it was still running; it will be started again below"
   rm -rf /tmp/aa-site && mkdir -p /tmp/aa-site
-  if tar -xzf "$TGZ" -C /tmp/aa-site && [ -f /tmp/aa-site/arrow-atlas.html ]; then
+  if tar -xzf "$TGZ" -C /tmp/aa-site && [ -f /tmp/aa-site/puzzle/index.html ]; then
     if docker cp /tmp/aa-site/. ariyankhan-web:/var/www/html 2>&1 | sed 's/^/      /'; then
       ok "the site's files are in the new container, before it starts"
     else
@@ -500,7 +500,7 @@ PY
     [ "$h" = "healthy" ] && break
     sleep 5
   done
-  live=$(curl -fsS -m 10 "https://$DOMAIN/arrow-atlas.html" 2>/dev/null | grep -o 'js/arrow-atlas\.js?v=[0-9]*' | head -1)
+  live=$(curl -fsS -m 10 "https://$DOMAIN/puzzle/" 2>/dev/null | grep -o 'js/puzzle\.js?v=[0-9]*' | head -1)
   if [ "$h" = "healthy" ] && [ -n "$live" ]; then
     ok "ariyankhan-web is healthy and the page still serves ($live)"
     docker logs --tail 6 ariyankhan-web 2>&1 | sed 's/^/      /'
@@ -568,7 +568,7 @@ mode_push_source() {
        set -e
        rm -rf /tmp/site && mkdir -p /tmp/site
        tar -xzf /tmp/arrow-atlas-site.tgz -C /tmp/site
-       [ -f /tmp/site/arrow-atlas.html ] || { echo "that is not the site"; exit 1; }
+       [ -f /tmp/site/puzzle/index.html ] || { echo "that is not the site"; exit 1; }
        cp -a /tmp/site/. /var/www/html/
        chown -R www-data:www-data /var/www/html || true
        rm -rf /tmp/site /tmp/arrow-atlas-site.tgz' >/dev/null 2>&1; then
@@ -576,8 +576,8 @@ mode_push_source() {
   else
     bad "could not put the client in place"; return
   fi
-  want=$(tar -xzf "$TGZ" -O ./arrow-atlas.html 2>/dev/null | grep -o 'js/arrow-atlas\.js?v=[0-9]*' | head -1)
-  live=$(curl -fsS -H 'X-Forwarded-Proto: https' "https://$DOMAIN/arrow-atlas.html" 2>/dev/null | grep -o 'js/arrow-atlas\.js?v=[0-9]*' | head -1)
+  want=$(tar -xzf "$TGZ" -O ./puzzle/index.html 2>/dev/null | grep -o 'js/puzzle\.js?v=[0-9]*' | head -1)
+  live=$(curl -fsS -H 'X-Forwarded-Proto: https' "https://$DOMAIN/puzzle/" 2>/dev/null | grep -o 'js/puzzle\.js?v=[0-9]*' | head -1)
   [ -n "$want" ] && [ "$want" = "$live" ] && ok "the page asks for $live, which is what this checkout ships" \
     || bad "the page asks for ${live:-nothing} and this checkout ships ${want:-nothing}"
 }
@@ -879,8 +879,8 @@ mode_deploy_site() {
   # a change to the page, the stylesheet or the client has no business interrupting a match in progress.
   have ariyankhan-web || { bad "ariyankhan-web is not here"; return; }
 
-  before=$(curl -sS -m 20 --resolve "$DOMAIN:443:127.0.0.1" "https://$DOMAIN/arrow-atlas.html" \
-    | grep -o 'js/arrow-atlas.js?v=[0-9]*' | head -1)
+  before=$(curl -sS -m 20 --resolve "$DOMAIN:443:127.0.0.1" "https://$DOMAIN/puzzle/" \
+    | grep -o 'js/puzzle.js?v=[0-9]*' | head -1)
   note "the page asks for ${before:-<nothing found>} right now"
 
   docker restart ariyankhan-web >/dev/null && ok "restarting, which re-fetches main" || { bad "could not restart it"; return; }
@@ -892,8 +892,8 @@ mode_deploy_site() {
   done
   [ "$h" = "healthy" ] && ok "ariyankhan-web is healthy again" || { bad "ariyankhan-web is $h after three minutes"; return; }
 
-  after=$(curl -sS -m 20 --resolve "$DOMAIN:443:127.0.0.1" "https://$DOMAIN/arrow-atlas.html" \
-    | grep -o 'js/arrow-atlas.js?v=[0-9]*' | head -1)
+  after=$(curl -sS -m 20 --resolve "$DOMAIN:443:127.0.0.1" "https://$DOMAIN/puzzle/" \
+    | grep -o 'js/puzzle.js?v=[0-9]*' | head -1)
   note "and now ${after:-<nothing found>}"
   [ -n "$after" ] || bad "the page no longer names a client at all"
 
@@ -931,8 +931,8 @@ mode_health() {
     else bad "$(printf '%-46s %s (want %s)' "$label" "$code" "$want")"; head -c 200 /tmp/aa-body | sed 's/^/        /'; echo; fi
   }
   hc "home page"                  200 "https://$DOMAIN/"
-  hc "the Arrow Atlas page"       200 "https://$DOMAIN/arrow-atlas.html"
-  hc "the client itself"          200 "https://$DOMAIN/js/arrow-atlas.js"
+  hc "the Puzzle page"           200 "https://$DOMAIN/puzzle/"
+  hc "the client itself"          200 "https://$DOMAIN/js/puzzle.js"
   hc "v1 auth/me"                 200 "https://$DOMAIN/api/arrow-atlas/v1/auth/me"
   hc "v1 lobby"                   200 "https://$DOMAIN/api/arrow-atlas/v1/lobby"
   hc "the legacy PHP path is gone" 404 "https://$DOMAIN/games/api/auth.php?a=me"
@@ -951,7 +951,7 @@ mode_health() {
   hc "health answers the host"    200 "https://$DOMAIN/api/arrow-atlas/health"
 
   say "the client the page actually asks for"
-  curl -sS -m 20 "${R[@]}" "https://$DOMAIN/arrow-atlas.html" | grep -o 'js/arrow-atlas.js?v=[0-9]*' | head -1 | sed 's/^/  /'
+  curl -sS -m 20 "${R[@]}" "https://$DOMAIN/puzzle/" | grep -o 'js/puzzle.js?v=[0-9]*' | head -1 | sed 's/^/  /'
 
   say "the WebSocket route"
   # A handshake without a session must be refused with 401, not 404: 404 would mean nginx has no route.

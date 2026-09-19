@@ -1,12 +1,12 @@
 // Validates Arrow Atlas data and the puzzle generator (every level generates and is solvable).
-// Run: node tests/arrow-atlas.test.mjs
+// Run: node tests/puzzle.test.mjs
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 const root = path.resolve(new URL('.', import.meta.url).pathname, '..');
-const js = fs.readFileSync(path.join(root, 'js/arrow-atlas.js'), 'utf8');
+const js = fs.readFileSync(path.join(root, 'js/puzzle.js'), 'utf8');
 const data = JSON.parse(fs.readFileSync(path.join(root, 'games/data/arrow-atlas.json'), 'utf8'));
-const html = fs.readFileSync(path.join(root, 'arrow-atlas.html'), 'utf8');
+const html = fs.readFileSync(path.join(root, 'puzzle/index.html'), 'utf8');
 // Pull the pure pieces of the engine out of the IIFE so the exact production code is tested.
 const grab = re => { const m = js.match(re); if (!m) throw new Error('could not find ' + re); return m[0]; };
 const src = [grab(/const REF = \d+;/), grab(/function parsePath\(d\) \{[\s\S]*?\n  \}\n/), grab(/function insidePath\([\s\S]*?\n  \}\n/), grab(/function rasterise\([\s\S]*?\n  \}\n/), grab(/const DIRS = [^\n]+/), grab(/const PALETTE = [^\n]+/), grab(/const STEP_POINTS = [^\n]+/), grab(/const FAST_SEC_PER_ARROW = [^\n]+/), grab(/const clampTier = [^\n]+/), grab(/const clearPoints = [^\n]+/), grab(/const FORM0 = [^\n]+/), grab(/const nextForm = [\s\S]*?\n  \};\n/), grab(/const MAXLEN_OF = [^\n]+/), grab(/const NARROW_OF = [^\n]+/), grab(/const FAR_OF = [^\n]+/), grab(/const RAIL_OF = [^\n]+/), grab(/const HOLE_OF = [^\n]+/), grab(/const LANE_OF = [^\n]+/), grab(/const TIGHTEN_OF = [^\n]+/), grab(/const GEN_OPTS = [^\n]+/), grab(/function mulberry32[^\n]+/), grab(/function generate\(mask, maxLen, seed[^)]*\) \{[\s\S]*?\n  \}\n/)].join('\n');

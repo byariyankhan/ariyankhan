@@ -5,7 +5,7 @@
 // game's parser reads), so the game's rasteriser and generator need no changes. A few shapes that no glyph
 // carries well (the pyramids) are drawn by hand in CUSTOM.
 // Usage (from the repo root, one-off): npm i --no-save sharp potrace @twemoji/svg && node games/build-discover-boards.mjs
-// Then bump DISCB_VERSION in js/arrow-atlas.js so edges drop the old file.
+// Then bump DISCB_VERSION in js/puzzle.js so edges drop the old file.
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
@@ -14,7 +14,7 @@ const TW = new URL('../' + (process.env.TWEMOJI_DIR || 'node_modules/@twemoji/sv
 const disc = JSON.parse(fs.readFileSync(new URL('./data/discover.json', import.meta.url), 'utf8')).items;
 const levels = JSON.parse(fs.readFileSync(new URL('./data/arrow-atlas.json', import.meta.url), 'utf8')).levels;
 const OUT = new URL('./data/discover-boards.json', import.meta.url).pathname;
-const js = fs.readFileSync(new URL('../js/arrow-atlas.js', import.meta.url), 'utf8');
+const js = fs.readFileSync(new URL('../js/puzzle.js', import.meta.url), 'utf8');
 const grab = re => { const m = js.match(re); if (!m) throw new Error('could not find ' + re); return m[0]; };
 const { rasterise, REF } = new Function([grab(/const REF = \d+;/), grab(/function parsePath\(d\) \{[\s\S]*?\n  \}\n/), grab(/function insidePath\([\s\S]*?\n  \}\n/), grab(/function rasterise\([\s\S]*?\n  \}\n/)].join('\n') + '\nreturn { rasterise, REF };')();
 const TARGETS = [110, 240, 400, 700, 900], MAX_DIM_OF = [32, 32, 32, 40, 44], MAX_TALL_OF = [46, 46, 46, 54, 58], MAX_WIDE_OF = [38, 38, 38, 46, 50];

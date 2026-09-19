@@ -1,12 +1,12 @@
 // Build "Arrow Atlas" level data: for each country its outline (in a REF×REF box) and, per difficulty tier, the
 // scale k (cells per unit) at which the game's own rasteriser yields about TARGETS[t] land cells. The grid masks
-// themselves are rasterised in the browser with the same code (extracted from js/arrow-atlas.js below), so the
+// themselves are rasterised in the browser with the same code (extracted from js/puzzle.js below), so the
 // data stays small and every player gets the same board.
 // Usage (from the repo root, one-off):
 //   npm i --no-save d3-geo topojson-client world-atlas
 //   curl -L -o ne50.geojson https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_50m_admin_0_countries.geojson
 //   node games/build-arrow-atlas.mjs ne50.geojson
-// Then bump DATA_VERSION in js/arrow-atlas.js so edges drop the old file.
+// Then bump DATA_VERSION in js/puzzle.js so edges drop the old file.
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
@@ -19,7 +19,7 @@ const atlas10 = require('world-atlas/countries-10m.json');   // the small states
 const SMALL = ['Andorra', 'Antigua and Barb.', 'Bahrain', 'Barbados', 'Cabo Verde', 'Comoros', 'Dominica', 'Grenada', 'Kiribati', 'Liechtenstein', 'Maldives', 'Malta', 'Marshall Is.', 'Mauritius', 'Micronesia', 'Monaco', 'Nauru', 'Palau', 'St. Kitts and Nevis', 'Saint Lucia', 'St. Vin. and Gren.', 'Samoa', 'San Marino', 'São Tomé and Principe', 'Seychelles', 'Singapore', 'Tonga', 'Tuvalu', 'Vatican'];
 const ne = JSON.parse(fs.readFileSync(process.argv[2] || 'ne_50m_admin_0_countries.geojson', 'utf8'));
 const OUT = new URL('./data/arrow-atlas.json', import.meta.url).pathname;
-const js = fs.readFileSync(new URL('../js/arrow-atlas.js', import.meta.url), 'utf8');
+const js = fs.readFileSync(new URL('../js/puzzle.js', import.meta.url), 'utf8');
 const grab = re => { const m = js.match(re); if (!m) throw new Error('could not find ' + re); return m[0]; };
 const { rasterise, REF } = new Function([grab(/const REF = \d+;/), grab(/function parsePath\(d\) \{[\s\S]*?\n  \}\n/), grab(/function insidePath\([\s\S]*?\n  \}\n/), grab(/function rasterise\([\s\S]*?\n  \}\n/)].join('\n') + '\nreturn { rasterise, REF };')();
 

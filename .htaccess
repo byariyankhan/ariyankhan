@@ -23,6 +23,15 @@ RewriteCond %{HTTPS} off
 RewriteCond %{HTTP:X-Forwarded-Proto} !=https
 RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 
+# ── The game moved: /arrow-atlas.html → /puzzle/ ──
+#    Permanent, and permanent it stays. Links to the old page are in shared results, in video
+#    descriptions and in the start_url of every copy of the game somebody has installed; a 301 is what
+#    keeps all three working and hands the search ranking to the new address. The fragment a share link
+#    carries (#b-050, #m=ABCD) is re-appended by the browser, so a challenge link survives the hop.
+RewriteRule ^arrow-atlas\.html$          /puzzle/ [R=301,L,NE]
+RewriteRule ^arrow-atlas-privacy\.html$  /puzzle/privacy.html [R=301,L,NE]
+RewriteRule ^arrow-atlas-terms\.html$    /puzzle/terms.html [R=301,L,NE]
+
 # ── Never serve deploy/test tooling ──────────────
 RedirectMatch 404 ^/(deploy|tests)(/|$)
 RedirectMatch 404 ^/games/build-[a-z-]+\.mjs$
@@ -81,11 +90,8 @@ RewriteRule ^ - [R=404,L]
   # subdomains of a host and not the host itself, and Analytics sends one of its two collect calls to the bare
   # name — which the browser refused, with the console saying so on every page load.
   Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://*.googletagmanager.com https://*.google-analytics.com https://static.cloudflareinsights.com https://*.googlesyndication.com; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://img.youtube.com https://i.ytimg.com https://*.google-analytics.com https://*.googletagmanager.com https://*.googlesyndication.com https://*.g.doubleclick.net; frame-src https://www.youtube.com https://drive.google.com https://www.facebook.com https://*.googlesyndication.com https://*.adtrafficquality.google; connect-src 'self' https://*.google-analytics.com https://analytics.google.com https://*.analytics.google.com https://*.googletagmanager.com https://*.g.doubleclick.net https://www.google.com https://cloudflareinsights.com https://www.youtube.com https://*.googlesyndication.com https://*.adtrafficquality.google; object-src 'none'; base-uri 'self'; form-action 'self'"
-  # The game page signs people in with Google, whose library loads from accounts.google.com, opens a frame there
-  # and injects its own <style>. Only this page gets that wider policy.
-  <Files "arrow-atlas.html">
-    Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://accounts.google.com https://www.gstatic.com https://*.googletagmanager.com https://*.google-analytics.com https://static.cloudflareinsights.com https://*.googlesyndication.com; style-src 'self' 'unsafe-inline' https://accounts.google.com https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://accounts.google.com https://*.googleusercontent.com https://www.gstatic.com https://img.youtube.com https://i.ytimg.com https://*.google-analytics.com https://*.googletagmanager.com https://*.googlesyndication.com https://*.g.doubleclick.net; frame-src https://accounts.google.com https://www.youtube.com https://drive.google.com https://www.facebook.com https://*.googlesyndication.com https://*.adtrafficquality.google; connect-src 'self' https://accounts.google.com https://*.google-analytics.com https://analytics.google.com https://*.analytics.google.com https://*.googletagmanager.com https://*.g.doubleclick.net https://www.google.com https://cloudflareinsights.com https://www.youtube.com https://*.googlesyndication.com https://*.adtrafficquality.google; object-src 'none'; base-uri 'self'; form-action 'self'"
-  </Files>
+  # The game keeps its own, wider policy in puzzle/.htaccess: it is the only page that signs people in
+  # with Google, and the folder that needs the exception is the folder that should carry it.
   # The channel pages on youtube.ariyankhan.com send their own security headers, and a stricter policy than
   # this one: nonces rather than 'unsafe-inline', frames denied outright. Two Content-Security-Policy headers
   # are enforced as the intersection of both and the other four would simply contradict each other, so the
