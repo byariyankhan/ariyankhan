@@ -1335,6 +1335,59 @@ mode_drop_orphan_volumes() {
   docker volume ls --format '{{.Name}}' | sed 's/^/      /'
 }
 
+# ── retire-site-data ────────────────────────────────────────────────────────
+#
+# ariyankhan_site_data holds one file, tracker.sqlite, and no container mounts it any more. Removing a
+# volume is final, and this one is not empty, so the file is copied out of it first and the copy is checked
+# before anything is removed. What comes out lands in /var/backups/ariyankhan-site/, outside Docker, where
+# deleting the volume cannot reach it.
+#
+# The volume belongs to the portfolio's compose project, not to this game. If that project is ever brought
+# up again with the volume still declared, Docker will make a new empty one, which is harmless.
+mode_retire_site_data() {
+  [ "$CONFIRM" = "DELETE" ] || { echo "::error::retire-site-data needs confirm=DELETE"; exit 2; }
+  V=ariyankhan_site_data
+
+  say "What is being retired"
+  docker volume inspect "$V" >/dev/null 2>&1 || { note "$V is already gone"; return; }
+  mp=$(docker volume inspect -f '{{.Mountpoint}}' "$V")
+  holders=$(docker ps -aq --filter "volume=$V" | wc -l | tr -d ' ')
+  [ "$holders" = "0" ] || { bad "$V is held by $(docker ps -a --filter "volume=$V" --format '{{.Names}}' | tr '\n' ' ') — not touching a volume something still mounts"; return; }
+  ok "nothing mounts it"
+  $SUDO ls -la "$mp" 2>/dev/null | sed 's/^/      /'
+
+  say "Copying what is in it somewhere the deletion cannot reach"
+  DEST=/var/backups/ariyankhan-site
+  $SUDO mkdir -p "$DEST"
+  $SUDO cp -a "$mp/." "$DEST/" 2>/dev/null || { bad "could not copy the contents out; nothing removed"; return; }
+  before=$($SUDO find "$mp" -type f | wc -l | tr -d ' ')
+  after=$($SUDO find "$DEST" -type f | wc -l | tr -d ' ')
+  note "$before file(s) in the volume, $after now in $DEST"
+  [ "$after" -ge "$before" ] || { bad "the copy is short; nothing removed"; return; }
+  $SUDO ls -la "$DEST" | sed 's/^/      /'
+  # A SQLite file that opens is a SQLite file that copied. sqlite3 is not on this host, so the header is the
+  # next best thing: every SQLite database starts with the same sixteen bytes.
+  for f in $($SUDO find "$DEST" -name '*.sqlite' -o -name '*.db' 2>/dev/null); do
+    if $SUDO head -c 15 "$f" 2>/dev/null | grep -q 'SQLite format 3'; then ok "$(basename "$f") is a readable SQLite file"
+    else bad "$(basename "$f") does not look like SQLite; nothing removed"; return; fi
+  done
+
+  say "Removing the volume"
+  if $SUDO docker volume rm "$V" >/dev/null 2>&1; then gone "$V"; else bad "could not remove $V"; return; fi
+  note "the copy stays at $DEST until you remove it yourself"
+
+  say "And the other one"
+  # ariyankhan_aa-data is empty, but the portfolio container mounts it, and that mount is written in
+  # hPanel's own compose file rather than in this repository. Saying so is as far as this goes.
+  if docker volume inspect ariyankhan_aa-data >/dev/null 2>&1; then
+    n=$($SUDO ls -A "$(docker volume inspect -f '{{.Mountpoint}}' ariyankhan_aa-data)" 2>/dev/null | wc -l | tr -d ' ')
+    h=$(docker ps -a --filter "volume=ariyankhan_aa-data" --format '{{.Names}}' | tr '\n' ' ')
+    kept "ariyankhan_aa-data — ${n:-0} entries inside, mounted by ${h:-nothing}"
+    note "it is declared in hPanel's own compose file for that container, not in this repository, so removing"
+    note "it means editing that file there first, recreating the container, and only then removing the volume"
+  fi
+}
+
 
 case "$MODE" in
   inspect)       mode_inspect ;;
@@ -1353,6 +1406,7 @@ case "$MODE" in
   drop-old-volumes) mode_drop_old_volumes ;;
   volumes)       mode_volumes ;;
   drop-orphan-volumes) mode_drop_orphan_volumes ;;
+  retire-site-data) mode_retire_site_data ;;
   *) echo "::error::unknown mode: $MODE"; exit 2 ;;
 esac
 
