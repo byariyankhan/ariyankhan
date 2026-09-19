@@ -41,6 +41,13 @@
 #                  database and role, and the host's backup directory all take the game's name. Takes and
 #                  restores a backup before it starts, copies the data rather than moving it, and deletes no
 #                  volume — going back is putting the old compose file back. Needs confirm=RENAME.
+#   rename-paths   The two paths the rename left behind. The backup container's bind mount still came from a
+#                  value naming /var/backups/arrow-atlas, so the host-side dumps were landing in the old
+#                  directory: this copies them into /var/backups/puzzle, points the value there, recreates the
+#                  one container that mounts it, and takes a backup to prove it lands. The old directory is kept.
+#                  Then the project directory itself moves out of the source checkout to /docker/puzzle, beside
+#                  the portfolio's own, once compose has rendered the identical configuration from there. Nothing
+#                  else is recreated. Needs confirm=RENAME.
 #   rename-env     The last of the old names: the keys in the project's .env on the host. Copies the file first,
 #                  renames only the part of a line before the first '=', proves no value moved by comparing a
 #                  hash of the values, renames the same references in the live compose file in place, and keeps
@@ -82,7 +89,7 @@ on:
         type: choice
         required: true
         default: inspect
-        options: [inspect, logs, web-look, web-revive, git-access, git-sync, backup-verify, cleanup, deploy, deploy-site, push-source, web-safe-fetch, rename-infra, finish-rename, rename-env, drop-old-volumes, drop-orphan-volumes, retire-site-data, web-drop-aa-mount, volumes, health]
+        options: [inspect, logs, web-look, web-revive, git-access, git-sync, backup-verify, cleanup, deploy, deploy-site, push-source, web-safe-fetch, rename-infra, finish-rename, rename-env, rename-paths, drop-old-volumes, drop-orphan-volumes, retire-site-data, web-drop-aa-mount, volumes, health]
       confirm:
         description: "Type DELETE for cleanup, DEPLOY for deploy, RENAME for rename-infra. Ignored by the read-only modes."
         required: false
@@ -108,7 +115,7 @@ jobs:
           case "${{ inputs.mode }}" in
             cleanup|drop-old-volumes|drop-orphan-volumes|retire-site-data|web-drop-aa-mount) [ "${{ inputs.confirm }}" = "DELETE" ] || { echo "::error::${{ inputs.mode }} needs confirm=DELETE"; exit 1; } ;;
             deploy|deploy-site|push-source|web-safe-fetch|web-revive) [ "${{ inputs.confirm }}" = "DEPLOY" ] || { echo "::error::${{ inputs.mode }} needs confirm=DEPLOY"; exit 1; } ;;
-            rename-infra|finish-rename|rename-env) [ "${{ inputs.confirm }}" = "RENAME" ] || { echo "::error::${{ inputs.mode }} needs confirm=RENAME"; exit 1; } ;;
+            rename-infra|finish-rename|rename-env|rename-paths) [ "${{ inputs.confirm }}" = "RENAME" ] || { echo "::error::${{ inputs.mode }} needs confirm=RENAME"; exit 1; } ;;
             *) echo "read-only mode, no confirmation needed" ;;
           esac
 

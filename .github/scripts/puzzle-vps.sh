@@ -28,6 +28,19 @@ API=$(C api); PG=$(C postgres); RDS=$(C redis); BKP=$(C backup)
 # `docker run -v <a name that does not exist>` quietly creates an empty volume instead of failing — which is
 # how a push-source could report success while the API went on serving what it already had.
 SITEVOL=$(docker volume inspect puzzle-site >/dev/null 2>&1 && echo puzzle-site || echo arrow-atlas-site)
+
+# Where compose reads this project from. The container's own label is asked first and is normally right; after
+# the directory is renamed the containers still carry the old one until they are next recreated, so a label
+# pointing at a directory with no compose file in it falls through to the names it could be.
+projdir() {
+  d=$(docker inspect -f '{{index .Config.Labels "com.docker.compose.project.working_dir"}}' "$API" 2>/dev/null)
+  if [ -n "$d" ] && $SUDO test -f "$d/docker-compose.yml"; then echo "$d"; return; fi
+  for c in /docker/puzzle /var/www/ariyankhan-src/games/arrow-atlas/deploy \
+           /srv/puzzle/deploy /srv/arrow-atlas/deploy; do
+    $SUDO test -f "$c/docker-compose.yml" && { echo "$c"; return; }
+  done
+  echo ""
+}
 AA_CONTAINERS="$API $PG $RDS $BKP"
 if [ -d /var/backups/puzzle ]; then HOST_BACKUPS=/var/backups/puzzle; else HOST_BACKUPS=/var/backups/arrow-atlas; fi
 fail=0
@@ -436,6 +449,140 @@ env_rollback() {
   $SUDO cp -a "$EBK" "$ENVF" && note "the .env is back as it was"
   $SUDO cp -a "$CBK" "$COMP" && note "the compose file is back as it was"
 }
+# The two paths the rename left behind, and the last of it on this host.
+#
+#   * the dumps. rename-infra made /var/backups/puzzle and this script has read and written it ever since, but
+#     the backup container's bind mount comes from a value in the .env, and that value still said
+#     /var/backups/arrow-atlas — so the host-side copies have been landing in the old directory. Nothing was
+#     lost: they are also in the puzzle-backups volume, and both places were there all along. This copies the
+#     old directory into the new one, points the value at it, recreates the one container that mounts it, and
+#     proves it by taking a backup and finding it on the host where it now belongs. The old directory is left
+#     exactly as it is: deleting a directory full of backups is its own decision, not a side effect of a rename.
+#
+#   * the project directory. Compose reads this project from games/arrow-atlas/deploy. The project's name is
+#     written in the file (`name: puzzle`), so it does not depend on the directory, and the two files are moved
+#     to games/puzzle/deploy only once compose has rendered the identical configuration from the new place.
+#     Nothing is recreated for this: the containers' labels point at the old directory until whatever recreates
+#     them next, and projdir() above resolves either.
+mode_rename_paths() {
+  [ "$CONFIRM" = "RENAME" ] || { echo "::error::rename-paths needs confirm=RENAME"; exit 2; }
+  echo "Puzzle — the last two paths  ($(hostname), $(date -u))"
+  have "$API" || { bad "no API container here"; return; }
+  PROJ=$(projdir)
+  [ -n "$PROJ" ] || { bad "cannot find the project directory"; return; }
+  ENVF="$PROJ/.env"; COMP="$PROJ/docker-compose.yml"
+  $SUDO test -f "$ENVF" || { bad "no .env in $PROJ"; return; }
+  note "$PROJ"
+
+  OLDB=/var/backups/arrow-atlas
+  NEWB=/var/backups/puzzle
+  say "1. the dumps, and where the backup container writes them"
+  MOUNT=$(docker inspect -f '{{range .Mounts}}{{if eq .Destination "/backups-host"}}{{.Source}}{{end}}{{end}}' "$BKP" 2>/dev/null)
+  note "it mounts ${MOUNT:-nothing} at /backups-host"
+  if [ "$MOUNT" = "$NEWB" ]; then
+    ok "already the new directory"
+  elif [ "$MOUNT" != "$OLDB" ]; then
+    bad "that is neither the old directory nor the new one; leaving the dumps alone"
+  else
+    $SUDO mkdir -p "$NEWB"
+    before=$($SUDO find "$OLDB" -maxdepth 1 -type f | wc -l | tr -d ' ')
+    note "$before file(s) in $OLDB"
+    $SUDO cp -an "$OLDB"/. "$NEWB"/ 2>/dev/null || true
+    missing=0
+    for f in $($SUDO find "$OLDB" -maxdepth 1 -type f -printf '%f\n'); do
+      $SUDO cmp -s "$OLDB/$f" "$NEWB/$f" || { bad "$f did not arrive in $NEWB intact"; missing=1; }
+    done
+    [ "$missing" = "0" ] && ok "every file in the old directory is in the new one, byte for byte" \
+      || { bad "not going further while a copy is in doubt"; return; }
+
+    say "2. the value that decides where they land"
+    $SUDO install -m 600 "$ENVF" "$HOST_BACKUPS/env.before-paths-$STAMP" && kept "$HOST_BACKUPS/env.before-paths-$STAMP"
+    $SUDO python3 - "$ENVF" "$OLDB" "$NEWB" <<'BDIR' || { bad "the .env was left alone"; return; }
+import io, re, sys
+path, old, new = sys.argv[1], sys.argv[2], sys.argv[3]
+lines = io.open(path, encoding='utf-8').read().split('\n')
+out, hit = [], 0
+for l in lines:
+    m = re.match(r'^(\s*(?:export\s+)?PUZZLE_BACKUP_HOST_DIR=)(.*)$', l)
+    if m and m.group(2).strip().strip('"\'') == old:
+        l = m.group(1) + new
+        hit += 1
+    out.append(l)
+if hit == 0:
+    print('      PUZZLE_BACKUP_HOST_DIR does not name the old directory; nothing changed', file=sys.stderr)
+    raise SystemExit(3)
+io.open(path, 'w', encoding='utf-8').write('\n'.join(out))
+print('      PUZZLE_BACKUP_HOST_DIR now names %s' % new)
+BDIR
+
+    say "3. the one container that mounts it"
+    ( cd "$PROJ" && $SUDO docker compose up -d --force-recreate puzzle-backup ) >/dev/null 2>&1 \
+      || note "compose reported trouble; checking anyway"
+    for i in $(seq 1 12); do
+      st=$(docker inspect -f '{{.State.Status}}{{if .State.Health}}/{{.State.Health.Status}}{{end}}' "$BKP" 2>/dev/null)
+      printf '      try %-2s  %s\n' "$i" "${st:-gone}"
+      case "$st" in running/healthy|running) break ;; esac
+      sleep 5
+    done
+    MOUNT=$(docker inspect -f '{{range .Mounts}}{{if eq .Destination "/backups-host"}}{{.Source}}{{end}}{{end}}' "$BKP" 2>/dev/null)
+    [ "$MOUNT" = "$NEWB" ] && ok "it mounts $NEWB now" || { bad "it still mounts ${MOUNT:-nothing}"; return; }
+
+    say "4. one backup, to prove it lands there"
+    n_before=$($SUDO find "$NEWB" -maxdepth 1 -name 'puzzle-*.dump' | wc -l | tr -d ' ')
+    aabackup once 2>&1 | tail -4 | sed 's/^/      /'
+    n_after=$($SUDO find "$NEWB" -maxdepth 1 -name 'puzzle-*.dump' | wc -l | tr -d ' ')
+    if [ "$n_after" -gt "$n_before" ]; then
+      ok "a new dump is on the host in $NEWB ($n_before -> $n_after)"
+      $SUDO ls -lt "$NEWB"/puzzle-*.dump 2>/dev/null | head -2 | sed 's/^/      /'
+    else
+      bad "no new dump appeared in $NEWB"
+    fi
+    kept "$OLDB, untouched — removing a directory of backups is its own decision"
+  fi
+
+  say "5. the project directory"
+  case "$PROJ" in
+    *arrow-atlas*) ;;
+    *) ok "already $PROJ"; return ;;
+  esac
+  # Not games/puzzle/deploy, even though that is the name this one should have had: that directory is inside the
+  # source checkout, and a project directory holding an installed compose file and a .env full of secrets has no
+  # business inside a tree that git pulls into. The box already has a convention for this — ariyankhan-web is
+  # defined from /docker/ariyankhan — so the game goes beside it. Where the game sits now is a directory the
+  # source-tree rename left behind, which is the only reason a .env survived in it at all.
+  if $SUDO test -d /docker; then NEWP=/docker/puzzle
+  else NEWP=$(printf '%s' "$PROJ" | sed 's#/games/arrow-atlas/#/games/puzzle/#'); fi
+  [ "$NEWP" != "$PROJ" ] || { bad "cannot work out what the new path would be"; return; }
+  note "$PROJ  ->  $NEWP"
+  $SUDO test -e "$NEWP/docker-compose.yml" && { bad "$NEWP already holds a compose file; not writing over it"; return; }
+  $SUDO test -e "$NEWP/.env" && { bad "$NEWP already holds a .env; not writing over it"; return; }
+  H1=$( cd "$PROJ" && $SUDO docker compose config 2>/dev/null | sha256sum | cut -d' ' -f1 )
+  case "$H1" in ''|e3b0c44298fc1c149afbf4c8996fb924*) bad "compose cannot render the project from where it is; stopping"; return ;; esac
+  $SUDO mkdir -p "$NEWP" || { bad "could not make $NEWP"; return; }
+  $SUDO cp -a "$ENVF" "$COMP" "$NEWP"/ || { bad "could not copy the two files over"; return; }
+  H2=$( cd "$NEWP" && $SUDO docker compose config 2>/dev/null | sha256sum | cut -d' ' -f1 )
+  if [ "$H1" = "$H2" ]; then
+    ok "compose renders the identical configuration from $NEWP"
+    $SUDO install -m 600 "$ENVF" "$HOST_BACKUPS/env.before-move-$STAMP" && kept "$HOST_BACKUPS/env.before-move-$STAMP"
+    $SUDO rm -f "$ENVF" "$COMP" && gone "the two files in $PROJ"
+    $SUDO rmdir "$PROJ" 2>/dev/null && gone "$PROJ (it was empty)" \
+      || note "$PROJ still holds other files; left as it is"
+    note "the containers keep the old directory in their labels until something recreates them, and every mode here resolves either"
+  else
+    bad "it renders something different from the new place; putting it back to one copy and changing nothing"
+    $SUDO rm -f "$NEWP/.env" "$NEWP/docker-compose.yml"
+    $SUDO rmdir "$NEWP" 2>/dev/null || true
+    return
+  fi
+
+  say "and the game, through all of it"
+  for c in $AA_CONTAINERS; do
+    printf '      %-18s %s\n' "$c" "$(docker inspect -f '{{.State.Status}}{{if .State.Health}} ({{.State.Health.Status}}){{end}}' "$c" 2>/dev/null)"
+  done
+  hp=$(curl -so /dev/null -w '%{http_code}' -m 10 "https://$DOMAIN/api/puzzle/v1/health")
+  [ "$hp" = "200" ] && ok "the API answers through nginx" || bad "the API answered $hp"
+}
+
 env_verify() {
   say "whether the live compose file is otherwise the one in this checkout"
   # A count, not a diff: this says whether a deploy is still owed, without printing a line of either file.
@@ -480,7 +627,7 @@ mode_rename_env() {
   command -v python3 >/dev/null || { bad "python3 is not on this host, and editing this file without it is not worth the risk"; return; }
   [ -s "$TGZ" ] || note "no checkout arrived; the comparison at the end will be skipped"
   have "$API" || { bad "no API container here"; return; }
-  PROJ=$(docker inspect -f '{{index .Config.Labels "com.docker.compose.project.working_dir"}}' "$API" 2>/dev/null)
+  PROJ=$(projdir)
   [ -n "$PROJ" ] && $SUDO test -f "$PROJ/.env" || { bad "cannot find the .env behind $API"; return; }
   ENVF="$PROJ/.env"; COMP="$PROJ/docker-compose.yml"
   EBK="$HOST_BACKUPS/env.before-rename-$STAMP"; CBK="$HOST_BACKUPS/docker-compose.yml.before-rename-$STAMP"
@@ -827,8 +974,8 @@ mode_push_source() {
   fi
 
   say "2. the compose file that came with it"
-  PROJ=$(docker inspect -f '{{index .Config.Labels "com.docker.compose.project.working_dir"}}' "$API" 2>/dev/null)
-  [ -n "$PROJ" ] && $SUDO test -d "$PROJ" || { bad "cannot find the project directory of $API"; return; }
+  PROJ=$(projdir)
+  [ -n "$PROJ" ] || { bad "cannot find the project directory of $API"; return; }
   note "$PROJ"
   $SUDO cp -a "$PROJ/docker-compose.yml" "$HOST_BACKUPS/docker-compose.yml.before-$STAMP" 2>/dev/null \
     && kept "$HOST_BACKUPS/docker-compose.yml.before-$STAMP  (the way back)"
@@ -1818,6 +1965,7 @@ case "$MODE" in
   health)        mode_health ;;
   rename-infra)  mode_rename_infra ;;
   rename-env)    mode_rename_env ;;
+  rename-paths)  mode_rename_paths ;;
   finish-rename) mode_finish_rename ;;
   drop-old-volumes) mode_drop_old_volumes ;;
   volumes)       mode_volumes ;;
