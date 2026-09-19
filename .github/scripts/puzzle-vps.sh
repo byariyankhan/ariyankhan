@@ -544,7 +544,10 @@ mode_rename_nginx() {
   # The socket is the reason the map exists, so it is the thing to check: a handshake with no session must be
   # refused with 401. A 404 would mean the route is gone, which is what renaming the variable in one of the two
   # files and not the other would do.
-  code=$(curl -sS -m 15 -o /dev/null -w '%{http_code}' \
+  # --http1.1 is the whole test. A WebSocket handshake is an HTTP/1.1 upgrade; over HTTP/2 those two headers mean
+  # nothing, so curl negotiating h2 with the CDN in front sends what arrives as an ordinary GET, and the API
+  # answers its own JSON 404 — which reads exactly like a missing nginx route and is nothing of the kind.
+  code=$(curl -sS --http1.1 -m 15 -o /dev/null -w '%{http_code}' \
       -H 'Connection: Upgrade' -H 'Upgrade: websocket' -H 'Sec-WebSocket-Version: 13' \
       -H 'Sec-WebSocket-Key: AAAAAAAAAAAAAAAAAAAAAA==' "https://$DOMAIN/ws/puzzle" 2>/dev/null || echo 000)
   case "$code" in
@@ -1514,7 +1517,7 @@ mode_health() {
 
   say "the WebSocket route"
   # A handshake without a session must be refused with 401, not 404: 404 would mean nginx has no route.
-  code=$(curl -sS -m 20 -o /dev/null -w '%{http_code}' "${R[@]}" \
+  code=$(curl -sS --http1.1 -m 20 -o /dev/null -w '%{http_code}' "${R[@]}" \
       -H 'Connection: Upgrade' -H 'Upgrade: websocket' -H 'Sec-WebSocket-Version: 13' \
       -H 'Sec-WebSocket-Key: AAAAAAAAAAAAAAAAAAAAAA==' \
       "https://$DOMAIN/ws/puzzle" 2>/dev/null || echo 000)
