@@ -55,11 +55,8 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-chip:empty{ display:none; }
 /* the struck coin: sized in ems so it follows whatever type it sits beside */
 .aa-coin{ width:1.3em; height:1.3em; flex:0 0 auto; vertical-align:-.28em; object-fit:contain; }
-.aa-chip--purse{ display:inline-flex; align-items:center; gap:6px; color:var(--ink); font-weight:900; font-size:14px; font-variant-numeric:tabular-nums; }
+.aa-chip--purse{ display:inline-flex; align-items:center; gap:6px; color:var(--ink); font-weight:900; font-size:16px; font-variant-numeric:tabular-nums; }
 .aa-chip--purse.is-won{ animation:aapop .5s ease-out 2; color:var(--accent); }
-/* the badge follows the number rather than the number following the badge */
-.aa-chip--purse.is-big{ font-size:13px; padding:5px 11px; gap:5px; }
-.aa-chip--purse.is-vast{ font-size:11px; padding:5px 9px; gap:4px; }
 /* lobby world map: every country faint, tour countries outlined, cleared ones filled and numbered */
 /* the map fits the screen width (bleeding into the side gutters); the height left over in the lobby is split
    evenly above and below it */
@@ -163,9 +160,11 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-fill input:checked::after{ transform:translateX(18px); }
 .aa-fill input:checked + span{ color:var(--ink); }
 .aa-purse{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin:0 0 12px; font-size:14px; font-weight:800; color:var(--muted); }
-.aa-gold{ margin-left:auto; display:flex; align-items:center; gap:5px; font-size:15px; font-weight:900; color:var(--ink); background:var(--bg2); border-radius:999px; padding:7px 13px; flex:0 0 auto; font-variant-numeric:tabular-nums; }
+/* the one field in the game a player types into */
+.aa-input{ width:100%; margin:10px 0 2px; padding:12px 14px; border:2px solid var(--outline); border-radius:14px; background:var(--bg2); color:var(--ink); font-family:inherit; font-weight:800; font-size:17px; text-align:center; }
+.aa-input:focus{ outline:none; border-color:var(--accent); }
+.aa-gold{ margin-left:auto; display:flex; align-items:center; gap:5px; font-size:16px; font-weight:900; color:var(--ink); background:var(--bg2); border-radius:999px; padding:7px 13px; flex:0 0 auto; font-variant-numeric:tabular-nums; }
 .aa-soon{ font-size:11px; font-weight:900; letter-spacing:1px; text-transform:uppercase; color:var(--muted); background:var(--bg2); border-radius:999px; padding:4px 10px; flex:0 0 auto; }
-.aa-input{ text-align:right; }
 .aa-vs{ display:grid; gap:6px; margin:0 0 14px; }
 .aa-vs-who{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .aa-vs-face{ flex:0 0 auto; width:30px; height:30px; font-size:13px; }
@@ -176,8 +175,6 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-from .aa-vs-face{ width:38px; height:38px; font-size:16px; }
 .aa-from .aa-vs-who{ white-space:normal; overflow:visible; text-overflow:clip; }
 .aa-gold.is-won{ animation:aapop .5s ease-out 2; color:var(--accent); }
-.aa-gold.is-big{ font-size:13px; padding:6px 11px; gap:4px; }
-.aa-gold.is-vast{ font-size:11px; padding:5px 9px; gap:3px; }
 @keyframes aapop{ 0%{ transform:scale(1); } 40%{ transform:scale(1.18); } 100%{ transform:scale(1); } }
 .aa-vs-row b{ font-variant-numeric:tabular-nums; }
 .aa-play:active{ transform:translateY(3px); box-shadow:0 3px 0 color-mix(in srgb, var(--accent2) 70%, #000); }
@@ -266,13 +263,6 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 #aaRecentCap.is-armed{ color:var(--good); }
 
 /* The way into the league from the dashboard, where the gold already is. */
-.aa-lg-open{ display:flex; align-items:center; gap:12px; width:100%; margin:12px 0 0; padding:12px 16px; border:none;
-  border-radius:18px; background:var(--card); color:var(--ink); font-family:inherit; font-weight:900; cursor:pointer;
-  box-shadow:0 2px 10px rgba(0,0,0,.05); text-align:left; transition:transform .1s; }
-.aa-lg-open:active{ transform:translateY(2px); }
-.aa-lg-open-t{ flex:1; min-width:0; font-size:15px; }
-.aa-lg-open-t small{ display:block; font-size:12px; font-weight:700; color:var(--muted); }
-.aa-lg-open-go{ color:var(--muted); font-size:20px; }
 
 /* ── Game ── */
 .aa-gamescreen{ gap:6px; }
@@ -417,6 +407,11 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 /* a caption over each group, so Settings reads as a few short lists rather than one long pile */
 .aa-cap{ font-size:12px; font-weight:900; letter-spacing:1px; text-transform:uppercase; color:var(--muted); margin:2px 0 8px 18px; }
 .aa-row{ display:flex; align-items:center; gap:14px; padding:16px 0; width:100%; background:none; border:none; color:var(--ink); font-size:18px; font-weight:700; text-align:left; text-decoration:none; cursor:default; }
+/* the account row, opened into a field: the input, what the name is for, and the two answers */
+.aa-row--edit{ display:block; }
+.aa-row--edit .aa-input{ margin:0; text-align:left; }
+.aa-row--edit small{ display:block; margin:8px 2px 10px; font-size:12px; font-weight:700; color:var(--muted); }
+.aa-edit-go{ display:flex; gap:8px; justify-content:flex-end; }
 .aa-row + .aa-row{ border-top:1px solid var(--bg2); }
 .aa-row--link{ cursor:pointer; }
 .aa-row--col{ flex-direction:column; align-items:stretch; gap:10px; }

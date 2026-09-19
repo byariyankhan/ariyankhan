@@ -69,7 +69,7 @@
          set these two when the backend moves to a host of its own and the client follows without a change:
          <meta name="arrow-atlas-api" content="https://api.arrowatlas.com" />
          <meta name="arrow-atlas-ws"  content="wss://api.arrowatlas.com" /> -->
-    <link rel="stylesheet" href="css/arrow-atlas.css?v=66" />
+    <link rel="stylesheet" href="css/arrow-atlas.css?v=67" />
     <link rel="preload" href="games/data/arrow-atlas.json?v=11" as="fetch" crossorigin="anonymous" />
 
     <!-- SCHEMA -->
@@ -435,7 +435,9 @@
         <div class="aa-sheet-head"><button type="button" class="aa-icon" data-close-sheet aria-label="Back"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H6M11 6l-6 6 6 6"/></svg></button><h2>Settings</h2></div>
         <p class="aa-cap" id="aaAccountCap" hidden>Account</p>
         <div class="aa-group" id="aaAccountGroup" hidden>
-          <div class="aa-row"><span class="aa-row-ico aa-row-face" id="aaAccountFace" aria-hidden="true"></span><span class="aa-row-label">Account<small id="aaAccountWho">Signed in</small></span><span class="aa-gold" id="aaAccountGold"></span></div>
+          <!-- The row says who this is, not that it is a row about an account: the caption above already does
+               that. The name is the thing a player can change, so the row itself is the button that changes it. -->
+          <button type="button" class="aa-row aa-row--link" id="aaAccountRow"><span class="aa-row-ico aa-row-face" id="aaAccountFace" aria-hidden="true"></span><span class="aa-row-label"><span id="aaAccountName">Player</span><small id="aaAccountWho">Signed in with Google</small></span><span class="aa-gold" id="aaAccountGold"></span><span class="aa-row-chev" aria-hidden="true">›</span></button>
         </div>
 
         <p class="aa-cap">Game</p>
@@ -479,6 +481,6 @@
       </div>
     </div>
 
-    <script src="js/arrow-atlas.js?v=90"></script>
+    <script src="js/arrow-atlas.js?v=91"></script>
   </body>
 </html>
