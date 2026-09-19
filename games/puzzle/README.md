@@ -11,20 +11,20 @@ own domain and its own server, moving it is a restore and a DNS change, not an u
 
 | Container | Image | Listens on | Reachable from |
 |---|---|---|---|
-| `arrow-atlas-api` | `node:22-alpine`, builds this repo at start | `127.0.0.1:8760` | the host nginx only |
-| `arrow-atlas-postgres` | `postgres:16-alpine` | nothing published | `arrow-atlas-api`, `arrow-atlas-backup` |
-| `arrow-atlas-redis` | `redis:7-alpine` | nothing published | `arrow-atlas-api` |
-| `arrow-atlas-backup` | `postgres:16-alpine` | nothing published | — |
+| `puzzle-api` | `node:22-alpine`, builds this repo at start | `127.0.0.1:8760` | the host nginx only |
+| `puzzle-postgres` | `postgres:16-alpine` | nothing published | `puzzle-api`, `puzzle-backup` |
+| `puzzle-redis` | `redis:7-alpine` | nothing published | `puzzle-api` |
+| `puzzle-backup` | `postgres:16-alpine` | nothing published | — |
 
-Volumes: `arrow-atlas-postgres-data`, `arrow-atlas-redis-data`, `arrow-atlas-backups`, and `arrow-atlas-site` —
+Volumes: `puzzle-postgres-data`, `puzzle-redis-data`, `puzzle-backups`, and `puzzle-site` —
 the checkout the API fetches, which the backup container reads its two scripts from.
 
-Two networks. `arrow-atlas-data` is `internal: true`, so the database and the cache have no route to or from the
-internet at all. `arrow-atlas-edge` exists only so the API can reach Google to verify a sign-in token. The API
+Two networks. `puzzle-data` is `internal: true`, so the database and the cache have no route to or from the
+internet at all. `puzzle-edge` exists only so the API can reach Google to verify a sign-in token. The API
 sits on both; nothing else sits on the edge.
 
-Database: `arrow_atlas`, owned by the role `arrow_atlas`.
-Every Redis key begins `arrow-atlas:`.
+Database: `puzzle`, owned by the role `puzzle`.
+Every Redis key begins `puzzle:`.
 
 ### Who owns what
 
@@ -101,9 +101,9 @@ proportion, without a deploy of anything but the environment.
 ## Public URLs
 
 ```
-REST       https://ariyankhan.com/api/arrow-atlas/v1/...
-WebSocket  wss://ariyankhan.com/ws/arrow-atlas
-health     http://127.0.0.1/api/arrow-atlas/health   (host-only)
+REST       https://ariyankhan.com/api/puzzle/v1/...
+WebSocket  wss://ariyankhan.com/ws/puzzle
+health     http://127.0.0.1/api/puzzle/health   (host-only)
 ```
 
 There is one surface and it is versioned. The `/games/api/*.php` paths the PHP service answered were kept
@@ -195,15 +195,15 @@ context on the server.
 ```bash
 cd games/puzzle/deploy
 cp .env.example .env          # fill in the two passwords and GOOGLE_CLIENT_ID
-mkdir -p /var/backups/arrow-atlas
+mkdir -p /var/backups/puzzle
 
 docker compose up -d
 docker compose ps             # all four healthy — the API's first start builds, so give it a minute or two
-docker compose logs -f arrow-atlas-api
+docker compose logs -f puzzle-api
 curl -s localhost:8760/health
 ```
 
-**The faster alternative, now that the image exists.** `.github/workflows/arrow-atlas-api.yml` runs every suite
+**The faster alternative, now that the image exists.** `.github/workflows/puzzle-api.yml` runs every suite
 against real PostgreSQL and Redis service containers on each push and pull request, and on a push to `main` it
 builds the image and publishes it to `ghcr.io`. Switching to it is three things: set `ARROW_ATLAS_IMAGE` in
 `.env`, replace the API service's `image:` line with `image: ${ARROW_ATLAS_IMAGE}`, and delete its `command:`
@@ -211,7 +211,7 @@ block. A deploy then becomes `docker compose pull` rather than a two-to-four min
 every restart. Production still fetches and builds, because that is what it was cut over with and it works;
 this is the next thing to change, not an urgent one.
 
-**Or from GitHub, without a shell on the server.** `.github/workflows/arrow-atlas-ops.yml` is dispatch-only and
+**Or from GitHub, without a shell on the server.** `.github/workflows/puzzle-ops.yml` is dispatch-only and
 has five modes: `inspect` and `health` read, `backup-verify` takes one dump and restores it into a scratch
 database, `cleanup` deletes legacy artifacts, and `deploy` installs the nginx snippet from the checkout (after
 `nginx -t` accepts it, keeping the previous one) and restarts the two containers that re-fetch this repository.
@@ -268,36 +268,36 @@ the `stakes_in` column, and the pre-2026-09-17 rows in `matches` — which are t
 
 ## Backups
 
-`arrow-atlas-backup` runs `backup.sh` from the repository checkout that `arrow-atlas-api` fetches, mounted
-read-only from the `arrow-atlas-site` volume. That is how it gets the script without a network of its own: it
+`puzzle-backup` runs `backup.sh` from the repository checkout that `puzzle-api` fetches, mounted
+read-only from the `puzzle-site` volume. That is how it gets the script without a network of its own: it
 sits only on the internal network, and `postgres:16-alpine` ships no `curl`. On a first deploy it waits for the
 checkout to appear, which takes seconds, and logs while it waits.
 
 It takes a backup on boot and then daily at `ARROW_ATLAS_BACKUP_AT_HOUR` UTC. Each dump is written
 with `pg_dump -Fc`, **read back with `pg_restore --list` before it is accepted** — by name, so a dump missing
 `users`, `sessions`, `matches`, `match_players` or `gold_ledger` is refused and says which — and copied to
-`/var/backups/arrow-atlas` on the host so losing the Docker volume does not lose the history. Dumps older than
+`/var/backups/puzzle` on the host so losing the Docker volume does not lose the history. Dumps older than
 `ARROW_ATLAS_BACKUP_KEEP_DAYS` are removed. The container's healthcheck goes red if the newest dump is more
 than a day old, so a backup that has quietly stopped shows up as an unhealthy container.
 
 ```bash
-docker exec arrow-atlas-backup sh -c 'sh $ARROW_ATLAS_SCRIPTS_DIR/backup.sh list'   # what we have
-docker exec arrow-atlas-backup sh -c 'sh $ARROW_ATLAS_SCRIPTS_DIR/backup.sh once'   # take one now
+docker exec puzzle-backup sh -c 'sh $ARROW_ATLAS_SCRIPTS_DIR/backup.sh list'   # what we have
+docker exec puzzle-backup sh -c 'sh $ARROW_ATLAS_SCRIPTS_DIR/backup.sh once'   # take one now
 ```
 
 ### Restoring
 
 ```bash
 # Prove a dump is restorable, without touching the game. Run this occasionally.
-docker exec arrow-atlas-backup sh -c 'sh $ARROW_ATLAS_SCRIPTS_DIR/restore.sh verify /backups/arrow-atlas-20260917T030000Z.dump'
+docker exec puzzle-backup sh -c 'sh $PUZZLE_SCRIPTS_DIR/restore.sh verify /backups/puzzle-20260917T030000Z.dump'
 
 # Restore into a database you name, to look at it.
-docker exec arrow-atlas-backup sh -c 'sh $ARROW_ATLAS_SCRIPTS_DIR/restore.sh into /backups/....dump arrow_atlas_yesterday'
+docker exec puzzle-backup sh -c 'sh $ARROW_ATLAS_SCRIPTS_DIR/restore.sh into /backups/....dump puzzle_yesterday'
 
 # Replace the live database. Saves the current one first, to /backups/pre-restore-<stamp>.dump.
-docker compose stop arrow-atlas-api
-docker exec -e CONFIRM=yes arrow-atlas-backup sh -c 'sh $ARROW_ATLAS_SCRIPTS_DIR/restore.sh live /backups/....dump'
-docker compose start arrow-atlas-api
+docker compose stop puzzle-api
+docker exec -e CONFIRM=yes puzzle-backup sh -c 'sh $ARROW_ATLAS_SCRIPTS_DIR/restore.sh live /backups/....dump'
+docker compose start puzzle-api
 ```
 
 `verify` restores into a scratch database, counts the rows, checks that the ledger reconciles, and drops the
@@ -311,13 +311,13 @@ scratch database again. It is the only way to know a backup works.
 
 ```bash
 cd games/puzzle/deploy
-ARROW_ATLAS_IMAGE=ghcr.io/byariyankhan/arrow-atlas-api:<previous-sha> docker compose up -d arrow-atlas-api
+ARROW_ATLAS_IMAGE=ghcr.io/byariyankhan/puzzle-api:<previous-sha> docker compose up -d puzzle-api
 ```
 
 **The data is wrong** — restore the newest good dump, as above.
 
 **The routing is wrong** — `deploy` keeps the snippet it replaced as
-`/var/backups/arrow-atlas/arrow-atlas.conf.before-<stamp>`, and it puts that file back itself if `nginx -t`
+`/var/backups/puzzle/arrow-atlas.conf.before-<stamp>` (the snippet keeps its installed filename), and it puts that file back itself if `nginx -t`
 refuses the new one. By hand it is a `cp` and a reload.
 
 There is no going back to the PHP service. It was deleted, with its SQLite file and the importer, once a
@@ -337,10 +337,10 @@ The work this whole layout exists to make short:
    one `restore.sh live <dump>`. Verify it first with `restore.sh verify`.
 3. **Persistent assets.** There are none beyond PostgreSQL: profile pictures are Google URLs, and boards are
    baked into the image.
-4. **Point the client at it.** Two meta tags in `arrow-atlas.html`:
+4. **Point the client at it.** Two meta tags in `puzzle/index.html`:
    ```html
-   <meta name="arrow-atlas-api" content="https://api.arrowatlas.com" />
-   <meta name="arrow-atlas-ws"  content="wss://api.arrowatlas.com" />
+   <meta name="puzzle-api" content="https://api.arrowatlas.com" />
+   <meta name="puzzle-ws"  content="wss://api.example.com" />
    ```
    and set `ARROW_ATLAS_ALLOWED_ORIGINS` to the origins the page is served from, so the browser may send
    credentials cross-origin. No JavaScript changes.

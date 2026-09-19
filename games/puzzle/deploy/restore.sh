@@ -1,15 +1,15 @@
 #!/bin/sh
 # Restore Arrow Atlas from a dump.
 #
-#   arrow-atlas-restore verify  <dump>              restore into a scratch database and check it, changing nothing
-#   arrow-atlas-restore into    <dump> <database>   restore into a database you name
-#   arrow-atlas-restore live    <dump>              replace the live database (asks for CONFIRM=yes)
+#   puzzle-restore verify  <dump>              restore into a scratch database and check it, changing nothing
+#   puzzle-restore into    <dump> <database>   restore into a database you name
+#   puzzle-restore live    <dump>              replace the live database (asks for CONFIRM=yes)
 #
 # `verify` is the one to run regularly: it proves the backup is restorable without touching the game.
 set -eu
 
-log()  { printf '{"ts":"%s","product":"arrow-atlas","component":"restore","msg":"%s"}\n' "$(date -u +%FT%TZ)" "$1"; }
-fail() { printf '{"ts":"%s","product":"arrow-atlas","component":"restore","level":"error","msg":"%s"}\n' "$(date -u +%FT%TZ)" "$1" >&2; }
+log()  { printf '{"ts":"%s","product":"puzzle","component":"restore","msg":"%s"}\n' "$(date -u +%FT%TZ)" "$1"; }
+fail() { printf '{"ts":"%s","product":"puzzle","component":"restore","level":"error","msg":"%s"}\n' "$(date -u +%FT%TZ)" "$1" >&2; }
 
 LIVE_DB="${PGDATABASE:-arrow_atlas}"
 # The same list backup.sh checks, so a dump it accepted is a dump this will accept.
