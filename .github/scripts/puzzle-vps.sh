@@ -387,7 +387,10 @@ mode_web_revive() {
     loop=$(docker exec "$W" sh -c 'curl -so /dev/null -w "%{http_code}" -m 8 http://127.0.0.1/' 2>/dev/null)
     live=$(curl -fsS -m 10 "https://$DOMAIN/puzzle/" 2>/dev/null | grep -o 'js/puzzle\.js?v=[0-9]*' | head -1)
     printf '      try %-2s  container %s, its own answer %s, page %s\n' "$i" "${h:-gone}" "${loop:-none}" "${live:-nothing}"
-    [ "$loop" = "200" ] && [ -n "$live" ] && break
+    # On its own loopback the answer to / is a 301: the request arrives without X-Forwarded-Proto, so the rule
+    # that forces HTTPS sends it away. Anything but a 5xx or nothing at all means Apache is reading .htaccess,
+    # which is the thing being waited for here.
+    case "${loop:-none}" in 2??|3??) [ -n "$live" ] && break ;; esac
   done
 
   if [ -n "$live" ]; then
