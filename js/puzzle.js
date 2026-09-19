@@ -349,9 +349,13 @@
   //
   // A heart lost is heard as well as seen. A low two-beat thump comes up under the board -- quicker, and a
   // little louder, the fewer hearts are left -- and then it goes away by itself: three seconds for the first
-  // heart lost, four for the next, seven for the one after that. On the last heart it does not go away. It
-  // stays until the board is won, lost or left, because on the last heart there is nothing else left to lose,
-  // and a sound that stops there would be the game relaxing at the exact moment the player cannot.
+  // heart lost, four for the next, seven for the one after. On the last heart it does not go away. It stays
+  // until the board is won, lost or left, because on the last heart there is nothing else left to lose, and a
+  // sound that stops there would be the game relaxing at the exact moment the player cannot.
+  //
+  // Every board gives four hearts today, so the third loss IS the last heart: what plays is three seconds, then
+  // four, then the one that does not stop. The seven is the next step of the same ramp, and it is written down
+  // here rather than left out so that a five-heart board would sound right the day there is one.
   //
   // Staying is not the same as never letting up, though. After forty-five seconds on one heart it drops back to
   // a quieter beat and holds there -- present, not shouting. A board of eighty arrows can take ten minutes, and
