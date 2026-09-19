@@ -388,10 +388,15 @@
   // the helper falls back to showing it once per session, which is the safe way to be wrong.
   const TAUGHT = store.get('taught', null) || {};
   const learning = () => { try { return !cleared(0); } catch { return false; } };
-  function teach(k, msg, kind = 'hint', ms = 2800) {
+  // Should this rule be explained at all, right now? True while the player is still on their first level, and
+  // true once ever after that -- and it records that it has been said, so the next time it is false.
+  function sayOnce(k) {
     const first = !TAUGHT[k];
     if (first) { TAUGHT[k] = 1; store.set('taught', TAUGHT); }
-    if (!first && !learning()) return false;
+    return first || learning();
+  }
+  function teach(k, msg, kind = 'hint', ms = 2800) {
+    if (!sayOnce(k)) return false;
     toast(msg, kind, ms);
     return true;
   }
@@ -1340,8 +1345,8 @@
     el.card.innerHTML = `
       <p class="aa-card-kicker">${state.daily ? (state.daily.race ? `Gold match · ${gpurse(state.daily.match?.stake || 0)}` : 'Daily board') : hudLabel()} · ${DIFF_OF(state.tier)}</p>
       <h3>${reason}</h3>
-      <p class="aa-card-lead">${state.left} of ${state.pieces.length} arrows were still on the board.${state.daily?.race ? ' You are still in the challenge: Try again puts you back on the same board with your hearts back, to clear from the start. Nothing is lost until somebody else clears it.' : ''}</p>
-      ${eased ? `<p class="aa-adapt aa-adapt--down">Two losses in a row. A new layout eases to ${DIFF_OF(learn.after.tier)}; Try again keeps this board.</p>` : learn && learn.after.losses === 1 && state.tier > 0 ? '<p class="aa-adapt">One more loss and the boards ease off a step.</p>' : ''}
+      <p class="aa-card-lead">${state.left} of ${state.pieces.length} arrows were still on the board.</p>
+      ${state.daily?.race && sayOnce('race-retry') ? '<p class="aa-adapt">Try again puts you back on the same board with your hearts back. Nothing is lost until somebody else clears it.</p>' : ''}
       <div class="aa-actions aa-actions--stack">
         <button type="button" class="aa-btn aa-btn--primary" data-act="retry">${ICON_AGAIN}Try again</button>
         ${state.daily?.race ? `<button type="button" class="aa-btn" data-act="giveup">${ICON_FLAG}Give the board up</button>` : `<button type="button" class="aa-btn" data-act="shuffle">${ICON_SHUFFLE}${eased ? 'Easier layout' : 'New layout'}</button>`}
