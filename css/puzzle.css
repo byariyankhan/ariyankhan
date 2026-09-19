@@ -277,10 +277,13 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-gactions{ display:flex; }
 .aa-status{ display:flex; align-items:center; justify-content:space-between; gap:8px; padding:6px 2px 0; }
 .aa-status-left{ display:flex; align-items:center; gap:12px; }
-.aa-lives{ font-size:26px; letter-spacing:2px; line-height:1; }
+/* Hearts are drawn now, so they are sized in pixels rather than in whatever the font made of ♥. */
+.aa-lives{ display:inline-flex; align-items:center; gap:3px; line-height:1; }
+.aa-lives span{ display:inline-flex; }
+.aa-lives svg{ width:24px; height:24px; display:block; fill:currentColor; stroke:none; }
 .aa-lives .is-on{ color:var(--heart); }
 .aa-lives .is-off{ color:var(--bg2); }
-.aa-lives.is-last .is-on{ animation:aa-heartbeat .8s ease-in-out infinite; display:inline-block; }
+.aa-lives.is-last .is-on{ animation:aa-heartbeat .8s ease-in-out infinite; }
 @keyframes aa-heartbeat{ 0%,100%{ transform:scale(1); } 50%{ transform:scale(1.3); } }
 .aa-time{ font-size:18px; font-weight:900; color:var(--muted); font-variant-numeric:tabular-nums; }
 .aa-time.is-low{ color:var(--bad); }
@@ -316,9 +319,10 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
    come down a little so all three sit on the same visual line. */
 .aa-status-left{ display:flex; align-items:center; gap:10px; min-width:0; }
 .aa-status-right{ display:flex; align-items:center; gap:6px; }
-.aa-status-right .aa-lives{ font-size:19px; line-height:30px; letter-spacing:1px; margin-right:2px; }
+.aa-status-right .aa-lives{ height:30px; margin-right:3px; }
+.aa-status-right .aa-lives svg{ width:19px; height:19px; }
 @media(max-width:380px){
-  .aa-status-right .aa-lives{ font-size:17px; }
+  .aa-status-right .aa-lives svg{ width:17px; height:17px; }
   .aa-hintbtn{ min-width:50px; padding:0 8px; font-size:13px; }
 }
 
