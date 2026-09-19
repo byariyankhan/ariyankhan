@@ -51,7 +51,8 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-home-top{ display:flex; align-items:center; justify-content:flex-end; min-height:42px; }
 .aa-home-top{ gap:8px; }
 .aa-home-top .aa-chip--purse{ margin-right:auto; }
-.aa-chip{ font-size:13px; color:var(--muted); background:var(--bg2); border-radius:30px; padding:6px 12px; }
+/* the two chips at the top are tapped as often as anything on this screen, so they are a thumb tall */
+.aa-chip{ font-size:13px; color:var(--muted); background:var(--bg2); border-radius:30px; padding:9px 14px; }
 .aa-chip:empty{ display:none; }
 /* the struck coin: sized in ems so it follows whatever type it sits beside */
 .aa-coin{ width:1.3em; height:1.3em; flex:0 0 auto; vertical-align:-.28em; object-fit:contain; }

@@ -1,0 +1,11 @@
+-- Who you have played with, read quickly.
+--
+-- The recent-players list starts from the newest rooms a player has sat in: match_players, filtered by the
+-- player and ordered by seat, newest first, taking a few hundred. The index that exists is on user_id alone,
+-- so PostgreSQL has to read every seat that player has ever taken and sort them to answer that. Somebody with
+-- ten thousand matches behind them would pay for all of them on every look at the dashboard.
+--
+-- With the seat in the index the same answer is the first few hundred rows of a scan that is already in the
+-- right order, and the sort disappears. The old index stays: it serves the lookups that only ask "is this
+-- player in this match", where the seat is no part of the question.
+CREATE INDEX IF NOT EXISTS match_players_user_seat_idx ON match_players (user_id, seat_id DESC);

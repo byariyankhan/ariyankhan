@@ -1,6 +1,6 @@
 {
   "id": "/arrow-atlas.html",
-  "name": "Arrow Atlas \u2014 Map Arrow Puzzle",
+  "name": "Arrow Atlas — Map Arrow Puzzle",
   "short_name": "Arrow Atlas",
   "description": "Arrow Atlas: a free arrow puzzle game on real country maps. Tap arrows to clear the board, keep your hearts, name the country. 197 countries, adaptive difficulty, works offline.",
   "start_url": "/arrow-atlas.html?utm_source=pwa",
@@ -15,16 +15,22 @@
   ],
   "icons": [
     {
-      "src": "/favicon/web-app-manifest-192x192.png",
+      "src": "/games/icons/arrow-atlas-192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
-      "src": "/favicon/web-app-manifest-512x512.png",
+      "src": "/games/icons/arrow-atlas-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/games/icons/arrow-atlas-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }

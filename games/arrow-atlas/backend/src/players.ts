@@ -58,14 +58,15 @@ export async function recentPlayers(sql: Sql, userId: number, limit = 24): Promi
   if (!r.rowCount) return [];
 
   const ids = r.rows.map(x => x.id);
-  // A seat in a room that has not finished. On its own this is not "in a match": a room nobody joined, or a
-  // race somebody walked out of, stays open for hours by design (the sweeper refunds it a day later), and
-  // reading that row alone told a player their friend was playing all night. So it is only half the answer —
-  // and the recent window keeps an old abandoned room from following somebody around even while they are here.
+  // In the middle of a race: a match that has started, a result not reported yet, recent enough to still be
+  // running. Waiting in a room that has not started is not this — those players are simply here, and asking
+  // them to come to your table instead is a fair thing to do. It is the same question the invite route asks
+  // before it refuses to interrupt somebody, so the row and the rule cannot disagree. Neither counts a room
+  // somebody walked out of hours ago: one stays open by design until the sweeper refunds it.
   const busy = await query<{ user_id: number }>(sql, `
     SELECT DISTINCT p.user_id FROM match_players p JOIN matches m ON m.code = p.code
-     WHERE p.user_id = ANY($1::bigint[]) AND p.ms IS NULL AND m.state IN ('open', 'playing')
-       AND m.created_at > now() - ($2 || ' minutes')::interval`, [ids, String(AT_A_TABLE_MINUTES)]);
+     WHERE p.user_id = ANY($1::bigint[]) AND p.ms IS NULL AND m.state = 'playing'
+       AND m.started_at > now() - ($2 || ' minutes')::interval`, [ids, String(AT_A_TABLE_MINUTES)]);
   const busySeat = new Set(busy.rows.map(x => x.user_id));
   const here = new Set<number>();
   // One Redis key each, in parallel: the list is at most a hundred names and each read is a single EXISTS.
@@ -80,6 +81,23 @@ export async function recentPlayers(sql: Sql, userId: number, limit = 24): Promi
     // row says, so presence decides first and the seat only chooses between "online" and "in a match".
     status: here.has(x.id) ? (busySeat.has(x.id) ? 'playing' : 'online') : 'offline',
   }));
+}
+
+/**
+ * Is this player in the middle of a race?
+ *
+ * Not "has a seat somewhere" — racing: a match that has started, a result they have not reported yet, and
+ * recent enough to still be going. Somebody with a board in front of them and a clock running is the one
+ * person an invitation must not reach: it is a notification over a game they are being timed on.
+ */
+export async function isRacing(sql: Sql, userId: number): Promise<boolean> {
+  const r = await query<{ ok: boolean }>(sql, `
+    SELECT EXISTS (
+      SELECT 1 FROM match_players p JOIN matches m ON m.code = p.code
+       WHERE p.user_id = $1 AND p.ms IS NULL AND m.state = 'playing'
+         AND m.started_at > now() - ($2 || ' minutes')::interval
+    ) AS ok`, [userId, String(AT_A_TABLE_MINUTES)]);
+  return !!r.rows[0]?.ok;
 }
 
 /**
