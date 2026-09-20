@@ -657,12 +657,11 @@
     const cleared_ = DATA.levels.filter((_, i) => cleared(i));
     el.statBoards.textContent = String(cleared_.length);
     el.statCountries.textContent = String(cleared_.filter(L => !L.disc && !L.focus).length);
-    // The streak is only ever written when a daily board is cleared, and nothing decays it — so a seven-day run
-    // abandoned a month ago would sit on the home screen saying seven. It counts only while it is still alive:
-    // today's daily cleared, or yesterday's with today still to play.
-    const ds = store.get('dailyStreak', { count: 0, last: '' });
-    const alive = ds.last === dayKey() || ds.last === dayKeyBack(1);
-    el.statStreak.textContent = String(alive ? ds.count || 0 : 0);
+    // Days played in a row, and nothing decays the stored record, so it counts only while it is still alive:
+    // played today, or played yesterday with today still to come.
+    const ps = store.get('playStreak', { count: 0, last: '' });
+    const alive = ps.last === dayKey() || ps.last === dayKeyBack(1);
+    el.statStreak.textContent = String(alive ? ps.count || 0 : 0);
   }
 
   // ── The home deck ──
@@ -1579,6 +1578,13 @@
     // every cleared board carries it: the name is on the card either way, and a row saved today should not
     // read as poorer than one saved last week.
     const rec = { t: isBest ? t : prev.t, stars: Math.max(s, prev?.stars || 0), quiz: true, tier: state.tier, arrows: state.pieces.length, at: Date.now() };
+    // The streak on the home screen is a streak of days this player played. It used to be the daily board's own
+    // streak, which is a board most people never open, so somebody who had cleared a hundred boards — several of
+    // them that morning — was told their streak was zero. Any cleared board keeps it alive; a day missed ends it.
+    if (!R) {
+      const ps = store.get('playStreak', { count: 0, last: '' }), today = dayKey();
+      if (ps.last !== today) store.set('playStreak', { count: ps.last === dayKeyBack(1) ? (ps.count || 0) + 1 : 1, last: today });
+    }
     if (R) { /* a race is not part of the tour: nothing is saved and the difficulty ladder does not move */ }
     else if (state.daily) {
       store.set(`daily:${state.daily.key}`, rec);
@@ -2132,7 +2138,7 @@
       body: body ? JSON.stringify(body) : undefined,
     }).then(async r => { const d = await r.json().catch(() => ({})); if (!r.ok) throw Object.assign(new Error(d.error || `HTTP ${r.status}`), { code: d.error }); return d; });
 
-  const STATE_KEYS = ['home', 'form', 'dailyStreak'];   // what a new device needs before it can show the right tour
+  const STATE_KEYS = ['home', 'form', 'dailyStreak', 'playStreak'];   // what a new device needs before it can show the right tour
 
   /** Everything this device has played, in the shape the server stores. */
   function localTour() {
