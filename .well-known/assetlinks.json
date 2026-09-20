@@ -7,7 +7,9 @@
       "namespace": "android_app",
       "package_name": "com.ariyankhan.puzzle",
       "sha256_cert_fingerprints": [
-        "D8:D0:30:5D:7D:A3:6E:42:C3:2C:7F:0B:A9:22:97:75:5C:C0:8F:AA:D0:1D:F7:D4:18:CD:53:8C:F0:AA:91:79"
+        "67:C7:A5:57:81:FC:FD:D1:1E:23:F1:B3:28:3F:D9:14:12:2D:43:47:7A:CC:D3:44:DC:3B:45:46:C5:51:7B:9F",
+        "D8:D0:30:5D:7D:A3:6E:42:C3:2C:7F:0B:A9:22:97:75:5C:C0:8F:AA:D0:1D:F7:D4:18:CD:53:8C:F0:AA:91:79",
+        "4E:7F:63:70:71:A2:C6:8A:93:C4:D5:25:F1:11:61:60:3A:C9:1A:28:5E:BC:94:BC:C1:7A:0C:35:0A:72:47:6E"
       ]
     }
   }
