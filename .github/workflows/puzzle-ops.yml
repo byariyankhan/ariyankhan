@@ -6,6 +6,11 @@
 #
 #   inspect        Reads. Containers, PostgreSQL row counts, gold and ledger agreement, where the legacy
 #                  SQLite data still is, what backups exist, what nginx currently serves. Changes nothing.
+#   push-keys      Makes the VAPID keypair that lets the API send notifications, on the VPS: generated in the
+#                  API container, written into the project's .env, passed through the compose file, and the API
+#                  recreated so it reads them. The private key is never printed and never leaves the host; the
+#                  public one is read back from the API's own endpoint at the end. Running it again when a key
+#                  is already there changes nothing. Needs confirm=DEPLOY.
 #   backup-verify  Takes one fresh pg_dump and restores it into a scratch database to prove it works.
 #                  This is the gate: no deletion happens until it passes.
 #   cleanup        Deletes the legacy artifacts, and only those. Needs confirm=DELETE.
@@ -99,7 +104,7 @@ on:
         type: choice
         required: true
         default: inspect
-        options: [inspect, logs, web-look, web-revive, git-access, git-sync, backup-verify, cleanup, deploy, deploy-site, push-source, web-safe-fetch, rename-infra, finish-rename, rename-env, rename-paths, rename-nginx, drop-old-backup-dir, drop-old-volumes, drop-orphan-volumes, retire-site-data, web-drop-aa-mount, volumes, health]
+        options: [inspect, logs, web-look, web-revive, git-access, git-sync, push-keys, backup-verify, cleanup, deploy, deploy-site, push-source, web-safe-fetch, rename-infra, finish-rename, rename-env, rename-paths, rename-nginx, drop-old-backup-dir, drop-old-volumes, drop-orphan-volumes, retire-site-data, web-drop-aa-mount, volumes, health]
       confirm:
         description: "Type DELETE for cleanup, DEPLOY for deploy, RENAME for rename-infra. Ignored by the read-only modes."
         required: false
@@ -124,7 +129,7 @@ jobs:
           set -euo pipefail
           case "${{ inputs.mode }}" in
             cleanup|drop-old-volumes|drop-orphan-volumes|retire-site-data|web-drop-aa-mount|drop-old-backup-dir) [ "${{ inputs.confirm }}" = "DELETE" ] || { echo "::error::${{ inputs.mode }} needs confirm=DELETE"; exit 1; } ;;
-            deploy|deploy-site|push-source|web-safe-fetch|web-revive) [ "${{ inputs.confirm }}" = "DEPLOY" ] || { echo "::error::${{ inputs.mode }} needs confirm=DEPLOY"; exit 1; } ;;
+            deploy|deploy-site|push-source|push-keys|web-safe-fetch|web-revive) [ "${{ inputs.confirm }}" = "DEPLOY" ] || { echo "::error::${{ inputs.mode }} needs confirm=DEPLOY"; exit 1; } ;;
             rename-infra|finish-rename|rename-env|rename-paths|rename-nginx) [ "${{ inputs.confirm }}" = "RENAME" ] || { echo "::error::${{ inputs.mode }} needs confirm=RENAME"; exit 1; } ;;
             *) echo "read-only mode, no confirmation needed" ;;
           esac

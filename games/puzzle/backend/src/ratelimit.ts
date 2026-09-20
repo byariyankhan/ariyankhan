@@ -48,6 +48,9 @@ export const LIMITS = {
   // limit here that does not move gold.
   players_read:  { name: 'players_read',  limit: 60,  windowSeconds: 60,  by: 'user' },
   match_invite:  { name: 'match_invite',  limit: 20,  windowSeconds: 60,  by: 'user' },
+  // Subscribing happens once per browser, and again whenever the browser rotates the subscription on its own.
+  // Ten a minute is far more than that and still stops a loop from filling the table.
+  push_write:    { name: 'push_write',    limit: 10,  windowSeconds: 60,  by: 'user' },
 } as const satisfies Record<string, Limit>;
 
 export type LimitName = keyof typeof LIMITS;

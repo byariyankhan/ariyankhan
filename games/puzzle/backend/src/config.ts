@@ -99,6 +99,22 @@ export const config = {
     baseGold: num('PUZZLE_LEAGUE_BASE_GOLD', 10_000),   // what last place in the prizes is paid
   },
 
+  // ── Reaching a player who is not looking at the game ──
+  //
+  // Web Push, for the two things that happen while somebody is away: a friend asking them to a match, and the
+  // league paying out. The keypair identifies this server to the browsers' push services; the private half is
+  // a secret and lives only in the environment of the host that runs this, never in the repository. With
+  // nothing set, notifications are simply off — every send is a no-op and the endpoints say so.
+  push: {
+    publicKey: str('PUZZLE_VAPID_PUBLIC'),
+    privateKey: str('PUZZLE_VAPID_PRIVATE'),
+    // Who the push service should complain to about us; a mailto: or a URL, per the VAPID spec.
+    subject: str('PUZZLE_VAPID_SUBJECT', 'mailto:ariyanfiles@gmail.com'),
+    // How long a push service should hold a notification for a phone that is off. An invitation is worth
+    // nothing tomorrow (the room is gone), so it expires with the room; the league can wait a day.
+    ttlSeconds: num('PUZZLE_PUSH_TTL', 3600),
+  },
+
   // How often the housekeeping loop runs. The PHP service swept on every request, which is what made a busy
   // lobby slow; one timer in one process does the same work without taxing the players.
   sweepSeconds: num('PUZZLE_SWEEP_SECONDS', 2),

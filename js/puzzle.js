@@ -108,6 +108,7 @@
     worldMap: $('#aaWorldMap'), worldCap: $('#aaWorldCap'), worldScroll: $('#aaWorldScroll'),
     brainArt: $('#aaBrainArt'), brainLv: $('#aaBrainLv'), brainDiff: $('#aaBrainDiff'), brainNote: $('#aaBrainNote'),
     deck: $('#aaDeck'), deckTrack: $('#aaDeckTrack'), deckDots: $('#aaDeckDots'),
+    notifyCap: $('#aaNotifyCap'), notifyGroup: $('#aaNotifyGroup'), btnNotify: $('#aaNotify'), notifyNote: $('#aaNotifyNote'),
     statBoards: $('#aaStatBoards'), statCountries: $('#aaStatCountries'), statStreak: $('#aaStatStreak'),
   };
   if (!el.board) return;
@@ -2222,6 +2223,122 @@
     syncTour({ [id]: { cleared: true, ms: rec.t ?? null, stars: rec.stars || 0, quiz: !!rec.quiz, tier: rec.tier || 0, arrows: rec.arrows || 0 } });
   }
 
+  // ── Notifications ──
+  //
+  // Two things in this game happen to somebody who is not looking at it: a friend asks them to a match, and
+  // the league pays out on Sunday night. Both are worth an interruption — the room the invitation is about
+  // will be gone in minutes, and the gold is real. Nothing else in the game is, and nothing else is sent.
+  //
+  // It is off until it is asked for. The switch appears only for a signed-in player on a browser that can do
+  // this and a server that has keys, because a notification has to be addressed to an account, and a switch
+  // that cannot do anything is worse than no switch. The permission prompt is only ever raised by that switch
+  // being turned on: a game that asks for notifications on the way in is a game people close.
+  const push = { key: '', on: false, busy: false, checked: false, asked: false };
+  // isSecureContext rather than a list of protocols: it is the browser's own answer to the same question, and
+  // it already knows that https, localhost and 127.0.0.1 all count and that a file:// page does not.
+  const pushable = () => window.isSecureContext && 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+  const pushApi = (path, body) =>
+    fetch(`${API_V1}/push/${path}`, {
+      method: body ? 'POST' : 'GET', credentials: 'include', cache: 'no-store',
+      headers: body ? { 'Content-Type': 'application/json' } : {},
+      body: body ? JSON.stringify(body) : undefined,
+    }).then(async r => { const d = await r.json().catch(() => ({})); if (!r.ok) throw Object.assign(new Error(d.error || `HTTP ${r.status}`), { code: d.error }); return d; });
+  // The server hands out its public key base64url; the browser wants the raw bytes.
+  const urlB64ToBytes = b64 => {
+    const pad = '='.repeat((4 - b64.length % 4) % 4);
+    const raw = atob((b64 + pad).replace(/-/g, '+').replace(/_/g, '/'));
+    return Uint8Array.from(raw, c => c.charCodeAt(0));
+  };
+  // `serviceWorker.ready` waits for a registration that may never come — a page whose worker failed to
+  // register, or a browser that quietly refused one — and a switch waiting on it would sit disabled for the
+  // rest of the session with nothing to show for it. Eight seconds, then it says so instead.
+  const swReady = () => Promise.race([
+    navigator.serviceWorker.ready,
+    new Promise(resolve => setTimeout(() => resolve(null), 8000)),
+  ]);
+  const pushSub = async () => { const reg = await swReady(); return reg ? reg.pushManager.getSubscription() : null; };
+
+  function renderNotify() {
+    if (!el.btnNotify) return;
+    const show = push.checked && !!push.key && !!auth.user && pushable();
+    if (el.notifyCap) el.notifyCap.hidden = !show;
+    if (el.notifyGroup) el.notifyGroup.hidden = !show;
+    if (!show) return;
+    el.btnNotify.setAttribute('aria-checked', String(push.on));
+    el.btnNotify.disabled = push.busy;
+    // The one state a switch cannot get itself out of: the browser has been told no, and only the browser's
+    // own settings can change that. Saying so is the difference between a broken switch and a closed door.
+    const blocked = Notification.permission === 'denied';
+    if (el.notifyNote) el.notifyNote.textContent = blocked
+      ? 'Blocked in this browser — turn it back on in the site settings.'
+      : push.on ? 'On for this device.' : 'Only when somebody invites you, and when the league pays out.';
+  }
+
+  /**
+   * What this device already has. Called when the account is known and again whenever Settings is opened,
+   * because the first call may well have happened before anybody was signed in — and a switch that decided it
+   * was unavailable while the page was still signing in would stay hidden for the rest of the session.
+   */
+  async function notifyInit() {
+    if (!el.btnNotify) return;
+    push.checked = true;
+    if (!pushable() || !auth.user) { renderNotify(); return; }
+    if (!push.asked) {
+      push.asked = true;
+      // A failed ask is not an answer: it is asked again next time rather than left looking unavailable.
+      try { const d = await pushApi('key'); push.key = d.enabled ? (d.key || '') : ''; }
+      catch { push.key = ''; push.asked = false; }
+    }
+    if (push.key) push.on = !!(await pushSub().catch(() => null));
+    renderNotify();
+  }
+
+  async function notifyToggle() {
+    if (push.busy || !push.key) return;
+    push.busy = true; renderNotify();
+    try {
+      const reg = await swReady();
+      if (!reg) { toast('This browser has not started the game\u2019s service worker, so it cannot receive notifications.', 'bad'); return; }
+      const had = await reg.pushManager.getSubscription();
+      if (push.on || had) {
+        // Off means off on this device: the browser's subscription goes, and so does the row that would have
+        // been sent to. A device nobody unsubscribed from is a notification nobody can stop.
+        if (had) { await pushApi('unsubscribe', { endpoint: had.endpoint }).catch(() => {}); await had.unsubscribe().catch(() => {}); }
+        push.on = false;
+        toast('Notifications off on this device.', 'hint');
+      } else {
+        const permission = await Notification.requestPermission();
+        if (permission !== 'granted') { push.on = false; renderNotify(); toast(permission === 'denied' ? 'Your browser is blocking notifications for this site.' : 'Notifications stay off.', 'hint'); return; }
+        const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlB64ToBytes(push.key) });
+        const json = sub.toJSON();
+        await pushApi('subscribe', { endpoint: json.endpoint, keys: json.keys });
+        push.on = true;
+        toast('Notifications on. Only an invite, and the league.', 'good');
+      }
+    } catch (err) {
+      push.on = !!(await pushSub().catch(() => null));
+      // The server's own words when it has them ('push_off'), the browser's when it does not ('AbortError',
+      // which is what a browser with no push service of its own says), and never a bare number.
+      const why = typeof err.code === 'string' ? err.code : (err.name || err.message || 'failed');
+      toast(`Could not change notifications (${why}).`, 'bad');
+    } finally {
+      push.busy = false; renderNotify();
+    }
+  }
+  el.btnNotify?.addEventListener('click', notifyToggle);
+
+  /** Give up this device's subscription, quietly. Used when the account leaves the browser. */
+  async function notifyDrop() {
+    if (!pushable()) return;
+    try {
+      const sub = await pushSub();
+      if (!sub) { push.on = false; return; }
+      await pushApi('unsubscribe', { endpoint: sub.endpoint }).catch(() => {});
+      await sub.unsubscribe().catch(() => {});
+    } catch { /* a browser that will not say is a browser with nothing to unsubscribe */ }
+    push.on = false;
+  }
+
   // ── Gold matches: stake, invite, play the same board, winner takes the pot ──
   // The server holds both stakes, picks the board and decides the winner; the game only shows what it says.
   //
@@ -3067,12 +3184,16 @@
   el.accountRow?.addEventListener('click', () => { if (auth.user) showRenameRow(); });
 
   el.signOutBtn?.addEventListener('click', async () => {
+    // Notifications go before the session does: a device left subscribed would keep ringing for an account
+    // that is no longer signed in on it.
+    await notifyDrop();
     try { await authApi('logout', {}); } catch { /* the cookie may already be gone */ }
-    auth.user = null; live.close(); renderAccountRow(); closeSheets(); toast('Signed out.');
+    auth.user = null; live.close(); renderAccountRow(); renderNotify(); closeSheets(); toast('Signed out.');
   });
   el.deleteAccBtn?.addEventListener('click', async () => {
     if (!confirm('Delete your account? Your gold and any matches go with it. The progress on this device stays.')) return;
-    try { await authApi('delete', {}); auth.user = null; renderAccountRow(); closeSheets(); toast('Account deleted.'); }
+    await notifyDrop();   // the rows go with the account anyway; the browser's own subscription does not
+    try { await authApi('delete', {}); auth.user = null; renderAccountRow(); renderNotify(); closeSheets(); toast('Account deleted.'); }
     catch { toast('Could not delete the account. Please try again.', 'bad'); }
   });
 
@@ -3479,7 +3600,8 @@
   el.settingsBtns.forEach(b => b.addEventListener('click', () => {
     openSheet(el.sheet);
     renderAccountRow();                                   // with what the page already knows, at once
-    authLoad(true).then(() => { renderAccountRow(); renderPurse(); syncTour(); }).catch(() => {});   // then with the server's answer, tour included
+    renderNotify();
+    authLoad(true).then(() => { renderAccountRow(); renderPurse(); syncTour(); return notifyInit(); }).catch(() => {});   // then with the server's answer, tour included
   }));
   el.friends?.addEventListener('click', openFriends);
   el.league?.addEventListener('click', openLeague);
@@ -3570,7 +3692,7 @@
     el.accept.focus({ preventScroll: true });
   }
   {
-    const deep = /^#(level-\d+|b-[\w:]+|daily|m=[A-Za-z0-9]+)$/.test(location.hash);
+    const deep = /^#(level-\d+|b-[\w:]+|daily|league|m=[A-Za-z0-9]+)$/.test(location.hash);
     let seenThisSession = false;
     try { seenThisSession = sessionStorage.getItem('aa:splash') === '1'; sessionStorage.setItem('aa:splash', '1'); } catch { /* ignore */ }
     if (!store.get('welcomed')) showGate();
@@ -3584,7 +3706,7 @@
     renderSelect();
     // the purse and the account row from the first paint, not only once Play with Friends has been tapped, and
     // a time from last time that never got through goes now
-    authLoad().then(() => { renderPurse(); renderAccountRow(); syncTour(); return flushResult(false); }).catch(() => {});
+    authLoad().then(() => { renderPurse(); renderAccountRow(); syncTour(); void notifyInit(); return flushResult(false); }).catch(() => {});
     // the league chip, and the clock that keeps its countdown honest
     loadLeague().then(startLeagueTick).catch(() => {});
     const m = /^#level-(\d+)$/.exec(location.hash), mb = /^#b-([\w:]+)$/.exec(location.hash), mm = matchHash();
@@ -3598,9 +3720,11 @@
     }
     else if (m) startLevel(+m[1] - 1);   // older links: position in the list
     else if (location.hash === '#daily') { const d = dailyPick(); startLevel(d.idx, false, d); }
+    // Where a league notification lands: the table it is about, not the lobby it happens to be reached through.
+    else if (location.hash === '#league') openLeague();
   }).catch(err => { el.loading.hidden = true; el.error.textContent = `Could not load the levels (${err.message}). Check your connection and reload.`; el.error.hidden = false; });
 
-  if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+  if ('serviceWorker' in navigator && window.isSecureContext) {
     window.addEventListener('load', () => { navigator.serviceWorker.register('/piece-the-world-sw.js').catch(() => {}); });
   }
 

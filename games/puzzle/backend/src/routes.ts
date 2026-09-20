@@ -14,6 +14,7 @@ import { boardPace, cleanLevels, cleanState, mergeLevels, mergeState, readAll } 
 import * as L from './league.js';
 import { liveProgress, online, roomPresence } from './presence.js';
 import { havePlayedTogether, isRacing, recentPlayers } from './players.js';
+import * as push from './push.js';
 import { body, caller, clearSessionCookie, limited, noStore, setSessionCookie, shapeUser, type Caller } from './httpkit.js';
 import { log } from './log.js';
 
@@ -213,6 +214,40 @@ const H = {
     await noStore(res).send({ players: await recentPlayers(pool, me.user.id) });
   },
 
+  // ── Notifications ──
+  // The public half of the keypair, which is what a browser needs before it can subscribe, and an honest
+  // answer when this deploy has no keys: the client then says notifications are unavailable rather than
+  // offering a switch that does nothing.
+  async pushKey(_req: Req, res: Res, _me: Caller) {
+    await noStore(res).send({ enabled: push.enabled, key: push.publicKey() });
+  },
+
+  async pushSubscribe(req: Req, res: Res, me: Caller) {
+    if (!me.user) { await noStore(res).code(401).send({ error: 'signed_out' }); return; }
+    if (!(await limited('push_write', req, res, me.user.id))) return;
+    if (!push.enabled) { await noStore(res).code(503).send({ error: 'push_off' }); return; }
+    const b = body(req);
+    const sub = (b.subscription ?? b) as { endpoint?: unknown; keys?: { p256dh?: unknown; auth?: unknown } };
+    const endpoint = String(sub.endpoint ?? '').trim();
+    const p256dh = String(sub.keys?.p256dh ?? '').trim();
+    const auth = String(sub.keys?.auth ?? '').trim();
+    // An endpoint is a URL at the browser's own push service and nowhere else: this service will make a
+    // request to whatever is stored here, so it is checked before it is kept, not before it is used.
+    if (!/^https:\/\/[^\s]+$/i.test(endpoint) || endpoint.length > 1000 || !p256dh || !auth) {
+      await noStore(res).code(400).send({ error: 'bad_subscription' }); return;
+    }
+    await push.saveSubscription(pool, me.user.id, { endpoint, keys: { p256dh, auth } }, String(req.headers['user-agent'] ?? ''));
+    await noStore(res).send({ ok: true, on: true });
+  },
+
+  async pushUnsubscribe(req: Req, res: Res, me: Caller) {
+    if (!me.user) { await noStore(res).code(401).send({ error: 'signed_out' }); return; }
+    if (!(await limited('push_write', req, res, me.user.id))) return;
+    const endpoint = String(body(req).endpoint ?? '').trim();
+    if (endpoint) await push.dropSubscription(pool, me.user.id, endpoint);
+    await noStore(res).send({ ok: true, on: endpoint ? await push.hasSubscription(pool, me.user.id) : true });
+  },
+
   async invite(req: Req, res: Res, me: Caller) {
     if (!me.user) { await noStore(res).code(401).send({ error: 'signed_out' }); return; }
     if (!(await limited('match_invite', req, res, me.user.id))) return;
@@ -238,7 +273,12 @@ const H = {
     });
     // Whether they are reachable right now decides what the sender is told, not whether the invitation was
     // sent: a socket that opens a second later still gets nothing, and saying so is kinder than a silent wait.
-    await noStore(res).send({ ok: true, delivered: await online.is(to) });
+    const here = await online.is(to);
+    // And if they are not here, their phone is told — the one thing in this game worth interrupting somebody
+    // for, because the room it is about will be gone in a few minutes. Somebody with the game open in front of
+    // them already has the invitation on their screen and does not need it twice.
+    if (!here) void push.sendToUser(to, push.invitedNote(me.user.name, m.stake, m.code));
+    await noStore(res).send({ ok: true, delivered: here });
   },
 
   async create(req: Req, res: Res, me: Caller) {
@@ -390,6 +430,10 @@ export function registerRoutes(app: FastifyInstance): void {
   app.post(`${v1}/ads/reward`, withCaller(H.adReward));
 
   app.get(`${v1}/league`, withCaller(H.league));
+
+  app.get(`${v1}/push/key`, withCaller(H.pushKey));
+  app.post(`${v1}/push/subscribe`, withCaller(H.pushSubscribe));
+  app.post(`${v1}/push/unsubscribe`, withCaller(H.pushUnsubscribe));
 
   app.get(`${v1}/lobby`, withCaller(H.lobby));
   app.get(`${v1}/players/recent`, withCaller(H.recent));
