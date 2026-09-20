@@ -412,7 +412,8 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-ask-panel{ width:100%; max-width:380px; padding:22px; border-radius:20px; background:var(--panel); color:var(--ink);
   text-align:center; box-shadow:0 18px 50px rgba(0,0,0,.3); animation:aa-pop .18s ease-out; }
 .aa-ask-panel h3{ margin:0 0 8px; font-size:21px; }
-.aa-ask-panel p{ margin:0 0 18px; color:var(--muted); font-size:15px; line-height:1.45; font-weight:700; }
+/* pre-line so a blank line in the question's body stays a blank line: these are paragraphs, not one run-on */
+.aa-ask-panel p{ margin:0 0 18px; color:var(--muted); font-size:15px; line-height:1.45; font-weight:700; white-space:pre-line; }
 @keyframes aa-pop{ from{ opacity:0; transform:translateY(8px) scale(.97); } to{ opacity:1; transform:none; } }
 @media(prefers-reduced-motion:reduce){ .aa-ask, .aa-ask-panel{ animation:none; } }
 .aa-adtest{ position:fixed; inset:0; z-index:90; display:flex; align-items:center; justify-content:center; padding:20px;
