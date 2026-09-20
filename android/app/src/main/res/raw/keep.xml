@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- What the resource shrinker must not take.
+
+     shrinkResources walks code and layouts to decide what is used, and a resource named only by a manifest
+     <meta-data android:resource="..."> is invisible to that walk. The splash drawable is named exactly that
+     way, so a release build dropped it while the debug build kept it — and then LauncherActivity built its
+     splash screen from an id that no longer resolved and the app died on launch with
+     Resources.NotFoundException. "Puzzle keeps stopping", on every open, only in the shipped build.
+
+     The colours go in the same list. The theme references them, which the shrinker does follow, but the
+     meta-data references it for the status bar, the navigation bar and the splash background do not, and a
+     future edit that drops them from the theme would bring the same failure back silently. -->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@drawable/splash,@color/paper,@color/ink" />

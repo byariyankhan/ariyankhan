@@ -84,11 +84,15 @@ jobs:
 
       # A bundle that is not signed, or is signed with the wrong key, looks fine until Play refuses it. Say so
       # here instead, where the run is still on screen.
-      - name: Check it is signed, and say what with
+      - name: Check it is signed, carries its splash, and say what with
         working-directory: android
         run: |
           AAB=app/build/outputs/bundle/release/app-release.aab
           unzip -l "$AAB" | grep -qE 'META-INF/.*\.(RSA|DSA|EC)$' || { echo "::error::the bundle came out unsigned"; exit 1; }
+          # shrinkResources cannot see a resource named only from manifest meta-data, and once dropped the
+          # splash id no longer resolves and the app dies on launch. res/raw/keep.xml holds it; this is the
+          # check that says so before anybody installs the result.
+          unzip -l "$AAB" | grep -q 'splash\.png' || { echo "::error::splash.png is missing — resource shrinking took it; check app/src/main/res/raw/keep.xml"; exit 1; }
           echo "versionCode ${{ steps.ver.outputs.code }} · versionName ${{ github.event.inputs.version_name }}"
           keytool -printcert -jarfile "$AAB" | grep -E 'Owner:|SHA256:' || true
 
