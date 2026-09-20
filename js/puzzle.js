@@ -1740,8 +1740,11 @@
     // Out of hearts is not the end of a challenge — giving up is, and it cannot be taken back: the loss goes
     // to the server, the seat closes and the stake is gone. So the quiet button asks before it does that.
     else if (act === 'giveup') {
-      if (!confirm('Give the board up? Your run ends here, and your stake goes to whoever clears it.')) return;
-      el.card.innerHTML = '<h3>Sending…</h3>'; finishMatch(false, 0);
+      ask({ title: 'Give the board up?', body: 'Your run ends here, and your stake goes to whoever clears it.',
+        ok: 'Give it up', cancel: 'Keep playing', danger: true }).then(yes => {
+        if (!yes) return;
+        el.card.innerHTML = '<h3>Sending…</h3>'; finishMatch(false, 0, true);
+      });
     }
     else if (act === 'resend') { const b = e.target.closest('[data-act]'); b.disabled = true; flushResult(true).then(ok => { if (!ok) b.disabled = false; }); }
     else if (act === 'minvite') showInvitePanel(state.pendingMatch);
@@ -2036,6 +2039,43 @@
   };
 
   // The offer. One sheet, one decision, and nothing is spent before the ad has actually been watched.
+  // ── Asking ──
+  // The browser's own confirm() is a modal from another world: it says "ariyankhan.com says", it cannot be
+  // styled, it freezes the page while it is up, and on a phone it looks like the site has been taken over by
+  // something. The four places this game stops to ask are all about losing something the player cares about —
+  // a board, a stake, an account — which is exactly where a dialog should look like it belongs to the game.
+  //
+  // So it is one of ours. Same panel as the advertisement offer, same buttons, and it answers the same way
+  // confirm() did: a promise for true or false, and nothing happens until it settles. Escape and the backdrop
+  // both mean no, and on a destructive question the safe button is the one holding focus — the OK button of a
+  // native confirm is under the thumb that opened it, which is how an account gets deleted by a double tap.
+  let asking = null;
+  function ask({ title, body, ok = 'OK', cancel = 'Cancel', danger = false }) {
+    if (asking) return asking;   // one question at a time, and the second press is not an answer to the first
+    return (asking = new Promise(resolve => {
+      const wrap = document.createElement('div');
+      wrap.className = 'aa-ask';
+      wrap.innerHTML = `<div class="aa-ask-panel" role="alertdialog" aria-modal="true" aria-labelledby="aaAskT" aria-describedby="aaAskB">
+        <h3 id="aaAskT">${escapeHtml(title)}</h3>
+        <p id="aaAskB">${escapeHtml(body)}</p>
+        <div class="aa-actions aa-actions--stack">
+          <button type="button" class="aa-btn ${danger ? 'aa-btn--danger' : 'aa-btn--primary'}" data-ask="yes">${escapeHtml(ok)}</button>
+          <button type="button" class="aa-btn" data-ask="no">${escapeHtml(cancel)}</button>
+        </div>
+      </div>`;
+      const done = answer => { if (!wrap.isConnected) return; document.removeEventListener('keydown', onKey, true); wrap.remove(); asking = null; resolve(answer); };
+      const onKey = e => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); done(false); } };
+      wrap.addEventListener('click', e => {
+        if (e.target === wrap) { done(false); return; }
+        const a = e.target.closest('[data-ask]')?.dataset.ask;
+        if (a) done(a === 'yes');
+      });
+      document.addEventListener('keydown', onKey, true);
+      document.body.appendChild(wrap);
+      $(danger ? '[data-ask="no"]' : '[data-ask="yes"]', wrap)?.focus({ preventScroll: true });
+    }));
+  }
+
   function adOffer(kind, note) {
     const R = AD_REWARD[kind];
     if (!R || ads.showing) return;
@@ -2897,7 +2937,7 @@
     const row = p => `<div class="aa-vs-row${p.won ? ' is-win' : ''}">
       <span class="aa-rank aa-vs-face${faceClass(p)}" aria-hidden="true">${faceInner(p)}</span>
       <span class="aa-vs-who">${p.ms > 0 ? `${p.place}. ` : ''}${escapeHtml(p.you ? 'You' : p.name)}</span>
-      <b>${p.ms == null ? 'still playing' : p.ms < 0 ? 'ran out of hearts' : fmtTime(p.race_ms ?? p.ms, true)}</b></div>`;
+      <b>${p.ms == null ? 'still playing' : p.ms < 0 ? (p.gave_up ? 'gave the board up' : 'ran out of hearts') : fmtTime(p.race_ms ?? p.ms, true)}</b></div>`;
     const purse = m.you_won ? `You won ${gpurse(m.pot)}` : m.winner ? `You lost ${gpurse(m.stake)}` : m.draw ? 'Every stake came back' : 'Your stake is held';
     // The reading from the board just cleared, where this sheet is the end of that run. A challenge is still a
     // board of this game, so it says the same things about it a tour board does — the stars, what it cost, the
@@ -3166,10 +3206,11 @@
   async function leaveMatch() {
     const m = state.daily?.match;
     if (!m) return;
-    if (!confirm(`Leave the challenge? Your ${gfmt(m.stake)} gold stays in the pot and the others play on.`)) return;
+    if (!await ask({ title: 'Leave the challenge?', body: `Your ${gfmt(m.stake)} gold stays in the pot and the others play on.`,
+      ok: 'Leave the board', cancel: 'Keep playing', danger: true })) return;
     stopProgressPoll(); stopTimer();
     state.finished = true; state.busy = true;
-    try { const d = await matchApi('result', { code: m.code, ms: 0, cleared: false }); setGold(d.gold); }
+    try { const d = await matchApi('result', { code: m.code, ms: 0, cleared: false, gave_up: true }); setGold(d.gold); }
     catch { /* the day's sweep counts a run that never came back as a loss anyway */ }
     goToLevels();
     toast('You left the challenge.');
@@ -3259,7 +3300,8 @@
     auth.user = null; live.close(); renderAccountRow(); renderNotify(); closeSheets(); toast('Signed out.');
   });
   el.deleteAccBtn?.addEventListener('click', async () => {
-    if (!confirm('Delete your account? Your gold and any matches go with it. The progress on this device stays.')) return;
+    if (!await ask({ title: 'Delete your account?', body: 'Your gold and any matches go with it. The progress on this device stays.',
+      ok: 'Delete it', cancel: 'Keep my account', danger: true })) return;
     await notifyDrop();   // the rows go with the account anyway; the browser's own subscription does not
     try { await authApi('delete', {}); auth.user = null; renderAccountRow(); renderNotify(); closeSheets(); toast('Account deleted.'); }
     catch { toast('Could not delete the account. Please try again.', 'bad'); }
@@ -3272,10 +3314,10 @@
   // is tried a few times, kept on the device if it still will not go, and sent again on the next visit. Only a
   // straight refusal from the server stops the retrying: asking again cannot change that answer.
   const PENDING = 'pendingResult';
-  async function sendResult(code, ms, cleared) {
+  async function sendResult(code, ms, cleared, gaveUp = false) {
     let last;
     for (let i = 0; i < 3; i++) {
-      try { return await matchApi('result', { code, ms, cleared }); }
+      try { return await matchApi('result', { code, ms, cleared, gave_up: gaveUp }); }
       catch (err) {
         last = err;
         if (err.code) break;
@@ -3290,14 +3332,14 @@
     : err?.code === 'no_match' ? 'That match is not there any more.'
     : `Your time has not reached the server yet${/^HTTP \d+$/.test(err?.message || '') ? ` (${err.message})` : ''}. It is kept on this device and sent again on your next visit.`;
 
-  async function finishMatch(cleared, ms) {
+  async function finishMatch(cleared, ms, gaveUp = false) {
     const R = state.daily;
     if (!R?.match) return;
     stopProgressPoll();
     const before = auth.user?.gold ?? 0;
-    const sent = { code: R.match.code, ms: Math.max(0, Math.round(ms) || 0), cleared: !!cleared };
+    const sent = { code: R.match.code, ms: Math.max(0, Math.round(ms) || 0), cleared: !!cleared, gave_up: !!gaveUp };
     try {
-      const d = await sendResult(sent.code, sent.ms, sent.cleared);
+      const d = await sendResult(sent.code, sent.ms, sent.cleared, sent.gave_up);
       store.set(PENDING, null);
       setGold(d.gold);
       renderRanks(d.match.players);
@@ -3321,7 +3363,7 @@
     const p = store.get(PENDING, null);
     if (!p?.code) return false;
     try {
-      const d = await sendResult(p.code, p.ms, p.cleared);
+      const d = await sendResult(p.code, p.ms, p.cleared, p.gave_up);
       store.set(PENDING, null);
       if (typeof d.gold === 'number') setGold(d.gold);
       if (loud) { el.overlay.hidden = true; showMatchState(d.match, (auth.user?.gold ?? 0) - (d.match?.you_won ? d.match.pot : 0)); }
@@ -3697,9 +3739,14 @@
   }
   el.themeBtn.addEventListener('click', () => { const cur = document.documentElement.dataset.theme || 'paper'; applyTheme(THEMES[(THEMES.indexOf(cur) + 1) % THEMES.length]); });
   applyTheme(THEMES.includes(store.get('theme')) ? store.get('theme') : 'paper');
-  el.btnLevels.addEventListener('click', () => {
+  // Leaving a board is always asked about now. It used to be asked about only once an arrow had been
+  // cleared, so walking out of a board a player had been staring at for a minute — the part that costs
+  // something on a hard one — took one tap and said nothing.
+  el.btnLevels.addEventListener('click', async () => {
     if (state.daily?.race && state.daily.match && !state.finished) { leaveMatch(); return; }
-    if (state.left < state.pieces.length && !state.finished && !confirm('Leave this level? Progress on it will be lost.')) return;
+    if (state.pieces.length && !state.finished && !await ask({
+      title: 'Leave this board?', body: 'It starts again from the beginning next time, with your hearts back.',
+      ok: 'Leave the board', cancel: 'Keep playing' })) return;
     goToLevels();
   });
   el.btnSound.addEventListener('click', () => { state.muted = !state.muted; store.set('muted', state.muted); renderSound(); if (!state.muted) SFX.shoot(); });

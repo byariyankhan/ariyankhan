@@ -399,7 +399,8 @@ const H = {
 
     const b = body(req);
     const settled = await tx(async c => {
-      await R.submitResult(c, code, me.user!.id, Number(b.ms ?? -1), b.cleared === true);
+      // gave_up separates the two ways a run ends without the board: the player walked out, or the board won.
+      await R.submitResult(c, code, me.user!.id, Number(b.ms ?? -1), b.cleared === true, b.gave_up === true);
       return R.settleMatch(c, code);
     });
     await publish(code, 'player_finished', { user_id: me.user.id, name: me.user.name, cleared: b.cleared === true });

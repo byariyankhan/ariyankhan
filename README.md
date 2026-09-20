@@ -671,6 +671,29 @@ links.
   four-second refreshes only restoring where it ended. The one thing left out
   there is a second clock: the race time is already on every line above it, and
   two different times on one sheet is how a race stops making sense.
+- **Asking** (`ask({title, body, ok, cancel, danger})` → a promise for true or
+  false): the browser's `confirm()` is a modal from another world — it says
+  "ariyankhan.com says", it cannot be styled, and on a phone it looks like the
+  site has been taken over. All four places the game stops to ask (leaving a
+  board, leaving a challenge, giving a board up, deleting an account) are about
+  losing something, which is exactly where the dialog should belong to the game.
+  Escape and the backdrop both mean no, one question can be open at a time, and
+  on a destructive question **the safe button holds focus** — a native confirm
+  puts OK under the thumb that opened it, which is how an account gets deleted by
+  a double tap. The destructive button is tinted rather than solid, because
+  `--bad` is a light red in the dark themes and white on it cannot be read.
+  Leaving a board is asked about whenever one is live; it used to be asked only
+  once an arrow had been cleared, so walking out of a board somebody had been
+  staring at for a minute took one tap and said nothing.
+- **Gave up, or ran out of hearts** (`009_gave_up.sql`): `ms = -1` used to mean
+  only "did not clear it", and every result sheet read that one value out as "ran
+  out of hearts" — so a player who left the room was told, on everybody's screen,
+  that the board had beaten them. `match_players.gave_up` remembers which it was;
+  the client sends `gave_up` with the result (from the back button and from the
+  card's "Give the board up"), `orderPlayers` passes it through, and the row reads
+  "gave the board up". Nothing else changes: `ms` still decides the order and who
+  is paid, and rows written before the column existed read false, which is the
+  meaning they actually had.
 - **Upright, always**: the game is a column — a square board, a status bar, a map
   under it — and it stays one however the phone is held. An installed copy is held
   there by `"orientation": "portrait"` in `puzzle/app.webmanifest`, and

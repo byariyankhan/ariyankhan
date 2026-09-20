@@ -404,6 +404,17 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-purse-add{ display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px; margin-left:6px; border:0; border-radius:50%;
   background:var(--accent); color:var(--accent-ink); font:inherit; font-size:15px; font-weight:900; line-height:1; cursor:pointer; }
 .aa-purse-add:hover{ filter:brightness(1.06); }
+/* The game's own confirm. The browser's says "ariyankhan.com says" and cannot be told otherwise; this one
+   is the same panel as the advertisement offer, and the button that does the damage is the one that looks it. */
+.aa-ask{ position:fixed; inset:0; z-index:120; display:flex; align-items:center; justify-content:center;
+  padding:20px calc(20px + env(safe-area-inset-left, 0px)) calc(20px + env(safe-area-inset-bottom, 0px)) calc(20px + env(safe-area-inset-right, 0px));
+  background:rgba(0,0,0,.55); backdrop-filter:blur(2px); animation:aa-in .16s ease-out; }
+.aa-ask-panel{ width:100%; max-width:380px; padding:22px; border-radius:20px; background:var(--panel); color:var(--ink);
+  text-align:center; box-shadow:0 18px 50px rgba(0,0,0,.3); animation:aa-pop .18s ease-out; }
+.aa-ask-panel h3{ margin:0 0 8px; font-size:21px; }
+.aa-ask-panel p{ margin:0 0 18px; color:var(--muted); font-size:15px; line-height:1.45; font-weight:700; }
+@keyframes aa-pop{ from{ opacity:0; transform:translateY(8px) scale(.97); } to{ opacity:1; transform:none; } }
+@media(prefers-reduced-motion:reduce){ .aa-ask, .aa-ask-panel{ animation:none; } }
 .aa-adoffer, .aa-adtest{ position:fixed; inset:0; z-index:90; display:flex; align-items:center; justify-content:center; padding:20px;
   background:color-mix(in srgb, var(--ink) 55%, transparent); }
 .aa-adoffer-panel, .aa-adtest-panel{ width:100%; max-width:380px; padding:22px; border-radius:20px; background:var(--panel); text-align:center;
@@ -585,6 +596,12 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 /* An offer, not an action: it is the only warm one in the card, so it reads as the extra thing on the row
    rather than as a second way of doing what the primary does. */
 .aa-actions .aa-btn--ad{ background:var(--accent); color:var(--accent-ink); }
+/* The one that does the damage. Tinted rather than solid, because --bad is a light red in the dark themes and
+   white on that cannot be read; the outline is what makes it look like a decision. */
+.aa-actions .aa-btn--danger{ background:color-mix(in srgb, var(--bad) 14%, transparent); color:var(--bad);
+  box-shadow:inset 0 0 0 2px color-mix(in srgb, var(--bad) 40%, transparent); }
+/* A question has two answers and they both take the line: side by side, one of them is the accidental tap. */
+.aa-ask-panel .aa-actions--stack{ grid-template-columns:1fr; }
 /* An odd one out takes the whole line rather than sitting in half of it with a hole beside it. */
 .aa-actions--stack:has(.aa-btn--primary) .aa-btn:last-child:nth-child(even){ grid-column:1 / -1; }
 .aa-bi{ width:19px; height:19px; flex:none; }
