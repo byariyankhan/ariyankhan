@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One activity, because the app is one screen: the game.
+
+     LauncherActivity comes from android-browser-helper and does the whole job — it opens the URL below in a
+     Trusted Web Activity, checks the site's Digital Asset Links, shows the splash while Chrome warms up, and
+     forwards the web app's notifications to Android's shade. There is no WebView here and no bridge; what
+     draws the board is the same Chrome that draws it in the browser. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Android 13 and up asks before an app may post a notification. The game's own web push sits behind
+         this; without it the switch in Settings turns on and nothing ever arrives. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <application
+        android:label="@string/app_name"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher"
+        android:allowBackup="true"
+        android:fullBackupContent="@xml/backup_rules"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:supportsRtl="false"
+        android:theme="@style/Theme.App">
+
+        <activity
+            android:name="com.google.androidbrowserhelper.trusted.LauncherActivity"
+            android:exported="true"
+            android:screenOrientation="portrait"
+            android:label="@string/app_name">
+
+            <!-- What to open, and how it should look while it opens. -->
+            <meta-data android:name="android.support.customtabs.trusted.DEFAULT_URL"
+                android:value="@string/launch_url" />
+            <meta-data android:name="android.support.customtabs.trusted.STATUS_BAR_COLOR"
+                android:resource="@color/paper" />
+            <meta-data android:name="android.support.customtabs.trusted.NAVIGATION_BAR_COLOR"
+                android:resource="@color/paper" />
+
+            <!-- The splash. Android shows this the instant the icon is tapped and holds it until the game has
+                 painted, so a cold start reads as an app opening rather than as a page loading. -->
+            <meta-data android:name="android.support.customtabs.trusted.SPLASH_IMAGE_DRAWABLE"
+                android:resource="@drawable/splash" />
+            <meta-data android:name="android.support.customtabs.trusted.SPLASH_SCREEN_BACKGROUND_COLOR"
+                android:resource="@color/paper" />
+            <meta-data android:name="androix.browser.trusted.splashscreen.PARAMS_SPLASH_SCREEN_FADE_OUT_DURATION"
+                android:value="240" />
+            <meta-data android:name="android.support.customtabs.trusted.FILE_PROVIDER_AUTHORITY"
+                android:value="com.ariyankhan.puzzle.fileprovider" />
+
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!-- Invitation links open the app rather than the browser. autoVerify makes Android check the same
+                 assetlinks.json the address bar depends on, so this and the trust come from one file. -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="@string/host" android:pathPrefix="/puzzle" />
+            </intent-filter>
+        </activity>
+
+        <!-- Notifications the web app posts arrive through here. -->
+        <service
+            android:name="com.google.androidbrowserhelper.trusted.DelegationService"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.support.customtabs.trusted.TRUSTED_WEB_ACTIVITY_SERVICE" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </service>
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="com.ariyankhan.puzzle.fileprovider"
+            android:grantUriPermissions="true"
+            android:exported="false">
+            <meta-data android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/filepaths" />
+        </provider>
+    </application>
+</manifest>

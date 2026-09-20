@@ -1,0 +1,44 @@
+plugins { id 'com.android.application' }
+
+android {
+    namespace 'com.ariyankhan.puzzle'
+    // 35 is what Play requires for new apps, and what the 16 KB page-size rule lands with.
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'com.ariyankhan.puzzle'
+        // 23 is where Chrome's Trusted Web Activity support begins; below it the app would only ever be a
+        // Custom Tab, which is not what anybody installed.
+        minSdk 23
+        targetSdk 35
+        versionCode 1
+        versionName '1.0.0'
+        resourceConfigurations += ['en']      // the game ships one language; do not carry 80 more
+    }
+
+    buildTypes {
+        release {
+            // One activity and one library: there is very little to strip, and stripping it is still free.
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            // Signed where the key is — Play App Signing holds the real one, and no keystore belongs in git.
+            signingConfig null
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    // Nothing here uses the build's own BuildConfig or resources beyond strings and colours.
+    buildFeatures { buildConfig false }
+}
+
+dependencies {
+    // The official Trusted Web Activity host. It is the whole app: it opens the site in Chrome without the
+    // browser around it, verifies Digital Asset Links, draws the splash, and hands web notifications to
+    // Android's notification shade.
+    implementation 'com.google.androidbrowserhelper:androidbrowserhelper:2.5.0'
+}

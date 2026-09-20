@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- There is nothing of the player's here to back up: the tour is on the account and in the browser's own
+     storage, which Android backs up separately. Backing up an empty app data directory only makes restores
+     slower. -->
+<full-backup-content>
+    <exclude domain="root" path="." />
+</full-backup-content>

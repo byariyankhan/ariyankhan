@@ -1,0 +1,10 @@
+# Build outputs and anything the SDK writes here. Nothing generated belongs in the repository, and a keystore
+# never does: Play App Signing holds the app key and the upload key lives on Ariyan's machine or in a CI secret.
+build/
+app/build/
+.gradle/
+local.properties
+*.keystore
+*.jks
+*.aab
+*.apk

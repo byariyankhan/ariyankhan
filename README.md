@@ -671,6 +671,28 @@ links.
   four-second refreshes only restoring where it ended. The one thing left out
   there is a second clock: the race time is already on every line above it, and
   two different times on one sheet is how a race stops making sense.
+- **Android** (`android/`, and `android/README.md` for the whole of it): the Play
+  Store app is a **Trusted Web Activity** — the site itself, in the phone's own
+  Chrome engine, with no browser around it. Not a rewrite, because the game is a
+  web game: a TWA runs the same code on the same engine at the same speed, with
+  no WebView penalty and no bridge, and a native port would mean a second board
+  generator, a second economy client and a second set of bugs without drawing one
+  arrow faster. One activity, one dependency
+  (`androidbrowserhelper`), a 180 KB bundle. Icons and splash come from the
+  game's own mark (`games/build-android-assets.mjs`), so there is nothing drawn
+  by hand to fall out of step. The address bar only disappears once
+  `.well-known/assetlinks.json` carries the SHA-256 of the certificate Play App
+  Signing holds — `games/build-assetlinks.mjs <fingerprint>` writes it, and the
+  fingerprint is only knowable after the first upload. **No keystore is in this
+  repository and none should be.**
+- **A cold start is not somebody else's JavaScript**: `puzzle/index.html` used to
+  carry a bare AdSense tag in its head — 655 KB fetched and parsed on every cold
+  start of a page with no ad units on it and no Auto ads enabled, more than the
+  whole game weighs. It is gone from the game page (the rest of the site keeps
+  it, which is where the site review reads), and `adsConfigure()` fetches the
+  same script itself the moment advertising is actually switched on. First load
+  went from 1,354 KB to 698 KB. On Android this is not a nicety: cold start time
+  is one of the vitals Play measures, and a demoted app is one nobody is shown.
 - **What a board pays** (`placePrizes`, `standings`, `settleMatch` in
   `rooms.ts`): first took the whole pot, which is a good rule for two players and
   a bad one for five — the moment somebody clears it everybody else is playing for
