@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The game's own paper, so the splash, the status bar and the first painted pixel are one colour and the
+     app never flashes white on the way in. Matches the bg custom property in css/puzzle.css and theme_color in the manifest. -->
+<resources>
+    <color name="paper">#F4EDE0</color>
+    <color name="ink">#2E2016</color>
+</resources>

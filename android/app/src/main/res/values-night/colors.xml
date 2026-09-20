@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A phone in dark mode should not be handed a sheet of cream while the game works out which theme it is on.
+     This is the Night theme's own background from css/puzzle.css. -->
+<resources>
+    <color name="paper">#121212</color>
+    <color name="ink">#F2EFEA</color>
+</resources>

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Puzzle</string>
+    <!-- The one URL this app exists to open. utm_source says where an install came from, the same way the
+         installed PWA's start_url does. -->
+    <string name="launch_url" translatable="false">https://ariyankhan.com/puzzle/?utm_source=android</string>
+    <!-- The host the app is trusted on, used by the deep link filter. One place, so it cannot drift. -->
+    <string name="host" translatable="false">ariyankhan.com</string>
+</resources>

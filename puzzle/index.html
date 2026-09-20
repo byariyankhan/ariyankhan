@@ -1,8 +1,15 @@
 <!doctype html>
 <html lang="en-US">
   <head>
-    <!-- Google AdSense: site verification only. No ad units and no Auto ads are enabled. -->
-    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1570944160084395" crossorigin="anonymous"></script>
+    <!-- Google AdSense is NOT loaded here.
+         It used to be, as a bare verification tag: 655 KB of somebody else's JavaScript fetched and parsed on
+         every single cold start of the game, for a page that has no ad units on it and no Auto ads enabled.
+         That is more than this whole game weighs, and on a phone it is the difference between a board being
+         ready in two seconds and in four.
+         The rest of the site still carries the tag, which is where AdSense's site review reads anyway; and the
+         moment advertising is switched on here (data-give="ad" below), adsConfigure() in js/puzzle.js fetches
+         the same script itself, at the moment it is actually needed. Nothing is lost and a cold start is half
+         the weight. -->
     <!-- The offers: a heart when the hearts run out, a hint, a check, and gold on the purse. Two switches.
          content : off | test | h5  — whether any of this exists.
          data-give: ad | free       — what the offer IS.
@@ -543,6 +550,6 @@
       </div>
     </div>
 
-    <script src="/js/puzzle.js?v=26"></script>
+    <script src="/js/puzzle.js?v=27"></script>
   </body>
 </html>
