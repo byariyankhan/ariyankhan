@@ -410,6 +410,8 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
   box-shadow:0 18px 50px rgba(0,0,0,.28); }
 .aa-adoffer-panel h3{ margin:0 0 8px; font-size:20px; }
 .aa-adoffer-panel p{ margin:0 0 16px; color:var(--muted); font-size:15px; line-height:1.45; }
+/* what an advertisement costs in a match, where the clock is somebody else's too */
+.aa-adoffer-panel .aa-adoffer-note{ margin:-10px 0 16px; font-size:13px; font-weight:800; color:var(--hard); }
 .aa-adtest-tag{ margin:0; font-size:11px; font-weight:800; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); }
 .aa-adtest-name{ margin:6px 0 0; font-size:13px; color:var(--muted); }
 .aa-adtest-why{ margin:8px 0 0; font-size:13px; line-height:1.45; color:var(--ink); }
@@ -531,6 +533,9 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
    this run landed. It sits on the card itself rather than in a panel of its own — a box around it only made
    the card busier, and the bar is loud enough without one. */
 .aa-focus{ --at:0%; margin:14px 0 0; text-align:left; }
+#aaMatchBody .aa-stars{ margin-top:16px; padding-top:16px; border-top:1px solid color-mix(in srgb, var(--muted) 22%, transparent); }
+#aaMatchBody .aa-stats{ grid-template-columns:repeat(3,1fr); }   /* three, not four: the race time is already on every line above */
+#aaMatchBody .aa-focus{ margin-bottom:28px; }   /* the brain mark hangs below the bar, and the sheet has no "vs" line under it to hold the space */
 /* The label and the reading share one small line directly over the bar: the number used to ride the brain,
    which put it on top of the label whenever the run was a slow one. Here they cannot collide, and the line
    costs the card almost nothing. */

@@ -657,6 +657,20 @@ links.
   colour, and one line saying how many boards are left to light it. Redrawn only
   when the tier or the lit count changes (`brainKey`), and the fade-in wave is
   skipped under `prefers-reduced-motion`.
+- **Every mode gets the same board**: what the game offers on a board does not
+  depend on which mode dealt it. Advertisements used to be switched off outright
+  in a challenge (`adCanOffer` returned false for `state.daily.race`), which
+  meant the one place in the game where a board actually costs something was the
+  one place a player could not buy a heart back; the reason behind it is real but
+  it is the player's to weigh, so the offer is there and it says **"The match
+  clock keeps running while it plays."** And a cleared challenge used to end on a
+  bare "Sending your time…", so the reading — the stars, what the board cost, the
+  focus bar — never appeared. It is kept on `state.raceReading` (keyed by match
+  code, cleared with every new board) and drawn on the result sheet under the
+  purse, with `runFocusBar(value, root, animate)` filling it once and the
+  four-second refreshes only restoring where it ended. The one thing left out
+  there is a second clock: the race time is already on every line above it, and
+  two different times on one sheet is how a race stops making sense.
 - **Upright, always**: the game is a column — a square board, a status bar, a map
   under it — so it does not rotate. An installed copy is held there by
   `"orientation": "portrait"` in `puzzle/app.webmanifest`, and
