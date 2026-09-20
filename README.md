@@ -644,13 +644,30 @@ links.
   arrows in the same line weights — drawn at the difficulty the player is
   actually being dealt (`TIER_OF()`), from `emblem` in
   `games/data/focus-boards.json` (the brain outline plus five scales of its own,
-  ~32 arrows on Easy to ~93 on Master). So the brain a player comes home to gets
+  ~27 arrows on Easy to ~90 on Master). The silhouette itself is drawn under the
+  arrows as a path (`.aa-brain-wash`), at the resolution it was designed at: a
+  cortical fold is smaller than a cell at twenty-odd arrows, so rasterising alone
+  leaves a lumpy blob, and the wash is what makes it a brain. The transform is the
+  mask's own — cell `(c, r)` has its centre at `(c + 0.5) / k` in the path's
+  100-unit box, cropped to the bounding box `mask.x`/`mask.y`.
+  So the brain a player comes home to gets
   finer and busier as they get better. Every board cleared lights another tenth
   of it, **from the bottom up**, and the tenth lights the lot in green — the same
   ten that makes a milestone. Under it: `Level <n>`, the difficulty in its own
   colour, and one line saying how many boards are left to light it. Redrawn only
   when the tier or the lit count changes (`brainKey`), and the fade-in wave is
   skipped under `prefers-reduced-motion`.
+- **Upright, always**: the game is a column — a square board, a status bar, a map
+  under it — so it does not rotate. An installed copy is held there by
+  `"orientation": "portrait"` in `puzzle/app.webmanifest`, and
+  `screen.orientation.lock('portrait')` is asked for on load, which an installed
+  or fullscreen window grants and a plain tab rejects (swallowed). No browser lets
+  a plain tab lock rotation, so that case is covered by `.aa-turn`, a notice
+  raised **by CSS alone** at `(orientation:landscape) and (max-height:560px) and
+  (pointer:coarse)` — all three, because a laptop window is landscape too and a
+  tablet in landscape is tall enough to play in. The script only stops the clock
+  behind it (the next tap on the board restarts it, exactly as returning from
+  another app does).
 - **SEO**: title/description/keywords around "puzzle", "train your brain", "arrow puzzle" and
   "arrow game"; Open Graph/Twitter card `images/puzzle-og.jpg` (1200×630,
   drawn by `games/build-puzzle-og.mjs`; the app icon by `games/build-puzzle-icon.mjs`); schema.org WebPage +
@@ -717,10 +734,16 @@ links.
   levels), so it unlocks, seeds, saves (`lv:d:<id>`) and deep-links (`#b-<id>`)
   exactly like a country.
 - **Focus boards** (`games/build-focus-boards.mjs` → `games/data/focus-boards.json`,
-  26 boards, 15 KB) are the boards the game opens on: a brain, a lightbulb, a
+  26 boards, 19 KB) are the boards the game opens on: a brain, a lightbulb, a
   key, a cog, a puzzle piece, a labyrinth, a knight — the game's own language
   rather than a country's, drawn here as M/L/Z outlines in the same 100-unit box
-  and scaled per tier by the same `rasterise`. In the game one is `{ id:
+  and scaled per tier by the same `rasterise`. The brain among them is **traced by
+  hand**, vertex by vertex — gyrus out, sulcus in — and rounded by two Chaikin
+  passes: every procedural fold tried before it (evenly spaced bumps on the
+  outline, however tuned) came out a flower or a cauliflower, because what makes a
+  cortex read is that the folds are all different sizes. Its lateral fissure and
+  the one over the cerebellum are **slits**, too fine for any board raster to
+  hold, and they are there for the home screen, which draws the path itself. In the game one is `{ id:
   'f:<id>', name, d, k, focus: true }`. `tourFor` puts the whole block at the
   **frontier**, in front of the first board the player has not cleared: a new
   player's level 1 is the brain, and a player who has already cleared a hundred

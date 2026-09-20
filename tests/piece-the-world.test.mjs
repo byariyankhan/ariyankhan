@@ -52,6 +52,6 @@ test('transcontinental countries sit with their capital', () => {
 test(`page copy quotes the real total (${total} pieces)`, () => assert.ok(html.includes(`${total} pieces`), `expected "${total} pieces" in piece-the-world.html`));
 test('page keeps the no-inline-style rule (CSP)', () => assert.ok(!/<[a-z][^>]*\sstyle="/i.test(html)));
 test('page bumps to the shared asset versions', () => {
-  for (const [f, v] of [['css/style.css', 18], ['js/site-nav.js', 11], ['js/site-footer.js', 13]]) assert.ok(html.includes(`${f}?v=${v}`), `${f}?v=${v}`);
+  for (const [f, v] of [['css/style.css', 19], ['js/site-nav.js', 11], ['js/site-footer.js', 15]]) assert.ok(html.includes(`${f}?v=${v}`), `${f}?v=${v}`);
 });
 console.log(process.exitCode ? `\nsome of ${tests} tests failed` : `\nall ${tests} tests passed`);

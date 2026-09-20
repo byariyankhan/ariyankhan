@@ -6,7 +6,7 @@
   "start_url": "/puzzle/?utm_source=pwa",
   "scope": "/puzzle/",
   "display": "standalone",
-  "orientation": "any",
+  "orientation": "portrait",
   "background_color": "#F4EDE0",
   "theme_color": "#F4EDE0",
   "categories": [

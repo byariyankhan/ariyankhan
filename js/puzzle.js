@@ -17,7 +17,7 @@
   const DATA_VERSION = '11';
   const MAP_VERSION = '3';
   const DISCB_VERSION = '4';  // games/data/discover-boards.json: the board shaped like each country's animal, bird or landmark
-  const FOCUS_VERSION = '2';  // games/data/focus-boards.json: the brain, the lightbulb, the key — the boards the game opens on
+  const FOCUS_VERSION = '3';  // games/data/focus-boards.json: the brain, the lightbulb, the key — the boards the game opens on
   const STORE = 'aa:v1:';
 
   // ── Where the backend lives ──
@@ -599,10 +599,11 @@
   function emblemFor(tier) {
     const em = FOCUS?.emblem; if (!em?.d || !em.k?.length) return null;
     if (!emblemCache.has(tier)) {
-      const b = generate(rasterise(em.d, em.k[tier] ?? em.k[0]), MAXLEN_OF[tier], 7000 + tier * 131, GEN_OPTS(tier));
+      const mask = rasterise(em.d, em.k[tier] ?? em.k[0]);
+      const b = generate(mask, MAXLEN_OF[tier], 7000 + tier * 131, GEN_OPTS(tier));
       // the order they light in: lowest head first, so the brain fills the way a glass does
       const order = b.pieces.map((_, i) => i).sort((a, c) => b.pieces[c].cells[0][0] - b.pieces[a].cells[0][0]);
-      emblemCache.set(tier, { W: b.W, H: b.H, pieces: b.pieces, order });
+      emblemCache.set(tier, { W: b.W, H: b.H, pieces: b.pieces, order, d: em.d, mask });
     }
     return emblemCache.get(tier);
   }
@@ -633,6 +634,12 @@
     svg.setAttribute('viewBox', `-0.6 -0.6 ${em.W + 1.2} ${em.H + 1.2}`);
     svg.classList.toggle('is-full', full);
     svg.classList.toggle('is-drawing', !still);
+    // The outline itself, under the arrows. Thirty arrows cannot draw a brain — a fold is smaller than a cell at
+    // this size, and what survives the raster is a lumpy blob. So the silhouette is drawn as a path, at the
+    // resolution it was designed at, and the arrows fill it. Cell (c, r) has its centre at (c + 0.5) / k in the
+    // path's own 0–100 box, and the mask was cropped to its bounding box, which is the whole of the transform.
+    svg.appendChild(svgEl('path', { class: 'aa-brain-wash', d: em.d, 'fill-rule': 'evenodd',
+      transform: `translate(${-em.mask.x} ${-em.mask.y}) scale(${em.mask.k})` }));
     const g = svgEl('g', { class: 'aa-brain-pieces' });
     em.pieces.forEach((p, i) => {
       const [dr, dc] = DIRS[p.dir], head = p.cells[0];
@@ -3662,6 +3669,19 @@
   renderToggles();
   document.addEventListener('keydown', e => { if (!el.game.hidden && !state.finished && (e.key === 'h' || e.key === 'H') && !/input|textarea/i.test(document.activeElement?.tagName || '')) hint(); });
   document.addEventListener('visibilitychange', () => { if (document.hidden && state.startedAt && !state.raceBase && !state.finished) { stopTimer(); } });
+
+  // ── Upright ──
+  // The game only works as a column, so it stays one. An installed copy is held there by the manifest
+  // ("orientation": "portrait"), and where a browser lets a page ask — Chrome on Android, in an installed or
+  // fullscreen window — it is locked outright below. A plain tab cannot be locked by anybody, so the notice in
+  // the markup covers that case, raised by CSS on a phone turned on its side. All this has to do is stop the
+  // clock while it is up: a board is not being played through it, and the next tap on the board starts the
+  // clock again exactly as coming back from another app does.
+  try { screen.orientation?.lock?.('portrait')?.catch?.(() => {}); } catch { /* a tab may not ask */ }
+  const sideways = matchMedia('(orientation:landscape) and (max-height:560px) and (pointer:coarse)');
+  const onTurn = () => { if (sideways.matches && state.startedAt && !state.raceBase && !state.finished) stopTimer(); };
+  sideways.addEventListener?.('change', onTurn);
+  onTurn();
   el.board.addEventListener('pointerdown', () => { if (!state.startedAt && !state.finished && state.elapsed) startTimer(); });
 
   // ── First open: welcome and terms. Every launch: the logo and a line to set the mood ──
