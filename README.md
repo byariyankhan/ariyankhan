@@ -672,16 +672,33 @@ links.
   there is a second clock: the race time is already on every line above it, and
   two different times on one sheet is how a race stops making sense.
 - **Upright, always**: the game is a column — a square board, a status bar, a map
-  under it — so it does not rotate. An installed copy is held there by
-  `"orientation": "portrait"` in `puzzle/app.webmanifest`, and
+  under it — and it stays one however the phone is held. An installed copy is held
+  there by `"orientation": "portrait"` in `puzzle/app.webmanifest`, and
   `screen.orientation.lock('portrait')` is asked for on load, which an installed
-  or fullscreen window grants and a plain tab rejects (swallowed). No browser lets
-  a plain tab lock rotation, so that case is covered by `.aa-turn`, a notice
-  raised **by CSS alone** at `(orientation:landscape) and (max-height:560px) and
-  (pointer:coarse)` — all three, because a laptop window is landscape too and a
-  tablet in landscape is tall enough to play in. The script only stops the clock
-  behind it (the next tap on the board restarts it, exactly as returning from
-  another app does).
+  or fullscreen window grants (the screen then never turns at all) and a plain tab
+  rejects, swallowed.
+  No browser lets a plain tab lock rotation, and that case used to be a notice
+  asking for the phone back — the wrong answer for somebody lying on their side,
+  who did not turn the phone but turned themselves. **The page turns back
+  instead**: `body` is given the portrait box it wants (`width:100dvh;
+  height:100dvw`) and rotated by exactly the angle the browser rotated it, the
+  other way, so the game stays on the same glass it was on a moment ago. Nothing
+  moves under the thumb and nothing is interrupted.
+  The direction comes from `screen.orientation.angle` (90 means the device was
+  turned counter-clockwise, so the page is turned clockwise back — `is-turned-ccw`
+  — and 270 the other way), because CSS cannot tell landscape-left from
+  landscape-right. The three media conditions are unchanged:
+  `(orientation:landscape) and (max-height:560px) and (pointer:coarse)` — all
+  three, because a laptop window is landscape too and a tablet in landscape is
+  tall enough to play in as it is. `--app-h` carries the column's height (`100dvh`
+  upright, `100dvw` turned) so every height in the stylesheet follows.
+  A rotated page is still handed screen coordinates, so **`ptOf(e)` and
+  `rectOf(node)`** put a finger and a box back into the page's own frame — the
+  identity while upright, which is every desktop and every phone held the usual
+  way. Directions and rectangles needed it (the deck swipe, the board's pan and
+  pinch, the confetti canvas); distances did not, because a quarter turn does not
+  change one.
+
 - **SEO**: title/description/keywords around "puzzle", "train your brain", "arrow puzzle" and
   "arrow game"; Open Graph/Twitter card `images/puzzle-og.jpg` (1200×630,
   drawn by `games/build-puzzle-og.mjs`; the app icon by `games/build-puzzle-icon.mjs`); schema.org WebPage +

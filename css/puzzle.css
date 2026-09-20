@@ -29,7 +29,7 @@ button{ font-family:inherit; }
 /* ── App frame ── */
 /* a game, not a document: no pinch or double-tap zoom anywhere, so quick taps never shove the board off screen */
 html, body{ touch-action:manipulation; overscroll-behavior:none; }
-.aa-app{ touch-action:manipulation; min-height:100dvh; max-width:640px; margin:0 auto; padding:calc(10px + env(safe-area-inset-top, 0px)) 16px calc(16px + env(safe-area-inset-bottom, 0px)); display:flex; flex-direction:column; }
+.aa-app{ touch-action:manipulation; min-height:var(--app-h); max-width:640px; margin:0 auto; padding:calc(10px + env(safe-area-inset-top, 0px)) 16px calc(16px + env(safe-area-inset-bottom, 0px)); display:flex; flex-direction:column; }
 .aa-screen{ display:flex; flex-direction:column; flex:1; min-height:0; padding:0; }
 .aa-icon{ width:42px; height:42px; border-radius:50%; border:none; background:transparent; color:var(--line); cursor:pointer; display:inline-flex; align-items:center; justify-content:center; padding:0; font-size:18px; font-weight:900; transition:background .15s, transform .15s; }
 .aa-icon svg{ width:26px; height:26px; fill:none; stroke:currentColor; stroke-width:1.9; stroke-linecap:round; stroke-linejoin:round; }
@@ -69,7 +69,7 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
    that wants more room pushes the buttons off the bottom instead of being made to fit. The 296px is everything
    else on the screen — the top row, the title, the two buttons, the gaps and the insets — so the cap is
    "whatever is left", and the deck takes exactly that on a short phone and on a tall one. */
-.aa-deck{ flex:1 1 auto; display:flex; flex-direction:column; gap:10px; min-height:180px; max-height:min(calc(100dvh - 296px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)), 560px); }
+.aa-deck{ flex:1 1 auto; display:flex; flex-direction:column; gap:10px; min-height:180px; max-height:min(calc(var(--app-h) - 296px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)), 560px); }
 .aa-deck-view{ display:flex; flex:1 1 auto; min-height:0; overflow:hidden; order:1; }
 /* the track is one view wide and as tall as the view stretches it; the cards are one view wide each,
    so it is twice as wide as it looks and the transform is what chooses which half you are seeing */
@@ -424,8 +424,8 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-board-wrap{ position:relative; flex:1; min-height:0; display:flex; align-items:center; justify-content:center; padding:10px 14px calc(16px + env(safe-area-inset-bottom, 0px)); overflow:hidden; touch-action:none; }
 .aa-board-track{ position:absolute; left:0; right:0; top:0; height:4px; background:var(--bg2); border-radius:4px; }
 .aa-board-bar{ height:100%; width:0; background:var(--accent); border-radius:4px; transition:width .3s; }
-.aa-board{ display:block; width:100%; height:auto; max-height:calc(100dvh - 232px); touch-action:none; transform-origin:0 0; will-change:transform; user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; }
-.aa-board--tall{ max-height:calc(100dvh - 212px); }
+.aa-board{ display:block; width:100%; height:auto; max-height:calc(var(--app-h) - 232px); touch-action:none; transform-origin:0 0; will-change:transform; user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; }
+.aa-board--tall{ max-height:calc(var(--app-h) - 212px); }
 .aa-outline{ fill:var(--accent); fill-opacity:0; stroke:none; transition:fill-opacity .35s; pointer-events:none; }
 .aa-guides{ display:none; }
 .aa-board--guides .aa-guides{ display:block; }
@@ -503,18 +503,27 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-splash-quote{ font-size:21px; line-height:1.4; color:var(--muted); margin:16px 0 0; width:100%; text-align:left; font-weight:700; }
 .aa-splash-by{ font-size:17px; color:var(--muted); margin:-22px 0 0; width:100%; text-align:right; font-weight:700; }
 /* ── Sideways ──────────────────────────────────────────────────────────────────────────────────────
-   The game is a column and always has been: a square board, a status bar, and the map under it. Turned on its
-   side a phone has no room for the board at a size worth tapping, so it asks for the phone back rather than
-   dealing one. Three conditions have to hold together, because two of them are true of a laptop as well:
-   landscape, a coarse pointer, and a viewport too short to play in. Media queries alone raise it, so it is
-   right even if the script never runs; the script only stops the clock behind it. */
-.aa-turn{ display:none; }
+   The game is a column and stays one, however the phone is held. It used to say so and stop: a notice asking
+   for the phone back, which is the wrong answer for somebody lying on their side — they did not turn the
+   phone, they turned themselves, and the game had nothing to do with it.
+
+   So the page turns back instead. The body is given the portrait box it wants (as wide as the screen is tall)
+   and rotated by exactly the angle the browser rotated it, in the opposite direction, which leaves the game
+   sitting on the same glass it was on before the screen flipped. Nothing moves under the player's thumb, and
+   nothing is interrupted.
+
+   The direction comes from the script, because CSS cannot tell landscape-left from landscape-right; the three
+   conditions below are the same three the notice used, because a laptop window is landscape too and a tablet
+   in landscape is tall enough to play in as it is. `--app-h` is the height of the column, which is the width
+   of the screen once it is turned. The pointer maths that follows a finger is turned with it (ptOf/rectOf in
+   js/puzzle.js); distances are the same either way, so only directions and rectangles needed it. */
+:root{ --app-h:100dvh; }
 @media (orientation:landscape) and (max-height:560px) and (pointer:coarse){
-  .aa-turn{ position:fixed; inset:0; z-index:90; background:var(--bg); display:flex; align-items:center; justify-content:center; padding:20px; text-align:center; }
-  .aa-turn-inner{ display:flex; flex-direction:column; align-items:center; gap:12px; max-width:420px; }
-  .aa-turn-ico{ width:52px; height:52px; color:var(--accent); }
-  .aa-turn-title{ margin:0; font-size:21px; font-weight:900; color:var(--line); }
-  .aa-turn-note{ margin:0; font-size:15px; font-weight:700; color:var(--muted); }
+  html.is-turned{ --app-h:100dvw; overflow:hidden; }
+  html.is-turned body{ position:fixed; top:0; left:0; width:100dvh; height:100dvw;
+    overflow-y:auto; overflow-x:hidden; -webkit-overflow-scrolling:touch; transform-origin:0 0; }
+  html.is-turned-ccw body{ transform:rotate(-90deg) translateX(-100%); }
+  html.is-turned-cw body{ transform:rotate(90deg) translateY(-100%); }
 }
 @keyframes aa-in{ from{ opacity:0; } to{ opacity:1; } }
 @keyframes aa-out{ from{ opacity:1; } to{ opacity:0; } }
@@ -526,7 +535,7 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-card-lead{ font-size:15px; color:var(--muted); margin:0 0 14px; }
 .aa-stars{ font-size:34px; color:var(--accent); letter-spacing:6px; margin:0 0 10px; }
 .aa-stats{ display:grid; grid-template-columns:repeat(4,1fr); gap:6px; margin:0 0 12px; }
-.aa-stats span{ display:flex; flex-direction:column; font-size:10px; letter-spacing:1px; text-transform:uppercase; color:var(--muted); background:var(--bg2); border-radius:12px; padding:10px 4px; }
+.aa-stats span{ display:flex; flex-direction:column; align-items:center; text-align:center; font-size:10px; letter-spacing:1px; text-transform:uppercase; color:var(--muted); background:var(--bg2); border-radius:12px; padding:10px 4px; }
 .aa-stats b{ font-size:20px; font-weight:900; color:var(--ink); letter-spacing:0; text-transform:none; margin-bottom:2px; font-variant-numeric:tabular-nums; }
 .aa-facts{ font-size:14px; color:var(--muted); margin:0 0 12px; line-height:1.5; }
 /* The focus reading, as a bar anybody can read: red at one end, green at the other, and a brain sitting where
@@ -613,7 +622,7 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 
 /* ── Sheets (levels, settings) ── */
 .aa-sheet{ position:fixed; inset:0; z-index:50; background:rgba(0,0,0,.35); display:flex; align-items:flex-end; justify-content:center; }
-.aa-sheet-panel{ width:100%; max-width:640px; max-height:92dvh; overflow:auto; background:var(--panel); color:var(--ink); border-radius:24px 24px 0 0; padding:14px 18px calc(24px + env(safe-area-inset-bottom, 0px)); box-shadow:0 -10px 40px rgba(0,0,0,.2); animation:aa-up .25s ease-out; }
+.aa-sheet-panel{ width:100%; max-width:640px; max-height:calc(var(--app-h) * 0.92); overflow:auto; background:var(--panel); color:var(--ink); border-radius:24px 24px 0 0; padding:14px 18px calc(24px + env(safe-area-inset-bottom, 0px)); box-shadow:0 -10px 40px rgba(0,0,0,.2); animation:aa-up .25s ease-out; }
 @keyframes aa-up{ from{ transform:translateY(40px); opacity:0; } to{ transform:none; opacity:1; } }
 .aa-sheet-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; }
 .aa-sheet-head h2{ margin:0; font-size:22px; font-weight:900; }

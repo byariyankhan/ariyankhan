@@ -124,6 +124,31 @@
   // ── Helpers ──
   const fmtTime = (ms, tenths) => { const s = Math.max(0, ms) / 1000, m = Math.floor(s / 60), r = s - m * 60; return tenths ? `${m}:${r.toFixed(1).padStart(4, '0')}` : `${m}:${String(Math.floor(r)).padStart(2, '0')}`; };
   const fmtPop = n => !n ? '' : n >= 1e9 ? `${(n / 1e9).toFixed(2)} billion` : n >= 1e6 ? `${Math.round(n / 1e6)} million` : `${Math.round(n / 1e3)}K`;
+  // Where a finger is, and where a box is, in the page's own coordinates rather than the screen's. The page
+  // is rotated when a phone is held sideways (see "Upright" at the foot of this file), and a rotated page is
+  // still handed screen coordinates: a swipe along the column arrives as a sideways delta, and a rectangle
+  // arrives with its width and height the wrong way round. These two put both back. While turn.dir is 0 they
+  // are the identity, which is every desktop and every phone held upright.
+  //
+  // The body's own box is the measurement, not a viewport unit: it is exactly what the transform was applied
+  // to, so the arithmetic cannot drift from the layout.
+  const turn = { dir: 0 };
+  const ptOf = e => {
+    if (!turn.dir) return { x: e.clientX, y: e.clientY };
+    const b = document.body;
+    return turn.dir < 0
+      ? { x: b.offsetWidth - e.clientY, y: e.clientX }
+      : { x: e.clientY, y: b.offsetHeight - e.clientX };
+  };
+  const rectOf = node => {
+    const r = node.getBoundingClientRect();
+    if (!turn.dir) return r;
+    const b = document.body;
+    const left = turn.dir < 0 ? b.offsetWidth - r.bottom : r.top;
+    const top = turn.dir < 0 ? r.left : b.offsetHeight - r.right;
+    // a quarter turn swaps them, and the box stays a box
+    return { left, top, width: r.height, height: r.width, right: left + r.height, bottom: top + r.width };
+  };
   const svgEl = (tag, attrs = {}) => { const n = document.createElementNS(SVG_NS, tag); for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v); return n; };
   // progress is keyed by country id (not by level number: the tour order is the player's own, home country first)
   const progressKey = i => 'lv:' + DATA.levels[i].id;
@@ -727,11 +752,12 @@
       // A finger on the deck stops the clock: a card that turns itself out from under a tap sends that tap to
       // whatever slid into its place. If the touch turns out to be a plain tap, the clock starts again.
       deckStop();
-      deck.swipedAt = 0; deck.drag = { x: e.clientX, y: e.clientY, dx: 0, lock: null };
+      deck.swipedAt = 0; { const q = ptOf(e); deck.drag = { x: q.x, y: q.y, dx: 0, lock: null }; }
     });
     el.deck.addEventListener('pointermove', e => {
       const d = deck.drag; if (!d) return;
-      d.dx = e.clientX - d.x; const dy = e.clientY - d.y;
+      const q = ptOf(e);
+      d.dx = q.x - d.x; const dy = q.y - d.y;
       if (d.lock === null && (Math.abs(d.dx) > DECK_SLOP || Math.abs(dy) > 8)) d.lock = Math.abs(d.dx) > Math.abs(dy) ? 'x' : 'y';
       if (d.lock !== 'x') return;
       // at the ends the card gives about a third as far, so a swipe that cannot go anywhere says so
@@ -1181,6 +1207,8 @@
       // a tap shoots (or fails); pressing and holding shows the arrow's lane instead: green if it can go, red if not
       let holdTimer = 0, held = false, down = null;
       g.addEventListener('pointerdown', e => { if (e.pointerType === 'mouse' && e.button !== 0) return; held = false; down = [e.clientX, e.clientY]; g.classList.add('is-pressed'); clearTimeout(holdTimer); holdTimer = setTimeout(() => { held = true; peek(p); }, HOLD_MS); });
+      // screen coordinates on purpose, and correct on a turned page too: this is how far the finger moved,
+      // and a distance is the same distance whichever way the page is rotated.
       g.addEventListener('pointermove', e => { if (down && Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 12) { clearTimeout(holdTimer); down = null; } });
       g.addEventListener('pointerup', () => { clearTimeout(holdTimer); g.classList.remove('is-pressed'); if (!down) return; down = null; if (held) { held = false; return; } tapPiece(p); });
       g.addEventListener('pointercancel', () => { clearTimeout(holdTimer); g.classList.remove('is-pressed'); down = null; });
@@ -3313,7 +3341,7 @@
       if (c.parentNode !== document.body) document.body.appendChild(c);   // the board is hidden in the lobby
       c.classList.add('is-over'); c.width = innerWidth; c.height = innerHeight;
     }
-    const r = overSheet ? { width: innerWidth, height: innerHeight } : el.boardWrap.getBoundingClientRect();
+    const r = overSheet ? { width: document.body.offsetWidth, height: document.body.offsetHeight } : rectOf(el.boardWrap);
     const list = [];
     for (let i = 0; i < n; i++) {
       const p = particle(Math.random() * r.width, -20 - Math.random() * r.height * 0.4, (Math.random() - 0.5) * 2, 1 + Math.random() * 3);
@@ -3346,7 +3374,7 @@
       if (c.classList.contains('is-over')) { c.classList.remove('is-over'); el.boardWrap.insertBefore(c, el.toast); }
       return;
     }
-    if (!fx.running && !c.classList.contains('is-over')) { const r = el.boardWrap.getBoundingClientRect(); c.width = Math.round(r.width); c.height = Math.round(r.height); }
+    if (!fx.running && !c.classList.contains('is-over')) { const r = rectOf(el.boardWrap); c.width = Math.round(r.width); c.height = Math.round(r.height); }
     c.hidden = false; fx.parts.push(...list);
     if (fx.running) return;
     fx.running = true;
@@ -3424,31 +3452,31 @@
     const wrap = el.boardWrap;
     wrap.addEventListener('pointerdown', e => {
       if (e.pointerType === 'mouse' && e.button !== 0) return;
-      zoom.ptrs.set(e.pointerId, [e.clientX, e.clientY]);
+      { const q = ptOf(e); zoom.ptrs.set(e.pointerId, [q.x, q.y]); }
       if (zoom.ptrs.size === 2) {
         // remember the board point under the pinch centre (board-local, unscaled) and the frame's origin on screen
-        const [a, b] = [...zoom.ptrs.values()]; const r = el.board.getBoundingClientRect(); const mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2;
+        const [a, b] = [...zoom.ptrs.values()]; const r = rectOf(el.board); const mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2;
         zoom.pinch = { d: Math.hypot(a[0] - b[0], a[1] - b[1]), s: zoom.s, left0: r.left - zoom.x, top0: r.top - zoom.y, qx: (mx - r.left) / zoom.s, qy: (my - r.top) / zoom.s }; zoom.pan = null;
       }
-      else if (zoom.ptrs.size === 1 && zoom.s > 1) zoom.pan = { x0: e.clientX, y0: e.clientY, zx: zoom.x, zy: zoom.y, moved: false };
+      else if (zoom.ptrs.size === 1 && zoom.s > 1) { const q = ptOf(e); zoom.pan = { x0: q.x, y0: q.y, zx: zoom.x, zy: zoom.y, moved: false }; }
     });
     wrap.addEventListener('pointermove', e => {
       if (!zoom.ptrs.has(e.pointerId)) return;
-      zoom.ptrs.set(e.pointerId, [e.clientX, e.clientY]);
+      { const q = ptOf(e); zoom.ptrs.set(e.pointerId, [q.x, q.y]); }
       if (zoom.pinch && zoom.ptrs.size === 2) {
         const [a, b] = [...zoom.ptrs.values()]; const d = Math.hypot(a[0] - b[0], a[1] - b[1]); const mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2;
         const s1 = Math.max(zoom.MIN, Math.min(zoom.MAX, zoom.pinch.s * d / Math.max(1, zoom.pinch.d)));
         // keep the board point under the pinch centre where the fingers are: screen = origin + x + q * s
         zoom.s = s1; zoom.x = (mx - zoom.pinch.left0) - zoom.pinch.qx * s1; zoom.y = (my - zoom.pinch.top0) - zoom.pinch.qy * s1; applyZoom();
       } else if (zoom.pan && zoom.ptrs.size === 1) {
-        const dx = e.clientX - zoom.pan.x0, dy = e.clientY - zoom.pan.y0;
+        const q = ptOf(e); const dx = q.x - zoom.pan.x0, dy = q.y - zoom.pan.y0;
         if (!zoom.pan.moved && Math.hypot(dx, dy) < 12) return;   // a tap on an arrow is still a tap
         zoom.pan.moved = true; zoom.x = zoom.pan.zx + dx; zoom.y = zoom.pan.zy + dy; applyZoom();
       }
     });
     const up = e => { zoom.ptrs.delete(e.pointerId); if (zoom.ptrs.size < 2) zoom.pinch = null; if (!zoom.ptrs.size) zoom.pan = null; };
     wrap.addEventListener('pointerup', up); wrap.addEventListener('pointercancel', up);
-    wrap.addEventListener('wheel', e => { if (!el.game || el.game.hidden) return; e.preventDefault(); const r = el.board.getBoundingClientRect(); zoomAt(e.deltaY < 0 ? 1.2 : 1 / 1.2, e.clientX - r.left + zoom.x, e.clientY - r.top + zoom.y); }, { passive: false });
+    wrap.addEventListener('wheel', e => { if (!el.game || el.game.hidden) return; e.preventDefault(); const r = rectOf(el.board), q = ptOf(e); zoomAt(e.deltaY < 0 ? 1.2 : 1 / 1.2, q.x - r.left + zoom.x, q.y - r.top + zoom.y); }, { passive: false });
   }
   // ── The league ──
   //
@@ -3704,18 +3732,37 @@
   document.addEventListener('visibilitychange', () => { if (document.hidden && state.startedAt && !state.raceBase && !state.finished) { stopTimer(); } });
 
   // ── Upright ──
-  // The game only works as a column, so it stays one. An installed copy is held there by the manifest
-  // ("orientation": "portrait"), and where a browser lets a page ask — Chrome on Android, in an installed or
-  // fullscreen window — it is locked outright below. A plain tab cannot be locked by anybody, so the notice in
-  // the markup covers that case, raised by CSS on a phone turned on its side. All this has to do is stop the
-  // clock while it is up: a board is not being played through it, and the next tap on the board starts the
-  // clock again exactly as coming back from another app does.
+  // The game is a column and stays one, however the phone is held. An installed copy is held there by the
+  // manifest ("orientation": "portrait"), and where a browser lets a page ask — installed or fullscreen — the
+  // orientation is locked outright, which is the best answer: the screen never turns at all.
+  //
+  // A plain tab cannot be locked by anybody. It used to say so and stop, with a notice asking for the phone
+  // back, and that is the wrong answer: somebody lying on their side did not turn the phone, they turned
+  // themselves, and being told to sit up by a puzzle game is not a reasonable thing to be told. So the page
+  // turns back instead. The body is given the portrait box it wants and rotated by exactly the angle the
+  // browser rotated it, the other way, which leaves the game on the same glass it was on a moment ago —
+  // nothing moves under the thumb, the clock does not stop, and the board being played is the board still
+  // being played.
+  //
+  // `turn.dir` is what the page was turned by: -90 for a screen the browser rotated one way, 90 for the
+  // other, 0 for upright. Everything that follows a finger reads through ptOf/rectOf below, which are the
+  // identity while it is 0 — so a phone held upright, and every desktop, runs exactly the code it always did.
   try { screen.orientation?.lock?.('portrait')?.catch?.(() => {}); } catch { /* a tab may not ask */ }
   const sideways = matchMedia('(orientation:landscape) and (max-height:560px) and (pointer:coarse)');
-  const onTurn = () => { if (sideways.matches && state.startedAt && !state.raceBase && !state.finished) stopTimer(); };
+  function onTurn() {
+    // 90 means the screen was turned one way, 270 (or -90) the other; anything else is upright enough.
+    const a = ((screen.orientation?.angle ?? window.orientation ?? 0) % 360 + 360) % 360;
+    turn.dir = !sideways.matches ? 0 : a === 90 ? -90 : a === 270 ? 90 : 0;
+    const r = document.documentElement.classList;
+    r.toggle('is-turned', turn.dir !== 0);
+    r.toggle('is-turned-ccw', turn.dir === -90);
+    r.toggle('is-turned-cw', turn.dir === 90);
+  }
   sideways.addEventListener?.('change', onTurn);
+  screen.orientation?.addEventListener?.('change', onTurn);
+  window.addEventListener('orientationchange', onTurn);
+  window.addEventListener('resize', onTurn);
   onTurn();
-  el.board.addEventListener('pointerdown', () => { if (!state.startedAt && !state.finished && state.elapsed) startTimer(); });
 
   // ── First open: welcome and terms. Every launch: the logo and a line to set the mood ──
   const QUOTES = [

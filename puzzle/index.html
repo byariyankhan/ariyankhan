@@ -88,7 +88,7 @@
          set these two when the backend moves to a host of its own and the client follows without a change:
          <meta name="puzzle-api" content="https://api.example.com" />
          <meta name="puzzle-ws"  content="wss://api.example.com" /> -->
-    <link rel="stylesheet" href="/css/puzzle.css?v=19" />
+    <link rel="stylesheet" href="/css/puzzle.css?v=20" />
     <link rel="preload" href="/games/data/puzzle.json?v=11" as="fetch" crossorigin="anonymous" />
 
     <!-- SCHEMA -->
@@ -207,22 +207,6 @@
         </div>
         <p class="aa-splash-quote" id="aaSplashQuote"></p>
         <p class="aa-splash-by">— Puzzle</p>
-      </div>
-    </div>
-    <!-- ── SIDEWAYS: the game is a column, so it asks for the phone back ──
-         Shown by CSS alone, on a touch screen turned landscape and too short to play in. An installed copy
-         never sees it: the manifest asks for portrait and the orientation is locked outright where a browser
-         allows that. A desktop window is landscape too, which is why the pointer and height both have to say
-         phone before this appears. -->
-    <div class="aa-turn" id="aaTurn">
-      <div class="aa-turn-inner">
-        <svg class="aa-turn-ico" viewBox="0 0 48 48" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="17" y="5" width="14" height="25" rx="3"/>
-          <path d="M24 34v9M24 43h12a4 4 0 0 0 4-4v-6"/>
-          <path d="M36 37l4-4 4 4"/>
-        </svg>
-        <p class="aa-turn-title">Turn your phone upright</p>
-        <p class="aa-turn-note">Puzzle plays in one column — a board, then the map under it.</p>
       </div>
     </div>
     <main class="aa-app" id="aaApp"><span id="top"></span>
@@ -559,6 +543,6 @@
       </div>
     </div>
 
-    <script src="/js/puzzle.js?v=23"></script>
+    <script src="/js/puzzle.js?v=24"></script>
   </body>
 </html>
