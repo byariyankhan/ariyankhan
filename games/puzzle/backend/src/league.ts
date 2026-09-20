@@ -20,6 +20,7 @@ import { pool, query, tx } from './db.js';
 import { config } from './config.js';
 import { give, idem } from './gold.js';
 import { log } from './log.js';
+import * as push from './push.js';
 
 /** The reasons that count as playing for gold. A prize (`league`), the signup grant and `admin` do not. */
 const PLAY_REASONS = ['stake', 'payout', 'leave_refund', 'expire_refund', 'draw_refund'];
@@ -249,6 +250,12 @@ export async function leagueSweep(now: Date = new Date()): Promise<string[]> {
     const done = await settleDue(now);
     if (!done) break;
     settled.push(done.key);
+    // The gold is in the ledger by now — the transaction above committed before this line — so telling the
+    // player is a separate, failable thing that cannot take the payment down with it. A week ends at a time
+    // nobody is playing, which is exactly why they are told rather than left to find out.
+    // user_id is null for a rank won by an account that has since been deleted: their place is still in the
+    // table, but there is nobody left to tell.
+    for (const p of done.paid) if (p.gold > 0 && p.user_id) void push.sendToUser(p.user_id, push.leagueNote(p.rank, p.gold));
   }
   return settled;
 }

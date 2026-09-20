@@ -97,6 +97,12 @@ services:
       PUZZLE_ALLOWED_ORIGINS: ${PUZZLE_ALLOWED_ORIGINS:-}
       PUZZLE_COOKIE_SECURE: ${PUZZLE_COOKIE_SECURE:-true}
       PUZZLE_LOG_LEVEL: ${PUZZLE_LOG_LEVEL:-info}
+      # Web Push. The private half is a secret and lives only in this host's .env, written there by the
+      # push-keys mode of .github/workflows/puzzle-ops.yml, which generates the pair on this machine and never
+      # prints the private one. Unset means notifications are simply off.
+      PUZZLE_VAPID_PUBLIC: ${PUZZLE_VAPID_PUBLIC:-}
+      PUZZLE_VAPID_PRIVATE: ${PUZZLE_VAPID_PRIVATE:-}
+      PUZZLE_VAPID_SUBJECT: ${PUZZLE_VAPID_SUBJECT:-mailto:ariyanfiles@gmail.com}
     working_dir: /srv/puzzle
     command:
       - sh

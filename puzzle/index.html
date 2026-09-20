@@ -88,7 +88,7 @@
          set these two when the backend moves to a host of its own and the client follows without a change:
          <meta name="puzzle-api" content="https://api.example.com" />
          <meta name="puzzle-ws"  content="wss://api.example.com" /> -->
-    <link rel="stylesheet" href="/css/puzzle.css?v=16" />
+    <link rel="stylesheet" href="/css/puzzle.css?v=17" />
     <link rel="preload" href="/games/data/puzzle.json?v=11" as="fetch" crossorigin="anonymous" />
 
     <!-- SCHEMA -->
@@ -508,6 +508,13 @@
           <div class="aa-row"><span class="aa-row-ico">📳</span><span class="aa-row-label">Vibration</span><button type="button" class="aa-switch" id="aaVibe" role="switch" aria-checked="true" aria-label="Vibration"></button></div>
         </div>
 
+        <!-- Off unless the account can be told apart from another, which is the whole point of a notification,
+             and hidden entirely where the browser cannot do it or the server has no keys. -->
+        <p class="aa-cap" id="aaNotifyCap" hidden>Notifications</p>
+        <div class="aa-group" id="aaNotifyGroup" hidden>
+          <div class="aa-row"><span class="aa-row-ico">🔔</span><span class="aa-row-label">An invite, and the league<small class="aa-row-sub" id="aaNotifyNote"></small></span><button type="button" class="aa-switch" id="aaNotify" role="switch" aria-checked="false" aria-label="Notifications"></button></div>
+        </div>
+
         <p class="aa-cap">Colours</p>
         <div class="aa-group">
           <div class="aa-row aa-row--col"><div class="aa-themes" id="aaThemes"></div></div>
@@ -536,6 +543,6 @@
       </div>
     </div>
 
-    <script src="/js/puzzle.js?v=19"></script>
+    <script src="/js/puzzle.js?v=20"></script>
   </body>
 </html>

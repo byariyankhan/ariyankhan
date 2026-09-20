@@ -581,6 +581,27 @@ links.
   Features world-atlas leaves without an id (Kosovo) get `n:<slug>` ids in both
   data files. Versioned with `MAP_VERSION`. There is no Restart button in the game any more (back out or
   fail and retry).
+- **Notifications** (`games/puzzle/backend/src/push.ts`, `migrations/008_push.sql`,
+  the `push` handlers at the end of `piece-the-world-sw.js`, and the switch in
+  Settings): Web Push, for the two things that happen to somebody who is not
+  looking at the game — a friend asking them to a match, and the league paying
+  out on Sunday night. Nothing else is ever sent. An invitation only pushes when
+  the player is **not** online (`online.is`), because somebody with the game open
+  already has it on their screen; the league pushes after the settlement
+  transaction has committed, so a push that fails cannot take a prize with it.
+  Both are fire-and-forget: `sendToUser` never throws into the caller. Endpoints:
+  `GET /v1/push/key` (the public key, or `enabled:false`), and
+  `POST /v1/push/subscribe` / `unsubscribe`, rate limited by `push_write`. One
+  row per browser endpoint, moved to whoever signs in on it, deleted with the
+  account, and deleted the moment a push service answers 404 or 410. The client
+  asks for permission **only** when the switch is turned on, hides the switch
+  entirely where the browser cannot do it or the server has no keys, and drops
+  the subscription on sign-out. **The VAPID keypair is generated on the VPS** by
+  the `push-keys` mode of `puzzle-ops.yml`: it writes both halves into the
+  project's `.env`, patches the compose file to pass them through, recreates the
+  API, and prints only the public one. The private key is never in the repository
+  and never in a log.
+
 - **Lobby layout**: purse, title, tagline ("Train your brain."), **the deck**, then
   Play & Discover and Play with Friends. The old cards carousel, the level-path
   dots and the compact Today's Country / All levels buttons are all gone.

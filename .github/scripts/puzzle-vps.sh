@@ -2149,6 +2149,110 @@ AADROP
 }
 
 
+# ── push-keys ──────────────────────────────────────────────────────────────────────────────────────────
+# The keypair that lets this server send notifications, made here and kept here.
+#
+# Web Push identifies the sender with a VAPID keypair. The private half is a secret, so it is generated on this
+# machine, written straight into the project's .env, and never printed, never sent anywhere and never put in the
+# repository. The public half is public by definition — the browser needs it to subscribe — and it is read back
+# at the end from the API's own endpoint, which is also the proof that the service picked the pair up.
+#
+# Idempotent: a run that finds a key already in the .env changes nothing and just reports. Safe: the .env is
+# copied first, only appended to, and the values already in it are proved untouched by comparing a hash of them
+# before and after — a hash of the values, never a value. The compose file is only touched if it does not
+# already pass the three variables through, it is validated by `docker compose config` before it is kept, and it
+# goes back as it was if anything about that fails.
+mode_push_keys() {
+  echo "Puzzle — push-keys  ($(date -u))"
+  PROJ=$(projdir)
+  [ -n "$PROJ" ] || { bad "could not find the project directory"; return; }
+  ENVF="$PROJ/.env"; COMP="$PROJ/docker-compose.yml"
+  $SUDO test -f "$ENVF" || { bad "no .env in $PROJ"; return; }
+  $SUDO test -f "$COMP" || { bad "no docker-compose.yml in $PROJ"; return; }
+  note "project $PROJ"
+
+  say "1. is there a key already?"
+  HAVE=$($SUDO grep -c '^PUZZLE_VAPID_PRIVATE=.\+' "$ENVF" || true)
+  if [ "${HAVE:-0}" -gt 0 ]; then
+    ok "this host already has a keypair; leaving it exactly as it is"
+  else
+    say "1b. generating one, inside the API container, from its own crypto"
+    # JWK export gives x, y and d already base64url-encoded, which is the form VAPID wants: the public key is
+    # the uncompressed point 0x04||x||y, the private key is d. Nothing is written to disk in the container.
+    GEN=$(docker exec "$API" node -e '
+      const { generateKeyPairSync } = require("node:crypto");
+      const { privateKey } = generateKeyPairSync("ec", { namedCurve: "prime256v1" });
+      const j = privateKey.export({ format: "jwk" });
+      const b = s => Buffer.from(s, "base64url");
+      process.stdout.write(Buffer.concat([Buffer.from([4]), b(j.x), b(j.y)]).toString("base64url") + " " + j.d);
+    ' 2>/dev/null) || { bad "could not generate a keypair in $API"; return; }
+    PUB=${GEN%% *}; PRIV=${GEN##* }
+    # 65 raw bytes base64url is 87 characters; 32 is 43. A wrong length here means a wrong key later.
+    [ ${#PUB} -eq 87 ] && [ ${#PRIV} -eq 43 ] || { bad "the generated pair is not the right shape"; return; }
+    ok "a P-256 keypair, generated on this machine"
+
+    say "2. writing it into the .env"
+    EBK="$ENVF.before-push-$STAMP"
+    $SUDO cp -a "$ENVF" "$EBK" || { bad "could not back the .env up"; return; }
+    $SUDO chmod 600 "$EBK"
+    kept "$EBK  (the way back)"
+    BEFORE=$($SUDO sed -n 's/^[A-Za-z_][A-Za-z0-9_]*=//p' "$ENVF" | sha256sum | cut -d" " -f1)
+    printf '\n# Web Push (written by puzzle-ops push-keys on %s). The private key is a secret.\nPUZZLE_VAPID_PUBLIC=%s\nPUZZLE_VAPID_PRIVATE=%s\n' \
+      "$(date -u +%Y-%m-%d)" "$PUB" "$PRIV" | $SUDO tee -a "$ENVF" >/dev/null || { bad "could not write to the .env"; return; }
+    $SUDO chmod 600 "$ENVF"
+    AFTER=$($SUDO sed -n 's/^[A-Za-z_][A-Za-z0-9_]*=//p' "$ENVF" | grep -v "^$PUB$" | grep -v "^$PRIV$" | sha256sum | cut -d" " -f1)
+    if [ "$BEFORE" = "$AFTER" ]; then ok "the two keys were added and nothing else in the file moved"
+    else bad "the .env changed in a way this did not intend; putting it back"; $SUDO cp -a "$EBK" "$ENVF"; return; fi
+    unset PRIV GEN
+  fi
+
+  say "3. does the compose file pass them to the API?"
+  if $SUDO grep -q 'PUZZLE_VAPID_PUBLIC' "$COMP"; then
+    ok "it already does"
+  else
+    CBK="$COMP.before-push-$STAMP"
+    $SUDO cp -a "$COMP" "$CBK"; kept "$CBK  (the way back)"
+    # Anchored on the one line that is already in the API's environment block, so the three go where they
+    # belong and nowhere else. A file that does not have that line is left alone and reported.
+    $SUDO python3 - "$COMP" <<'PATCH' || { bad "could not add them; the compose file is unchanged"; $SUDO cp -a "$CBK" "$COMP"; return; }
+import sys
+p = sys.argv[1]
+src = open(p).read()
+anchor = "      PUZZLE_LOG_LEVEL: ${PUZZLE_LOG_LEVEL:-info}\n"
+if anchor not in src:
+    sys.exit("the API's environment block does not look the way this expects")
+add = ("      PUZZLE_VAPID_PUBLIC: ${PUZZLE_VAPID_PUBLIC:-}\n"
+       "      PUZZLE_VAPID_PRIVATE: ${PUZZLE_VAPID_PRIVATE:-}\n"
+       "      PUZZLE_VAPID_SUBJECT: ${PUZZLE_VAPID_SUBJECT:-mailto:ariyanfiles@gmail.com}\n")
+open(p, "w").write(src.replace(anchor, anchor + add, 1))
+PATCH
+    if (cd "$PROJ" && $SUDO docker compose config -q 2>&1 | sed 's/^/      /'); then
+      ok "compose still renders, with the three variables in it"
+    else
+      bad "compose refused the edited file; putting it back"; $SUDO cp -a "$CBK" "$COMP"; return
+    fi
+  fi
+
+  say "4. recreating the API so it reads them"
+  # The variables are passed at create time, so a restart is not enough: the container has to be made again.
+  (cd "$PROJ" && $SUDO docker compose up -d --force-recreate puzzle-api >/dev/null 2>&1) \
+    || { bad "could not recreate $API"; return; }
+  for i in $(seq 1 90); do
+    h=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$API" 2>/dev/null)
+    [ "$h" = "healthy" ] && break
+    sleep 5
+  done
+  [ "$h" = "healthy" ] && ok "the API is healthy again" || bad "the API did not come back healthy (state: ${h:-unknown})"
+
+  say "5. what the browsers will be given"
+  K=$(curl -s -m 15 "https://$DOMAIN/api/puzzle/v1/push/key" || true)
+  case "$K" in
+    *'"enabled":true'*) ok "notifications are on"; note "public key: $(printf '%s' "$K" | sed -n 's/.*"key":"\([^"]*\)".*/\1/p')" ;;
+    *) bad "the API still says notifications are off: ${K:-no answer}" ;;
+  esac
+  note "the private key is in $ENVF on this host and nowhere else; it has not been printed"
+}
+
 case "$MODE" in
   inspect)       mode_inspect ;;
   logs)          mode_logs ;;
@@ -2156,6 +2260,7 @@ case "$MODE" in
   web-look)      mode_web_look ;;
   git-access)    mode_git_access ;;
   git-sync)      mode_git_sync ;;
+  push-keys)     mode_push_keys ;;
   push-source)   mode_push_source ;;
   web-safe-fetch) mode_web_safe_fetch ;;
   backup-verify) mode_backup_verify ;;
