@@ -22,3 +22,6 @@ games/puzzle/backend/.env.dev
 # load-test fixtures: these hold real session tokens for seeded players
 games/puzzle/tests/load-tokens.txt
 games/puzzle/tests/load-codes.txt
+
+# a local redis run leaves this behind; it is not ours
+dump.rdb

@@ -1226,7 +1226,7 @@
     const seed = (daily ? daily.seed : (i + 1) * 1000) + state.seedBump;
     const gen = bestBoard(state.maskInfo, state.tier, seed);
     const livesMax = livesFor(state.tier);
-    Object.assign(state, { W: gen.W, H: gen.H, pieces: gen.pieces, occ: gen.occ, land: gen.land, left: gen.pieces.length, hintsMax: hintsFor(state.tier), checksUsed: 0, checksMax: CHECKS_PER_LEVEL, lives: livesMax, livesMax, elapsed: 0, startedAt: 0, raceBase: 0, finished: false, hintsUsed: 0, wrong: 0, busy: false, potGone: false, combo: 0, bestCombo: 0, lastShot: 0, cheerHold: 0, shown: new Set(), armed: new Set() });
+    Object.assign(state, { W: gen.W, H: gen.H, pieces: gen.pieces, occ: gen.occ, land: gen.land, left: gen.pieces.length, hintsMax: hintsFor(state.tier), checksUsed: 0, checksMax: CHECKS_PER_LEVEL, lives: livesMax, livesMax, elapsed: 0, startedAt: 0, raceBase: 0, finished: false, hintsUsed: 0, wrong: 0, busy: false, potGone: false, combo: 0, bestCombo: 0, lastShot: 0, cheerHold: 0, shown: new Set(), armed: new Set(), raceReading: null });
     el.error.hidden = true; el.loading.hidden = true;
     if (daily) { if (history.replaceState) history.replaceState(null, '', location.pathname + location.search + (daily.hash ?? '#daily')); } else setHash(i);
     scrollToGame();
@@ -1531,9 +1531,12 @@
   // The bar is filled in front of the player rather than handed to them finished: the brain travels, the
   // number counts up with it, and the sound climbs alongside. That second is the whole point of the reading —
   // it is the only part of the card that is worth watching happen.
-  function runFocusBar(value) {
-    const box = $('#aaFocus', el.card);
+  function runFocusBar(value, root = el.card, animate = true) {
+    const box = $('#aaFocus', root);
     if (!box) return;
+    // A sheet that re-renders while it waits for the others to finish must not replay the animation every four
+    // seconds: the second time round the bar is simply put where it ended.
+    if (!animate) { box.style.setProperty('--at', `${value}%`); const n = $('.aa-focus-num', box); if (n) n.textContent = String(value); box.classList.add('is-done'); return; }
     const mark = $('.aa-focus-mark', box), num = $('.aa-focus-num', box), dim = $('.aa-focus-dim', box);
     const at = pct => { box.style.setProperty('--at', `${pct}%`); };
     at(0);
@@ -1601,8 +1604,14 @@
       syncTour({});   // the daily board lives in the state blob, which every push carries
     } else { store.set(progressKey(i), rec); forgetNums(); pushOne(DATA.levels[i].id, rec); showBrainNext = true; }
     if (R) {
+      // How the run went is the player's either way, so the reading goes with them onto the result sheet: the
+      // stars, what the board cost, and the focus bar, exactly as a tour board draws them. It is kept here
+      // rather than drawn here because the sheet is a second away and two cards in a row is one too many.
+      //
       // No number here on purpose: the one that counts is the race time the server works out, and it is on the
       // sheet a second later. Two different times on two screens in a row is how a race stops making sense.
+      state.raceReading = { code: R.match?.code, stars: s, lost: state.livesMax - state.lives, hints: state.hintsUsed,
+        combo: state.bestCombo, focus: focusOf(t, state.pieces.length, state.livesMax - state.lives, state.hintsUsed) };
       el.card.innerHTML = '<h3>Board cleared!</h3><p class="aa-card-lead">Sending your time…</p>';
       showCard();
       finishMatch(true, t);
@@ -1846,7 +1855,11 @@
   // The one place it is still refused is a gold match. Somebody who has put gold on a table is racing people who
   // put in the same gold; letting one of them buy extra hearts with their attention is not a lifeline, it is a
   // different game. The tour and the daily board have nothing at stake but pride, and there it is a kindness.
-  function adCanOffer(kind) { return ads.on() && !state.daily?.race; }
+  // Every board, not only the tour's. A challenge used to be excluded from this outright, which meant a player
+  // in a match — the one place in the game where a board actually costs something — was the one player who
+  // could not buy a heart back. The reason it was excluded is real but it is the player's to weigh, not this
+  // function's: the match clock does not stop for an advertisement, and the offer says so.
+  function adCanOffer(kind) { void kind; return ads.on(); }
 
   // A stand-in ad: the same shape as the real one, long enough to be a real decision, skippable like the real
   // one, and it resolves exactly the way the real one does.
@@ -2007,6 +2020,7 @@
     wrap.innerHTML = `<div class="aa-adoffer-panel" role="dialog" aria-modal="true" aria-labelledby="aaAdTitle">
       <h3 id="aaAdTitle">${escapeHtml(C.title)}</h3>
       <p>${escapeHtml((ads.isAd() && note) || C.lead)}</p>
+      ${state.daily?.race ? '<p class="aa-adoffer-note">The match clock keeps running while it plays.</p>' : ''}
       <div class="aa-actions aa-actions--stack">
         <button type="button" class="aa-btn aa-btn--primary" data-ad="go">${ads.isAd() ? ICON_AD : ''}${escapeHtml(C.cta)}</button>
         <button type="button" class="aa-btn" data-ad="no">No thanks</button>
@@ -2857,12 +2871,31 @@
       <span class="aa-vs-who">${p.ms > 0 ? `${p.place}. ` : ''}${escapeHtml(p.you ? 'You' : p.name)}</span>
       <b>${p.ms == null ? 'still playing' : p.ms < 0 ? 'ran out of hearts' : fmtTime(p.race_ms ?? p.ms, true)}</b></div>`;
     const purse = m.you_won ? `You won ${gpurse(m.pot)}` : m.winner ? `You lost ${gpurse(m.stake)}` : m.draw ? 'Every stake came back' : 'Your stake is held';
+    // The reading from the board just cleared, where this sheet is the end of that run. A challenge is still a
+    // board of this game, so it says the same things about it a tour board does — the stars, what it cost, the
+    // focus bar — and the only thing left out is a second clock, because the race time is already on every line
+    // above. On a sheet opened for somebody else's match, or reopened later, there is no reading and the block
+    // is simply not there.
+    const RR = state.raceReading?.code && state.raceReading.code === m.code ? state.raceReading : null;
+    const band = RR ? focusBand(RR.focus) : null;
+    const reading = !RR ? '' : `
+      <p class="aa-stars" aria-label="${RR.stars} of 3 stars">${'★'.repeat(RR.stars)}${'☆'.repeat(3 - RR.stars)}</p>
+      <div class="aa-stats"><span><b>${RR.lost}</b>hearts lost</span><span><b>${RR.hints}</b>hints</span><span><b>x${RR.combo}</b>best combo</span></div>
+      <div class="aa-focus" id="aaFocus" role="img" aria-label="Focus ${RR.focus} out of 100 — ${band.name}">
+        <p class="aa-focus-cap">Your focus level<b class="aa-focus-num">0</b></p>
+        <div class="aa-focus-bar">
+          <span class="aa-focus-dim"></span>
+          <span class="aa-focus-mark">${BRAIN}</span>
+        </div>
+      </div>`;
     el.matchBody.innerHTML = `
       <div class="aa-vs">${(m.players || []).map(row).join('')}</div>
       <p class="aa-purse"><span>${purse}</span><span class="aa-gold${m.you_won ? ' is-won' : ''}" title="${gfmt(auth.user?.gold ?? 0)} gold">${COIN}<span id="aaPurseCount">${gpurse(auth.user?.gold ?? 0)}</span></span></p>
+      ${reading}
       ${m.state === 'done' ? '' : '<p class="aa-sheet-note">The others are still playing for their place.</p>'}
       <div class="aa-actions"><button type="button" class="aa-btn aa-btn--primary" data-mact="stakes">Play another</button><button type="button" class="aa-btn" data-mact="close">Close</button></div>`;
     wireFaces(el.matchBody);
+    if (RR) { runFocusBar(RR.focus, el.matchBody, !RR.ran); RR.ran = true; }
     openSheet(el.matchSheet);
     if (m.you_won && celebrate) {
       if (typeof goldBefore === 'number') purseWin = { from: goldBefore, to: auth.user?.gold ?? goldBefore };
