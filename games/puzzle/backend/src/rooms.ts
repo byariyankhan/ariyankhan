@@ -26,10 +26,10 @@ export interface MatchRow {
 }
 export interface SeatRow {
   seat_id: number; code: string; user_id: number; tier: number; pct: number;
-  ms: number | null; finished_at: Date | null; joined_at: Date; name: string; pic: string;
+  ms: number | null; gave_up: boolean; finished_at: Date | null; joined_at: Date; name: string; pic: string;
 }
 export interface PlayerView {
-  name: string; pic: string; pct: number; ms: number | null; race_ms: number | null;
+  name: string; pic: string; pct: number; ms: number | null; gave_up: boolean; race_ms: number | null;
   you: boolean; host: boolean; won: boolean; place: number;
 }
 export interface MatchView {
@@ -105,7 +105,7 @@ export function roomTier(seats: SeatRow[]): number {
 /**
  * Everyone in the room, first place first: whoever cleared the board earliest leads, because the race is won by
  * finishing first and not by the shortest clock; then the players still going, the one furthest along in front;
- * and last anyone who ran out of hearts.
+ * and last anyone whose run ended without it — out of hearts, or walked away.
  */
 export function orderPlayers(m: MatchRow, seats: SeatRow[], meId: number | null): PlayerView[] {
   const started = m.started_at ? m.started_at.getTime() : 0;
@@ -114,6 +114,8 @@ export function orderPlayers(m: MatchRow, seats: SeatRow[], meId: number | null)
     pic: p.pic ?? '',
     pct: p.ms !== null && p.ms > 0 ? 100 : Math.max(0, Math.min(100, p.pct)),
     ms: p.ms,
+    // which of the two ways a run can end without the board being cleared; false on a cleared one
+    gave_up: p.ms !== null && p.ms <= 0 && p.gave_up,
     race_ms: p.finished_at && p.ms !== null && p.ms > 0 && started ? Math.max(0, p.finished_at.getTime() - started) : null,
     you: meId !== null && p.user_id === meId,
     host: m.host_id !== null && p.user_id === m.host_id,
@@ -395,12 +397,12 @@ export async function settleMatch(c: PoolClient, code: string): Promise<MatchRow
  * finishing first is what wins — not the shortest clock. Sending the same result again changes nothing, which
  * is what lets the client retry a request it never saw an answer to.
  */
-export async function submitResult(c: PoolClient, code: string, userId: number, ms: number, cleared: boolean): Promise<void> {
+export async function submitResult(c: PoolClient, code: string, userId: number, ms: number, cleared: boolean, gaveUp = false): Promise<void> {
   const value = cleared && ms > 0 ? Math.min(ms, 24 * 3600 * 1000) : -1;
   await query(c,
-    `UPDATE match_players SET ms = $3, finished_at = now(), pct = $4
+    `UPDATE match_players SET ms = $3, finished_at = now(), pct = $4, gave_up = $5
       WHERE code = $1 AND user_id = $2 AND ms IS NULL`,
-    [code, userId, value, value > 0 ? 100 : 0]);
+    [code, userId, value, value > 0 ? 100 : 0, value > 0 ? false : gaveUp]);
 }
 
 /** How far along a player is. Never goes backwards, and never moves a player who has already finished. */

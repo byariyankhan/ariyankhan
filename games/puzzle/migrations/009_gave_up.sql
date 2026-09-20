@@ -1,0 +1,11 @@
+-- Why a run ended, where it did not end in a cleared board.
+--
+-- Until now `ms = -1` meant only "did not clear it", and the result sheet read that one value out as "ran out
+-- of hearts" for everybody. Two different things end a run that way, and they are not the same thing to the
+-- people watching the sheet: losing the last heart is the board beating you, and walking out is a choice.
+-- Somebody who left the room was being told, on everybody's screen, that they had run out of hearts.
+--
+-- So the row remembers which it was. Nothing else changes: `ms` still decides the order and who is paid, and
+-- a row written before this column existed reads false, which is the older of the two meanings and the one
+-- those rows actually had.
+ALTER TABLE match_players ADD COLUMN IF NOT EXISTS gave_up BOOLEAN NOT NULL DEFAULT false;
