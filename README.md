@@ -671,6 +671,32 @@ links.
   four-second refreshes only restoring where it ended. The one thing left out
   there is a second clock: the race time is already on every line above it, and
   two different times on one sheet is how a race stops making sense.
+- **What a board pays** (`placePrizes`, `standings`, `settleMatch` in
+  `rooms.ts`): first took the whole pot, which is a good rule for two players and
+  a bad one for five — the moment somebody clears it everybody else is playing for
+  nothing, and they stop. From **three players up** a board pays three places:
+  **second gets its stake back** (finish second and the board cost you nothing,
+  which is the whole reason to keep going after somebody has won), **third a tenth
+  of its stake**, and first takes everything else — on any room bigger than three,
+  still the great majority of the pot. Two players is a duel and a duel has one
+  winner, so nothing changes there.
+  A place is earned by **clearing the board**, in the order they were cleared, and
+  never by ranking above somebody who gave up — otherwise giving up would pay.
+  First is paid its share the instant it clears (the gold still lands on the win);
+  second and third are paid as they arrive, each with its own idempotency key; and
+  a place nobody claims goes to first **when the room closes**, which is the one
+  moment it is certain nobody is coming. All of it is the `payout` reason, so the
+  ledger and the league count it exactly as before.
+  `standings` reads the places *behind the recorded winner* rather than off the
+  head of the list: an account deleted mid-match takes its seat row with it, and
+  reading the list alone would promote everybody by one and pay second place
+  twice. With the winner gone there is no first to pay, and what first would have
+  taken is not invented.
+  The client is told per row (`prize`) what that player took, so second is told
+  its stake came back rather than that it lost, and per table (`prizes`) what the
+  places pay. A room being invited into does not know how many will sit down, so
+  the sentence there says "with three or more at the table" until three actually
+  are.
 - **Asking** (`ask({title, body, ok, cancel, danger})` → a promise for true or
   false): the browser's `confirm()` is a modal from another world — it says
   "ariyankhan.com says", it cannot be styled, and on a phone it looks like the

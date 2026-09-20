@@ -2428,7 +2428,7 @@
     push.on = false;
   }
 
-  // ── Gold matches: stake, invite, play the same board, winner takes the pot ──
+  // ── Gold matches: stake, invite, play the same board, and the board pays its places ──
   // The server holds both stakes, picks the board and decides the winner; the game only shows what it says.
   //
   // The tables are the server's list, not this file's: it is the server that refuses a stake it does not
@@ -2683,6 +2683,18 @@
     }
   }
 
+  // What this table pays, said once and said the same way everywhere a player is about to put gold on it.
+  //
+  // Whether the places pay depends on how many end up at the table, and a room being invited into does not
+  // know that yet — so the sentence says what is certain either way. Once three are actually sitting there,
+  // the server sends the two numbers and it can stop saying "with three or more".
+  const splitLine = m => {
+    const back = gpurse(m?.stake || 0), tenth = gpurse(Math.floor((m?.stake || 0) / 10));
+    return m?.prizes?.second
+      ? `First takes the pot, second gets its ${back} stake back and third ${tenth} — so finishing is worth it even once somebody has won.`
+      : `Clear it first and you take the pot. With three or more at the table, second gets its ${back} stake back and third ${tenth}.`;
+  };
+
   // Receiving one: the same card a shared link opens, so there is one way to say yes to a match.
   async function onInvite(ev) {
     const d = ev?.data || {};
@@ -2798,6 +2810,7 @@
       <h3>${m.count} of ${m.seats} joined</h3>
       <div class="aa-ranks aa-ranks--card">${faces(m.players)}</div>
       <p class="aa-wait">${roomWait(m, host)}</p>
+      <p class="aa-sheet-note">${splitLine(m)}</p>
       <div class="aa-actions">
         <button type="button" class="aa-btn${host && !m.open_to_all ? '' : ' aa-btn--primary'}" data-act="minvite">Invite</button>
         ${host && !m.open_to_all ? `<button type="button" class="aa-btn aa-btn--primary" data-act="mstart"${m.count > 1 ? '' : ' disabled'}>Start</button>` : ''}
@@ -2912,7 +2925,7 @@
         <span class="aa-vs-who"><b>${escapeHtml(m.host)}</b> challenges you.</span>
       </div>
       <p class="aa-purse"><span>Stake</span><span class="aa-gold" title="${gfmt(m.stake)} gold">${COIN}${gpurse(m.stake)}</span></p>
-      <p class="aa-sheet-note">Everyone puts in ${gpurse(m.stake)} gold and plays the very same board. Clear it first and you take the lot.${short ? ` <b>You have only ${gpurse(gold)}.</b>` : ''}</p>
+      <p class="aa-sheet-note">Everyone puts in ${gpurse(m.stake)} gold and plays the very same board. ${splitLine(m)}${short ? ` <b>You have only ${gpurse(gold)}.</b>` : ''}</p>
       <div class="aa-actions">
         <button type="button" class="aa-btn aa-btn--primary" data-mact="join"${short ? ' disabled' : ''}>Confirm game</button>
         <button type="button" class="aa-btn" data-mact="close">Not now</button>
@@ -2938,7 +2951,13 @@
       <span class="aa-rank aa-vs-face${faceClass(p)}" aria-hidden="true">${faceInner(p)}</span>
       <span class="aa-vs-who">${p.ms > 0 ? `${p.place}. ` : ''}${escapeHtml(p.you ? 'You' : p.name)}</span>
       <b>${p.ms == null ? 'still playing' : p.ms < 0 ? (p.gave_up ? 'gave the board up' : 'ran out of hearts') : fmtTime(p.race_ms ?? p.ms, true)}</b></div>`;
-    const purse = m.you_won ? `You won ${gpurse(m.pot)}` : m.winner ? `You lost ${gpurse(m.stake)}` : m.draw ? 'Every stake came back' : 'Your stake is held';
+    const mine = (m.players || []).find(p => p.you);
+    // What this player took, which after a three-way board is not the same as what the pot held: second place
+    // has its stake back and third a tenth of one, and telling either of them they "lost" would be a lie.
+    const took = mine?.prize ?? 0;
+    const purse = took > 0
+      ? (m.you_won ? `You won ${gpurse(took)}` : took >= m.stake ? `Your ${gpurse(m.stake)} stake came back` : `You took ${gpurse(took)} back`)
+      : m.winner ? `You lost ${gpurse(m.stake)}` : m.draw ? 'Every stake came back' : 'Your stake is held';
     // The reading from the board just cleared, where this sheet is the end of that run. A challenge is still a
     // board of this game, so it says the same things about it a tour board does — the stars, what it cost, the
     // focus bar — and the only thing left out is a second clock, because the race time is already on every line
@@ -2960,7 +2979,7 @@
       <div class="aa-vs">${(m.players || []).map(row).join('')}</div>
       <p class="aa-purse"><span>${purse}</span><span class="aa-gold${m.you_won ? ' is-won' : ''}" title="${gfmt(auth.user?.gold ?? 0)} gold">${COIN}<span id="aaPurseCount">${gpurse(auth.user?.gold ?? 0)}</span></span></p>
       ${reading}
-      ${m.state === 'done' ? '' : '<p class="aa-sheet-note">The others are still playing for their place.</p>'}
+      ${m.state === 'done' ? '' : `<p class="aa-sheet-note">The others are still playing for their place. ${m.prizes?.second ? `Second takes ${gpurse(m.prizes.second)}, third ${gpurse(m.prizes.third)}.` : ''}</p>`}
       <div class="aa-actions"><button type="button" class="aa-btn aa-btn--primary" data-mact="stakes">Play another</button><button type="button" class="aa-btn" data-mact="close">Close</button></div>`;
     wireFaces(el.matchBody);
     if (RR) { runFocusBar(RR.focus, el.matchBody, !RR.ran); RR.ran = true; }
@@ -3070,7 +3089,7 @@
   async function sendInvite(m) {
     if (!m) return;
     const link = matchLink(m.code);
-    const text = `Puzzle – Train Your Brain: I put ${gfmt(m.stake)} gold on a board. Match it, clear it before me and take the lot.\n${link}`;
+    const text = `Puzzle – Train Your Brain: I put ${gfmt(m.stake)} gold on a board. Match it and clear it before me.\n${link}`;
     const flash = $('.aa-flash', el.overlay.hidden ? el.matchBody : el.card);
     try {
       if (navigator.share) { await navigator.share({ text }); return; }
@@ -3307,8 +3326,8 @@
     catch { toast('Could not delete the account. Please try again.', 'bad'); }
   });
 
-  // The board is over: tell the server, then show where the gold went. Clearing it first pays the whole pot on
-  // the spot; anyone finishing after that is playing for a place on the list, not for gold.
+  // The board is over: tell the server, then show where the gold went. Clearing it first pays first place on
+  // the spot, and second and third as they come in; anyone finishing after that is playing for a place on the list, not for gold.
   //
   // A phone on a bad connection must not cost somebody the pot for a blink of a dropped request, so the result
   // is tried a few times, kept on the device if it still will not go, and sent again on the next visit. Only a
