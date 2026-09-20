@@ -1,0 +1,106 @@
+# Builds the Android app bundle, signs it with the upload key, and hands it back as an artifact.
+#
+# Why this exists. The bundle used to be built by hand and signed on a laptop with jarsigner, which is three
+# manual steps for every fix and one of them — remembering to raise versionCode — is the step Play rejects an
+# upload for. Here the version comes from the run number, so it can never repeat, and the signing happens with
+# a key the repository has never seen.
+#
+# Where the key lives. Not here. Four repository secrets carry it, and the workflow writes the keystore to the
+# runner's own temporary directory, uses it, and deletes it in a step that runs even when the build fails:
+#
+#   PUZZLE_KEYSTORE_B64       puzzle-upload.jks, base64:  base64 -w0 puzzle-upload.jks
+#   PUZZLE_KEYSTORE_PASSWORD  the keystore password
+#   PUZZLE_KEY_ALIAS          puzzle-upload
+#   PUZZLE_KEY_PASSWORD       the key password
+#
+# Nothing is uploaded to Play from here. The artifact is downloaded and uploaded by hand, on purpose: pushing
+# straight to a track needs a service account with release rights, and that is a second key to look after for
+# a saving of one drag and drop.
+name: Android bundle
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_name:
+        description: 'versionName shown to players, e.g. 1.0.1'
+        required: true
+        default: '1.0.1'
+      track_note:
+        description: 'What changed, for your own reference in the artifact name'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Java 17, which is what the Android plugin compiles against
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      # The runner ships an Android SDK but not necessarily the platform this app targets. sdkmanager is
+      # already on PATH there, so this adds only what is missing and stays a first-party dependency.
+      - name: Android SDK 36
+        run: |
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+          sdkmanager --install "platforms;android-36" "build-tools;36.0.0" > /dev/null
+          echo "ANDROID_HOME=$ANDROID_SDK_ROOT" >> "$GITHUB_ENV"
+
+      # versionCode has to rise and never repeat. run_number does exactly that, and the +1 steps over the 1
+      # that the first hand-built bundle already spent on the internal track.
+      - name: Work out the version
+        id: ver
+        run: |
+          echo "code=$(( ${{ github.run_number }} + 1 ))" >> "$GITHUB_OUTPUT"
+
+      - name: Unpack the upload key
+        env:
+          KEYSTORE_B64: ${{ secrets.PUZZLE_KEYSTORE_B64 }}
+        run: |
+          if [ -z "$KEYSTORE_B64" ]; then
+            echo "::error::PUZZLE_KEYSTORE_B64 is not set. Add the four repository secrets first (see the header of this file)."
+            exit 1
+          fi
+          printf '%s' "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/upload.jks"
+          test -s "$RUNNER_TEMP/upload.jks" || { echo "::error::the secret did not decode to a keystore"; exit 1; }
+
+      - name: Build the bundle
+        working-directory: android
+        env:
+          PUZZLE_KEYSTORE: ${{ runner.temp }}/upload.jks
+          PUZZLE_KEYSTORE_PASSWORD: ${{ secrets.PUZZLE_KEYSTORE_PASSWORD }}
+          PUZZLE_KEY_ALIAS: ${{ secrets.PUZZLE_KEY_ALIAS }}
+          PUZZLE_KEY_PASSWORD: ${{ secrets.PUZZLE_KEY_PASSWORD }}
+          PUZZLE_VERSION_CODE: ${{ steps.ver.outputs.code }}
+          PUZZLE_VERSION_NAME: ${{ github.event.inputs.version_name }}
+        run: ./gradlew --no-daemon bundleRelease
+
+      # A bundle that is not signed, or is signed with the wrong key, looks fine until Play refuses it. Say so
+      # here instead, where the run is still on screen.
+      - name: Check it is signed, and say what with
+        working-directory: android
+        run: |
+          AAB=app/build/outputs/bundle/release/app-release.aab
+          unzip -l "$AAB" | grep -qE 'META-INF/.*\.(RSA|DSA|EC)$' || { echo "::error::the bundle came out unsigned"; exit 1; }
+          echo "versionCode ${{ steps.ver.outputs.code }} · versionName ${{ github.event.inputs.version_name }}"
+          keytool -printcert -jarfile "$AAB" | grep -E 'Owner:|SHA256:' || true
+
+      - name: Keep it
+        uses: actions/upload-artifact@v4
+        with:
+          name: puzzle-${{ github.event.inputs.version_name }}-${{ steps.ver.outputs.code }}
+          path: android/app/build/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
+          retention-days: 30
+
+      # Runs whatever happened above, because a key left on a runner is a key left somewhere.
+      - name: Shred the key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/upload.jks"
