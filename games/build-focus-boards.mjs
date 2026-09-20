@@ -38,28 +38,47 @@ const disc = (cx, cy, r, n = 40) => ring(arc(cx, cy, r, 0, 360 - 360 / n, n - 1)
 const box = (x0, y0, x1, y1) => ring([[x0, y0], [x1, y0], [x1, y1], [x0, y1]]);
 const poly = (...xy) => ring(xy);
 
-// The brain, seen from the side: a coarse outline whose whole upper edge is replaced by folds. Every segment
-// becomes a bump on its own chord (`scallop`), which is what makes an eye call it a brain before it has counted
-// anything — a smooth blob of the same size reads as a cloud. The cerebellum is the smaller lobe at the back and
-// the stem is what stops the whole thing reading as a tree.
-function scallop(pts, from, to, sign = 1, rise = 1, n = 10) {
-  const out = pts.slice(0, from);
-  for (let i = from; i < to; i++) {
-    const a = pts[i], b = pts[(i + 1) % pts.length];
-    const cx = (a[0] + b[0]) / 2, cy = (a[1] + b[1]) / 2, r = Math.hypot(b[0] - a[0], b[1] - a[1]) / 2 * rise;
-    const a0 = Math.atan2(a[1] - cy, a[0] - cx) * 180 / Math.PI;
-    out.push(...arc(cx, cy, r, a0, a0 + sign * 180, n).slice(0, -1));
+// The brain, seen from the side, the way an anatomy plate draws it — and traced by hand rather than generated.
+// Every procedural fold (evenly spaced bumps on the outline, however tuned) comes out as a flower or a
+// cauliflower, because what makes a cortex read is that the gyri are all different sizes and the sulci between
+// them cut in at their own angles. So the vertices below are placed one at a time: out for a gyrus, in for a
+// sulcus, up the front, over the top, down the back; then the fissure over the cerebellum, the cerebellum's
+// finer folia, the stem, the underside of the temporal lobe, and the lateral fissure back to the frontal pole.
+//
+// Two of those are slits rather than wedges — the lateral fissure and the one over the cerebellum — which the
+// rasteriser cannot hold at board sizes and does not need to: the home screen draws this path itself, under the
+// arrows (renderBrain in js/puzzle.js), so the folds and the fissures are carried at the size they were drawn
+// at. What the raster keeps is the silhouette, which is what a board is.
+//
+// Chaikin twice turns the traced corners into folds. It is done here because the game's parser reads straight
+// segments only, and a corner-cutting pass is a curve in the one form it can read.
+function chaikin(pts, passes = 2) {
+  let p = pts;
+  for (let n = 0; n < passes; n++) {
+    const out = [];
+    for (let i = 0; i < p.length; i++) {
+      const a = p[i], b = p[(i + 1) % p.length];
+      out.push([a[0] * 0.75 + b[0] * 0.25, a[1] * 0.75 + b[1] * 0.25], [a[0] * 0.25 + b[0] * 0.75, a[1] * 0.25 + b[1] * 0.75]);
+    }
+    p = out;
   }
-  return out.concat(pts.slice(to));
+  return p;
 }
+
 function brain() {
-  const base = [
-    [14, 56], [9, 40], [17, 23], [32, 11], [50, 7], [68, 11], [83, 22], [90, 39], [86, 55],   // front, over the top, down the back
-    [80, 64], [69, 69],                                                                        // the cerebellum
-    [58, 74], [57, 86], [50, 93], [43, 86], [42, 74],                                          // the stem
-    [34, 71], [25, 69], [17, 63],                                                              // back along the underside
+  const traced = [
+    [8, 45], [4, 38], [11, 34], [5, 28], [13, 24], [11, 18],                              // up the front
+    [18, 16], [16, 9], [23, 14], [30, 6], [35, 13], [41, 4], [46, 12],                     // over the top: gyrus, sulcus, gyrus
+    [52, 4], [57, 12], [64, 5], [69, 13], [76, 9], [80, 18],
+    [86, 16], [87, 25], [93, 27], [88, 34], [95, 40], [89, 46], [92, 53],                  // down the back to the occipital pole
+    [80, 57], [74, 58.5], [82, 58], [88, 58.5],                                            // the fissure over the cerebellum, in and out
+    [90, 63], [86, 65], [89, 70], [84, 72], [86, 77], [80, 78], [80, 82], [73, 81], [71, 85], [64, 84], [60, 80],
+    [57, 74], [57, 83], [56, 90], [44, 90], [43, 81], [45, 72],                            // the stem, which is smooth in life too
+    [41, 77], [37, 72], [31, 77], [27, 72], [21, 71], [17, 65], [15, 60],                  // forward along the temporal lobe
+    [14, 56], [26, 51.5], [32, 48.5], [36, 46.5], [30, 48], [22, 50], [11, 51],            // the lateral fissure, in and back out
   ];
-  return ring(scallop(base, 0, 11, 1, 0.9));
+  // A brain is half again as wide as it is tall; traced upright it comes out too round.
+  return ring(chaikin(traced.map(([x, y]) => [x, 50 + (y - 47) * 0.86])));
 }
 
 // A cog: ten teeth on a ring, one closed outline, with the hub punched out.

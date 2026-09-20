@@ -96,6 +96,9 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 /* it shrinks to fit a short screen but never stretches: a brain pinned to the top of a tall card with its
    name stranded at the bottom is two things, and this is one */
 .aa-brain-art{ display:block; width:100%; max-width:min(86vw, 380px); flex:0 1 auto; min-height:110px; overflow:visible; }
+/* the silhouette under the arrows: a wash and a hairline, so the folds the raster loses are still there */
+.aa-brain-wash{ fill:color-mix(in srgb, var(--accent2) 9%, transparent); stroke:color-mix(in srgb, var(--accent2) 30%, transparent); stroke-width:.22; stroke-linejoin:round; }
+.aa-brain-art.is-full .aa-brain-wash{ fill:color-mix(in srgb, var(--good) 11%, transparent); stroke:color-mix(in srgb, var(--good) 34%, transparent); }
 .aa-brain-p .aa-brain-track{ fill:none; stroke:var(--line); stroke-opacity:.22; stroke-width:.2; stroke-linecap:round; stroke-linejoin:round; }
 .aa-brain-p .aa-brain-head{ fill:var(--line); fill-opacity:.22; stroke:none; }
 .aa-brain-p.is-lit .aa-brain-track{ stroke:var(--accent2); stroke-opacity:1; stroke-width:.24; }
@@ -497,6 +500,20 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-splash-logo img{ width:104px; height:104px; display:block; }
 .aa-splash-quote{ font-size:21px; line-height:1.4; color:var(--muted); margin:16px 0 0; width:100%; text-align:left; font-weight:700; }
 .aa-splash-by{ font-size:17px; color:var(--muted); margin:-22px 0 0; width:100%; text-align:right; font-weight:700; }
+/* ── Sideways ──────────────────────────────────────────────────────────────────────────────────────
+   The game is a column and always has been: a square board, a status bar, and the map under it. Turned on its
+   side a phone has no room for the board at a size worth tapping, so it asks for the phone back rather than
+   dealing one. Three conditions have to hold together, because two of them are true of a laptop as well:
+   landscape, a coarse pointer, and a viewport too short to play in. Media queries alone raise it, so it is
+   right even if the script never runs; the script only stops the clock behind it. */
+.aa-turn{ display:none; }
+@media (orientation:landscape) and (max-height:560px) and (pointer:coarse){
+  .aa-turn{ position:fixed; inset:0; z-index:90; background:var(--bg); display:flex; align-items:center; justify-content:center; padding:20px; text-align:center; }
+  .aa-turn-inner{ display:flex; flex-direction:column; align-items:center; gap:12px; max-width:420px; }
+  .aa-turn-ico{ width:52px; height:52px; color:var(--accent); }
+  .aa-turn-title{ margin:0; font-size:21px; font-weight:900; color:var(--line); }
+  .aa-turn-note{ margin:0; font-size:15px; font-weight:700; color:var(--muted); }
+}
 @keyframes aa-in{ from{ opacity:0; } to{ opacity:1; } }
 @keyframes aa-out{ from{ opacity:1; } to{ opacity:0; } }
 @media(prefers-reduced-motion:reduce){ .aa-splash, .aa-splash.is-out{ animation:none; } }
