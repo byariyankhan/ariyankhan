@@ -67,9 +67,9 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
    the buttons stay where a thumb is and nothing falls off the bottom of the screen. */
 /* The cap is what keeps the whole home screen on one screen: the app frame is min-height, not height, so a card
    that wants more room pushes the buttons off the bottom instead of being made to fit. The 296px is everything
-   else on the screen — the top row, the title, the two buttons and the gaps between them — so the cap is
+   else on the screen — the top row, the title, the two buttons, the gaps and the insets — so the cap is
    "whatever is left", and the deck takes exactly that on a short phone and on a tall one. */
-.aa-deck{ flex:1 1 auto; display:flex; flex-direction:column; gap:10px; min-height:180px; max-height:min(calc(100dvh - 296px), 560px); }
+.aa-deck{ flex:1 1 auto; display:flex; flex-direction:column; gap:10px; min-height:180px; max-height:min(calc(100dvh - 296px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)), 560px); }
 .aa-deck-view{ display:flex; flex:1 1 auto; min-height:0; overflow:hidden; order:1; }
 /* the track is one view wide and as tall as the view stretches it; the cards are one view wide each,
    so it is twice as wide as it looks and the transform is what chooses which half you are seeing */
@@ -79,6 +79,9 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 /* the card that has finished leaving is hidden outright, which takes it out of the Tab order even where `inert`
    is not understood; it is marked hidden only once the slide is over, so it is visible the whole way across */
 .aa-slide[aria-hidden="true"]{ visibility:hidden; }
+/* ...and while a finger is dragging, the card coming in is still marked hidden — it is only un-marked on the
+   release. Without this the swipe pulls a blank hole across the screen and the card appears at the end of it. */
+.aa-deck-track.is-dragging .aa-slide{ visibility:visible; }
 .aa-slide > .aa-panel{ flex:1 1 auto; min-width:0; min-height:0; max-height:100%; display:flex; flex-direction:column; justify-content:center; }
 .aa-deck-dots{ display:flex; justify-content:center; align-items:center; gap:8px; order:2; }
 .aa-deck-dot{ width:9px; height:9px; padding:0; border:none; border-radius:50%; background:var(--line); opacity:.24; cursor:pointer; transition:width .2s, opacity .2s, background .2s; }

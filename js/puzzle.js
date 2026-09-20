@@ -129,7 +129,9 @@
   const skipKey = i => 'skip:' + DATA.levels[i].id;
   const cleared = i => store.get(progressKey(i));
   const unlocked = i => i === 0 || !!cleared(i - 1) || !!store.get(skipKey(i));
-  const dayKey = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+  const dayKeyOf = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const dayKey = () => dayKeyOf(new Date());
+  const dayKeyBack = n => { const d = new Date(); d.setDate(d.getDate() - n); return dayKeyOf(d); };
   const hashStr = str => { let h = 2166136261; for (const ch of str) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; };
   // the daily board is the same country for everyone: picked from the canonical list, then found in the player's own order
   const dailyPick = () => { const h = hashStr('aa-daily-' + dayKey()); const L = DATA.canon[h % DATA.canon.length]; return { key: dayKey(), idx: DATA.levels.indexOf(L), tier: 1 + (h >> 8) % 4, seed: 900000 + (h % 100000) }; };
@@ -655,7 +657,12 @@
     const cleared_ = DATA.levels.filter((_, i) => cleared(i));
     el.statBoards.textContent = String(cleared_.length);
     el.statCountries.textContent = String(cleared_.filter(L => !L.disc && !L.focus).length);
-    el.statStreak.textContent = String(store.get('dailyStreak', { count: 0 }).count || 0);
+    // The streak is only ever written when a daily board is cleared, and nothing decays it — so a seven-day run
+    // abandoned a month ago would sit on the home screen saying seven. It counts only while it is still alive:
+    // today's daily cleared, or yesterday's with today still to play.
+    const ds = store.get('dailyStreak', { count: 0, last: '' });
+    const alive = ds.last === dayKey() || ds.last === dayKeyBack(1);
+    el.statStreak.textContent = String(alive ? ds.count || 0 : 0);
   }
 
   // ── The home deck ──
@@ -664,7 +671,7 @@
   // screen now. It turns itself every few seconds so both are seen without anybody being asked to do anything;
   // the moment the player turns it themselves — a swipe, a dot, an arrow key — it stops turning on its own and
   // stays where they put it.
-  const DECK_EVERY = 4500, DECK_SWIPE = 44;
+  const DECK_EVERY = 4500, DECK_SWIPE = 44, DECK_SLOP = 15;   // 15px: under that a finger is tapping, not swiping
   const deck = { i: 0, n: 2, timer: 0, hide: 0, auto: true, drag: null, swipedAt: 0 };
   let showBrainNext = false;   // set when a board is cleared: the brain has just changed and it is what to come home to
   const deckStop = () => { clearInterval(deck.timer); deck.timer = 0; };
@@ -672,7 +679,7 @@
     deckStop();
     if (!el.deckTrack || !deck.auto || document.hidden || el.select?.hidden) return;
     if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;   // nothing moves on its own here
-    deck.timer = setInterval(() => deckGo(deck.i + 1), DECK_EVERY);
+    deck.timer = setInterval(() => { if (!deck.drag) deckGo(deck.i + 1); }, DECK_EVERY);   // never mid-gesture
   }
   // `manual` is a gesture, a dot or a key, and those stop at the ends: a card that gave way under the finger and
   // then jumped to the far end of the deck is a card that lied about where it was going. The timer wraps.
@@ -710,12 +717,15 @@
     // A drag decides on its first few pixels whether it is a swipe or the page being scrolled, and never both.
     el.deck.addEventListener('pointerdown', e => {
       if (e.pointerType === 'mouse' && e.button !== 0) return;
+      // A finger on the deck stops the clock: a card that turns itself out from under a tap sends that tap to
+      // whatever slid into its place. If the touch turns out to be a plain tap, the clock starts again.
+      deckStop();
       deck.swipedAt = 0; deck.drag = { x: e.clientX, y: e.clientY, dx: 0, lock: null };
     });
     el.deck.addEventListener('pointermove', e => {
       const d = deck.drag; if (!d) return;
       d.dx = e.clientX - d.x; const dy = e.clientY - d.y;
-      if (d.lock === null && (Math.abs(d.dx) > 8 || Math.abs(dy) > 8)) d.lock = Math.abs(d.dx) > Math.abs(dy) ? 'x' : 'y';
+      if (d.lock === null && (Math.abs(d.dx) > DECK_SLOP || Math.abs(dy) > 8)) d.lock = Math.abs(d.dx) > Math.abs(dy) ? 'x' : 'y';
       if (d.lock !== 'x') return;
       // at the ends the card gives about a third as far, so a swipe that cannot go anywhere says so
       const edge = (deck.i === 0 && d.dx > 0) || (deck.i === deck.n - 1 && d.dx < 0);
@@ -726,7 +736,9 @@
       const d = deck.drag; deck.drag = null;
       if (!d) return;
       el.deckTrack.classList.remove('is-dragging');
-      if (d.lock !== 'x') { if (Math.abs(d.dx) > 8) deck.swipedAt = performance.now(); return; }
+      // A tap that slid a few pixels is still a tap, and so is one that ended up scrolling the page: neither may
+      // cost the player the country under their thumb. Only a gesture that took the deck sideways eats its click.
+      if (d.lock !== 'x') { deckStart(); return; }
       deck.swipedAt = performance.now();   // a swipe is not a tap: whatever it ended on must not be clicked
       if (Math.abs(d.dx) > DECK_SWIPE) deckGo(deck.i + (d.dx < 0 ? 1 : -1), true);
       else deckGo(deck.i, true);
@@ -739,6 +751,7 @@
     // standing would eat the next real tap — or the next Enter on a country, which also arrives as a click.
     el.deck.addEventListener('click', e => {
       if (!deck.swipedAt || performance.now() - deck.swipedAt > 400) return;
+      if (e.target.closest('.aa-deck-dots')) return;   // the dots are how you undo a swipe; they are never eaten
       deck.swipedAt = 0; e.stopPropagation(); e.preventDefault();
     }, true);
   }
@@ -1570,7 +1583,7 @@
     else if (state.daily) {
       store.set(`daily:${state.daily.key}`, rec);
       const ds = store.get('dailyStreak', { count: 0, last: '' });
-      if (ds.last !== state.daily.key) { const y = new Date(); y.setDate(y.getDate() - 1); const yk = `${y.getFullYear()}-${String(y.getMonth() + 1).padStart(2, '0')}-${String(y.getDate()).padStart(2, '0')}`; store.set('dailyStreak', { count: ds.last === yk ? ds.count + 1 : 1, last: state.daily.key }); }
+      if (ds.last !== state.daily.key) store.set('dailyStreak', { count: ds.last === dayKeyBack(1) ? ds.count + 1 : 1, last: state.daily.key });
       syncTour({});   // the daily board lives in the state blob, which every push carries
     } else { store.set(progressKey(i), rec); forgetNums(); pushOne(DATA.levels[i].id, rec); showBrainNext = true; }
     if (R) {
