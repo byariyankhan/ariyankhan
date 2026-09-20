@@ -593,7 +593,11 @@ links.
   a country under the finger is not opened by accident, while a plain tap on a
   country still opens it (only the click within 400 ms of the release is
   swallowed, so the next real tap — or Enter on a country — is not eaten).
-  Manual turns stop at the ends, the timer wraps. Keyboard and screen reader: the
+  Manual turns stop at the ends, the timer wraps. The thresholds are the ones a
+  thumb needs: under 15 px sideways is a tap, not a swipe, so a country under a
+  finger that slid a little still opens; a finger down stops the clock, so the
+  card can never turn out from under a tap; and while a drag is live every card
+  is visible, because the one arriving is still marked hidden until the release. Keyboard and screen reader: the
   dots come before the card in the DOM (Tab reaches the dots, then the card they
   choose) and the CSS `order` puts them back underneath; arriving in the deck
   stops it turning (`focusin`), so nothing moves under somebody reading it; the
@@ -606,8 +610,10 @@ links.
   title and the two buttons have had theirs" — which is what keeps the whole home
   screen on one screen from a 360×560 phone to a tablet, and the two buttons at
   the bottom where a thumb is. The three tiles under the map (boards, countries,
-  day streak, counted in `renderHomeStats` so a map that failed to load does not
-  leave a hundred-board player looking at three zeroes) are the win card's own
+  day streak — the streak only counts while it is alive, today's daily or
+  yesterday's, because nothing decays the stored one; all three counted in
+  `renderHomeStats` so a map that failed to load does not leave a hundred-board
+  player looking at three zeroes) are the win card's own
   tiles. Clearing a board sets `showBrainNext`, so the player comes home to the
   brain they have just lit rather than to whichever card they left on.
 - **The brain on the home screen** (`renderBrain`, `emblemFor`): a board of this
