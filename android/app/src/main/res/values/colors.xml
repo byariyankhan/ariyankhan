@@ -1,6 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- The game's own paper, so the splash, the status bar and the first painted pixel are one colour and the
-     app never flashes white on the way in. Matches the bg custom property in css/puzzle.css and theme_color in the manifest. -->
+     app never flashes white on the way in. Matches the bg custom property in css/puzzle.css and theme_color
+     in the manifest.
+
+     There is deliberately no values-night beside this. The game does not follow the phone's dark mode — it
+     has its own themes, it starts on paper whatever the phone is set to, and css/puzzle.css contains no
+     prefers-color-scheme rule at all. A night override here made Android paint the status bar #121212 over a
+     cream game on any phone in dark mode, which left the clock and the battery invisible against it. The one
+     thing that should move these colours is the player's own choice of theme, which the page reports through
+     its theme-color meta. -->
 <resources>
     <color name="paper">#F4EDE0</color>
     <color name="ink">#2E2016</color>
