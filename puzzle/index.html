@@ -88,7 +88,7 @@
          set these two when the backend moves to a host of its own and the client follows without a change:
          <meta name="puzzle-api" content="https://api.example.com" />
          <meta name="puzzle-ws"  content="wss://api.example.com" /> -->
-    <link rel="stylesheet" href="/css/puzzle.css?v=12" />
+    <link rel="stylesheet" href="/css/puzzle.css?v=13" />
     <link rel="preload" href="/games/data/puzzle.json?v=11" as="fetch" crossorigin="anonymous" />
 
     <!-- SCHEMA -->
@@ -220,23 +220,43 @@
 
         <div class="aa-hero">
           <h1 class="aa-title">Puzzle</h1>
-          <p class="aa-tagline" id="aaTagline">Train your brain. Clear the arrows.</p>
+          <p class="aa-tagline" id="aaTagline">Train your brain.</p>
         </div>
 
-        <!-- The brain: a board of this game drawn at the player's own difficulty, lit from the bottom by the
-             boards they have cleared. It is drawn by js/puzzle.js — see renderBrain. -->
-        <section class="aa-panel aa-brainbox" aria-labelledby="aaBrainLv">
-          <svg class="aa-brain-art" id="aaBrainArt" viewBox="0 0 10 10" role="img" aria-label="Your brain, filling with the boards you clear"></svg>
-          <div class="aa-brain-meta">
-            <p class="aa-brain-line"><b class="aa-brain-lv" id="aaBrainLv">Level 1</b><span class="aa-brain-diff" id="aaBrainDiff">Easy</span></p>
-            <p class="aa-brain-note" id="aaBrainNote"></p>
+        <!-- One card at a time: the brain, then the world map. Swipe, tap a dot, or leave it alone and it
+             turns itself. Two things side by side asked the player to choose what to look at; one asks nothing.
+             Driven by js/puzzle.js — see the deck. -->
+        <div class="aa-deck" id="aaDeck" role="group" aria-roledescription="carousel" aria-label="Your brain and the world tour">
+          <!-- The dots come first so that a keyboard lands on them before the card they choose; the CSS puts
+               them back underneath it. -->
+          <div class="aa-deck-dots" id="aaDeckDots">
+            <button type="button" class="aa-deck-dot is-on" data-slide="0" aria-label="Show your brain" aria-current="true"></button>
+            <button type="button" class="aa-deck-dot" data-slide="1" aria-label="Show the world map"></button>
           </div>
-        </section>
+          <div class="aa-deck-view">
+            <div class="aa-deck-track" id="aaDeckTrack">
+              <!-- The brain: a board of this game drawn at the player's own difficulty, lit from the bottom by
+                   the boards they have cleared (renderBrain). -->
+              <div class="aa-slide" id="aaSlideBrain" role="group" aria-roledescription="slide" aria-label="Your brain">
+                <section class="aa-panel aa-brainbox" aria-labelledby="aaBrainLv">
+                  <svg class="aa-brain-art" id="aaBrainArt" viewBox="0 0 10 10" role="img" aria-label="Your brain, filling with the boards you clear"></svg>
+                  <div class="aa-brain-meta">
+                    <p class="aa-brain-line"><b class="aa-brain-lv" id="aaBrainLv">Level 1</b><span class="aa-brain-diff" id="aaBrainDiff">Easy</span></p>
+                    <p class="aa-brain-note" id="aaBrainNote"></p>
+                  </div>
+                </section>
+              </div>
+              <div class="aa-slide" id="aaSlideMap" role="group" aria-roledescription="slide" aria-label="The world tour">
+                <section class="aa-panel aa-world" id="aaWorld">
+                  <div class="aa-world-scroll" id="aaWorldScroll"><svg class="aa-world-map" id="aaWorldMap" viewBox="0 36 1000 448" preserveAspectRatio="xMidYMid meet" role="group" aria-label="World map of the tour: tap a country to play it"><g class="aa-world-land"></g><g class="aa-world-labels"></g></svg></div>
+                  <p class="aa-world-cap" id="aaWorldCap"></p>
+                  <div class="aa-home-stats" id="aaHomeStats"><span><b id="aaStatBoards">0</b>boards</span><span><b id="aaStatCountries">0</b>countries</span><span><b id="aaStatStreak">0</b>day streak</span></div>
+                </section>
+              </div>
+            </div>
+          </div>
+        </div>
 
-        <section class="aa-panel aa-world" id="aaWorld">
-          <div class="aa-world-scroll" id="aaWorldScroll"><svg class="aa-world-map" id="aaWorldMap" viewBox="0 36 1000 448" preserveAspectRatio="xMidYMid meet" role="img" aria-label="World map of the tour: cleared countries are numbered"><g class="aa-world-land"></g><g class="aa-world-labels"></g></svg></div>
-          <p class="aa-world-cap" id="aaWorldCap"></p>
-        </section>
 
         <button type="button" class="aa-play" id="aaPlay" aria-label="Play and discover the next country"><span class="aa-play-label">Play &amp; Discover</span></button>
         <button type="button" class="aa-play aa-play--ghost" id="aaFriends"><span class="aa-play-label">Play with Friends</span></button>
@@ -516,6 +536,6 @@
       </div>
     </div>
 
-    <script src="/js/puzzle.js?v=15"></script>
+    <script src="/js/puzzle.js?v=16"></script>
   </body>
 </html>

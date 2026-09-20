@@ -58,14 +58,41 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-coin{ width:1.3em; height:1.3em; flex:0 0 auto; vertical-align:-.28em; object-fit:contain; }
 .aa-chip--purse{ display:inline-flex; align-items:center; gap:6px; color:var(--ink); font-weight:900; font-size:16px; font-variant-numeric:tabular-nums; }
 .aa-chip--purse.is-won{ animation:aapop .5s ease-out 2; color:var(--accent); }
-/* A panel: the home screen is two of them, the brain and the map, so neither floats in the middle of nowhere. */
+/* A panel: the home screen shows one at a time, the brain or the map, so neither floats in the middle of nowhere. */
 .aa-panel{ background:var(--panel); border:1px solid var(--outline); border-radius:22px; padding:14px 14px 12px; }
+
+/* ── The deck ──
+   Two cards, one on screen: swipe it, tap a dot, or leave it and it turns itself every few seconds. The whole
+   deck takes the height left between the title and the buttons, and the leftover splits above and below it, so
+   the buttons stay where a thumb is and nothing falls off the bottom of the screen. */
+/* The cap is what keeps the whole home screen on one screen: the app frame is min-height, not height, so a card
+   that wants more room pushes the buttons off the bottom instead of being made to fit. The 296px is everything
+   else on the screen — the top row, the title, the two buttons and the gaps between them — so the cap is
+   "whatever is left", and the deck takes exactly that on a short phone and on a tall one. */
+.aa-deck{ flex:1 1 auto; display:flex; flex-direction:column; gap:10px; min-height:180px; max-height:min(calc(100dvh - 296px), 560px); }
+.aa-deck-view{ display:flex; flex:1 1 auto; min-height:0; overflow:hidden; order:1; }
+/* the track is one view wide and as tall as the view stretches it; the cards are one view wide each,
+   so it is twice as wide as it looks and the transform is what chooses which half you are seeing */
+.aa-deck-track{ display:flex; flex:0 0 100%; min-width:0; transition:transform .38s cubic-bezier(.22,.61,.36,1); touch-action:pan-y; }
+.aa-deck-track.is-dragging{ transition:none; }
+.aa-slide{ flex:0 0 100%; min-width:0; display:flex; padding:0 2px; }
+/* the card that has finished leaving is hidden outright, which takes it out of the Tab order even where `inert`
+   is not understood; it is marked hidden only once the slide is over, so it is visible the whole way across */
+.aa-slide[aria-hidden="true"]{ visibility:hidden; }
+.aa-slide > .aa-panel{ flex:1 1 auto; min-width:0; min-height:0; max-height:100%; display:flex; flex-direction:column; justify-content:center; }
+.aa-deck-dots{ display:flex; justify-content:center; align-items:center; gap:8px; order:2; }
+.aa-deck-dot{ width:9px; height:9px; padding:0; border:none; border-radius:50%; background:var(--line); opacity:.24; cursor:pointer; transition:width .2s, opacity .2s, background .2s; }
+.aa-deck-dot.is-on{ width:26px; border-radius:6px; opacity:1; background:var(--accent2); }
+.aa-deck-dot:focus-visible{ outline:2px solid var(--accent2); outline-offset:3px; }
+@media(prefers-reduced-motion:reduce){ .aa-deck-track{ transition:none; } }
 
 /* ── The brain ──
    A board of this game, drawn at the player's own difficulty and lit from the bottom up by the boards they
    have cleared. The arrows are the board's arrows, in the board's own line weights, one size down. */
-.aa-brainbox{ display:flex; flex-direction:column; align-items:center; gap:10px; padding-top:16px; }
-.aa-brain-art{ display:block; width:100%; max-width:min(74vw, 260px); max-height:32vh; height:auto; overflow:visible; }
+.aa-brainbox{ align-items:center; gap:10px; padding-top:16px; }
+/* it shrinks to fit a short screen but never stretches: a brain pinned to the top of a tall card with its
+   name stranded at the bottom is two things, and this is one */
+.aa-brain-art{ display:block; width:100%; max-width:min(86vw, 380px); flex:0 1 auto; min-height:110px; overflow:visible; }
 .aa-brain-p .aa-brain-track{ fill:none; stroke:var(--line); stroke-opacity:.22; stroke-width:.2; stroke-linecap:round; stroke-linejoin:round; }
 .aa-brain-p .aa-brain-head{ fill:var(--line); fill-opacity:.22; stroke:none; }
 .aa-brain-p.is-lit .aa-brain-track{ stroke:var(--accent2); stroke-opacity:1; stroke-width:.24; }
@@ -86,23 +113,29 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 /* lobby world map: every country faint, tour countries outlined, cleared ones filled and numbered */
 /* the map fills the panel's width, and the panel takes the height it needs rather than stretching to swallow
    whatever the rest of the screen left over */
-.aa-world{ display:flex; flex-direction:column; justify-content:center; margin:0; min-height:0; padding:10px 8px 8px; }
-.aa-world-scroll{ margin:0; }
+.aa-world{ margin:0; min-height:0; padding:10px 8px 8px; }
+.aa-world-scroll{ margin:0 -12px; }   /* the map is the card's picture: it goes to the card's edges */
 .aa-world-map{ display:block; width:100%; height:auto; }
 .aa-world-land path{ fill:color-mix(in srgb, var(--line) 9%, var(--bg)); stroke:var(--bg); stroke-width:.7; stroke-linejoin:round; }
 .aa-world-land path.is-tour{ fill:color-mix(in srgb, var(--line) 18%, var(--bg)); stroke:color-mix(in srgb, var(--line) 45%, var(--bg)); stroke-width:1; cursor:pointer; }
 .aa-world-land path.is-done{ fill:var(--good); stroke:var(--bg); }
 .aa-world-land path.is-next{ fill:var(--accent2); stroke:var(--bg); animation:aa-next 1.4s ease-in-out infinite alternate; }
 .aa-world-land path.is-locked{ cursor:default; }
-.aa-world-land path.is-tour:hover, .aa-world-land path.is-tour:focus-visible{ filter:brightness(1.12); outline:none; }
+.aa-world-land path.is-tour:hover{ filter:brightness(1.12); }
+/* a country the keyboard is standing on says so: brightness alone is not a focus ring */
+.aa-world-land path.is-tour:focus-visible{ outline:none; stroke:var(--accent2); stroke-width:3; filter:brightness(1.12); }
 .aa-world-labels text{ font-family:inherit; font-weight:900; font-size:22px; fill:#fff; text-anchor:middle; dominant-baseline:central; pointer-events:none; paint-order:stroke; stroke:rgba(0,0,0,.28); stroke-width:3px; stroke-linejoin:round; }
 .aa-world-labels circle{ fill:var(--good); pointer-events:none; }
 .aa-world-labels .is-next circle{ fill:var(--accent2); }
 .aa-world-cap{ font-size:12px; color:var(--muted); text-align:center; margin:8px 0 2px; font-weight:800; }
+/* the same tiles the win card uses, so the two screens count things the same way */
+.aa-home-stats{ display:grid; grid-template-columns:repeat(3,1fr); gap:6px; margin:10px 0 0; }
+.aa-home-stats span{ display:flex; flex-direction:column; font-size:10px; letter-spacing:1px; text-transform:uppercase; color:var(--muted); background:var(--bg2); border-radius:12px; padding:9px 4px; }
+.aa-home-stats b{ font-size:19px; font-weight:900; color:var(--ink); letter-spacing:0; text-transform:none; margin-bottom:2px; font-variant-numeric:tabular-nums; }
 @keyframes aa-next{ from{ filter:brightness(1); } to{ filter:brightness(1.25); } }
 @media(prefers-reduced-motion:reduce){ .aa-world-land path.is-next{ animation:none; } }
 .aa-hero{ text-align:center; margin:0; padding:0; }
-.aa-home .aa-play{ margin-top:auto; }   /* whatever height is left over goes above the buttons, not into the middle of the screen */
+.aa-home .aa-play:not(.aa-play--ghost){ margin-top:auto; }   /* the two buttons are the floor of this screen: the space above them is the first one's, not shared between them */
 .aa-title{ font-size:clamp(28px,7.5vw,40px); font-weight:900; margin:0; letter-spacing:-.5px; color:var(--line); }
 .aa-tagline{ margin:6px 0 0; color:var(--muted); font-size:15px; }
 /* compact secondary actions under the map: daily board and the level list */

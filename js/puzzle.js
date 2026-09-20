@@ -107,6 +107,8 @@
     gate: $('#aaGate'), accept: $('#aaAccept'), splash: $('#aaSplash'), splashQuote: $('#aaSplashQuote'),
     worldMap: $('#aaWorldMap'), worldCap: $('#aaWorldCap'), worldScroll: $('#aaWorldScroll'),
     brainArt: $('#aaBrainArt'), brainLv: $('#aaBrainLv'), brainDiff: $('#aaBrainDiff'), brainNote: $('#aaBrainNote'),
+    deck: $('#aaDeck'), deckTrack: $('#aaDeckTrack'), deckDots: $('#aaDeckDots'),
+    statBoards: $('#aaStatBoards'), statCountries: $('#aaStatCountries'), statStreak: $('#aaStatStreak'),
   };
   if (!el.board) return;
 
@@ -645,11 +647,111 @@
     if (!still) requestAnimationFrame(() => requestAnimationFrame(() => svg.classList.remove('is-drawing')));
   }
 
+  // The three numbers under the map: everything cleared, the countries among it, and the daily streak. They are
+  // counted here rather than inside renderWorld because a map that could not be fetched still leaves a player
+  // with a hundred boards behind them, and three zeroes would be a lie about their own game.
+  function renderHomeStats() {
+    if (!DATA || !el.statBoards) return;
+    const cleared_ = DATA.levels.filter((_, i) => cleared(i));
+    el.statBoards.textContent = String(cleared_.length);
+    el.statCountries.textContent = String(cleared_.filter(L => !L.disc && !L.focus).length);
+    el.statStreak.textContent = String(store.get('dailyStreak', { count: 0 }).count || 0);
+  }
+
+  // ── The home deck ──
+  // The brain and the world map used to sit one above the other, which asked the player which of the two they
+  // were meant to be looking at and pushed the second button off the bottom of the screen. One card is on
+  // screen now. It turns itself every few seconds so both are seen without anybody being asked to do anything;
+  // the moment the player turns it themselves — a swipe, a dot, an arrow key — it stops turning on its own and
+  // stays where they put it.
+  const DECK_EVERY = 4500, DECK_SWIPE = 44;
+  const deck = { i: 0, n: 2, timer: 0, hide: 0, auto: true, drag: null, swipedAt: 0 };
+  let showBrainNext = false;   // set when a board is cleared: the brain has just changed and it is what to come home to
+  const deckStop = () => { clearInterval(deck.timer); deck.timer = 0; };
+  function deckStart() {
+    deckStop();
+    if (!el.deckTrack || !deck.auto || document.hidden || el.select?.hidden) return;
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;   // nothing moves on its own here
+    deck.timer = setInterval(() => deckGo(deck.i + 1), DECK_EVERY);
+  }
+  // `manual` is a gesture, a dot or a key, and those stop at the ends: a card that gave way under the finger and
+  // then jumped to the far end of the deck is a card that lied about where it was going. The timer wraps.
+  function deckGo(i, manual, first) {
+    if (!el.deckTrack) return;
+    deck.i = manual ? Math.max(0, Math.min(deck.n - 1, i)) : ((i % deck.n) + deck.n) % deck.n;
+    el.deckTrack.style.transform = `translateX(${-deck.i * 100}%)`;
+    // Somebody reading the card with a keyboard or a screen reader is standing on it: hiding a card with the
+    // focus inside it throws that focus back to the top of the document mid-sentence. Move them to the dot for
+    // the card they are being shown first, and only then put the other card out of reach.
+    const slides = [...el.deckTrack.children];
+    if (el.deckTrack.contains(document.activeElement)) el.deckDots?.children[deck.i]?.focus({ preventScroll: true });
+    clearTimeout(deck.hide);
+    // The card arriving is reachable at once; the one leaving is put out of reach only once it has left, because
+    // it is on screen for the length of the slide. aria-hidden also hides it outright in CSS, which is what
+    // keeps a browser too old for `inert` from letting the Tab key walk into a card nobody can see.
+    slides[deck.i].inert = false; slides[deck.i].setAttribute('aria-hidden', 'false');
+    const hide = () => slides.forEach((sl, k) => { if (k !== deck.i) { sl.inert = true; sl.setAttribute('aria-hidden', 'true'); } });
+    if (first) hide(); else deck.hide = setTimeout(hide, 420);
+    if (el.deckDots) [...el.deckDots.children].forEach((d, k) => { d.classList.toggle('is-on', k === deck.i); if (k === deck.i) d.setAttribute('aria-current', 'true'); else d.removeAttribute('aria-current'); });
+    // While it is turning on its own it says nothing — a screen reader reading a card out every four seconds is
+    // noise. Once the player has taken it over, the card they asked for is announced.
+    el.deckTrack.parentElement?.setAttribute('aria-live', deck.auto ? 'off' : 'polite');
+    if (manual) { deck.auto = false; deckStop(); }
+  }
+  if (el.deck) {
+    el.deckDots?.addEventListener('click', e => { const b = e.target.closest('[data-slide]'); if (b) deckGo(+b.dataset.slide, true); });
+    // a keyboard or a screen reader arriving in the deck is somebody reading it: it stops turning under them
+    el.deck.addEventListener('focusin', () => { deck.auto = false; deckStop(); });
+    el.deck.addEventListener('keydown', e => {
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      if (e.altKey || e.metaKey || e.ctrlKey || e.shiftKey) return;   // Alt+Arrow is the browser's Back, not ours
+      e.preventDefault(); deckGo(deck.i + (e.key === 'ArrowRight' ? 1 : -1), true);
+    });
+    // A drag decides on its first few pixels whether it is a swipe or the page being scrolled, and never both.
+    el.deck.addEventListener('pointerdown', e => {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      deck.swipedAt = 0; deck.drag = { x: e.clientX, y: e.clientY, dx: 0, lock: null };
+    });
+    el.deck.addEventListener('pointermove', e => {
+      const d = deck.drag; if (!d) return;
+      d.dx = e.clientX - d.x; const dy = e.clientY - d.y;
+      if (d.lock === null && (Math.abs(d.dx) > 8 || Math.abs(dy) > 8)) d.lock = Math.abs(d.dx) > Math.abs(dy) ? 'x' : 'y';
+      if (d.lock !== 'x') return;
+      // at the ends the card gives about a third as far, so a swipe that cannot go anywhere says so
+      const edge = (deck.i === 0 && d.dx > 0) || (deck.i === deck.n - 1 && d.dx < 0);
+      el.deckTrack.classList.add('is-dragging');
+      el.deckTrack.style.transform = `translateX(calc(${-deck.i * 100}% + ${Math.round(edge ? d.dx / 3 : d.dx)}px))`;
+    });
+    const dragEnd = () => {
+      const d = deck.drag; deck.drag = null;
+      if (!d) return;
+      el.deckTrack.classList.remove('is-dragging');
+      if (d.lock !== 'x') { if (Math.abs(d.dx) > 8) deck.swipedAt = performance.now(); return; }
+      deck.swipedAt = performance.now();   // a swipe is not a tap: whatever it ended on must not be clicked
+      if (Math.abs(d.dx) > DECK_SWIPE) deckGo(deck.i + (d.dx < 0 ? 1 : -1), true);
+      else deckGo(deck.i, true);
+    };
+    el.deck.addEventListener('pointerup', dragEnd);
+    el.deck.addEventListener('pointercancel', dragEnd);
+    el.deck.addEventListener('pointerleave', dragEnd);
+    // the tap that ended a swipe lands on a country: swallow it before the map ever hears about it
+    // Only the click that the swipe itself produces, which arrives in the same breath as the release. A flag left
+    // standing would eat the next real tap — or the next Enter on a country, which also arrives as a click.
+    el.deck.addEventListener('click', e => {
+      if (!deck.swipedAt || performance.now() - deck.swipedAt > 400) return;
+      deck.swipedAt = 0; e.stopPropagation(); e.preventDefault();
+    }, true);
+  }
+
   // ── Level select ──
   function renderSelect() {
     if (!DATA) return;
     renderWorld();
     renderBrain();
+    renderHomeStats();
+    if (showBrainNext) { showBrainNext = false; deck.i = 0; }
+    deckGo(deck.i, false, true);
+    deckStart();
     const n = DATA.levels.length;
     renderPurse();
     const nextIdx = DATA.levels.findIndex((_, j) => !cleared(j) && unlocked(j));
@@ -1090,7 +1192,7 @@
     if (i < 0 || i >= DATA.levels.length) i = 0;
     if (!daily && !unlocked(i)) i = DATA.levels.findIndex((_, j) => !cleared(j) && unlocked(j));
     if (i < 0) i = 0;
-    stopTimer(); stopProgressPoll(); heartbeatStop();
+    stopTimer(); stopProgressPoll(); heartbeatStop(); deckStop();
     if (el.ranks) el.ranks.hidden = true;
     if (daily?.race) state.seedBump = 0;   // a race is that exact board: a stray reshuffle must not change it
     else if (bumpSeed) state.seedBump++; else if (state.idx !== i || !!daily !== !!state.daily) { state.seedBump = 0; state.fails = 0; }
@@ -1470,7 +1572,7 @@
       const ds = store.get('dailyStreak', { count: 0, last: '' });
       if (ds.last !== state.daily.key) { const y = new Date(); y.setDate(y.getDate() - 1); const yk = `${y.getFullYear()}-${String(y.getMonth() + 1).padStart(2, '0')}-${String(y.getDate()).padStart(2, '0')}`; store.set('dailyStreak', { count: ds.last === yk ? ds.count + 1 : 1, last: state.daily.key }); }
       syncTour({});   // the daily board lives in the state blob, which every push carries
-    } else { store.set(progressKey(i), rec); forgetNums(); pushOne(DATA.levels[i].id, rec); }
+    } else { store.set(progressKey(i), rec); forgetNums(); pushOne(DATA.levels[i].id, rec); showBrainNext = true; }
     if (R) {
       // No number here on purpose: the one that counts is the race time the server works out, and it is on the
       // sheet a second later. Two different times on two screens in a row is how a race stops making sense.
@@ -3401,7 +3503,8 @@
   // the board is a gesture it will accept, and the music that was built silently comes up then.
   document.addEventListener('pointerdown', () => { try { if (music.on && audio?.state === 'suspended') audio.resume(); } catch { /* ignore */ } }, { passive: true });
   document.addEventListener('visibilitychange', () => {
-    if (document.hidden) { musicStop(); heartbeatStop(); return; }
+    if (document.hidden) { musicStop(); heartbeatStop(); deckStop(); return; }
+    if (!el.select.hidden) deckStart();   // the home deck turns while somebody is looking at it, and not otherwise
     // Back on a board that was left mid-play. Nothing else restarts it now that music begins with a board
     // rather than with the first tap anywhere, so coming back is its own beginning.
     if (state.music && !el.game.hidden && !state.finished) musicStart();
