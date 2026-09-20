@@ -67,9 +67,13 @@ width is 600dp — a tablet, or a foldable once it is open. **Games are the
 documented exception**, so `android:appCategory="game"` on `<application>` is what
 keeps the portrait lock working; it is not decoration. And the lock is not the
 only line of defence: `css/puzzle.css` counter-rotates the board when the window
-arrives sideways, so the game stays upright even where the manifest is overruled —
-by the per-app device setting today, or by API 37, where the exception is
-scheduled to go away.
+arrives sideways, so the game stays upright even where the manifest is overruled.
+That happens today when a user picks the per-app override in device settings. It
+may happen wholesale later: Google's documented escape hatch for non-games, the
+`PROPERTY_COMPAT_ALLOW_RESTRICTED_RESIZABILITY` property, is stated to stop
+working at API 37, and while the games exception carries no announced end date,
+the direction of travel is plainly towards adaptive windows. The CSS is what makes
+that a non-event for us rather than a rewrite.
 
 **Edge-to-edge is mandatory.** `windowOptOutEdgeToEdgeEnforcement` is deprecated
 and does nothing on Android 16. There is no opt-out and nothing to do here: the
