@@ -12,6 +12,12 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- appCategory="game" is load-bearing. Android 16 ignores android:screenOrientation on any display
+         600dp wide or over, so a tablet or an unfolded foldable would hand the game a landscape window
+         whatever the activity below asked for. Games are the documented exception, and this is a game, so
+         with the category declared the portrait lock still holds. The web side does not lean on it either:
+         css/puzzle.css counter-rotates the board when the window comes up sideways, and that is what carries
+         us the day the exception goes away. -->
     <application
         android:label="@string/app_name"
         android:icon="@mipmap/ic_launcher"
@@ -20,7 +26,8 @@
         android:fullBackupContent="@xml/backup_rules"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:supportsRtl="false"
-        android:theme="@style/Theme.App">
+        android:theme="@style/Theme.App"
+        android:appCategory="game">
 
         <activity
             android:name="com.google.androidbrowserhelper.trusted.LauncherActivity"
@@ -42,7 +49,7 @@
                 android:resource="@drawable/splash" />
             <meta-data android:name="android.support.customtabs.trusted.SPLASH_SCREEN_BACKGROUND_COLOR"
                 android:resource="@color/paper" />
-            <meta-data android:name="androix.browser.trusted.splashscreen.PARAMS_SPLASH_SCREEN_FADE_OUT_DURATION"
+            <meta-data android:name="androidx.browser.trusted.splashscreen.PARAMS_SPLASH_SCREEN_FADE_OUT_DURATION"
                 android:value="240" />
             <meta-data android:name="android.support.customtabs.trusted.FILE_PROVIDER_AUTHORITY"
                 android:value="com.ariyankhan.puzzle.fileprovider" />

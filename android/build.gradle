@@ -1,3 +1,4 @@
 plugins {
-    id 'com.android.application' version '8.7.3' apply false
+    // The last 8.x line, and the first that treats compileSdk 36 as released rather than a preview.
+    id 'com.android.application' version '8.13.2' apply false
 }
