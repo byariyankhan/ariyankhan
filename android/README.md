@@ -51,6 +51,41 @@ so the fingerprint is not knowable until the first bundle has been uploaded:
 Until step 4 lands, the app runs with the address bar showing. Nothing else
 breaks.
 
+## Android 16 (API 36), and what it changes
+
+Google Play has required **API 36 of new apps and of every update since 31 August
+2026**. An upload targeting 35 is rejected, so `compileSdk` and `targetSdk` are
+both 36, which pins the toolchain: AGP 8.13.2, Gradle 8.14.3, JDK 17+, and
+android-browser-helper 2.7.3 (2.5.0 predates the Android 16 window).
+
+Three of Android 16's behaviour changes land on an app shaped like this one:
+
+**Fixed orientation is ignored at 600dp and over.** Under `targetSdk 36` Android
+throws away `android:screenOrientation`, `resizableActivity`, `minAspectRatio`,
+`maxAspectRatio` and `setRequestedOrientation()` on any display whose smallest
+width is 600dp — a tablet, or a foldable once it is open. **Games are the
+documented exception**, so `android:appCategory="game"` on `<application>` is what
+keeps the portrait lock working; it is not decoration. And the lock is not the
+only line of defence: `css/puzzle.css` counter-rotates the board when the window
+arrives sideways, so the game stays upright even where the manifest is overruled.
+That happens today when a user picks the per-app override in device settings. It
+may happen wholesale later: Google's documented escape hatch for non-games, the
+`PROPERTY_COMPAT_ALLOW_RESTRICTED_RESIZABILITY` property, is stated to stop
+working at API 37, and while the games exception carries no announced end date,
+the direction of travel is plainly towards adaptive windows. The CSS is what makes
+that a non-event for us rather than a rewrite.
+
+**Edge-to-edge is mandatory.** `windowOptOutEdgeToEdgeEnforcement` is deprecated
+and does nothing on Android 16. There is no opt-out and nothing to do here: the
+window belongs to Chrome, the game's own layout is already inset-aware through
+`env(safe-area-inset-*)`, and the splash is a single colour that reaches the
+edges by construction.
+
+**Predictive back is on by default.** `onBackPressed()` is not called and
+`KEYCODE_BACK` is not dispatched. Nothing in this project implements either —
+`LauncherActivity` launches and finishes, and back inside the game is Chrome's —
+so there is no migration, which is exactly why the library floor matters.
+
 ## Keys
 
 **No keystore is in this repository and none should ever be.** Play App Signing
@@ -61,6 +96,11 @@ signing happens where the key is.
 ## Building
 
 ```bash
-export ANDROID_HOME=/path/to/android-sdk
-cd android && ./gradlew bundleRelease     # app/build/outputs/bundle/release/
+export ANDROID_HOME=/path/to/android-sdk   # needs platforms;android-36 and build-tools;36.0.0
+cd android && ./gradlew bundleRelease       # app/build/outputs/bundle/release/app-release.aab
 ```
+
+The bundle is about 900 KB, nearly all of it android-browser-helper's dex and the
+launcher icons. There is no native code in it, so the **16 KB page-size
+requirement** that applies to apps targeting Android 15 and up is satisfied by
+having nothing to align.

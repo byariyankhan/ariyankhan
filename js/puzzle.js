@@ -1480,7 +1480,7 @@
   function hint() {
     if (state.finished) return;
     if (state.hintsUsed >= (state.hintsMax ?? HINTS_PER_LEVEL)) {
-      if (adCanOffer('hint')) { adOffer('hint'); return; }
+      if (adCanOffer('hint')) { adOffer('hint', null, true).then(got => { if (got) hint(); }); return; }
       toast('No hints left on this level.', 'bad'); return;
     }
     const p = state.pieces.find(q => !q.gone && !blockerOf(q));
@@ -1982,23 +1982,6 @@
     }
   }
 
-  // The free lifeline. Not an advertisement, never called one, and no advertising code runs for it. It keeps
-  // the shape of the offer -- a decision, a short wait, a reward -- so that switching to the real thing changes
-  // what happens and not how it feels.
-  async function freeShow(name) {
-    if (!ads.ready()) return 'unavailable';
-    ads.showing = true;
-    const wasMusic = music.on;
-    try {
-      if (wasMusic) musicStop();
-      return await adTestShow(name, 'Free lifeline',
-        'Advertising is not running in the game yet, so this one is on us. Take a moment, and it is yours.');
-    } finally {
-      ads.showing = false;
-      if (wasMusic && state.music && !el.game.hidden && !state.finished) musicStart();
-    }
-  }
-
   // What each kind of reward is, in one table: what to call it, what the ad is named in the network's own
   // reporting, and what happens when it is earned. Gold is the odd one out and says so -- it is the only one
   // the client cannot grant, because gold is real and the server is the only thing allowed to make it.
@@ -2007,32 +1990,28 @@
       title: 'One more heart',
       lead: 'Watch a short advertisement through and carry on with this board from where it stopped, with one heart.',
       cta: 'Watch for a heart',
-      free: { lead: 'Carry on with this board from where it stopped, with one heart. Free \u2014 advertising is not running in the game yet.', cta: 'Take a heart' },
       grant() { state.lives = 1; state.finished = false; state.busy = false; el.overlay.hidden = true; renderHud(); startTimer(); heartLost(); toast('One heart. Make it count.', 'good'); },
     },
     hint: {
       title: 'One more hint',
       lead: 'Watch a short advertisement through for one more hint on this board.',
       cta: 'Watch for a hint',
-      free: { lead: 'One more hint on this board, free \u2014 advertising is not running in the game yet.', cta: 'Take a hint' },
       // The hint is added, and nothing else. It used to light the arrow up the moment the advertisement closed,
       // which put a 2.5-second glow on screen while the player was still watching the ad panel disappear -- the
       // thing they had just spent half a minute on, missed. An advertisement buys the item; using it is a tap,
       // like every other hint.
-      grant() { state.hintsMax = (state.hintsMax ?? HINTS_PER_LEVEL) + 1; renderHud(); toast('One more hint.', 'good'); },
+      grant(quiet) { state.hintsMax = (state.hintsMax ?? HINTS_PER_LEVEL) + 1; renderHud(); if (!quiet) toast('One more hint.', 'good'); },
     },
     check: {
       title: `One more ${CHECK_WORD}`,
       lead: `Watch a short advertisement through for one more ${CHECK_WORD} on this board.`,
       cta: `Watch for a ${CHECK_WORD}`,
-      free: { lead: `One more ${CHECK_WORD} on this board, free \u2014 advertising is not running in the game yet.`, cta: `Take a ${CHECK_WORD}` },
       grant() { state.checksMax = (state.checksMax ?? CHECKS_PER_LEVEL) + 1; renderHud(); toast(`One more ${CHECK_WORD}.`, 'good'); },
     },
     gold: {
       title: 'Gold for an advertisement',
       lead: 'Watch a short advertisement through and the gold is added to your purse.',
       cta: 'Watch for gold',
-      free: { title: 'Gold on the house', lead: 'Gold added to your purse, free \u2014 advertising is not running in the game yet.', cta: 'Take the gold' },
       needsAccount: true,
       async grant() { await adClaimGold(); },
     },
@@ -2076,21 +2055,31 @@
     }));
   }
 
-  function adOffer(kind, note) {
+  async function adOffer(kind, note, quiet = false) {
     const R = AD_REWARD[kind];
     if (!R || ads.showing) return;
     if (R.needsAccount && !auth.user) { openSignIn('Sign in first, so the gold has a purse to go into.'); return; }
-    // One sheet, two vocabularies. An advertisement is described as an advertisement; a free lifeline is
-    // described as a free lifeline. Neither borrows the other's words.
-    const C = ads.isAd() ? R : { ...R, ...(R.free || {}) };
+    // With advertising off there is no advertisement to agree to and nothing to sit through, so the sheet was
+    // asking the player to confirm that yes, they would like the free thing they had just asked for: two taps
+    // for one hint. The plus is the whole transaction now, and the toast every grant already raises is what
+    // says the hint arrived.
+    //
+    // The sheet comes back the day advertising does, and not out of politeness. A rewarded advertisement has
+    // to be opted into with the reward named before it plays, and a bare plus is not that opt-in — so this
+    // branch is the free lifeline's alone, and turning ads on restores the ask by itself.
+    if (!ads.isAd()) {
+      ads.showing = true;                       // gold's grant goes to the server; a second tap is not a second reward
+      try { await R.grant(quiet); } finally { ads.showing = false; }
+      return true;                              // and the caller may spend it straight away
+    }
     const wrap = document.createElement('div');
     wrap.className = 'aa-adoffer';
     wrap.innerHTML = `<div class="aa-adoffer-panel" role="dialog" aria-modal="true" aria-labelledby="aaAdTitle">
-      <h3 id="aaAdTitle">${escapeHtml(C.title)}</h3>
-      <p>${escapeHtml((ads.isAd() && note) || C.lead)}</p>
+      <h3 id="aaAdTitle">${escapeHtml(R.title)}</h3>
+      <p>${escapeHtml(note || R.lead)}</p>
       ${state.daily?.race ? '<p class="aa-adoffer-note">The match clock keeps running while it plays.</p>' : ''}
       <div class="aa-actions aa-actions--stack">
-        <button type="button" class="aa-btn aa-btn--primary" data-ad="go">${ads.isAd() ? ICON_AD : ''}${escapeHtml(C.cta)}</button>
+        <button type="button" class="aa-btn aa-btn--primary" data-ad="go">${ICON_AD}${escapeHtml(R.cta)}</button>
         <button type="button" class="aa-btn" data-ad="no">No thanks</button>
       </div>
     </div>`;
@@ -2103,12 +2092,11 @@
       if (act === 'no') { close(); return; }
       const btn = e.target.closest('[data-ad]');
       btn.disabled = true;
-      const how = ads.isAd() ? await adShow(`${PRODUCT_AD}-${kind}`) : await freeShow(`${PRODUCT_AD}-${kind}`);
+      const how = await adShow(`${PRODUCT_AD}-${kind}`);
       close();
       // Watched through, or nothing. There is no third answer, and each of the others says which one it was.
       if (how !== 'watched') {
-        toast(!ads.isAd() ? 'Nothing was added.'
-          : how === 'dismissed' ? 'The advertisement was not watched through, so nothing was added.'
+        toast(how === 'dismissed' ? 'The advertisement was not watched through, so nothing was added.'
           : 'No advertisement was available, so nothing was added. Try again in a moment.', 'hint', 3200);
         return;
       }
@@ -2955,9 +2943,17 @@
     // What this player took, which after a three-way board is not the same as what the pot held: second place
     // has its stake back and third a tenth of one, and telling either of them they "lost" would be a lie.
     const took = mine?.prize ?? 0;
+    // Said as a label and a figure, because the sheet already shows the figure as a coin. What used to sit in
+    // that coin was the player's whole balance, which is the one number this sheet has nothing to do with: it
+    // is the same before and after for everybody who did not win, and on a winner it buries the winnings
+    // inside a total. So the coin now holds what this match moved, and the words beside it say which way.
     const purse = took > 0
-      ? (m.you_won ? `You won ${gpurse(took)}` : took >= m.stake ? `Your ${gpurse(m.stake)} stake came back` : `You took ${gpurse(took)} back`)
-      : m.winner ? `You lost ${gpurse(m.stake)}` : m.draw ? 'Every stake came back' : 'Your stake is held';
+      ? (m.you_won ? { label: 'You won', gold: took }
+        : took >= m.stake ? { label: 'Your stake came back', gold: took }
+        : { label: 'You took back', gold: took })
+      : m.winner ? { label: 'You lost', gold: m.stake }
+      : m.draw ? { label: 'Every stake came back' }
+      : { label: 'Your stake is held' };
     // The reading from the board just cleared, where this sheet is the end of that run. A challenge is still a
     // board of this game, so it says the same things about it a tour board does — the stars, what it cost, the
     // focus bar — and the only thing left out is a second clock, because the race time is already on every line
@@ -2977,7 +2973,7 @@
       </div>`;
     el.matchBody.innerHTML = `
       <div class="aa-vs">${(m.players || []).map(row).join('')}</div>
-      <p class="aa-purse"><span>${purse}</span><span class="aa-gold${m.you_won ? ' is-won' : ''}" title="${gfmt(auth.user?.gold ?? 0)} gold">${COIN}<span id="aaPurseCount">${gpurse(auth.user?.gold ?? 0)}</span></span></p>
+      <p class="aa-purse"><span>${purse.label}</span>${purse.gold == null ? '' : `<span class="aa-gold${m.you_won ? ' is-won' : ''}" title="${gfmt(purse.gold)} gold">${COIN}<span id="aaPurseCount">${gpurse(purse.gold)}</span></span>`}</p>
       ${reading}
       ${m.state === 'done' ? '' : `<p class="aa-sheet-note">The others are still playing for their place. ${m.prizes?.second ? `Second takes ${gpurse(m.prizes.second)}, third ${gpurse(m.prizes.third)}.` : ''}</p>`}
       <div class="aa-actions"><button type="button" class="aa-btn aa-btn--primary" data-mact="stakes">Play another</button><button type="button" class="aa-btn" data-mact="close">Close</button></div>`;
@@ -2988,7 +2984,7 @@
       if (typeof goldBefore === 'number') purseWin = { from: goldBefore, to: auth.user?.gold ?? goldBefore };
       SFX.win(); vibe([0, 40, 60, 120]); goldRain(100, true);
       setTimeout(() => goldRain(60, true), 500);
-      if (typeof goldBefore === 'number') countTo($('#aaPurseCount', el.matchBody), goldBefore, auth.user?.gold ?? goldBefore);
+      countTo($('#aaPurseCount', el.matchBody), 0, took);
     }
   }
 
