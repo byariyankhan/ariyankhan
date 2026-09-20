@@ -610,8 +610,10 @@ links.
   title and the two buttons have had theirs" — which is what keeps the whole home
   screen on one screen from a 360×560 phone to a tablet, and the two buttons at
   the bottom where a thumb is. The three tiles under the map (boards, countries,
-  day streak — the streak only counts while it is alive, today's daily or
-  yesterday's, because nothing decays the stored one; all three counted in
+  day streak — days this player cleared any board, not days they opened the daily
+  board, which is what it counted at first and why somebody a hundred boards in
+  was told zero; it counts only while it is alive, played today or yesterday,
+  because nothing decays the stored record; all three counted in
   `renderHomeStats` so a map that failed to load does not leave a hundred-board
   player looking at three zeroes) are the win card's own
   tiles. Clearing a board sets `showBrainNext`, so the player comes home to the
