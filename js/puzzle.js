@@ -462,10 +462,20 @@
       seq.push([base * Math.pow(2, (pct >= 85 ? 16 : pct >= 70 ? 12 : pct >= 50 ? 7 : 3) / 12), notes * step + 0.04, 0.34, 'sine', 0.06]);
       beep(seq);
     } };
-  // Every button in the game answers back. The board's own arrows are not buttons, so they keep their own shot.
+  // Every tap answers back. The board's arrows are the one exception: shooting one has its own sound, and a
+  // click under it would only blur the shot.
+  //
+  // What counts as tappable is deliberately not a list of class names. That list went stale the moment a
+  // settings row became an <a> instead of a <button>, which is why some things clicked and some did not. The
+  // stylesheet has already decided what looks tappable -- cursor:pointer -- so that is what is asked, along
+  // with the handful of elements that are tappable by tag whatever the cursor says.
+  const TAP_BY_TAG = 'button, a, summary, label, [role="button"], .aa-fill';
   document.addEventListener('pointerdown', e => {
-    const b = e.target.closest('button, .aa-fill');
-    if (b && !b.disabled && !b.closest('.aa-piece')) SFX.tap();
+    if (e.target.closest?.('.aa-piece')) return;
+    for (let n = e.target, hop = 0; n && n !== document.body && hop < 6; n = n.parentElement, hop++) {
+      if (n.disabled) return;                               // a dead control says nothing, at any depth
+      if (n.matches?.(TAP_BY_TAG) || getComputedStyle(n).cursor === 'pointer') { SFX.tap(); return; }
+    }
   }, true);
   function vibe(ms) { if (state.vibe && navigator.vibrate) { try { navigator.vibrate(ms); } catch { /* ignore */ } } }
   function renderToggles() {
@@ -2377,10 +2387,7 @@
         if (Notification.permission === 'default' &&
             !(await ask({
               title: 'Turn on notifications?',
-              body: 'Two things only: a friend inviting you to a board, and the league paying out at the end '
-                  + 'of the week. Nothing else, ever.\n\nYour browser will ask next, and it will show the '
-                  + 'site\u2019s address rather than the game\u2019s name \u2014 that is the browser\u2019s own dialog, '
-                  + 'and it works the same for every site.',
+              body: 'An invite, and the league. Nothing else.\n\nYour browser asks next.',
               ok: 'Ask me',
               cancel: 'Not now',
             }))) { push.on = false; renderNotify(); return; }
