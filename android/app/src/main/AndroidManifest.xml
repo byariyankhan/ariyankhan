@@ -65,7 +65,14 @@
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="https" android:host="@string/host" android:pathPrefix="/puzzle" />
+                <!-- The game itself, and nothing else under /puzzle. A prefix would also claim
+                     privacy.html and terms.html, and a reader who taps the privacy policy wants to read it,
+                     not to be dropped into a puzzle. An exact path still catches every link the game hands
+                     out — #m=CODE for an invitation, #b-<id> for a shared board, ?utm_source=android for its
+                     own launch — because a fragment and a query are not part of the path. Both spellings,
+                     since a link typed or pasted without the trailing slash is the same page. -->
+                <data android:scheme="https" android:host="@string/host" android:path="/puzzle/" />
+                <data android:scheme="https" android:host="@string/host" android:path="/puzzle" />
             </intent-filter>
         </activity>
 
