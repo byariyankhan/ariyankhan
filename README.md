@@ -644,7 +644,7 @@ links.
   arrows in the same line weights — drawn at the difficulty the player is
   actually being dealt (`TIER_OF()`), from `emblem` in
   `games/data/focus-boards.json` (the brain outline plus five scales of its own,
-  ~27 arrows on Easy to ~90 on Master). The silhouette itself is drawn under the
+  ~31 arrows on Easy to ~90 on Master). The silhouette itself is drawn under the
   arrows as a path (`.aa-brain-wash`), at the resolution it was designed at: a
   cortical fold is smaller than a cell at twenty-odd arrows, so rasterising alone
   leaves a lumpy blob, and the wash is what makes it a brain. The transform is the
@@ -734,16 +734,20 @@ links.
   levels), so it unlocks, seeds, saves (`lv:d:<id>`) and deep-links (`#b-<id>`)
   exactly like a country.
 - **Focus boards** (`games/build-focus-boards.mjs` → `games/data/focus-boards.json`,
-  26 boards, 19 KB) are the boards the game opens on: a brain, a lightbulb, a
+  26 boards, 18 KB) are the boards the game opens on: a brain, a lightbulb, a
   key, a cog, a puzzle piece, a labyrinth, a knight — the game's own language
   rather than a country's, drawn here as M/L/Z outlines in the same 100-unit box
-  and scaled per tier by the same `rasterise`. The brain among them is **traced by
-  hand**, vertex by vertex — gyrus out, sulcus in — and rounded by two Chaikin
-  passes: every procedural fold tried before it (evenly spaced bumps on the
-  outline, however tuned) came out a flower or a cauliflower, because what makes a
-  cortex read is that the folds are all different sizes. Its lateral fissure and
-  the one over the cerebellum are **slits**, too fine for any board raster to
-  hold, and they are there for the home screen, which draws the path itself. In the game one is `{ id:
+  and scaled per tier by the same `rasterise`. The brain among them is **the
+  logo's brain** and not a second drawing of one: the same outline the splash mark
+  and the app icon are built from (`images/puzzle-brain-mark.svg` — that mark is
+  this outline filled with this game's arrows), a brain seen from above, narrower
+  at the front and fuller at the back, split into two hemispheres. Two things
+  differ from the logo's own code, both so it survives being a board: the outline
+  is sampled into straight segments rather than left as quadratics, because that
+  is the one form `parsePath` reads; and the channel between the hemispheres is
+  cut out of the **shape** — two rings with a gap — rather than masked out of the
+  grid afterwards, so the split is there at every size, the home screen's outline
+  included. In the game one is `{ id:
   'f:<id>', name, d, k, focus: true }`. `tourFor` puts the whole block at the
   **frontier**, in front of the first board the player has not cleared: a new
   player's level 1 is the brain, and a player who has already cleared a hundred

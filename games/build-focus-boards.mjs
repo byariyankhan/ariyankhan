@@ -38,47 +38,46 @@ const disc = (cx, cy, r, n = 40) => ring(arc(cx, cy, r, 0, 360 - 360 / n, n - 1)
 const box = (x0, y0, x1, y1) => ring([[x0, y0], [x1, y0], [x1, y1], [x0, y1]]);
 const poly = (...xy) => ring(xy);
 
-// The brain, seen from the side, the way an anatomy plate draws it — and traced by hand rather than generated.
-// Every procedural fold (evenly spaced bumps on the outline, however tuned) comes out as a flower or a
-// cauliflower, because what makes a cortex read is that the gyri are all different sizes and the sulci between
-// them cut in at their own angles. So the vertices below are placed one at a time: out for a gyrus, in for a
-// sulcus, up the front, over the top, down the back; then the fissure over the cerebellum, the cerebellum's
-// finer folia, the stem, the underside of the temporal lobe, and the lateral fissure back to the frontal pole.
+// The brain is the logo's brain, and not a second drawing of one. The mark on the splash screen and the app
+// icon (images/puzzle-brain-mark.svg) is this same outline filled with this same game's arrows: a brain seen
+// from above, a lumpy oval narrower at the front and fuller at the back, split down the middle into two
+// hemispheres. The bumps are the gyri, and they are what makes an eye call it a brain before it has counted
+// anything — a plain ellipse reads as an ellipse.
 //
-// Two of those are slits rather than wedges — the lateral fissure and the one over the cerebellum — which the
-// rasteriser cannot hold at board sizes and does not need to: the home screen draws this path itself, under the
-// arrows (renderBrain in js/puzzle.js), so the folds and the fissures are carried at the size they were drawn
-// at. What the raster keeps is the silhouette, which is what a board is.
-//
-// Chaikin twice turns the traced corners into folds. It is done here because the game's parser reads straight
-// segments only, and a corner-cutting pass is a curve in the one form it can read.
-function chaikin(pts, passes = 2) {
-  let p = pts;
-  for (let n = 0; n < passes; n++) {
-    const out = [];
-    for (let i = 0; i < p.length; i++) {
-      const a = p[i], b = p[(i + 1) % p.length];
-      out.push([a[0] * 0.75 + b[0] * 0.25, a[1] * 0.75 + b[1] * 0.25], [a[0] * 0.25 + b[0] * 0.75, a[1] * 0.25 + b[1] * 0.75]);
-    }
-    p = out;
+// Two differences from the logo's own code, both because this one has to survive being a board. The outline is
+// sampled into straight segments rather than left as quadratics, because that is the one path form the game's
+// parser reads. And the channel between the hemispheres is cut out of the *shape* — two rings with a gap
+// between them — rather than masked out of the grid afterwards, so the split is there at every size, including
+// in the outline the home screen draws under the arrows.
+const BRAIN = { cx: 50, cy: 51, rx: 42, ry: 40, bumps: 10, depth: 0.055, phase: 0.35, gap: 3.1 };
+
+/** Clip a closed polygon to one side of a vertical line (Sutherland–Hodgman; one convex edge). */
+function clipX(pts, edge, keepLeft) {
+  const inside = q => (keepLeft ? q[0] <= edge : q[0] >= edge);
+  const cross = (a, b) => { const t = (edge - a[0]) / (b[0] - a[0]); return [edge, a[1] + (b[1] - a[1]) * t]; };
+  const out = [];
+  for (let i = 0; i < pts.length; i++) {
+    const a = pts[i], b = pts[(i + 1) % pts.length];
+    if (inside(a)) { out.push(a); if (!inside(b)) out.push(cross(a, b)); }
+    else if (inside(b)) out.push(cross(a, b));
   }
-  return p;
+  return out;
 }
 
-function brain() {
-  const traced = [
-    [8, 45], [4, 38], [11, 34], [5, 28], [13, 24], [11, 18],                              // up the front
-    [18, 16], [16, 9], [23, 14], [30, 6], [35, 13], [41, 4], [46, 12],                     // over the top: gyrus, sulcus, gyrus
-    [52, 4], [57, 12], [64, 5], [69, 13], [76, 9], [80, 18],
-    [86, 16], [87, 25], [93, 27], [88, 34], [95, 40], [89, 46], [92, 53],                  // down the back to the occipital pole
-    [80, 57], [74, 58.5], [82, 58], [88, 58.5],                                            // the fissure over the cerebellum, in and out
-    [90, 63], [86, 65], [89, 70], [84, 72], [86, 77], [80, 78], [80, 82], [73, 81], [71, 85], [64, 84], [60, 80],
-    [57, 74], [57, 83], [56, 90], [44, 90], [43, 81], [45, 72],                            // the stem, which is smooth in life too
-    [41, 77], [37, 72], [31, 77], [27, 72], [21, 71], [17, 65], [15, 60],                  // forward along the temporal lobe
-    [14, 56], [26, 51.5], [32, 48.5], [36, 46.5], [30, 48], [22, 50], [11, 51],            // the lateral fissure, in and back out
-  ];
-  // A brain is half again as wide as it is tall; traced upright it comes out too round.
-  return ring(chaikin(traced.map(([x, y]) => [x, 50 + (y - 47) * 0.86])));
+function brain(N = 240) {
+  const { cx, cy, rx, ry, bumps, depth, phase, gap } = BRAIN;
+  const pts = [];
+  for (let i = 0; i < N; i++) {
+    const t = (i / N) * Math.PI * 2;                  // t = -PI/2 is the top of the shape
+    const up = Math.max(0, -Math.sin(t)), down = Math.max(0, Math.sin(t));
+    const narrow = 1 - 0.155 * up * up;               // the frontal end is the narrow one
+    const full = 1 + 0.045 * down;                    // and the back is fuller, and a touch longer
+    // the gyri: a fold wave, strongest around the sides where the lobes actually show
+    const fold = depth * Math.sin(bumps * t + phase) + depth * 0.4 * Math.sin(bumps * 2 * t + 1.3 + phase);
+    const w = 1 + fold * (0.55 + 0.45 * Math.abs(Math.cos(t)));
+    pts.push([cx + rx * narrow * w * Math.cos(t), cy + ry * full * w * Math.sin(t)]);
+  }
+  return ring(clipX(pts, cx - gap, true)) + ' ' + ring(clipX(pts, cx + gap, false));
 }
 
 // A cog: ten teeth on a ring, one closed outline, with the hub punched out.

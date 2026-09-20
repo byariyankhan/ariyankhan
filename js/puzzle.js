@@ -17,7 +17,7 @@
   const DATA_VERSION = '11';
   const MAP_VERSION = '3';
   const DISCB_VERSION = '4';  // games/data/discover-boards.json: the board shaped like each country's animal, bird or landmark
-  const FOCUS_VERSION = '3';  // games/data/focus-boards.json: the brain, the lightbulb, the key — the boards the game opens on
+  const FOCUS_VERSION = '4';  // games/data/focus-boards.json: the brain, the lightbulb, the key — the boards the game opens on
   const STORE = 'aa:v1:';
 
   // ── Where the backend lives ──
