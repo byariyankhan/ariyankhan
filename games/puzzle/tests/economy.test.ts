@@ -61,6 +61,70 @@ section('A result that arrives twice pays once');
   eq(Number(rows.rows[0]!.n), 1, 'and the ledger holds exactly one payout row');
 }
 
+section('Three at a table: first takes the rest, second its stake back, third a tenth');
+{
+  const a = await player('pl-a'), b = await player('pl-b'), c3 = await player('pl-c');
+  const made = await R.createMatch(a, S, false, 2) as { ok: true; code: string };
+  await tx(c => R.joinRoomTx(c, b.id, made.code, 2));
+  await tx(c => R.joinRoomTx(c, c3.id, made.code, 2));
+  const g = { a: await goldOf(a.id), b: await goldOf(b.id), c: await goldOf(c3.id) };
+  await tx(c => R.startRoom(c, made.code));
+
+  const third = Math.floor(S / 10);
+  await tx(async c => { await R.submitResult(c, made.code, a.id, 4_000, true); await R.settleMatch(c, made.code); });
+  eq(await goldOf(a.id), g.a + S * 3 - S - third, 'first takes the pot less what the other two places hold');
+  eq(await goldOf(b.id), g.b, 'and nobody else is paid yet');
+
+  await tx(async c => { await R.submitResult(c, made.code, b.id, 6_000, true); await R.settleMatch(c, made.code); });
+  eq(await goldOf(b.id), g.b + S, 'second gets its stake back, so the board cost it nothing');
+
+  await tx(async c => { await R.submitResult(c, made.code, c3.id, 9_000, true); await R.settleMatch(c, made.code); });
+  eq(await goldOf(c3.id), g.c + third, 'third gets a tenth of its stake');
+
+  const m = (await R.matchRow(pool, made.code))!;
+  eq(m.state, 'done', 'and the room closes with everybody in');
+  eq(m.winner_id, a.id, 'the first to clear it is still the winner');
+  eq((await goldOf(a.id)) + (await goldOf(b.id)) + (await goldOf(c3.id)), g.a + g.b + g.c + S * 3,
+    'and the three prizes add up to exactly the pot');
+}
+
+section('A place nobody claims goes to first, and only once the room has closed');
+{
+  const a = await player('un-a'), b = await player('un-b'), c3 = await player('un-c');
+  const made = await R.createMatch(a, S, false, 2) as { ok: true; code: string };
+  await tx(c => R.joinRoomTx(c, b.id, made.code, 2));
+  await tx(c => R.joinRoomTx(c, c3.id, made.code, 2));
+  const g = { a: await goldOf(a.id), b: await goldOf(b.id), c: await goldOf(c3.id) };
+  await tx(c => R.startRoom(c, made.code));
+
+  const third = Math.floor(S / 10);
+  await tx(async c => { await R.submitResult(c, made.code, a.id, 4_000, true); await R.settleMatch(c, made.code); });
+  eq(await goldOf(a.id), g.a + S * 3 - S - third, 'first is paid its share the moment it clears');
+
+  // the other two give the board up rather than clearing it
+  await tx(async c => { await R.submitResult(c, made.code, b.id, 0, false, true); await R.settleMatch(c, made.code); });
+  eq(await goldOf(b.id), g.b, 'giving the board up is not second place');
+  await tx(async c => { await R.submitResult(c, made.code, c3.id, 0, false); await R.settleMatch(c, made.code); });
+  eq(await goldOf(c3.id), g.c, 'nor is running out of hearts');
+  eq(await goldOf(a.id), g.a + S * 3, 'and the places nobody claimed go to first when the room closes');
+  const rows = await query<{ n: string }>(pool,
+    `SELECT COUNT(*)::bigint AS n FROM gold_ledger WHERE match_code = $1 AND reason = 'payout'`, [made.code]);
+  eq(Number(rows.rows[0]!.n), 2, 'as one more ledger row, not a second pot');
+}
+
+section('Two players is still a duel: the winner takes everything');
+{
+  const a = await player('du-a'), b = await player('du-b');
+  const made = await R.createMatch(a, S, false, 2) as { ok: true; code: string };
+  await tx(c => R.joinRoomTx(c, b.id, made.code, 2));
+  const g = { a: await goldOf(a.id), b: await goldOf(b.id) };
+  await tx(c => R.startRoom(c, made.code));
+  await tx(async c => { await R.submitResult(c, made.code, a.id, 4_000, true); await R.settleMatch(c, made.code); });
+  eq(await goldOf(a.id), g.a + S * 2, 'first takes the whole pot');
+  await tx(async c => { await R.submitResult(c, made.code, b.id, 7_000, true); await R.settleMatch(c, made.code); });
+  eq(await goldOf(b.id), g.b, 'and second place pays nothing at a table of two');
+}
+
 section('Two settlements racing pay one pot');
 {
   const a = await player('eve'), b = await player('finn');
@@ -209,7 +273,7 @@ section('A winner who deletes their account does not hand the pot to somebody el
 
   const goldA = await goldOf(a.id);
   await tx(async t => { await R.submitResult(t, made.code, a.id, 2_000, true); await R.settleMatch(t, made.code); });
-  eq(await goldOf(a.id), goldA + S * 3, 'the first to clear it takes the pot of three');
+  eq(await goldOf(a.id), goldA + S * 3 - S - Math.floor(S / 10), 'the first to clear it takes the pot less the two places behind it');
 
   const paidOut = (await query<{ n: number }>(pool,
     `SELECT COALESCE(SUM(delta),0)::bigint AS n FROM gold_ledger WHERE match_code = $1 AND reason = 'payout'`,
@@ -220,18 +284,24 @@ section('A winner who deletes their account does not hand the pot to somebody el
 
   const goldB = await goldOf(b.id);
   await tx(async t => { await R.submitResult(t, made.code, b.id, 5_000, true); await R.settleMatch(t, made.code); });
-  eq(await goldOf(b.id), goldB, 'the second finisher is not paid a pot that is already gone');
+  // Second place is owed its stake back whatever became of first — but only its stake back. The bug this
+  // guards against is the pot being paid a second time, not the places behind it going unpaid.
+  eq(await goldOf(b.id), goldB + S, 'the second finisher is paid second place, and not the pot again');
 
-  const payoutRows = (await query<{ n: number }>(pool,
-    `SELECT COUNT(*)::int AS n FROM gold_ledger WHERE match_code = $1 AND reason = 'payout'`,
+  const paidSince = (await query<{ n: number }>(pool,
+    `SELECT COALESCE(SUM(delta),0)::bigint AS n FROM gold_ledger WHERE match_code = $1 AND reason = 'payout'`,
     [made.code])).rows[0]!.n;
-  eq(payoutRows, 0, 'the only payout row went with the account that was deleted, and no new one replaced it');
+  eq(Number(paidSince), S, 'the pot\'s own row went with the deleted account and nothing replaced it');
   ok(paidOut > 0, 'the pot really had been paid before the deletion');
 
   // and the last player still going must not be handed a draw refund either
   const goldC = await goldOf(c2.id);
   await tx(async t => { await R.submitResult(t, made.code, c2.id, -1, false); await R.settleMatch(t, made.code); });
   eq(await goldOf(c2.id), goldC, 'nor is the last one out refunded a stake that was won');
+  const endPaid = (await query<{ n: number }>(pool,
+    `SELECT COALESCE(SUM(delta),0)::bigint AS n FROM gold_ledger WHERE match_code = $1 AND reason = 'payout'`,
+    [made.code])).rows[0]!.n;
+  eq(Number(endPaid), S, 'and third place, unclaimed, is not invented for a winner who no longer exists');
   const end = (await R.matchRow(pool, made.code))!;
   eq(end.state, 'done', 'the match still closes');
   ok(end.paid_at !== null, 'and it still remembers that it was won, with the winner gone');

@@ -30,16 +30,94 @@ export interface SeatRow {
 }
 export interface PlayerView {
   name: string; pic: string; pct: number; ms: number | null; gave_up: boolean; race_ms: number | null;
+  /** what this player took from the pot, once the pot has been paid; 0 for everybody who took nothing */
+  prize?: number;
   you: boolean; host: boolean; won: boolean; place: number;
 }
 export interface MatchView {
   code: string; stake: number; state: string; players: PlayerView[]; count: number; seats: number;
   pot: number; host: string; you: '' | 'host' | 'guest'; can_start: boolean; open_to_all: boolean;
+  /** what the table pays for second and third, both 0 at a table too small for places */
+  prizes: { second: number; third: number };
   fills_in: number | null; board?: string; tier?: number; seed?: number; your_ms?: number | null;
   // How long the match has been running, as this server counts it. The client starts its own clock from this
   // rather than from a timestamp, because a device with a wrong clock would then show a wrong race.
   age_ms?: number;
   winner?: string; you_won?: boolean; draw?: boolean;
+}
+
+// ── What a board pays ──
+//
+// First took the whole pot, and that is a good rule for two players and a bad one for five: the moment somebody
+// clears it, everybody else is playing for nothing and knows it. They stop, which is the opposite of what a
+// room full of people is for.
+//
+// So from three players up, a board pays three places. Second gets its stake back — finish second and the
+// board cost you nothing, which is the whole reason to keep going after somebody has won. Third gets a tenth
+// of its stake, which is not a prize so much as a reason to finish. First takes everything else, and on any
+// room bigger than three that is still the great majority of the pot.
+//
+// A place is earned by CLEARING the board, in the order they were cleared — never by ranking above somebody
+// who gave up. A place nobody claims is not paid: it goes to first when the room closes, which is the one
+// moment it is certain nobody is coming.
+export const PLACES_FROM = 3;          // two players is a duel, and a duel has one winner
+export const THIRD_DIVISOR = 10;       // third takes a tenth of what it staked
+
+/** What second and third are owed at this table, and what first therefore cannot have. */
+export function placePrizes(stake: number, players: number): { second: number; third: number; reserved: number } {
+  if (players < PLACES_FROM) return { second: 0, third: 0, reserved: 0 };
+  const second = stake, third = Math.floor(stake / THIRD_DIVISOR);
+  return { second, third, reserved: second + third };
+}
+
+/**
+ * What each player has been paid out of this pot, by user id. Empty until the pot is paid, and the same
+ * arithmetic settleMatch uses — including the unclaimed places, which are first's only once the room is
+ * closed, because until then somebody may still be coming for them.
+ */
+function paidOut(m: MatchRow, seats: SeatRow[]): Map<number, number> {
+  const out = new Map<number, number>();
+  if (m.paid_at === null) return out;
+  const players = Math.max(1, m.stakes_in), pot = m.stake * players;
+  const { winnerId, behind } = standings(m, seats);
+  if (winnerId !== null) out.set(winnerId, prizeAt(0, pot, m.stake, players));
+  let claimed = 0;
+  for (let i = 0; i < behind.length && i < PLACES_FROM - 1; i++) {
+    const prize = prizeAt(i + 1, pot, m.stake, players);
+    claimed += prize;
+    out.set(behind[i]!.user_id, prize);
+  }
+  if (m.state === 'done' && winnerId !== null) {
+    const { reserved } = placePrizes(m.stake, players);
+    out.set(winnerId, (out.get(winnerId) ?? 0) + (reserved - claimed));
+  }
+  return out;
+}
+
+/** Everyone who cleared the board, in the order they cleared it. The prize places, and nobody else. */
+const clearedInOrder = (seats: SeatRow[]): SeatRow[] => seats
+  .filter(p => p.ms !== null && p.ms > 0 && p.finished_at !== null)
+  .sort((a, b) => a.finished_at!.getTime() - b.finished_at!.getTime());
+
+/**
+ * Who is standing where. First is the winner the match recorded, not simply whoever is at the head of the
+ * list now: an account deleted mid-match takes its seat row with it, and reading the list alone would promote
+ * everybody behind it by one and pay second place twice. With the winner gone the row is NULL, and then there
+ * is no first to pay — the places behind it are still owed, and what first would have taken is not invented.
+ */
+function standings(m: MatchRow, seats: SeatRow[]): { winnerId: number | null; behind: SeatRow[] } {
+  const order = clearedInOrder(seats);
+  const winnerId = m.paid_at !== null ? m.winner_id : (order[0]?.user_id ?? null);
+  return { winnerId, behind: order.filter(p => p.user_id !== winnerId) };
+}
+
+/** What the player in this place (0-based, by clear order) takes from a pot of this size. */
+function prizeAt(place: number, pot: number, stake: number, players: number): number {
+  const { second, third, reserved } = placePrizes(stake, players);
+  if (place === 0) return pot - reserved;
+  if (place === 1) return second;
+  if (place === 2) return third;
+  return 0;
 }
 
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';   // no I, O, 0 or 1: these get read out loud
@@ -109,6 +187,7 @@ export function roomTier(seats: SeatRow[]): number {
  */
 export function orderPlayers(m: MatchRow, seats: SeatRow[], meId: number | null): PlayerView[] {
   const started = m.started_at ? m.started_at.getTime() : 0;
+  const paid = paidOut(m, seats);
   const rows = seats.map(p => ({
     name: p.name,
     pic: p.pic ?? '',
@@ -116,6 +195,7 @@ export function orderPlayers(m: MatchRow, seats: SeatRow[], meId: number | null)
     ms: p.ms,
     // which of the two ways a run can end without the board being cleared; false on a cleared one
     gave_up: p.ms !== null && p.ms <= 0 && p.gave_up,
+    prize: paid.get(p.user_id) ?? 0,
     race_ms: p.finished_at && p.ms !== null && p.ms > 0 && started ? Math.max(0, p.finished_at.getTime() - started) : null,
     you: meId !== null && p.user_id === meId,
     host: m.host_id !== null && p.user_id === m.host_id,
@@ -159,6 +239,7 @@ export async function matchView(sql: PoolClient | typeof pool, m: MatchRow, meId
     count: players.length,
     seats: config.game.seats,
     pot: m.stake * Math.max(1, m.stakes_in),
+    prizes: (({ second, third }) => ({ second, third }))(placePrizes(m.stake, Math.max(1, m.stakes_in))),
     host: await nameOf(sql, m.host_id, seats),
     you: mine ? (isHost ? 'host' : 'guest') : '',
     can_start: isHost && m.state === 'open' && players.length > 1 && !m.open_to_all,
@@ -357,13 +438,10 @@ export async function settleMatch(c: PoolClient, code: string): Promise<MatchRow
   const seats = await room(c, code);
   if (!seats.length) return m;
 
-  let first: number | null = null, best: number | null = null, everyoneIn = true;
-  for (const p of seats) {
-    if (p.ms === null) { everyoneIn = false; continue; }
-    if (p.ms <= 0) continue;                                     // out of hearts: a place, never the pot
-    const done = p.finished_at ? p.finished_at.getTime() : 0;
-    if (best === null || done < best) { best = done; first = p.user_id; }
-  }
+  const everyoneIn = seats.every(p => p.ms !== null);
+  const players = Math.max(1, m.stakes_in);
+  const pot = m.stake * players;
+  const first = clearedInOrder(seats)[0]?.user_id ?? null;
 
   // paid_at is the guard, not winner_id: an account deletion nulls the foreign key and cascades the payout's
   // ledger row away, which used to make a settled match look unsettled and pay the same pot twice.
@@ -375,9 +453,18 @@ export async function settleMatch(c: PoolClient, code: string): Promise<MatchRow
       `UPDATE matches SET winner_id = $2, winner_name = $3, paid_at = now(), settled_at = now()
         WHERE code = $1 AND state = 'playing' AND paid_at IS NULL`, [code, first, name]);
     if (upd.rowCount === 1) {
-      await give(c, first, m.stake * Math.max(1, m.stakes_in), 'payout', idem.payout(code), code);
+      await give(c, first, prizeAt(0, pot, m.stake, players), 'payout', idem.payout(code), code);
       winner = first; paid = true;
-      log.info('pot paid', { code, winner_id: first, pot: m.stake * Math.max(1, m.stakes_in) });
+      log.info('pot paid', { code, winner_id: first, first: prizeAt(0, pot, m.stake, players), pot, players });
+    }
+  }
+  // Second and third, as they arrive. Each has its own key, so a result that is sent twice pays once, and a
+  // place that never fills is simply never paid.
+  const { winnerId, behind } = standings({ ...m, winner_id: winner, paid_at: paid ? (m.paid_at ?? new Date()) : null }, seats);
+  if (paid) {
+    for (let i = 0; i < behind.length && i < PLACES_FROM - 1; i++) {
+      const prize = prizeAt(i + 1, pot, m.stake, players);
+      if (prize > 0) await give(c, behind[i]!.user_id, prize, 'payout', idem.place(code, behind[i]!.user_id), code);
     }
   }
   if (!everyoneIn) return { ...m, winner_id: winner, paid_at: paid ? (m.paid_at ?? new Date()) : null };
@@ -387,6 +474,15 @@ export async function settleMatch(c: PoolClient, code: string): Promise<MatchRow
   if (closed.rowCount === 1 && !paid) {
     // nobody cleared it: every stake goes back, one refund per player, each with its own key
     for (const p of seats) await give(c, p.user_id, m.stake, 'draw_refund', idem.drawRefund(code, p.user_id), code);
+  }
+  // The room is closed, so a place still empty is a place nobody is coming for: what it was holding goes to
+  // first, which is where it would have gone if the table had been too small for places at all.
+  if (closed.rowCount === 1 && paid && winnerId !== null) {
+    const { reserved } = placePrizes(m.stake, players);
+    let claimed = 0;
+    for (let i = 0; i < behind.length && i < PLACES_FROM - 1; i++) claimed += prizeAt(i + 1, pot, m.stake, players);
+    const left = reserved - claimed;
+    if (left > 0) await give(c, winnerId, left, 'payout', idem.placesLeft(code), code);
   }
   return { ...m, state: closed.rowCount === 1 ? 'done' : m.state, winner_id: winner,
            paid_at: paid ? (m.paid_at ?? new Date()) : null };

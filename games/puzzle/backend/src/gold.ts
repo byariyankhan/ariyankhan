@@ -18,6 +18,10 @@ export const idem = {
   expireRefund: (code: string, userId: number) => `expire_refund:${code}:${userId}`,
   drawRefund: (code: string, userId: number) => `draw_refund:${code}:${userId}`,
   payout: (code: string) => `payout:${code}`,
+  // Second and third place, one key each; and what first takes of a place nobody turned up to claim, once the
+  // room has closed and it is certain nobody will.
+  place: (code: string, userId: number) => `place:${code}:${userId}`,
+  placesLeft: (code: string) => `rest:${code}`,
   league: (season: string, userId: number) => `league:${season}:${userId}`,
   // The day and the claim's number within it. Two requests racing for the same nth claim of the same day
   // collide on the unique index, so a double-tapped button mints once -- and the key doubles as the counter
