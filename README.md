@@ -572,7 +572,7 @@ links.
 - **Lobby world map**: `games/data/world-map.json` (built by
   `games/build-world-map.mjs` from world-atlas 110m, Natural Earth projection,
   1000×520, Antarctica dropped, label point = centroid of the main landmass) is
-  drawn on the home screen by `renderWorld()`: every country faint, the tour
+  drawn on the second card of the home deck by `renderWorld()`: every country faint, the tour
   countries outlined and tappable (opens that level), cleared ones filled green
   and numbered with their level, the next level pulsing purple. The map sits in a
   panel of its own and takes the height it needs; before the first country is
@@ -581,10 +581,35 @@ links.
   Features world-atlas leaves without an id (Kosovo) get `n:<slug>` ids in both
   data files. Versioned with `MAP_VERSION`. There is no Restart button in the game any more (back out or
   fail and retry).
-- **Lobby layout**: purse, title, tagline, **the brain**, the world map panel (the
-  level picker) and its caption, then Play & Discover and Play with Friends. The
-  old cards carousel, the level-path dots and the compact Today's Country / All
-  levels buttons are all gone.
+- **Lobby layout**: purse, title, tagline ("Train your brain."), **the deck**, then
+  Play & Discover and Play with Friends. The old cards carousel, the level-path
+  dots and the compact Today's Country / All levels buttons are all gone.
+- **The deck** (`.aa-deck`, `deckGo`/`deckStart`/`deckStop`): the brain and the
+  world map are two cards and only one is on screen. It turns itself every 4.5 s;
+  the moment the player turns it themselves — a swipe, a dot, an arrow key — it
+  stops turning and stays where they put it. A drag decides on its first 8 px
+  whether it is a swipe or the page scrolling and never does both; a swipe never
+  becomes a tap (a capture-phase click listener swallows the one that ends it), so
+  a country under the finger is not opened by accident, while a plain tap on a
+  country still opens it (only the click within 400 ms of the release is
+  swallowed, so the next real tap — or Enter on a country — is not eaten).
+  Manual turns stop at the ends, the timer wraps. Keyboard and screen reader: the
+  dots come before the card in the DOM (Tab reaches the dots, then the card they
+  choose) and the CSS `order` puts them back underneath; arriving in the deck
+  stops it turning (`focusin`), so nothing moves under somebody reading it; the
+  card leaving is made `inert`, `aria-hidden` and — once the slide is over, which
+  is also how a browser without `inert` keeps Tab out of it — `visibility:hidden`;
+  focus is moved to the dot before a card holding it is hidden; the view is
+  `aria-live` only once the player has taken the deck over; and Alt/Cmd+Arrow is
+  left to the browser. The deck's height
+  is `min(calc(100dvh - 296px), 560px)` — "whatever is left once the top row, the
+  title and the two buttons have had theirs" — which is what keeps the whole home
+  screen on one screen from a 360×560 phone to a tablet, and the two buttons at
+  the bottom where a thumb is. The three tiles under the map (boards, countries,
+  day streak, counted in `renderHomeStats` so a map that failed to load does not
+  leave a hundred-board player looking at three zeroes) are the win card's own
+  tiles. Clearing a board sets `showBrainNext`, so the player comes home to the
+  brain they have just lit rather than to whichever card they left on.
 - **The brain on the home screen** (`renderBrain`, `emblemFor`): a board of this
   game and nothing else — the same rasteriser, the same generator, the same
   arrows in the same line weights — drawn at the difficulty the player is
