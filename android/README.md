@@ -104,3 +104,30 @@ The bundle is about 900 KB, nearly all of it android-browser-helper's dex and th
 launcher icons. There is no native code in it, so the **16 KB page-size
 requirement** that applies to apps targeting Android 15 and up is satisfied by
 having nothing to align.
+
+That build is **unsigned**, which is what you want for looking at the app and not
+what Play accepts. Four environment variables turn the same command into a signed
+one, and they are the only way a key ever reaches this build:
+
+```bash
+PUZZLE_KEYSTORE=/path/to/puzzle-upload.jks \
+PUZZLE_KEYSTORE_PASSWORD=... PUZZLE_KEY_ALIAS=puzzle-upload PUZZLE_KEY_PASSWORD=... \
+PUZZLE_VERSION_CODE=3 PUZZLE_VERSION_NAME=1.0.2 \
+  ./gradlew bundleRelease
+```
+
+`PUZZLE_VERSION_CODE` matters more than it looks: **Play refuses a versionCode it
+has already seen**, and 1 went with the first internal-track upload. A build with
+the variable unset stays at 1 on purpose — usable, and obviously not uploadable.
+
+## Building it in CI instead
+
+`.github/workflows/android-build.yml` does all of the above on a runner: it
+installs SDK 36, takes the version from the run number so it can never repeat,
+signs with a key held in four repository secrets, checks the result really is
+signed, and hands back the bundle as an artifact. The keystore is written to the
+runner's temporary directory and deleted in a step that runs even when the build
+fails.
+
+It does not upload to Play. That would need a service account with release
+rights — a second key to look after, to save one drag and drop.

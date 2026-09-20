@@ -12,9 +12,26 @@ android {
         // Custom Tab, which is not what anybody installed.
         minSdk 23
         targetSdk 36
-        versionCode 1
-        versionName '1.0.0'
+        // Play refuses a versionCode it has already seen, and 1 is spent. CI passes the next one in; a build
+        // run by hand keeps 1, which is fine for looking at the app and wrong for uploading it.
+        versionCode ((System.getenv('PUZZLE_VERSION_CODE') ?: '1') as int)
+        versionName (System.getenv('PUZZLE_VERSION_NAME') ?: '1.0.0')
         resourceConfigurations += ['en']      // the game ships one language; do not carry 80 more
+    }
+
+    // The upload key reaches the build from the environment and from nowhere else. No keystore is in this
+    // repository, none is written into it, and a build with none of these set simply produces an unsigned
+    // bundle — which is what a local `./gradlew bundleRelease` has always produced.
+    signingConfigs {
+        upload {
+            def ks = System.getenv('PUZZLE_KEYSTORE')
+            if (ks) {
+                storeFile file(ks)
+                storePassword System.getenv('PUZZLE_KEYSTORE_PASSWORD')
+                keyAlias System.getenv('PUZZLE_KEY_ALIAS')
+                keyPassword System.getenv('PUZZLE_KEY_PASSWORD')
+            }
+        }
     }
 
     buildTypes {
@@ -24,7 +41,7 @@ android {
             shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             // Signed where the key is — Play App Signing holds the real one, and no keystore belongs in git.
-            signingConfig null
+            signingConfig System.getenv('PUZZLE_KEYSTORE') ? signingConfigs.upload : null
         }
     }
 
