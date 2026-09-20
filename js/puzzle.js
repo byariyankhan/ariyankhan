@@ -1952,10 +1952,14 @@
   }
 
   // Asking the network takes a moment, and a moment of nothing at all reads as a button that did not work.
-  function adLooking() {
+  // It is also the one screen the player sees between tapping the plus and the advertisement arriving, so it
+  // is where the bargain is stated: what this is for, in one line, before it starts.
+  function adLooking(earn) {
     const wrap = document.createElement('div');
     wrap.className = 'aa-adtest';
-    wrap.innerHTML = '<div class="aa-adtest-panel"><p class="aa-adtest-tag">Advertisement</p><p class="aa-adtest-name">Looking for one\u2026</p></div>';
+    wrap.innerHTML = `<div class="aa-adtest-panel"><p class="aa-adtest-tag">Advertisement</p>${
+      earn ? `<p class="aa-adtest-why">${escapeHtml(earn)}</p>` : ''
+    }<p class="aa-adtest-name">Looking for one\u2026</p></div>`;
     document.body.appendChild(wrap);
     return wrap;
   }
@@ -1966,14 +1970,14 @@
   // failed load, a request something blocked -- comes back as itself and grants nothing. This function has no
   // consolation path on purpose: a reward handed out for an advertisement that did not run is an advertisement
   // we were paid nothing for and a promise to the player that was not kept.
-  async function adShow(name) {
+  async function adShow(name, earn = '') {
     if (!ads.ready()) return 'unavailable';
     ads.showing = true;
     const wasMusic = music.on;
     try {
       if (wasMusic) musicStop();                     // an ad has its own sound; the pad does not talk over it
-      if (ads.mode === 'test') return await adTestShow(name);
-      const looking = adLooking();
+      if (ads.mode === 'test') return await adTestShow(name, 'Test advertisement', earn);
+      const looking = adLooking(earn);
       const shut = () => looking.remove();
       try { return await adH5Show(name, shut); } finally { shut(); }
     } finally {
@@ -1985,33 +1989,23 @@
   // What each kind of reward is, in one table: what to call it, what the ad is named in the network's own
   // reporting, and what happens when it is earned. Gold is the odd one out and says so -- it is the only one
   // the client cannot grant, because gold is real and the server is the only thing allowed to make it.
+  // `earn` is the line the advertisement panel carries while it is fetching one: what this is for, said before
+  // it starts rather than in a sheet the player had to get past first.
   const AD_REWARD = {
     heart: {
-      title: 'One more heart',
-      lead: 'Watch a short advertisement through and carry on with this board from where it stopped, with one heart.',
-      cta: 'Watch for a heart',
+      earn: 'Watch this through and the board carries on where it stopped, with one heart.',
       grant() { state.lives = 1; state.finished = false; state.busy = false; el.overlay.hidden = true; renderHud(); startTimer(); heartLost(); toast('One heart. Make it count.', 'good'); },
     },
     hint: {
-      title: 'One more hint',
-      lead: 'Watch a short advertisement through for one more hint on this board.',
-      cta: 'Watch for a hint',
-      // The hint is added, and nothing else. It used to light the arrow up the moment the advertisement closed,
-      // which put a 2.5-second glow on screen while the player was still watching the ad panel disappear -- the
-      // thing they had just spent half a minute on, missed. An advertisement buys the item; using it is a tap,
-      // like every other hint.
+      earn: 'Watch this through for one more hint on this board.',
       grant(quiet) { state.hintsMax = (state.hintsMax ?? HINTS_PER_LEVEL) + 1; renderHud(); if (!quiet) toast('One more hint.', 'good'); },
     },
     check: {
-      title: `One more ${CHECK_WORD}`,
-      lead: `Watch a short advertisement through for one more ${CHECK_WORD} on this board.`,
-      cta: `Watch for a ${CHECK_WORD}`,
+      earn: `Watch this through for one more ${CHECK_WORD} on this board.`,
       grant() { state.checksMax = (state.checksMax ?? CHECKS_PER_LEVEL) + 1; renderHud(); toast(`One more ${CHECK_WORD}.`, 'good'); },
     },
     gold: {
-      title: 'Gold for an advertisement',
-      lead: 'Watch a short advertisement through and the gold is added to your purse.',
-      cta: 'Watch for gold',
+      earn: 'Watch this through and the gold goes to your purse.',
       needsAccount: true,
       async grant() { await adClaimGold(); },
     },
@@ -2055,54 +2049,42 @@
     }));
   }
 
+  // Tapping the plus is the whole transaction. It used to raise a sheet first — a title, a paragraph, a
+  // "Watch for a hint" and a "No thanks" — which is a second decision about a decision the player had already
+  // made by reaching for an empty counter. The advertisement starts on the tap now, and the line it was worth
+  // reading in that sheet rides on the advertisement's own panel instead, where it is in front of the player
+  // for the whole wait rather than for as long as it takes to press a button.
+  //
+  // What is not lost by skipping it: the reward is still named before anything plays, the advertisement is
+  // still started by the player's own tap on a control that says what it is for, and nothing is granted for an
+  // advertisement that did not run through.
   async function adOffer(kind, note, quiet = false) {
     const R = AD_REWARD[kind];
     if (!R || ads.showing) return;
     if (R.needsAccount && !auth.user) { openSignIn('Sign in first, so the gold has a purse to go into.'); return; }
-    // With advertising off there is no advertisement to agree to and nothing to sit through, so the sheet was
-    // asking the player to confirm that yes, they would like the free thing they had just asked for: two taps
-    // for one hint. The plus is the whole transaction now, and the toast every grant already raises is what
-    // says the hint arrived.
-    //
-    // The sheet comes back the day advertising does, and not out of politeness. A rewarded advertisement has
-    // to be opted into with the reward named before it plays, and a bare plus is not that opt-in — so this
-    // branch is the free lifeline's alone, and turning ads on restores the ask by itself.
-    if (!ads.isAd()) {
-      ads.showing = true;                       // gold's grant goes to the server; a second tap is not a second reward
-      try { await R.grant(quiet); } finally { ads.showing = false; }
-      return true;                              // and the caller may spend it straight away
-    }
-    const wrap = document.createElement('div');
-    wrap.className = 'aa-adoffer';
-    wrap.innerHTML = `<div class="aa-adoffer-panel" role="dialog" aria-modal="true" aria-labelledby="aaAdTitle">
-      <h3 id="aaAdTitle">${escapeHtml(R.title)}</h3>
-      <p>${escapeHtml(note || R.lead)}</p>
-      ${state.daily?.race ? '<p class="aa-adoffer-note">The match clock keeps running while it plays.</p>' : ''}
-      <div class="aa-actions aa-actions--stack">
-        <button type="button" class="aa-btn aa-btn--primary" data-ad="go">${ICON_AD}${escapeHtml(R.cta)}</button>
-        <button type="button" class="aa-btn" data-ad="no">No thanks</button>
-      </div>
-    </div>`;
-    document.body.appendChild(wrap);
-    const close = () => wrap.remove();
-    wrap.addEventListener('click', async e => {
-      if (e.target === wrap) { close(); return; }
-      const act = e.target.closest('[data-ad]')?.dataset.ad;
-      if (!act) return;
-      if (act === 'no') { close(); return; }
-      const btn = e.target.closest('[data-ad]');
-      btn.disabled = true;
-      const how = await adShow(`${PRODUCT_AD}-${kind}`);
-      close();
+
+    if (ads.isAd()) {
+      // A match does not pause for this, and a player about to spend half a minute on an advertisement is owed
+      // that before it starts, not after.
+      const earn = `${note || R.earn}${state.daily?.race ? ' The match clock keeps running while it plays.' : ''}`;
+      const how = await adShow(`${PRODUCT_AD}-${kind}`, earn);
       // Watched through, or nothing. There is no third answer, and each of the others says which one it was.
       if (how !== 'watched') {
         toast(how === 'dismissed' ? 'The advertisement was not watched through, so nothing was added.'
           : 'No advertisement was available, so nothing was added. Try again in a moment.', 'hint', 3200);
         return;
       }
-      await R.grant();
-    });
-    $('[data-ad]', wrap)?.focus({ preventScroll: true });
+      // The network's panel is still tearing itself down as this resolves, and a 2.5-second hint glow behind it
+      // is a hint the player never sees. A breath first, then the reward.
+      await new Promise(r => setTimeout(r, 400));
+      await R.grant(quiet);
+      return true;
+    }
+
+    // Advertising off: there is nothing to watch and nothing to agree to, so the tap simply pays out.
+    ads.showing = true;                         // gold's grant goes to the server; a second tap is not a second reward
+    try { await R.grant(quiet); } finally { ads.showing = false; }
+    return true;
   }
   const PRODUCT_AD = 'puzzle';
 

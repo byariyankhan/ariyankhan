@@ -415,19 +415,16 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-ask-panel p{ margin:0 0 18px; color:var(--muted); font-size:15px; line-height:1.45; font-weight:700; }
 @keyframes aa-pop{ from{ opacity:0; transform:translateY(8px) scale(.97); } to{ opacity:1; transform:none; } }
 @media(prefers-reduced-motion:reduce){ .aa-ask, .aa-ask-panel{ animation:none; } }
-.aa-adoffer, .aa-adtest{ position:fixed; inset:0; z-index:90; display:flex; align-items:center; justify-content:center; padding:20px;
+.aa-adtest{ position:fixed; inset:0; z-index:90; display:flex; align-items:center; justify-content:center; padding:20px;
   background:color-mix(in srgb, var(--ink) 55%, transparent); }
-.aa-adoffer-panel, .aa-adtest-panel{ width:100%; max-width:380px; padding:22px; border-radius:20px; background:var(--panel); text-align:center;
+.aa-adtest-panel{ width:100%; max-width:380px; padding:22px; border-radius:20px; background:var(--panel); text-align:center;
   box-shadow:0 18px 50px rgba(0,0,0,.28); }
-.aa-adoffer-panel h3{ margin:0 0 8px; font-size:20px; }
-.aa-adoffer-panel p{ margin:0 0 16px; color:var(--muted); font-size:15px; line-height:1.45; }
-/* what an advertisement costs in a match, where the clock is somebody else's too */
-.aa-adoffer-panel .aa-adoffer-note{ margin:-10px 0 16px; font-size:13px; font-weight:800; color:var(--hard); }
 .aa-adtest-tag{ margin:0; font-size:11px; font-weight:800; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); }
-.aa-adtest-name{ margin:6px 0 0; font-size:13px; color:var(--muted); }
-.aa-adtest-why{ margin:8px 0 0; font-size:13px; line-height:1.45; color:var(--ink); }
+/* what the advertisement is for, read while it is being fetched rather than in a sheet ahead of it */
+.aa-adtest-why{ margin:10px 0 0; font-size:15px; font-weight:800; line-height:1.45; color:var(--ink); }
+.aa-adtest-name{ margin:8px 0 0; font-size:13px; color:var(--muted); }
 .aa-adtest-count{ margin:14px 0; font-size:44px; font-weight:900; color:var(--ink); font-variant-numeric:tabular-nums; }
-@media(prefers-reduced-motion:reduce){ .aa-adoffer, .aa-adtest{ animation:none; } }
+@media(prefers-reduced-motion:reduce){ .aa-adtest{ animation:none; } }
 /* A board needs air around it. Some countries are long and thin and some fill a phone corner to corner, and
    an arrow sitting on the edge of the glass is one the thumb cannot reach without the palm covering half the
    board. So the frame keeps a margin on every side, and a little more at the bottom, where the phone's own
