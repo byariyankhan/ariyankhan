@@ -2366,6 +2366,24 @@
         push.on = false;
         toast('Notifications off on this device.', 'hint');
       } else {
+        // Say what this is for before the browser asks. Its own dialog is a system one -- it names the origin
+        // rather than the game, it cannot be restyled or reworded, and there is no version of it that says
+        // "Puzzle". What it can be given is context, so the player is not reading "ariyankhan.com wants to
+        // send you notifications" cold and guessing what for.
+        //
+        // The second reason matters more. That dialog is a single shot: tap Block and web push is off for
+        // this origin until the player digs into browser settings to undo it, and nothing in the game can
+        // ask again. Anyone who is not sure should be able to say no here, where no costs nothing.
+        if (Notification.permission === 'default' &&
+            !(await ask({
+              title: 'Turn on notifications?',
+              body: 'Two things only: a friend inviting you to a board, and the league paying out at the end '
+                  + 'of the week. Nothing else, ever.\n\nYour browser will ask next, and it will show the '
+                  + 'site\u2019s address rather than the game\u2019s name \u2014 that is the browser\u2019s own dialog, '
+                  + 'and it works the same for every site.',
+              ok: 'Ask me',
+              cancel: 'Not now',
+            }))) { push.on = false; renderNotify(); return; }
         const permission = await Notification.requestPermission();
         if (permission !== 'granted') { push.on = false; renderNotify(); toast(permission === 'denied' ? 'Your browser is blocking notifications for this site.' : 'Notifications stay off.', 'hint'); return; }
         const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlB64ToBytes(push.key) });
