@@ -1,0 +1,4 @@
+# Authorised Digital Sellers for ariyankhan.com — https://iabtechlab.com/ads-txt/
+# One seller: Google, selling directly, under this site's own AdSense publisher ID.
+# f08c47fec0942fa0 is Google's TAG certification id and is the same for every publisher.
+google.com, pub-1570944160084395, DIRECT, f08c47fec0942fa0
