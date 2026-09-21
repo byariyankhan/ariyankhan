@@ -24,14 +24,20 @@
          itself an advertisement: it is a free lifeline and it says so, in the game and in the policy.
 
          ON APPROVAL: change data-give to "ad", or delete the attribute. That is the whole switch.
-         The publisher id is read from the AdSense tag above. (Plain AdSense does not serve rewarded ads; H5
-         Games Ads, requested from the same account, is the one that does.) content="off" sleeps all of it. -->
+         (Plain AdSense does not serve rewarded ads; H5 Games Ads, requested from the same account, is the one
+         that does.) content="off" sleeps all of it.
+
+         data-client is the publisher id, and it has to be written here. adsConfigure() used to read it off the
+         AdSense script tag, back when the page carried one; that tag was removed to save 655 KB on every cold
+         start, and nobody noticed that it had taken the publisher id with it. Without this attribute the
+         switch above flips and nothing happens at all — no tag built, no break requested, no error — which is
+         the worst way for a thing to be broken. -->
     <!-- data-admob-*: the AdMob ad unit ids, used only when the game is running inside the Android app.
          The same AdSense tag asks for the same breaks either way; these decide who answers. Empty until the
          AdMob account has them, and then they are just pasted in — nothing else changes.
          They look like ca-app-pub-0000000000000000/0000000000 (a slash, where the app id has a tilde). -->
-    <meta name="puzzle-ads" content="h5" data-give="free"
-          data-admob-rewarded="" data-admob-interstitial="" />
+    <meta name="puzzle-ads" content="h5" data-give="free" data-client="ca-pub-1570944160084395"
+          data-admob-rewarded="ca-app-pub-1570944160084395/3154222428" data-admob-interstitial="" />
     <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-8ZPSNG5X37"></script>
     <script>
@@ -402,6 +408,6 @@
       </div>
     </div>
 
-    <script src="/js/puzzle.js?v=35"></script>
+    <script src="/js/puzzle.js?v=36"></script>
   </body>
 </html>
