@@ -507,8 +507,20 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-splash.is-out{ animation:aa-out .25s ease-in forwards; }
 .aa-splash-inner{ gap:36px; max-width:360px; }
 /* The mark sits on its own card. The three-colour arrow rules that used to be here went with the three arrows. */
-.aa-splash-logo{ width:116px; height:116px; border-radius:30px; background:#fff; box-shadow:0 10px 30px rgba(0,0,0,.10); display:grid; place-items:center; overflow:hidden; }
+/* The mark sits on the page, not on a card.
+
+   It used to be a white rounded square with a shadow — an app icon, drawn inside an app that was already
+   open. On the website it was merely odd; in the Android app it was a flash of white, because the app's own
+   splash is the same brain on the same cream with nothing behind it, so the moment the page painted, a white
+   tile appeared under the logo and then vanished again. Two splashes that look alike hand over invisibly.
+   It was also hardcoded #fff, which would have been a white tile on black once the night theme was on. */
+.aa-splash-logo{ width:116px; height:116px; display:grid; place-items:center; }
 .aa-splash-logo img{ width:104px; height:104px; display:block; }
+/* The mark is one colour, #2E2016, which the white card used to sit behind. Without the card it is a dark
+   drawing on a dark screen once the night theme is on, and all but invisible. Inverting flips its lightness
+   and the hue rotation puts the warmth back, so it lands near the night theme's own off-white rather than on
+   the pale blue a bare invert would give. Only night needs it: paper and mint are both light. */
+:root[data-theme="night"] .aa-splash-logo img{ filter:invert(1) hue-rotate(180deg); }
 .aa-splash-quote{ font-size:21px; line-height:1.4; color:var(--muted); margin:16px 0 0; width:100%; text-align:left; font-weight:700; }
 .aa-splash-by{ font-size:17px; color:var(--muted); margin:-22px 0 0; width:100%; text-align:right; font-weight:700; }
 /* ── Sideways ──────────────────────────────────────────────────────────────────────────────────────
