@@ -5,6 +5,8 @@ import android.content.Intent;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.View;
 import android.webkit.CookieManager;
 import android.webkit.WebResourceError;
@@ -22,6 +24,25 @@ import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
+import androidx.credentials.CredentialManager;
+import androidx.credentials.CredentialManagerCallback;
+import androidx.credentials.CustomCredential;
+import androidx.credentials.GetCredentialRequest;
+import androidx.credentials.GetCredentialResponse;
+import androidx.credentials.exceptions.GetCredentialCancellationException;
+import androidx.credentials.exceptions.GetCredentialException;
+import androidx.credentials.exceptions.NoCredentialException;
+import androidx.webkit.JavaScriptReplyProxy;
+import androidx.webkit.WebViewCompat;
+import androidx.webkit.WebViewFeature;
+
+import com.google.android.libraries.identity.googleid.GetGoogleIdOption;
+import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential;
+
+import org.json.JSONException;
+import org.json.JSONObject;
+
+import java.util.Collections;
 
 /**
  * The game, in a window this app owns.
@@ -90,6 +111,8 @@ public final class MainActivity extends ComponentActivity {
         };
         getOnBackPressedDispatcher().addCallback(this, back);
         web.setWebViewClient(new Client(back));
+
+        installBridge(web);
 
         if (state == null) web.loadUrl(target(getIntent()));
     }
@@ -235,6 +258,120 @@ public final class MainActivity extends ComponentActivity {
         // The same 240ms the Trusted Web Activity faded over, so the way in looks no different than before.
         splash.animate().alpha(0f).setDuration(240)
                 .withEndAction(() -> splash.setVisibility(View.GONE)).start();
+    }
+
+    // ── The bridge ────────────────────────────────────────────────────────────────────────────────────
+    //
+    // window.PuzzleShell in the page, with postMessage and onmessage. Deliberately not
+    // addJavascriptInterface: that injects the object into every frame in the WebView, including the
+    // advertisements' iframes once they arrive, and this bridge is going to be carrying a sign-in token today
+    // and a purchase later. addWebMessageListener takes origin rules, so only our own page ever sees it.
+    //
+    // Where the feature is missing — a System WebView older than about 2021 — no bridge is installed, nothing
+    // throws, and the page keeps saying sign-in is not in the app yet, which is then true.
+
+    private void installBridge(WebView v) {
+        if (!WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) return;
+        WebViewCompat.addWebMessageListener(v, "PuzzleShell",
+                Collections.singleton("https://" + getString(R.string.host)),
+                (view, message, sourceOrigin, isMainFrame, reply) -> {
+                    if (!isMainFrame) return;
+                    String cmd = message.getData();
+                    if ("signIn".equals(cmd)) signIn(reply);
+                    else if ("hello".equals(cmd)) answer(reply, ok("signIn", true));
+                });
+    }
+
+    /**
+     * Ask Google for an ID token, natively, and hand it to the page.
+     *
+     * <p>The page cannot do this itself: Google blocks its OAuth endpoint in an embedded WebView and answers
+     * disallowed_useragent. What comes back here is the same shape of thing the browser's own sign-in returns
+     * — an ID token whose audience is the web client — so the page posts it to the endpoint it always used and
+     * the server checks it the way it always did.
+     */
+    private void signIn(JavaScriptReplyProxy reply) {
+        GetCredentialRequest request;
+        try {
+            request = new GetCredentialRequest.Builder()
+                    .addCredentialOption(new GetGoogleIdOption.Builder()
+                            // Show every account on the phone, not only ones that have used this app before:
+                            // the first sign-in is the one that matters and it has no history to filter by.
+                            .setFilterByAuthorizedAccounts(false)
+                            .setServerClientId(getString(R.string.google_web_client_id))
+                            .setAutoSelectEnabled(false)
+                            .build())
+                    .build();
+        } catch (RuntimeException wrongShape) {
+            answer(reply, fail("failed"));
+            return;
+        }
+        try {
+            CredentialManager.create(this).getCredentialAsync(
+                    this, request, null, Runnable::run,
+                    new CredentialManagerCallback<GetCredentialResponse, GetCredentialException>() {
+                        @Override public void onResult(GetCredentialResponse response) {
+                            String token = tokenOf(response);
+                            answer(reply, token == null ? fail("failed") : ok("idToken", token));
+                        }
+
+                        @Override public void onError(GetCredentialException e) {
+                            answer(reply, fail(
+                                    e instanceof GetCredentialCancellationException ? "cancelled"
+                                            : e instanceof NoCredentialException ? "no_account"
+                                            : "failed"));
+                        }
+                    });
+        } catch (RuntimeException noPlayServices) {
+            // A phone without Play services cannot do this at all, and saying so beats hanging.
+            answer(reply, fail("unavailable"));
+        }
+    }
+
+    private static String tokenOf(GetCredentialResponse response) {
+        try {
+            if (!(response.getCredential() instanceof CustomCredential)) return null;
+            CustomCredential c = (CustomCredential) response.getCredential();
+            if (!GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL.equals(c.getType())) return null;
+            return GoogleIdTokenCredential.createFrom(c.getData()).getIdToken();
+        } catch (RuntimeException notOne) {
+            return null;
+        }
+    }
+
+    private static JSONObject ok(String key, Object value) {
+        return body(true, key, value);
+    }
+
+    private static JSONObject fail(String error) {
+        return body(false, "error", error);
+    }
+
+    /** Built rather than concatenated, so a token can never carry a quote into the page's JSON.parse. */
+    private static JSONObject body(boolean ok, String key, Object value) {
+        JSONObject o = new JSONObject();
+        try {
+            o.put("ok", ok);
+            if (key != null) o.put(key, value);
+        } catch (JSONException impossible) {
+            // The keys are literals; the values are a boolean and a string.
+        }
+        return o;
+    }
+
+    /**
+     * Reply on the main thread, because the credential callback does not arrive on it, and swallow whatever
+     * a reply to a page that has since navigated away throws. Nothing here is worth an app.
+     */
+    private void answer(JavaScriptReplyProxy reply, JSONObject body) {
+        String json = body.toString();
+        new Handler(Looper.getMainLooper()).post(() -> {
+            try {
+                reply.postMessage(json);
+            } catch (RuntimeException pageIsGone) {
+                // The player closed the sheet, or the page reloaded. There is nobody to tell.
+            }
+        });
     }
 
     private final class Client extends WebViewClient {

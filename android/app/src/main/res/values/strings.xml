@@ -11,4 +11,15 @@
     <string name="offline_title">No connection</string>
     <string name="offline_body">Puzzle needs the network the first time it opens. After that it plays offline.</string>
     <string name="offline_retry">Try again</string>
+    <!-- The Web OAuth client, and deliberately the web one: Credential Manager is told this as its
+         serverClientId, which makes it the audience of the ID token it returns — and the audience is exactly
+         what the server compares against its own GOOGLE_CLIENT_ID. So the app signs in through the endpoint
+         the browser already uses and the server needs no change at all.
+
+         The Android client IDs are not here and are not needed in code. They exist in the same Cloud project
+         so that Google can check the package name and signing certificate of whatever is asking; nothing
+         references them.
+
+         Not a secret. The site serves this same value from /api/puzzle/v1/auth/me to every visitor. -->
+    <string name="google_web_client_id" translatable="false">83384024830-f7bt8g5amgo21e6pmonr4ssjrq02vhg4.apps.googleusercontent.com</string>
 </resources>

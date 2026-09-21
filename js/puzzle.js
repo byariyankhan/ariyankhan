@@ -45,7 +45,31 @@
   // The agent string is the signal because there is no JavaScript bridge yet and nothing here needs one. It is
   // also the safer of the two: a suffix the shell appends to its own agent cannot be read by a third-party
   // frame, which an injected object in a WebView can be, and the frames arrive with the advertisements.
-  const shell = { on: / PuzzleApp\/\d/.test(navigator.userAgent) };
+  const shell = {
+    on: / PuzzleApp\/\d/.test(navigator.userAgent),
+    // window.PuzzleShell is put there by the app, and only on this origin: it is injected with
+    // addWebMessageListener and an origin rule, not addJavascriptInterface, so an advertisement's iframe
+    // cannot reach it. Absent on an old System WebView, where the feature does not exist — hence a function
+    // and not a flag, because it appears as the page loads rather than before it.
+    bridge: () => window.PuzzleShell || null,
+    /**
+     * Ask the app something and wait for its answer. One question at a time, which is all this is ever asked
+     * for: signing in is modal, and nothing else uses the bridge yet. Every failure resolves rather than
+     * throws, so a caller never has to guess whether a rejection was the app or its own bug, and the timeout
+     * is long because the answer is behind a system dialog somebody has to read.
+     */
+    ask(cmd, ms = 180000) {
+      return new Promise(resolve => {
+        const b = shell.bridge();
+        if (!b) { resolve({ ok: false, error: 'no_bridge' }); return; }
+        let done = false;
+        const finish = d => { if (done) return; done = true; clearTimeout(timer); b.onmessage = null; resolve(d); };
+        const timer = setTimeout(() => finish({ ok: false, error: 'timeout' }), ms);
+        b.onmessage = e => { let d; try { d = JSON.parse(e.data); } catch { d = { ok: false, error: 'bad_reply' }; } finish(d); };
+        try { b.postMessage(cmd); } catch { finish({ ok: false, error: 'no_bridge' }); }
+      });
+    },
+  };
   const store = {
     get(k, fb) { try { const v = localStorage.getItem(STORE + k); return v == null ? fb : JSON.parse(v); } catch { return fb; } },
     set(k, v) { try { localStorage.setItem(STORE + k, JSON.stringify(v)); } catch { /* ignore */ } },
@@ -2168,9 +2192,9 @@
     if (el.googleBtn) el.googleBtn.innerHTML = '';
     if (el.signInNote) { el.signInNote.hidden = true; el.signInNote.textContent = ''; }
     openSheet(el.signInSheet);
-    // In the app there is no button to draw: Google will not run its sign-in in a WebView, and one that opened
-    // a browser tab the game never hears back from would be a dead end dressed as a door.
-    if (shell.on) signInNote('Signing in is not in the app yet. Every board plays without an account, and the gold is waiting when it lands.');
+    // Google will not run its own sign-in inside a WebView — it answers disallowed_useragent — so in the app
+    // the button is ours and the token is fetched natively on the other side of the bridge.
+    if (shell.on) renderShellButton();
     else if (auth.providers.google) loadGis();
     else signInNote('Sign-in is being switched on. Until then, a challenge link you were sent still works without an account.');
   }
@@ -2194,6 +2218,42 @@
       google.accounts.id.renderButton(box, { theme: 'outline', size: 'large', shape: 'pill', text: 'continue_with', width: 260 });
     } catch { signInNote('Google sign-in could not start. Please try again.'); }
   }
+  /**
+   * The app's sign-in button, drawn only where it can work.
+   *
+   * What comes back over the bridge is the same kind of ID token Google's own button produces in a browser —
+   * minted for the web client, because that is what the app passes as its serverClientId — so it is handed to
+   * exactly the same function, posted to exactly the same endpoint, and checked by a server that needed no
+   * change to accept it.
+   */
+  function renderShellButton() {
+    const box = el.googleBtn;
+    if (!box) return;
+    if (!shell.bridge()) {
+      // An Android System WebView too old for web message listeners. Nothing to press.
+      signInNote('Signing in is not in the app yet. Every board plays without an account, and the gold is waiting when it lands.');
+      return;
+    }
+    box.innerHTML = '<button type="button" class="aa-btn aa-btn--primary aa-signin-app" id="aaShellGoogle">Continue with Google</button>';
+    $('#aaShellGoogle', box)?.addEventListener('click', shellSignIn);
+  }
+
+  async function shellSignIn() {
+    const btn = $('#aaShellGoogle');
+    if (btn) { btn.disabled = true; btn.textContent = 'Asking Google…'; }
+    if (el.signInNote) { el.signInNote.hidden = true; el.signInNote.textContent = ''; }
+    let d;
+    try { d = await shell.ask('signIn'); } catch { d = { ok: false, error: 'failed' }; }
+    if (btn) { btn.disabled = false; btn.textContent = 'Continue with Google'; }
+    if (d.ok && d.idToken) { await onGoogleCredential({ credential: d.idToken }); return; }
+    // Cancelling is an answer, not a fault, and it gets no scolding.
+    if (d.error === 'cancelled') return;
+    signInNote(
+      d.error === 'no_account' ? 'No Google account on this phone yet. Add one in Android settings, then try again.'
+      : d.error === 'unavailable' ? 'This phone cannot sign in with Google — it has no Play services.'
+      : 'That sign-in did not go through. Please try again.');
+  }
+
   async function onGoogleCredential(res) {
     try {
       const d = await authApi('google', { credential: res?.credential || '' });
