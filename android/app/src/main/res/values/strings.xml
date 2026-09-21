@@ -22,4 +22,13 @@
 
          Not a secret. The site serves this same value from /api/puzzle/v1/auth/me to every visitor. -->
     <string name="google_web_client_id" translatable="false">83384024830-f7bt8g5amgo21e6pmonr4ssjrq02vhg4.apps.googleusercontent.com</string>
+
+    <!-- ⚠️ STILL GOOGLE'S TEST APP ID. Replace with the real one before anything is uploaded to Play.
+         AdMob → your app → App settings → App ID, and it looks like ca-app-pub-0000000000000000~0000000000.
+
+         It has to be here at all because the Mobile Ads SDK reads it out of the manifest at startup and
+         *crashes the app on launch* if it is missing or malformed — by design, so the mistake is found in
+         development rather than in the store. Google's own test id is what that development is done against:
+         clicking a real advertisement of your own is invalid traffic, and invalid traffic costs the account. -->
+    <string name="admob_app_id" translatable="false">ca-app-pub-3940256099942544~3347511713</string>
 </resources>

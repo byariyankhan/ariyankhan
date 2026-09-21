@@ -36,6 +36,23 @@
         android:appCategory="game"
         android:enableOnBackInvokedCallback="true">
 
+        <!-- The Mobile Ads SDK reads both of these at startup.
+
+             APPLICATION_ID is not optional and not lenient: absent or malformed and the SDK throws on launch,
+             deliberately, so that it is found here rather than by a player. It is still Google's test id; see
+             strings.xml.
+
+             INTEGRATION_MANAGER is what makes this app's AdMob an H5 integration rather than a native one. It
+             says: do not expect native ad views in this app, expect a WebView that will be registered, and
+             serve the ads the game's own AdSense tag asks for from AdMob's demand instead of AdSense's. That
+             is the whole reason the app owns its WebView. -->
+        <meta-data
+            android:name="com.google.android.gms.ads.APPLICATION_ID"
+            android:value="@string/admob_app_id" />
+        <meta-data
+            android:name="com.google.android.gms.ads.INTEGRATION_MANAGER"
+            android:value="webview" />
+
         <!-- configChanges is the difference between a rotation costing nothing and a rotation throwing the
              board away. Without it Android destroys and rebuilds the activity, and a rebuilt WebView starts
              the page again: saveState() restores a URL and a history list, never the running JavaScript. The

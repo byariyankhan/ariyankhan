@@ -1884,6 +1884,7 @@
     mode: 'off',
     give: 'ad',
     client: '',
+    admob: { rewarded: '', interstitial: '' },
     showing: false,
     ready() { return this.mode !== 'off' && !this.showing; },
     on() { return this.mode !== 'off'; },
@@ -1893,6 +1894,14 @@
     const meta = document.querySelector('meta[name="puzzle-ads"]');
     let mode = (meta?.content || 'off').trim();
     ads.client = (meta?.dataset.client || '').trim();
+    // AdMob's ad unit ids, for when the game is running inside the app. They are not an alternative to the
+    // AdSense tag — the same tag asks for the same breaks — they are what decides who answers: AdMob's demand
+    // instead of AdSense's, which is the only arrangement Google's H5 guide calls policy compliant for a game
+    // embedded in an app you own. Empty until the AdMob account has them; the browser never uses them.
+    ads.admob = {
+      rewarded: (meta?.dataset.admobRewarded || '').trim(),
+      interstitial: (meta?.dataset.admobInterstitial || '').trim(),
+    };
     // The test mode is a developer's switch, not a URL anybody can find: on the live site it needs a flag set
     // by hand on that device first. The server's daily cap is the real defence either way -- it can only ever
     // hand out a few hundred gold a day, whatever the page claims to have shown -- but a free-gold link in a
@@ -1916,6 +1925,13 @@
       const sc = document.createElement('script');
       sc.async = true; sc.crossOrigin = 'anonymous';
       sc.dataset.adFrequencyHint = '30s';
+      // Only in the app, and only if there is something to put there. In a browser these attributes mean
+      // nothing, and leaving them off keeps the page that is serving real visitors today byte for byte the
+      // one that has been proven to work.
+      if (shell.on) {
+        if (ads.admob.rewarded) sc.dataset.admobRewardedSlot = ads.admob.rewarded;
+        if (ads.admob.interstitial) sc.dataset.admobInterstitialSlot = ads.admob.interstitial;
+      }
       sc.src = `https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${encodeURIComponent(ads.client)}`;
       document.head.appendChild(sc);
     }

@@ -194,12 +194,46 @@ directory and deleted in a step that runs even when the build fails.
 It does not upload to Play. That would need a service account with release rights — a second key to look
 after, to save one drag and drop.
 
+## AdMob
+
+`MobileAds.registerWebView(web)` in `MainActivity`, and two manifest meta-data entries the SDK reads at
+startup: `APPLICATION_ID`, and `INTEGRATION_MANAGER` set to `webview` — the second is what tells AdMob this is
+an H5 integration and not a native one.
+
+Nothing in this app draws an advertisement. The game's own Ad Placement API tag still asks for the breaks;
+what the registration changes is who answers — AdMob's demand rather than AdSense's, which is the only
+arrangement Google's H5 guide calls policy compliant for a game embedded in an app you own. The ad unit ids
+travel the other way, from `meta[name=puzzle-ads]` in the page onto that tag as `data-admob-rewarded-slot` and
+`data-admob-interstitial-slot`, and only when the page can see it is in the app.
+
+**`APPLICATION_ID` is still Google's test id**, in `strings.xml`, and it is not optional: the SDK throws on
+launch if it is missing or malformed, by design. Clicking a real advertisement of your own is invalid traffic
+and invalid traffic costs the account, so development is done against the test ids and the real ones go in
+last.
+
+### What the SDK changes about the Play listing
+
+It merges these into the manifest whether or not an advertisement is ever shown:
+
+```
+com.google.android.gms.permission.AD_ID
+android.permission.ACCESS_ADSERVICES_AD_ID
+android.permission.ACCESS_ADSERVICES_ATTRIBUTION
+android.permission.ACCESS_ADSERVICES_TOPICS
+android.permission.ACCESS_NETWORK_STATE
+android.permission.FOREGROUND_SERVICE
+android.permission.WAKE_LOCK
+```
+
+`AD_ID` is the one that matters. The **Advertising ID** declaration under App content, and the advertising id
+row in **Data safety**, were both answered *no* when this app had no advertising SDK in it. With one, both
+answers are yes, and an upload that says otherwise is a false declaration.
+
 ## What is not here yet
 
 In the order it is meant to arrive:
 
-1. **AdMob.** `registerWebView`, an interstitial and a rewarded ad unit, and the two
-   `data-admob-*-slot` attributes on the Ad Placement API tag the game already loads.
+1. **The real ad ids**, and H5 Games Ads approved for the domain so `data-give` can go from `free` to `ad`.
 2. **Play Billing.** Consumable products for hints and lifelines, verified server-side, acknowledged inside
    three days or Play refunds them, and clawed back through the Voided Purchases API when somebody refunds a
    purchase they have already spent.
