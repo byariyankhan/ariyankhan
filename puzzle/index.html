@@ -95,7 +95,7 @@
          set these two when the backend moves to a host of its own and the client follows without a change:
          <meta name="puzzle-api" content="https://api.example.com" />
          <meta name="puzzle-ws"  content="wss://api.example.com" /> -->
-    <link rel="stylesheet" href="/css/puzzle.css?v=23" />
+    <link rel="stylesheet" href="/css/puzzle.css?v=24" />
     <link rel="preload" href="/games/data/puzzle.json?v=11" as="fetch" crossorigin="anonymous" />
 
     <!-- SCHEMA -->
@@ -164,19 +164,6 @@
           "itemListElement": [
             { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://ariyankhan.com/" },
             { "@type": "ListItem", "position": 2, "name": "Puzzle – Train Your Brain", "item": "https://ariyankhan.com/puzzle" }
-          ]
-        },
-        {
-          "@type": "FAQPage",
-          "@id": "https://ariyankhan.com/puzzle#faq",
-          "mainEntity": [
-            { "@type": "Question", "name": "How do I play Puzzle?", "acceptedAnswer": { "@type": "Answer", "text": "Every arrow slides in the direction it points. Tap one and, if nothing is in its path, it shoots off the board. If another arrow is in the way it stays put and you lose a heart. Clear every arrow to reveal the country underneath, and the card tells you what you cleared." } },
-            { "@type": "Question", "name": "Is it free and do I need an account?", "acceptedAnswer": { "@type": "Answer", "text": "Yes, it is free, and playing on your own needs no account: progress, stars and best times are saved in your own browser and nothing is uploaded. Play with Friends is the one part that asks you to sign in with Google, so the people you play against know who you are; while you are signed in your progress also syncs to your account, and Settings → Delete account removes all of it. The game can also offer you a Google advertisement in exchange for an extra heart, hint, check or gold — always your choice, never inside a puzzle. The Privacy Policy sets both out in full." } },
-            { "@type": "Question", "name": "How does the difficulty work?", "acceptedAnswer": { "@type": "Answer", "text": "It follows you, not the level number. Boards come in five tiers, Easy, Normal, Hard, Expert and Master, from about 20 arrows on Easy to 80 and more on Master. Clear a board flawlessly and fast, no heart lost and no hint, and the next one steps up a tier at once. Two first-try clears in a row step up too, whatever hearts and hints you spent. Lose two boards in a row and they ease off a tier. There is no clock to beat: four hearts, three hints and four checks per level, that is all. A check is a press and hold on any arrow, which says whether its lane is clear without costing you a heart to find out." } },
-            { "@type": "Question", "name": "Can a level become impossible?", "acceptedAnswer": { "@type": "Answer", "text": "No. Boards are generated so that a solution always exists, and removing an arrow can only free space for the others, so whatever order you tap in you can never get stuck. If you are out of ideas, use a hint: it lights up an arrow that is free right now and adds five seconds to your clock. Or press and hold an arrow you are wondering about: four of those a level, and they cost no time at all." } },
-            { "@type": "Question", "name": "Are the puzzles the same for everyone?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. Each level has a fixed layout, so when you share a time on level 12 your friend faces exactly the same board. Choosing “New layout” after a fail gives you a fresh arrangement of the same country. Today's Country is likewise the same bonus board for everyone that day." } },
-            { "@type": "Question", "name": "Why are the countries hidden until I finish?", "acceptedAnswer": { "@type": "Answer", "text": "That is the geography part. The board is the country's real outline and it fades in as you clear arrows, so you are quietly learning shapes while you play. The quiz at the end checks whether you spotted it, and the level card shows the capital, population and region. Then comes a second board shaped like something you would find in that country (its animal, its bird or a landmark), with a quiz of its own." } },
-            { "@type": "Question", "name": "Can I install it as an app?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. On Android and desktop Chrome use “Install” or “Add to Home Screen”; on iPhone use Share → Add to Home Screen. After the first visit the levels are cached so the game works offline." } }
           ]
         }
       ]
@@ -301,156 +288,18 @@
     </main>
 
 
-    <!-- ── ABOUT ARROW ATLAS (visible below the game) ── -->
-    <section class="aa-seo" id="aaAbout" aria-label="About Puzzle">
-      <div class="aa-page">
-      <!-- ── ABOUT ── -->
-      <section class="aa-section" id="about-puzzle">
-        <div class="tag-pill">About the game</div>
-        <h2 class="section-title">Puzzle: a free <span class="yl">arrow puzzle game</span> that trains your brain</h2>
-        <p>
-          <strong>Puzzle – Train Your Brain</strong> is a tap-away arrow puzzle you play in the browser, free, and playing on your own needs no account. Every board is the real outline of a country, filled with arrows that only slide the way they point. Tap an arrow whose path to the edge is clear and it shoots off the board; tap one that is blocked and you lose one of four hearts. Clear the board and the country appears, with a reading of how well you focused, and you move on along a 197-country world tour. If you are looking for an arrow game that rewards patience and a careful eye rather than speed, this is it.
-        </p>
-        <p>
-          It is built by <a href="https://www.youtube.com/@ariyankhan" target="_blank" rel="noopener">Ariyan Khan</a>, who makes geography, history and economy videos, and it doubles as a quiet focus exercise: a few boards a day, no feed, no timer.
-        </p>
-      </section>
+    <!-- ── THE FOOT OF THE GAME ──
+         What used to be here was five sections of prose about the game — what it is, how it plays, the tour,
+         the geography, and a FAQ — written for search engines and read by nobody who had already started
+         playing. In the app it was worse than useless: a game you scroll past into an advertisement for
+         itself. It is gone from both, and so is the FAQPage structured data that described it, because
+         markup for answers that are not on the page is markup Google is entitled to distrust.
 
-      <!-- ── HOW TO PLAY ── -->
-      <section class="aa-section" id="how">
-        <div class="tag-pill">How To Play</div>
-        <h2 class="section-title">Tap, shoot, <span class="yl">reveal</span></h2>
-        <ol class="aa-steps">
-          <li><strong>Look before you tap</strong>Every arrow slides the way it points. If the cells between its tip and the edge are empty, tapping it shoots it off the board. If another arrow sits in that path, the tap fails and you lose one of your four hearts. The blocker flashes red, and the arrow you tapped stays red: the moment its lane clears it goes by itself, no second tap needed. Not sure? Press and hold any arrow to see its lane, green if it can go, red if not — four of those a level, counted on the bar beside your hearts.</li>
-          <li><strong>Peel the board from the outside in</strong>Arrows near the edge are usually free first. Clearing them opens lanes for the ones behind. There is always at least one free arrow, so if you cannot see it, press Hint: it lights one up for five seconds on the clock.</li>
-          <li><strong>Name the country</strong>As the board empties, the country's real outline fades in underneath. Clear the last arrow, pick its name from three options, and the level card shows the capital, population and region. Then on to the next stop of the tour.</li>
-        </ol>
-      </section>
-
-      <!-- ── THE TOUR ── -->
-      <section class="aa-section" id="tour">
-        <div class="tag-pill">The World Tour</div>
-        <h2 class="section-title">197 countries, <span class="yl">five tiers</span></h2>
-        <p>
-          The tour starts with shapes almost everyone knows, Italy, India, Australia, Brazil, Bangladesh, Japan, and
-          works through the world's largest countries before finishing with Iceland. Early boards have about 90 cells
-          and short arrows; the last tier packs 600 cells with arrows that snake up to eight cells long. Every outline is the real
-          country from Natural Earth, drawn on an equal-area projection, so sizes are honest.
-        </p>
-        <div class="aa-callout">
-          <p>
-            <strong>Same board for everyone.</strong> Each level has a fixed layout, so a time you share on level 12
-            is a fair challenge. Fail a board twice and you can skip it; you can also ask for a new layout of the same
-            country at any time.
-          </p>
-        </div>
-        <p>
-          There is no clock to beat. Every level gives four hearts, three hints and four checks — press and hold any
-          arrow and it tells you whether its lane is clear, green for yes and red for no, without spending a heart to
-          find out. The difficulty follows you,
-          not the level number: a flawless, fast clear (no heart lost, no hint) steps the boards up a tier at once,
-          two first-try clears in a row step up too whatever hearts and hints you spent, and two losses in a row ease
-          off a tier. Boards run from about 20
-          arrows on Easy to 80 and more on Master and are labelled Easy, Normal, Hard, Expert and Master. Quick consecutive taps build a combo,
-          clearing levels back to back builds a win streak, every tenth level is a milestone, and the Today's Country
-          board gives everyone the same bonus puzzle each day.
-        </p>
-      </section>
-
-      <!-- ── WHY ── -->
-      <section class="aa-section" id="why">
-        <div class="tag-pill">Why I Built This</div>
-        <h2 class="section-title">Geography that <span class="yl">sneaks up on you</span></h2>
-        <p>
-          I make videos about geography, history, culture and economies, and I animate maps for other channels. Tap-away
-          arrow puzzles are the most addictive casual genre on the app stores, but the shapes underneath them are
-          butterflies and trophies. Swapping those for real countries costs the player nothing, and after a few boards
-          they can pick Mozambique out of a line-up without ever having tried to learn it.
-        </p>
-        <p>
-          If you prefer a slower, more deliberate way to learn the map, try my other game,
-          <a href="/piece-the-world.html">Piece the World</a>, a jigsaw of continents and countries.
-        </p>
-        <div class="aa-author">
-          <img src="/images/ariyan-khan-profile.webp?v=3" alt="Ariyan Khan, video editor and creator" width="72" height="72" loading="lazy" />
-          <div>
-            <p class="aa-author-name">Ariyan Khan</p>
-            <p>Geography, history and economy videos on <a href="https://www.youtube.com/@ariyankhan" target="_blank" rel="noopener">YouTube</a>. Freelance video editor and map animator. <a href="/about.html">About me</a>.</p>
-          </div>
-        </div>
-      </section>
-
-      <!-- ── FAQ ── -->
-      <section class="aa-section aa-faq" id="faq">
-        <div class="tag-pill">FAQ</div>
-        <h2 class="section-title">Questions before you <span class="yl">tap</span></h2>
-
-        <div class="faq-item">
-          <button class="faq-q" id="aa-faq-q-1" type="button" aria-expanded="false" aria-controls="aa-faq-a-1">
-            <span class="faq-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M4 12h16"/><path d="m14 6 6 6-6 6"/></svg></span><span class="faq-q-text">How do I play Puzzle?</span><span class="faq-chevron" aria-hidden="true"></span>
-          </button>
-          <div class="faq-a" id="aa-faq-a-1" role="region" aria-labelledby="aa-faq-q-1" aria-hidden="true"><p>Every arrow slides in the direction it points. Tap one and, if nothing is in its path, it shoots off the board. If another arrow is in the way it stays put and you lose a heart. Clear every arrow to reveal the country underneath, and the card tells you what you cleared.</p></div>
-        </div>
-        <div class="faq-item">
-          <button class="faq-q" id="aa-faq-q-2" type="button" aria-expanded="false" aria-controls="aa-faq-a-2">
-            <span class="faq-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z"/></svg></span><span class="faq-q-text">Is it free and do I need an account?</span><span class="faq-chevron" aria-hidden="true"></span>
-          </button>
-          <div class="faq-a" id="aa-faq-a-2" role="region" aria-labelledby="aa-faq-q-2" aria-hidden="true"><p>Yes, it is free, and playing on your own needs no account: progress, stars and best times are saved in your own browser and nothing is uploaded. <strong>Play with Friends</strong> is the one part that asks you to sign in with Google, so the people you play against know who you are; while you are signed in your progress also syncs to your account, and Settings &rarr; Delete account removes all of it. The game can also offer you a Google advertisement in exchange for an extra heart, hint, check or gold &mdash; always your choice, never inside a puzzle. The <a href="/puzzle/privacy.html">Privacy Policy</a> sets both out in full.</p></div>
-        </div>
-        <div class="faq-item">
-          <button class="faq-q" id="aa-faq-q-3" type="button" aria-expanded="false" aria-controls="aa-faq-a-3">
-            <span class="faq-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2M9 3h6"/></svg></span><span class="faq-q-text">How does the difficulty work?</span><span class="faq-chevron" aria-hidden="true"></span>
-          </button>
-          <div class="faq-a" id="aa-faq-a-3" role="region" aria-labelledby="aa-faq-q-3" aria-hidden="true"><p>It follows you, not the level number. Boards come in five tiers, Easy, Normal, Hard, Expert and Master, from about 20 arrows on Easy to 80 and more on Master. Clear a board flawlessly and fast, no heart lost and no hint, and the next one steps up a tier at once. Two first-try clears in a row step up too, whatever hearts and hints you spent. Lose two boards in a row and they ease off a tier. There is no clock to beat: four hearts, three hints and four checks per level, that is all. A check is a press and hold on any arrow, which says whether its lane is clear without costing you a heart to find out.</p></div>
-        </div>
-        <div class="faq-item">
-          <button class="faq-q" id="aa-faq-q-4" type="button" aria-expanded="false" aria-controls="aa-faq-a-4">
-            <span class="faq-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M4 12h16M12 4v16"/></svg></span><span class="faq-q-text">Can a level become impossible?</span><span class="faq-chevron" aria-hidden="true"></span>
-          </button>
-          <div class="faq-a" id="aa-faq-a-4" role="region" aria-labelledby="aa-faq-q-4" aria-hidden="true"><p>No. Boards are generated so that a solution always exists, and removing an arrow can only free space for the others, so whatever order you tap in you can never get stuck. If you are out of ideas, use a hint: it lights up an arrow that is free right now and adds five seconds to your clock. Or press and hold an arrow you are wondering about — four of those a level, and they cost no time at all.</p></div>
-        </div>
-        <div class="faq-item">
-          <button class="faq-q" id="aa-faq-q-5" type="button" aria-expanded="false" aria-controls="aa-faq-a-5">
-            <span class="faq-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg></span><span class="faq-q-text">Are the puzzles the same for everyone?</span><span class="faq-chevron" aria-hidden="true"></span>
-          </button>
-          <div class="faq-a" id="aa-faq-a-5" role="region" aria-labelledby="aa-faq-q-5" aria-hidden="true"><p>Yes. Each level has a fixed layout, so when you share a time on level 12 your friend faces exactly the same board. Choosing “New layout” after a fail gives you a fresh arrangement of the same country.</p></div>
-        </div>
-        <div class="faq-item">
-          <button class="faq-q" id="aa-faq-q-6" type="button" aria-expanded="false" aria-controls="aa-faq-a-6">
-            <span class="faq-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg></span><span class="faq-q-text">Why are the countries hidden until I finish?</span><span class="faq-chevron" aria-hidden="true"></span>
-          </button>
-          <div class="faq-a" id="aa-faq-a-6" role="region" aria-labelledby="aa-faq-q-6" aria-hidden="true"><p>That is the geography part. The board is the country's real outline and it fades in as you clear arrows, so you are quietly learning shapes while you play. The quiz at the end checks whether you spotted it, and the level card shows the capital, population and region. Then comes a second board shaped like something you would find in that country (its animal, its bird or a landmark), with a quiz of its own.</p></div>
-        </div>
-        <div class="faq-item">
-          <button class="faq-q" id="aa-faq-q-7" type="button" aria-expanded="false" aria-controls="aa-faq-a-7">
-            <span class="faq-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M11 18h2"/></svg></span><span class="faq-q-text">Can I install it as an app?</span><span class="faq-chevron" aria-hidden="true"></span>
-          </button>
-          <div class="faq-a" id="aa-faq-a-7" role="region" aria-labelledby="aa-faq-q-7" aria-hidden="true"><p>Yes. On Android and desktop Chrome use “Install” or “Add to Home Screen”; on iPhone use Share → Add to Home Screen. After the first visit the levels are cached so the game works offline.</p></div>
-        </div>
-      </section>
-
-      <section class="aa-cta">
-        <div class="tag-pill">More Geography</div>
-        <h2 class="section-title">Videos on the countries <span class="yl">you just cleared</span></h2>
-        <p class="section-desc">
-          Geography, history, culture and economy explainers every week.
-        </p>
-        <a href="https://www.youtube.com/@ariyankhan" class="aa-btn aa-btn--primary" target="_blank" rel="noopener">Watch on YouTube</a>
-      </section>
-
-      <div class="aa-explore">
-        <p class="aa-explore-label">More Free Games &amp; Tools</p>
-        <div class="aa-explore-links">
-          <a href="/piece-the-world.html" class="aa-explore-link"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 8h5a2 2 0 1 1 4 0h7v12H4z"/><path d="M4 14a2 2 0 1 0 0 0"/></svg>Piece the World</a>
-          <a href="/map-maker.html" class="aa-explore-link"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m4 6 5-2 6 2 5-2v14l-5 2-6-2-5 2Z"/><path d="M9 4v14"/><path d="M15 6v14"/></svg>Map Maker</a>
-          <a href="/ai-metadata-remover.html" class="aa-explore-link"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="m8 8 8 8M16 8l-8 8"/></svg>AI Metadata Remover</a>
-        </div>
-      </div>
-          </div>
-      <p class="aa-seo-cta"><a class="aa-btn aa-btn--primary" href="#top">Play Puzzle</a></p>
+         These two lines are not decoration. The discovery silhouettes are traced from Twemoji, which is
+         CC-BY 4.0, and attribution is the licence's one condition; the policies are what the store listing
+         and the sign-in both point at. -->
+    <section class="aa-seo" aria-label="Credits and policies">
       <p class="aa-seo-credit">Country outlines from Natural Earth (public domain). Discovery board shapes are silhouettes traced from <a href="https://github.com/twitter/twemoji" target="_blank" rel="noopener">Twemoji</a> graphics by Twitter and contributors, licensed <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC-BY 4.0</a>.</p>
-      <!-- The game's own policies, on the page rather than only behind the settings sheet: they cover the sign-in,
-           the saved progress and the advertisements, none of which the site-wide policy describes in full. -->
       <p class="aa-seo-legal">
         <a href="/puzzle/privacy.html">Privacy Policy</a> &middot;
         <a href="/puzzle/terms.html">Terms of Service</a> &middot;
@@ -529,13 +378,11 @@
 
         <p class="aa-cap">Help</p>
         <div class="aa-group">
-          <button type="button" class="aa-row aa-row--link" id="aaHowTo"><span class="aa-row-ico">❓</span><span class="aa-row-label">How to play</span><span class="aa-row-chev">›</span></button>
           <a class="aa-row aa-row--link" href="/#contact"><span class="aa-row-ico">💬</span><span class="aa-row-label">Feedback</span><span class="aa-row-chev">›</span></a>
         </div>
 
         <p class="aa-cap">About</p>
         <div class="aa-group">
-          <a class="aa-row aa-row--link" href="#aaAbout" data-close-sheet><span class="aa-row-ico">ℹ️</span><span class="aa-row-label">About Puzzle</span><span class="aa-row-chev">›</span></a>
           <a class="aa-row aa-row--link" href="/puzzle/privacy.html"><span class="aa-row-ico">🔒</span><span class="aa-row-label">Privacy Policy</span><span class="aa-row-chev">›</span></a>
           <a class="aa-row aa-row--link" href="/puzzle/terms.html"><span class="aa-row-ico">📄</span><span class="aa-row-label">Terms of Service</span><span class="aa-row-chev">›</span></a>
         </div>
@@ -550,6 +397,6 @@
       </div>
     </div>
 
-    <script src="/js/puzzle.js?v=32"></script>
+    <script src="/js/puzzle.js?v=33"></script>
   </body>
 </html>

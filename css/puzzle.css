@@ -575,6 +575,10 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-facts b{ color:var(--ink); }
 /* discoveries: four finds per cleared country */
 .aa-seo-credit{ font-size:12px; color:var(--muted); }
+/* The two licence links used to sit in a page full of styled links and were never looked at. Now that the
+   credit is half of what is under the game, default browser blue is the loudest thing on the screen. */
+.aa-seo-credit a{ color:var(--muted); text-decoration:underline; text-underline-offset:3px; }
+.aa-seo-credit a:hover{ color:var(--ink); }
 /* The game's own policies, visible on the page. A reviewer should not have to open a settings sheet to find them. */
 .aa-seo-legal{ margin:10px 0 0; font-size:13px; font-weight:800; color:var(--muted); }
 .aa-seo-legal a{ color:var(--muted); text-decoration:underline; text-underline-offset:3px; }
@@ -656,7 +660,9 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-about-summary::-webkit-details-marker{ display:none; }
 .aa-credit{ font-size:13px; color:var(--muted); text-align:center; margin:14px 0 0; }
 /* the About / how-to / FAQ copy sits under the app, visible to readers and crawlers */
-.aa-seo{ max-width:640px; margin:0 auto; padding:28px 16px 48px; border-top:1px solid var(--bg2); }
+/* Two lines now — a licence credit and the policy links — so it is the foot of the page rather than a
+   section of it, and its bottom padding has to clear the gesture bar in the app. */
+.aa-seo{ max-width:640px; margin:0 auto; padding:24px 16px calc(28px + env(safe-area-inset-bottom, 0px)); border-top:1px solid var(--bg2); }
 .aa-row--danger .aa-row-label{ color:var(--bad); }
 /* legal pages (privacy, terms) in the game's own dress */
 .aa-legal{ max-width:640px; margin:0 auto; padding:calc(18px + env(safe-area-inset-top, 0px)) 16px 48px; font-weight:600; }

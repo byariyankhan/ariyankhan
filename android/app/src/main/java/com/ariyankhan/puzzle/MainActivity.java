@@ -2,6 +2,7 @@ package com.ariyankhan.puzzle;
 
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
+import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
 import android.view.View;
@@ -52,23 +53,24 @@ public final class MainActivity extends ComponentActivity {
         offline = findViewById(R.id.offline);
         splash = findViewById(R.id.splash);
 
-        // The game's paper is light and stays light whatever the phone's dark mode says — there is no
-        // values-night beside colors.xml, and css/puzzle.css has no prefers-color-scheme rule. So the bars
-        // always want dark icons over that cream; the alternative is the invisible clock this project has
-        // already fixed once.
-        WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView())
-                .setAppearanceLightStatusBars(true);
-        WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView())
-                .setAppearanceLightNavigationBars(true);
+        // The page gets the whole window, bars included, which is what the Trusted Web Activity did and what
+        // the page is already written for: its viewport is viewport-fit=cover and css/puzzle.css pads by
+        // env(safe-area-inset-*) on all four edges.
+        //
+        // The first version of this shell padded the WebView by those same insets instead, and the result was
+        // the gap counted twice — once by Android and once by the page — which is what put the League chip a
+        // finger's width below where it belongs. One owner of the inset, and it is the page.
+        //
+        // It also means html{background:var(--bg)} is what paints behind the clock, so the bars follow the
+        // player's chosen theme rather than being stuck on the cream of the default one.
+        WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
 
-        // Android 16 windows are edge-to-edge and there is no opt-out, so the insets are applied by hand.
-        // The keyboard is folded into the bottom inset rather than handled separately: the game has little to
-        // type into, and where it does, a board pushed up by the keyboard beats one hidden behind it.
-        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.content), (v, insets) -> {
+        // The offline screen is the one piece of native UI here, so it is the one thing that has to keep
+        // itself clear of the bars.
+        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.offline), (v, insets) -> {
             Insets bars = insets.getInsets(
                     WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout());
-            int ime = insets.getInsets(WindowInsetsCompat.Type.ime()).bottom;
-            v.setPadding(bars.left, bars.top, bars.right, Math.max(bars.bottom, ime));
+            v.setPadding(bars.left, bars.top, bars.right, bars.bottom);
             return insets;
         });
 
@@ -90,6 +92,45 @@ public final class MainActivity extends ComponentActivity {
         web.setWebViewClient(new Client(back));
 
         if (state == null) web.loadUrl(target(getIntent()));
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // A theme picked in Settings changes the page's theme-color without a navigation, so the bars would
+        // keep the old contrast until something asked again. Leaving the app and coming back asks again.
+        readThemeColour();
+    }
+
+    /**
+     * What colour the page says it is, and therefore whether the clock and the battery should be drawn dark
+     * or light. The page keeps its meta[name=theme-color] in step with the chosen theme — paper and mint are
+     * light, night is nearly black — which is the same signal Chrome used to read when this was a Trusted Web
+     * Activity.
+     */
+    private void readThemeColour() {
+        web.evaluateJavascript(
+                "(document.querySelector('meta[name=\"theme-color\"]')||{}).content||''",
+                value -> {
+                    // evaluateJavascript hands back a JSON string, quotes and all.
+                    String hex = value == null ? "" : value.replace("\"", "").trim();
+                    int colour;
+                    try {
+                        colour = Color.parseColor(hex);
+                    } catch (IllegalArgumentException notAColour) {
+                        return;
+                    }
+                    // Rec. 601 luma, the same rule a browser uses to decide bar contrast.
+                    double luma = (0.299 * Color.red(colour)
+                            + 0.587 * Color.green(colour)
+                            + 0.114 * Color.blue(colour)) / 255.0;
+                    boolean light = luma > 0.6;
+                    findViewById(R.id.root).setBackgroundColor(colour);
+                    WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView())
+                            .setAppearanceLightStatusBars(light);
+                    WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView())
+                            .setAppearanceLightNavigationBars(light);
+                });
     }
 
     /** A link to the game, tapped anywhere on the phone, arrives here rather than in the browser. */
@@ -216,6 +257,28 @@ public final class MainActivity extends ComponentActivity {
             back.setEnabled(v.canGoBack());
         }
 
+        /**
+         * Ask the page whether it is the game.
+         *
+         * <p>onReceivedError is not enough on its own, which a phone proved: with the service worker in
+         * control, a failed load comes back as the worker's fetch handler rejecting, the WebView paints its
+         * own "Web page not available" over everything, and what the client is told about it is not
+         * dependable. So rather than trusting a callback, this looks for something only the game has. It
+         * catches the WebView's error page, a worker that rejected, and a page served from somewhere
+         * unexpected, and because it runs on every finished load it puts the game back by itself the moment
+         * one succeeds.
+         */
+        @Override
+        public void onPageFinished(@NonNull WebView v, @NonNull String url) {
+            v.evaluateJavascript("!!document.getElementById('aaPlay')", value -> {
+                boolean isTheGame = "true".equals(value);
+                hideSplash();
+                offline.setVisibility(isTheGame ? View.GONE : View.VISIBLE);
+                if (isTheGame) readThemeColour();
+            });
+        }
+
+        /** The fast path: say so before the error page has even finished drawing. onPageFinished decides. */
         @Override
         public void onReceivedError(@NonNull WebView v, @NonNull WebResourceRequest r,
                                     @NonNull WebResourceError e) {

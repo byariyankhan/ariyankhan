@@ -1,16 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Light, always, and explicitly so. The game has its own themes and starts on paper whatever the phone's
-         dark mode says, so a DayNight parent would have styled this app's own widgets — the one Button on the
-         offline screen — dark grey on a cream background on half the phones that install it. windowBackground
-         is that same paper, which is what fills the screen between the icon being tapped and the layout being
-         inflated. statusBarColor and navigationBarColor do nothing from API 35 on, where the window is
-         edge-to-edge and MainActivity pads around the bars instead; they are still what colours the bars on
-         everything older than that, down to the minSdk. -->
+    <!-- Light, and explicitly so. The game has its own themes and starts on paper whatever the phone's dark
+         mode says, so a DayNight parent would have styled this app's own widgets — the one Button on the
+         offline screen — dark grey on a cream background on half the phones that install it.
+
+         windowBackground is that paper, and it is what fills the screen between the icon being tapped and the
+         layout being inflated. After that the page owns every pixel, including the strips behind the clock and
+         the navigation bar, which is why both bar colours are transparent: on API 35 and up they are ignored
+         anyway, and below it transparency is what lets the page background show through, so a player on
+         the night theme gets black behind the clock rather than a cream band around a dark game.
+
+         MainActivity reads the page's theme-color and decides from it whether those bars should be drawn with
+         dark icons or light ones. -->
     <style name="Theme.App" parent="android:Theme.DeviceDefault.Light.NoActionBar">
         <item name="android:windowBackground">@color/paper</item>
-        <item name="android:statusBarColor">@color/paper</item>
-        <item name="android:navigationBarColor">@color/paper</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
         <item name="android:enforceNavigationBarContrast">false</item>
         <item name="android:enforceStatusBarContrast">false</item>
     </style>
