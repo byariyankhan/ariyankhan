@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Three layers, and the order matters.
+
+     #content is padded by the window insets, so the game never draws under the clock or the navigation bar.
+     Android 16 makes the window edge-to-edge and offers no way out of it, so the padding is how the old
+     status-bar colour is reproduced: the root is the game's paper, the content stops short of the bars, and
+     what shows through behind the clock is that same paper.
+
+     #splash sits outside #content on purpose. It is the only thing that should reach the screen edges, it
+     covers the moment between the icon being tapped and the board being painted, and it is faded out by
+     MainActivity the first time the page commits a frame. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/paper">
+
+    <FrameLayout
+        android:id="@+id/content"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <WebView
+            android:id="@+id/web"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+        <!-- What a first run with no network gets. A WebView that fails its main frame paints nothing at all,
+             and a blank app is both a bad first impression and the shape of app Play rejects under its
+             minimum functionality policy. Once the service worker has a copy of the game this screen stops
+             appearing, because the failure never reaches us. -->
+        <LinearLayout
+            android:id="@+id/offline"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:padding="32dp"
+            android:background="@color/paper"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/offline_title"
+                android:textColor="@color/ink"
+                android:textSize="20sp"
+                android:gravity="center" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="@string/offline_body"
+                android:textColor="@color/ink"
+                android:alpha="0.7"
+                android:textSize="15sp"
+                android:gravity="center" />
+
+            <Button
+                android:id="@+id/retry"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="24dp"
+                android:text="@string/offline_retry" />
+        </LinearLayout>
+    </FrameLayout>
+
+    <ImageView
+        android:id="@+id/splash"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@color/paper"
+        android:padding="72dp"
+        android:scaleType="centerInside"
+        android:importantForAccessibility="no"
+        android:src="@drawable/splash" />
+</FrameLayout>

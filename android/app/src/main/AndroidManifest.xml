@@ -1,15 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- One activity, because the app is one screen: the game.
 
-     LauncherActivity comes from android-browser-helper and does the whole job — it opens the URL below in a
-     Trusted Web Activity, checks the site's Digital Asset Links, shows the splash while Chrome warms up, and
-     forwards the web app's notifications to Android's shade. There is no WebView here and no bridge; what
-     draws the board is the same Chrome that draws it in the browser. -->
+     It is a WebView the app owns, not a Trusted Web Activity handed to Chrome. The reason is money, not
+     taste: AdMob's H5 integration registers a WebView instance with the Mobile Ads SDK, and a Trusted Web
+     Activity has no instance to register because the renderer is Chrome's. Play Billing points the same way.
+     See MainActivity for the rest, and android/README.md for what the move cost.
+
+     There is no POST_NOTIFICATIONS here any more. The Push API does not exist in a WebView, so the game's web
+     push cannot work in the app whatever this file says, and a permission the app cannot use has no business
+     on the store listing. It comes back with Firebase Cloud Messaging, which is what will actually deliver an
+     invitation to a phone. -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Android 13 and up asks before an app may post a notification. The game's own web push sits behind
-         this; without it the switch in Settings turns on and nothing ever arrives. -->
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.INTERNET" />
 
     <!-- appCategory="game" is load-bearing. Android 16 ignores android:screenOrientation on any display
@@ -17,7 +19,11 @@
          whatever the activity below asked for. Games are the documented exception, and this is a game, so
          with the category declared the portrait lock still holds. The web side does not lean on it either:
          css/puzzle.css counter-rotates the board when the window comes up sideways, which covers both the
-         user picking the per-app override today and Google retiring the exception later. -->
+         user picking the per-app override today and Google retiring the exception later.
+
+         enableOnBackInvokedCallback is what routes the back gesture through OnBackInvokedDispatcher, which is
+         where MainActivity's OnBackPressedCallback listens. Without it the callback is never called on
+         Android 13 and up and back would leave the game instead of walking its history. -->
     <application
         android:label="@string/app_name"
         android:icon="@mipmap/ic_launcher"
@@ -27,40 +33,31 @@
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:supportsRtl="false"
         android:theme="@style/Theme.App"
-        android:appCategory="game">
+        android:appCategory="game"
+        android:enableOnBackInvokedCallback="true">
 
+        <!-- configChanges is the difference between a rotation costing nothing and a rotation throwing the
+             board away. Without it Android destroys and rebuilds the activity, and a rebuilt WebView starts
+             the page again: saveState() restores a URL and a history list, never the running JavaScript. The
+             game is locked to portrait, but a theme change, a font-size change and a foldable being opened
+             are all configuration changes too.
+
+             singleTask so an invitation link tapped in a chat window comes back to the game already running
+             rather than stacking a second copy of it. -->
         <activity
-            android:name="com.google.androidbrowserhelper.trusted.LauncherActivity"
+            android:name=".MainActivity"
             android:exported="true"
+            android:launchMode="singleTask"
             android:screenOrientation="portrait"
-            android:label="@string/app_name">
-
-            <!-- What to open, and how it should look while it opens. -->
-            <meta-data android:name="android.support.customtabs.trusted.DEFAULT_URL"
-                android:value="@string/launch_url" />
-            <meta-data android:name="android.support.customtabs.trusted.STATUS_BAR_COLOR"
-                android:resource="@color/paper" />
-            <meta-data android:name="android.support.customtabs.trusted.NAVIGATION_BAR_COLOR"
-                android:resource="@color/paper" />
-
-            <!-- The splash. Android shows this the instant the icon is tapped and holds it until the game has
-                 painted, so a cold start reads as an app opening rather than as a page loading. -->
-            <meta-data android:name="android.support.customtabs.trusted.SPLASH_IMAGE_DRAWABLE"
-                android:resource="@drawable/splash" />
-            <meta-data android:name="android.support.customtabs.trusted.SPLASH_SCREEN_BACKGROUND_COLOR"
-                android:resource="@color/paper" />
-            <meta-data android:name="android.support.customtabs.trusted.SPLASH_SCREEN_FADE_OUT_DURATION"
-                android:value="240" />
-            <meta-data android:name="android.support.customtabs.trusted.FILE_PROVIDER_AUTHORITY"
-                android:value="com.ariyankhan.puzzle.fileprovider" />
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|uiMode|keyboardHidden|keyboard|navigation|fontScale|density">
 
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
-            <!-- Invitation links open the app rather than the browser. autoVerify makes Android check the same
-                 assetlinks.json the address bar depends on, so this and the trust come from one file. -->
+            <!-- Invitation links open the app rather than the browser. autoVerify makes Android check
+                 assetlinks.json on the site, which is the same file and the same fingerprints as before. -->
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -75,58 +72,5 @@
                 <data android:scheme="https" android:host="@string/host" android:path="/puzzle" />
             </intent-filter>
         </activity>
-
-        <!-- Four components android-browser-helper reaches for that this manifest never declared, which is
-             what killed the app on launch. The library's own AAR manifest declares none of them — only a
-             <queries> block — so an app that hand-writes its manifest, as this one does rather than being
-             generated by Bubblewrap, has to declare every one.
-
-             ManageDataLauncherActivity is the one that crashed. LauncherActivity.launchTwa() asks
-             PackageManager to enable or disable it depending on whether the browser offers site settings, and
-             setComponentEnabledSetting on a component the package does not contain throws
-             IllegalArgumentException — before the first frame, on every open, in every build. Declared here
-             exactly as Bubblewrap's template declares it.
-
-             The other three had not been reached yet, and would each have been the next crash: FocusActivity
-             brings a running Trusted Web Activity back to the front, WebViewFallbackActivity is what runs when
-             the phone has no browser that supports one, and NotificationPermissionRequestActivity is what asks
-             for POST_NOTIFICATIONS on Android 13 and up — which this app requests, for the invitations. -->
-        <activity android:name="com.google.androidbrowserhelper.trusted.ManageDataLauncherActivity"
-            android:exported="false"
-            android:enabled="true"
-            android:excludeFromRecents="true">
-            <meta-data android:name="android.support.customtabs.trusted.MANAGE_SPACE_URL"
-                android:value="@string/launch_url" />
-            <intent-filter>
-                <action android:name="android.intent.action.APPLICATION_PREFERENCES" />
-                <category android:name="android.intent.category.DEFAULT" />
-            </intent-filter>
-        </activity>
-
-        <activity android:name="com.google.androidbrowserhelper.trusted.FocusActivity" />
-
-        <activity android:name="com.google.androidbrowserhelper.trusted.WebViewFallbackActivity"
-            android:configChanges="orientation|screenSize" />
-
-        <activity android:name="com.google.androidbrowserhelper.trusted.NotificationPermissionRequestActivity" />
-
-        <!-- Notifications the web app posts arrive through here. -->
-        <service
-            android:name="com.google.androidbrowserhelper.trusted.DelegationService"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.support.customtabs.trusted.TRUSTED_WEB_ACTIVITY_SERVICE" />
-                <category android:name="android.intent.category.DEFAULT" />
-            </intent-filter>
-        </service>
-
-        <provider
-            android:name="androidx.core.content.FileProvider"
-            android:authorities="com.ariyankhan.puzzle.fileprovider"
-            android:grantUriPermissions="true"
-            android:exported="false">
-            <meta-data android:name="android.support.FILE_PROVIDER_PATHS"
-                android:resource="@xml/filepaths" />
-        </provider>
     </application>
 </manifest>

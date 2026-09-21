@@ -6,4 +6,9 @@
     <string name="launch_url" translatable="false">https://ariyankhan.com/puzzle/?utm_source=android</string>
     <!-- The host the app is trusted on, used by the deep link filter. One place, so it cannot drift. -->
     <string name="host" translatable="false">ariyankhan.com</string>
+    <!-- The first-run-with-no-network screen. After that the service worker has the game and this is
+         unreachable. -->
+    <string name="offline_title">No connection</string>
+    <string name="offline_body">Puzzle needs the network the first time it opens. After that it plays offline.</string>
+    <string name="offline_retry">Try again</string>
 </resources>

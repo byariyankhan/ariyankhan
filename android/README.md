@@ -1,133 +1,171 @@
 # Puzzle – Train Your Brain, on Android
 
-This is a **Trusted Web Activity**: the Play Store app is the game at
-`https://ariyankhan.com/puzzle/`, running in the phone's own Chrome engine with no
-address bar, no browser chrome and no second copy of the game to keep in step.
+The Play Store app is the game at `https://ariyankhan.com/puzzle/`, running in a **WebView this project
+owns**. One activity, one window, no browser chrome, and no second copy of the game to keep in step.
 
-## Why this and not a rewrite
+It was a **Trusted Web Activity** until September 2026, which was the right shape while the app earned
+nothing. What changed is below, because it is the only interesting decision in this directory.
 
-The game is a web game. A TWA runs **the same code on the same engine at the same
-speed** — there is no WebView-in-an-app penalty and no JavaScript bridge, because
-there is nothing to bridge to. A native rewrite would mean a second board
-generator, a second economy client, a second socket layer and a second set of
-bugs, and it would not draw a single arrow faster: what renders the board is
-Chrome either way.
+## Why the window moved into the app
 
-What that buys, concretely:
+A Trusted Web Activity hands the URL to Chrome. Chrome draws the game, and the app is a shortcut with an
+icon. That costs nothing and it is genuinely fast — until you try to be paid.
 
-* every fix shipped to the site is on Android the same hour, with no store review
+**AdMob will not serve an H5 game unless your app owns the WebView it runs in.** The integration is
+`MobileAds.registerWebView(webView, ...)`, plus a manifest `INTEGRATION_MANAGER` of `"webview"`; in a Trusted
+Web Activity there is no WebView instance to pass, because the renderer belongs to Chrome. And AdMob is not
+optional: AdSense's own behavioural policy says *"Google ads may not be integrated into a software application
+(does not apply to AdMob) of any kind"*, and Google's H5 Games Ads guide says that when the game is designed
+to be embedded in an app you own, *"the only way to do this in a high-performing and policy compliant way is
+to use this AdMob support for mobile apps"*.
+
+Play Billing points the same way. It is reachable from a Trusted Web Activity through the Digital Goods API,
+but the Billing Library version underneath it is android-browser-helper's to keep current, and Play's
+deadlines are not negotiable — Billing Library 8 has been required of new apps and updates since 31 August
+2026. Native, it is this project's dependency and this project's problem.
+
+So: the game stays a web game, and the frame around it becomes ours.
+
+## What this bought, and what it cost
+
+Kept, exactly as before:
+
+* every fix shipped to the site is in the app the same hour, with no store review
 * one set of tests, which is the set that already exists
-* the Play listing, Play billing and Play's own install flows still work
+* one board generator — which matters more than it sounds, because the boards are generated from a fixed
+  seed, and a second implementation would have to agree with the first bit for bit or two players in a gold
+  match would be handed different boards
 
-What it costs: the device needs Chrome (or any browser supporting TWAs) — on
-effectively every phone that matters it is there. Where it is not, the app falls
-back to a Custom Tab, which still works and merely shows the address bar.
+Gained:
+
+* AdMob, and with it the only policy-clean way to show advertisements in the app
+* Play Billing natively, on a library version under our control
+* Firebase Cloud Messaging, whose permission dialog names *Puzzle* rather than naming the origin
+
+Lost, and these are real:
+
+* **Google sign-in does not work in a WebView.** Google blocks its OAuth endpoint in embedded WebViews and
+  answers `disallowed_useragent`; spoofing the agent string to get around it breaks its terms. The game
+  detects the shell and says so instead of drawing a button that leads nowhere. It comes back natively through
+  Credential Manager, which needs an Android OAuth client ID.
+* **The Push API does not exist in a WebView.** Service workers run; `PushManager` is absent. The
+  notification switch hides itself in the app until Firebase Cloud Messaging replaces it, and
+  `POST_NOTIFICATIONS` has been removed from the manifest in the meantime, because a permission the app cannot
+  use has no business on a store listing.
+* One more surface to keep: an old System WebView on a cheap phone is a thing that can now break the game, and
+  Chrome updating itself is no longer the whole story.
 
 ## The parts
 
 | file | what it is |
 |---|---|
-| `app/src/main/AndroidManifest.xml` | one activity, `LauncherActivity` from android-browser-helper |
-| `app/src/main/res/values/strings.xml` | the URL the app opens, and the host it is trusted on |
-| `app/src/main/res/values/colors.xml` | the splash and system-bar colours, matched to the game |
-| `app/build.gradle` | the app id, versions, and the one dependency |
-| `../.well-known/assetlinks.json` | what makes the address bar disappear (see below) |
+| `app/src/main/java/.../MainActivity.java` | the shell: the WebView, its settings, the splash, insets, back, and the URL policy |
+| `app/src/main/res/layout/activity_main.xml` | three layers — padded content, the offline screen, the splash over both |
+| `app/src/main/res/values/strings.xml` | the URL the app opens, the host it will keep in its own window, the offline copy |
+| `app/src/main/res/values/colors.xml` | the game's paper and ink; deliberately no `values-night` |
+| `app/src/main/res/values/themes.xml` | light always, because the game is |
+| `app/build.gradle` | the app id, the versions, and two AndroidX libraries |
+| `../.well-known/assetlinks.json` | what makes an invitation link open the app (see below) |
 
-## Digital Asset Links — the one thing that must match
+There is **no JavaScript bridge yet**, and nothing needs one: the game learns it is in the app from a
+`PuzzleApp/1` suffix on the user agent. When sign-in arrives the bridge should be
+`WebViewCompat.addWebMessageListener` with origin rules and not `addJavascriptInterface`, because the latter
+injects into every frame including the advertisements' iframes, and the bridge will be carrying purchases.
 
-A TWA only drops the address bar when the **site** says it trusts the **app**.
-That is `https://ariyankhan.com/.well-known/assetlinks.json`, and it has to carry
-the SHA-256 of the certificate the app is actually signed with.
+## Digital Asset Links — what it is still for
 
-With Play App Signing — which is what this uses — Google holds that certificate,
-so the fingerprint is not knowable until the first bundle has been uploaded:
+`https://ariyankhan.com/.well-known/assetlinks.json` carries the SHA-256 of the certificates the app is
+signed with, and `node games/build-assetlinks.mjs <fingerprints…>` regenerates it.
 
-1. build the bundle, upload it to the **internal testing** track
-2. Play Console → *Test and release* → *Setup* → *App signing*
-3. copy **SHA-256 certificate fingerprint** under *App signing key certificate*
-4. `node games/build-assetlinks.mjs <that fingerprint>` and deploy the site
-5. install from the internal track and check the address bar is gone
-
-Until step 4 lands, the app runs with the address bar showing. Nothing else
-breaks.
+**It no longer has anything to do with an address bar** — there is no browser in the app to show one. What it
+still does is verify the deep link: `autoVerify="true"` on the intent filter makes Android check that file, and
+that is what sends an invitation link to the app instead of to the browser. Play App Signing issues three
+certificates and all three fingerprints are in the file; the deployment certificate is the one that signs what
+a phone actually installs.
 
 ## Android 16 (API 36), and what it changes
 
-Google Play has required **API 36 of new apps and of every update since 31 August
-2026**. An upload targeting 35 is rejected, so `compileSdk` and `targetSdk` are
-both 36, which pins the toolchain: AGP 8.13.2, Gradle 8.14.3, JDK 17+, and
-android-browser-helper 2.7.3 (2.5.0 predates the Android 16 window).
+Play has required API 36 of new apps and of every update since 31 August 2026, so `compileSdk` and `targetSdk`
+are both 36, which pins the toolchain: AGP 8.13.2, Gradle 8.14.3, JDK 17+.
 
-Three of Android 16's behaviour changes land on an app shaped like this one:
+**Fixed orientation is ignored at 600dp and over.** Under `targetSdk 36` Android throws away
+`android:screenOrientation` and friends on any display whose smallest width is 600dp — a tablet, or an open
+foldable. **Games are the documented exception**, so `android:appCategory="game"` on `<application>` is what
+keeps the portrait lock working; it is not decoration. And the lock is not the only line of defence:
+`css/puzzle.css` counter-rotates the board when the window arrives sideways, so the game stays upright even
+where the manifest is overruled — today when a user picks the per-app override, and wholesale later if Google
+retires the exception the way it has said it will retire
+`PROPERTY_COMPAT_ALLOW_RESTRICTED_RESIZABILITY` at API 37.
 
-**Fixed orientation is ignored at 600dp and over.** Under `targetSdk 36` Android
-throws away `android:screenOrientation`, `resizableActivity`, `minAspectRatio`,
-`maxAspectRatio` and `setRequestedOrientation()` on any display whose smallest
-width is 600dp — a tablet, or a foldable once it is open. **Games are the
-documented exception**, so `android:appCategory="game"` on `<application>` is what
-keeps the portrait lock working; it is not decoration. And the lock is not the
-only line of defence: `css/puzzle.css` counter-rotates the board when the window
-arrives sideways, so the game stays upright even where the manifest is overruled.
-That happens today when a user picks the per-app override in device settings. It
-may happen wholesale later: Google's documented escape hatch for non-games, the
-`PROPERTY_COMPAT_ALLOW_RESTRICTED_RESIZABILITY` property, is stated to stop
-working at API 37, and while the games exception carries no announced end date,
-the direction of travel is plainly towards adaptive windows. The CSS is what makes
-that a non-event for us rather than a rewrite.
+**Edge-to-edge is mandatory.** `windowOptOutEdgeToEdgeEnforcement` is deprecated and does nothing. Under the
+Trusted Web Activity this needed no thought, because the window was Chrome's. Now it is ours:
+`MainActivity` reads the system-bar, display-cutout and IME insets and pads `#content` by them, while `#root`
+stays the game's paper — so what shows behind the clock is the same cream as the game, which is how the old
+`STATUS_BAR_COLOR` result is reproduced. The bars are told to use dark icons, always, because the game is
+light whatever the phone's dark mode says.
 
-**Edge-to-edge is mandatory.** `windowOptOutEdgeToEdgeEnforcement` is deprecated
-and does nothing on Android 16. There is no opt-out and nothing to do here: the
-window belongs to Chrome, the game's own layout is already inset-aware through
-`env(safe-area-inset-*)`, and the splash is a single colour that reaches the
-edges by construction.
+**Predictive back is on by default**, and `onBackPressed()` is not called. The shell uses
+`OnBackPressedDispatcher` with `android:enableOnBackInvokedCallback="true"`, and the callback is only enabled
+while `WebView.canGoBack()` is true. That last detail is the point: with nothing left to go back to the
+callback switches itself off, the press reaches the system, and Android animates the app closing instead of it
+vanishing.
 
-**Predictive back is on by default.** `onBackPressed()` is not called and
-`KEYCODE_BACK` is not dispatched. Nothing in this project implements either —
-`LauncherActivity` launches and finishes, and back inside the game is Chrome's —
-so there is no migration, which is exactly why the library floor matters.
+**`configChanges` is load-bearing.** Without it a rotation, a font-size change or a foldable opening destroys
+the activity, and a rebuilt WebView starts the page again — `saveState()` restores a URL and a history list,
+never the running JavaScript, so a player would lose the board they were halfway through.
 
 ## Keys
 
-**No keystore is in this repository and none should ever be.** Play App Signing
-holds the app signing key. The upload key lives on Ariyan's machine (or as a CI
-secret); `./gradlew bundleRelease` produces an *unsigned* bundle here, and the
-signing happens where the key is.
+**No keystore is in this repository and none should ever be.** Play App Signing holds the app signing key. The
+upload key lives on Ariyan's machine (or as a CI secret); `./gradlew bundleRelease` produces an *unsigned*
+bundle here, and the signing happens where the key is.
 
 ## Building
 
 ```bash
 export ANDROID_HOME=/path/to/android-sdk   # needs platforms;android-36 and build-tools;36.0.0
+cd android && ./gradlew assembleDebug       # app/build/outputs/apk/debug/app-debug.apk, installable
 cd android && ./gradlew bundleRelease       # app/build/outputs/bundle/release/app-release.aab
 ```
 
-The bundle is about 900 KB, nearly all of it android-browser-helper's dex and the
-launcher icons. There is no native code in it, so the **16 KB page-size
-requirement** that applies to apps targeting Android 15 and up is satisfied by
-having nothing to align.
+The debug APK is about 2.5 MB, nearly all of it AndroidX. There is no native code in it, so the **16 KB
+page-size requirement** is satisfied by having nothing to align.
 
-That build is **unsigned**, which is what you want for looking at the app and not
-what Play accepts. Four environment variables turn the same command into a signed
-one, and they are the only way a key ever reaches this build:
+`bundleRelease` is **unsigned**, which is what you want for looking at the app and not what Play accepts. Four
+environment variables turn the same command into a signed one, and they are the only way a key ever reaches
+this build:
 
 ```bash
 PUZZLE_KEYSTORE=/path/to/puzzle-upload.jks \
 PUZZLE_KEYSTORE_PASSWORD=... PUZZLE_KEY_ALIAS=puzzle-upload PUZZLE_KEY_PASSWORD=... \
-PUZZLE_VERSION_CODE=3 PUZZLE_VERSION_NAME=1.0.2 \
+PUZZLE_VERSION_CODE=6 PUZZLE_VERSION_NAME=1.1.0 \
   ./gradlew bundleRelease
 ```
 
-`PUZZLE_VERSION_CODE` matters more than it looks: **Play refuses a versionCode it
-has already seen**, and 1 went with the first internal-track upload. A build with
-the variable unset stays at 1 on purpose — usable, and obviously not uploadable.
+`PUZZLE_VERSION_CODE` matters more than it looks: **Play refuses a versionCode it has already seen**, and 1
+through 5 are spent. A build with the variable unset stays at 1 on purpose — usable, and obviously not
+uploadable.
 
 ## Building it in CI instead
 
-`.github/workflows/android-build.yml` does all of the above on a runner: it
-installs SDK 36, takes the version from the run number so it can never repeat,
-signs with a key held in four repository secrets, checks the result really is
-signed, and hands back the bundle as an artifact. The keystore is written to the
-runner's temporary directory and deleted in a step that runs even when the build
-fails.
+`.github/workflows/android-build.yml` does all of the above on a runner: it installs SDK 36, takes the version
+from the run number so it can never repeat, signs with a key held in four repository secrets, checks the result
+really is signed, and hands back the bundle as an artifact. The keystore is written to the runner's temporary
+directory and deleted in a step that runs even when the build fails.
 
-It does not upload to Play. That would need a service account with release
-rights — a second key to look after, to save one drag and drop.
+It does not upload to Play. That would need a service account with release rights — a second key to look
+after, to save one drag and drop.
+
+## What is not here yet
+
+In the order it is meant to arrive:
+
+1. **Native Google sign-in.** Credential Manager takes an ID token, the bridge hands it to the page, the page
+   posts it to the `/auth/google` endpoint that already exists. Needs an Android OAuth client ID, and the
+   server has to accept it as a second audience beside the web client.
+2. **AdMob.** `registerWebView`, an interstitial and a rewarded ad unit, and the two
+   `data-admob-*-slot` attributes on the Ad Placement API tag the game already loads.
+3. **Play Billing.** Consumable products for hints and lifelines, verified server-side, acknowledged inside
+   three days or Play refunds them, and clawed back through the Voided Purchases API when somebody refunds a
+   purchase they have already spent.
+4. **Firebase Cloud Messaging**, and `POST_NOTIFICATIONS` back in the manifest with it.
