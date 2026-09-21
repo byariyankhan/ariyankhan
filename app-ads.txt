@@ -1,0 +1,14 @@
+# Authorised Digital Sellers for the Android app — https://iabtechlab.com/ads-txt/
+#
+# The app's half of ads.txt, and a separate file because it answers a different question: ads.txt says who may
+# sell advertising on this website, app-ads.txt says who may sell it inside apps published by whoever owns
+# this website. One seller either way — Google, selling directly, under the same publisher id that AdSense and
+# AdMob share.
+#
+# How a buyer finds this file: the Play listing for com.ariyankhan.puzzle names ariyankhan.com as the
+# developer's website, so a buyer offered inventory from that app comes here to check the seller is us. Without
+# the file the inventory is "unauthorised", and a good share of programmatic demand simply will not bid on it —
+# which shows up as lower fill and lower revenue rather than as any kind of error.
+#
+# f08c47fec0942fa0 is Google's TAG certification id and is the same for every publisher.
+google.com, pub-1570944160084395, DIRECT, f08c47fec0942fa0
