@@ -45,9 +45,9 @@ Gained:
 Lost, and these are real:
 
 * **Google sign-in does not work in a WebView.** Google blocks its OAuth endpoint in embedded WebViews and
-  answers `disallowed_useragent`; spoofing the agent string to get around it breaks its terms. The game
-  detects the shell and says so instead of drawing a button that leads nowhere. It comes back natively through
-  Credential Manager, which needs an Android OAuth client ID.
+  answers `disallowed_useragent`; spoofing the agent string to get around it breaks its terms. Paid for with
+  the bridge and Credential Manager below, plus an Android OAuth client ID per signing certificate — which is
+  a thing that can be forgotten, and whose symptom looks nothing like its cause.
 * **The Push API does not exist in a WebView.** Service workers run; `PushManager` is absent. The
   notification switch hides itself in the app until Firebase Cloud Messaging replaces it, and
   `POST_NOTIFICATIONS` has been removed from the manifest in the meantime, because a permission the app cannot
@@ -64,13 +64,51 @@ Lost, and these are real:
 | `app/src/main/res/values/strings.xml` | the URL the app opens, the host it will keep in its own window, the offline copy |
 | `app/src/main/res/values/colors.xml` | the game's paper and ink; deliberately no `values-night` |
 | `app/src/main/res/values/themes.xml` | light always, because the game is |
-| `app/build.gradle` | the app id, the versions, and two AndroidX libraries |
+| `app/build.gradle` | the app id, the versions, and the libraries |
 | `../.well-known/assetlinks.json` | what makes an invitation link open the app (see below) |
 
-There is **no JavaScript bridge yet**, and nothing needs one: the game learns it is in the app from a
-`PuzzleApp/1` suffix on the user agent. When sign-in arrives the bridge should be
-`WebViewCompat.addWebMessageListener` with origin rules and not `addJavascriptInterface`, because the latter
-injects into every frame including the advertisements' iframes, and the bridge will be carrying purchases.
+## The bridge
+
+`window.PuzzleShell` in the page, put there by `WebViewCompat.addWebMessageListener` with an origin rule of
+`https://ariyankhan.com`. Deliberately **not** `addJavascriptInterface`: that injects the object into every
+frame in the WebView, including the advertisements' iframes once they arrive, and this bridge carries a
+sign-in token today and a purchase later.
+
+The protocol is one string in, one JSON object out:
+
+| the page posts | the shell replies |
+|---|---|
+| `hello` | `{"ok":true,"signIn":true}` |
+| `signIn` | `{"ok":true,"idToken":"…"}` or `{"ok":false,"error":"cancelled"\|"no_account"\|"unavailable"\|"failed"}` |
+
+Where `WebViewFeature.WEB_MESSAGE_LISTENER` is missing — a System WebView older than about 2021 — no bridge is
+installed, nothing throws, and the page goes on saying sign-in is not in the app, which is then true.
+
+The game still learns it is *in* the app from a `PuzzleApp/1` suffix on the user agent, because that is true
+before the page has loaded and true even where the bridge is not.
+
+## Sign-in
+
+Google blocks its OAuth endpoint in embedded WebViews and answers `disallowed_useragent`, so the token is
+fetched natively with Credential Manager and handed to the page.
+
+The part worth knowing: `GetGoogleIdOption.setServerClientId` is given the **web** client ID, which makes that
+the *audience* of the ID token that comes back — and the audience is exactly what the server compares against
+its own `GOOGLE_CLIENT_ID` (`games/puzzle/backend/src/auth.ts`). So the app signs in through the endpoint the
+browser already uses, with the same kind of token, and **the server needed no change at all**.
+
+The Android OAuth client IDs are not in this repository and are not referenced by any code. They exist in the
+same Cloud project (`arrow-atlas-508819`) so that Google can check the package name and signing certificate of
+whatever is asking. One is needed per package-and-fingerprint pair:
+
+| package | fingerprint |
+|---|---|
+| `com.ariyankhan.puzzle` | the upload key's SHA-1 |
+| `com.ariyankhan.puzzle` | the Play App Signing key's SHA-1 |
+| `com.ariyankhan.puzzle.debug` | whichever debug keystore built the test APK |
+
+Miss one and sign-in fails for builds signed that way and only those, which is a confusing thing to debug: the
+symptom is a credential error, not a rejection from our server.
 
 ## Digital Asset Links — what it is still for
 
@@ -160,12 +198,9 @@ after, to save one drag and drop.
 
 In the order it is meant to arrive:
 
-1. **Native Google sign-in.** Credential Manager takes an ID token, the bridge hands it to the page, the page
-   posts it to the `/auth/google` endpoint that already exists. Needs an Android OAuth client ID, and the
-   server has to accept it as a second audience beside the web client.
-2. **AdMob.** `registerWebView`, an interstitial and a rewarded ad unit, and the two
+1. **AdMob.** `registerWebView`, an interstitial and a rewarded ad unit, and the two
    `data-admob-*-slot` attributes on the Ad Placement API tag the game already loads.
-3. **Play Billing.** Consumable products for hints and lifelines, verified server-side, acknowledged inside
+2. **Play Billing.** Consumable products for hints and lifelines, verified server-side, acknowledged inside
    three days or Play refunds them, and clawed back through the Voided Purchases API when somebody refunds a
    purchase they have already spent.
-4. **Firebase Cloud Messaging**, and `POST_NOTIFICATIONS` back in the manifest with it.
+3. **Firebase Cloud Messaging**, and `POST_NOTIFICATIONS` back in the manifest with it.

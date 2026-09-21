@@ -168,6 +168,10 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-row--soon{ opacity:.55; }
 .aa-signin{ display:flex; justify-content:center; min-height:44px; margin:4px 0 12px; }
 .aa-signin:empty{ display:none; margin:0; min-height:0; }   /* no empty gap when Google's button could not load */
+/* The app's own sign-in button, where Google's rendered one cannot go. Google draws a 260px pill; this is the
+   game's own button at the same weight, wide enough to read as the one thing on the sheet to press. */
+.aa-signin-app{ width:100%; max-width:280px; }
+.aa-signin-app[disabled]{ opacity:.6; cursor:default; }
 .aa-signin-list{ margin:0 0 14px; padding:0 0 0 18px; color:var(--muted); font-size:14px; line-height:1.7; }
 /* The player's own header: face, name, and the purse right under the name rather than adrift at the far edge. */
 .aa-me{ display:flex; align-items:center; gap:14px; margin:0 0 16px; min-width:0; }
