@@ -8,8 +8,8 @@ android {
 
     defaultConfig {
         applicationId 'com.ariyankhan.puzzle'
-        // 23 is where Chrome's Trusted Web Activity support begins; below it the app would only ever be a
-        // Custom Tab, which is not what anybody installed.
+        // 23 is what the shell needs: WebViewClient.onPageCommitVisible, which is how the splash knows the
+        // game has painted, arrived there. Everything below it is older than the WebView the game expects.
         minSdk 23
         targetSdk 36
         // Play refuses a versionCode it has already seen, and 1 is spent. CI passes the next one in; a build
@@ -35,6 +35,13 @@ android {
     }
 
     buildTypes {
+        debug {
+            // A different package, so a test build installs beside the one from Play instead of being refused
+            // for having a different signature — and so a check of the shell never costs the real app and the
+            // progress in it. The deep link will not verify under this id, since assetlinks.json names the
+            // real one; everything else behaves the same.
+            applicationIdSuffix '.debug'
+        }
         release {
             // One activity and one library: there is very little to strip, and stripping it is still free.
             minifyEnabled true
@@ -55,9 +62,17 @@ android {
 }
 
 dependencies {
-    // The official Trusted Web Activity host. It is the whole app: it opens the site in Chrome without the
-    // browser around it, verifies Digital Asset Links, draws the splash, and hands web notifications to
-    // Android's notification shade. 2.7.x is the first line that knows about Android 16's edge-to-edge
-    // window and its predictive back gesture.
-    implementation 'com.google.androidbrowserhelper:androidbrowserhelper:2.7.3'
+    // Two libraries, and only for things the platform makes awkward rather than impossible.
+    //
+    // activity is ComponentActivity and OnBackPressedCallback: the supported way to intercept back such that
+    // the last press still belongs to the system, which is what lets Android 16 animate the app closing.
+    //
+    // core is WindowCompat and the inset types. Android 16 makes every window edge-to-edge with no opt-out,
+    // so the padding around the status and navigation bars is applied by hand, and it has to read the same
+    // inset values on API 23 as on 36.
+    //
+    // android-browser-helper is gone. It was the whole app when the app was a Trusted Web Activity; the four
+    // components it reached for and the crash they caused went with it.
+    implementation 'androidx.activity:activity:1.9.0'
+    implementation 'androidx.core:core:1.17.0'
 }

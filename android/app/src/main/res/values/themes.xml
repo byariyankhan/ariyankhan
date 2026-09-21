@@ -1,13 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- No action bar and no title: the game draws its own. The window background is the splash colour so
-         there is nothing to see between the tap and the splash. -->
-    <style name="Theme.App" parent="android:Theme.DeviceDefault.DayNight">
-        <item name="android:windowNoTitle">true</item>
-        <item name="android:windowActionBar">false</item>
+    <!-- Light, always, and explicitly so. The game has its own themes and starts on paper whatever the phone's
+         dark mode says, so a DayNight parent would have styled this app's own widgets — the one Button on the
+         offline screen — dark grey on a cream background on half the phones that install it. windowBackground
+         is that same paper, which is what fills the screen between the icon being tapped and the layout being
+         inflated. statusBarColor and navigationBarColor do nothing from API 35 on, where the window is
+         edge-to-edge and MainActivity pads around the bars instead; they are still what colours the bars on
+         everything older than that, down to the minSdk. -->
+    <style name="Theme.App" parent="android:Theme.DeviceDefault.Light.NoActionBar">
         <item name="android:windowBackground">@color/paper</item>
         <item name="android:statusBarColor">@color/paper</item>
         <item name="android:navigationBarColor">@color/paper</item>
         <item name="android:enforceNavigationBarContrast">false</item>
+        <item name="android:enforceStatusBarContrast">false</item>
     </style>
 </resources>

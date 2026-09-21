@@ -29,6 +29,23 @@
   const WS_BASE = (metaBase('puzzle-ws') || API_BASE.replace(/^http/, 'ws')).replace(/\/$/, '');
   const API_V1 = `${API_BASE}/api/puzzle/v1`;
   const WS_URL = `${WS_BASE}/ws/puzzle`;
+  // ── Whether the game is running inside the Android app rather than in a browser tab ──
+  //
+  // The app is a WebView this repository owns (see android/), and it exists because AdMob will not serve an H5
+  // game unless the app owns the WebView it runs in. What that ownership costs is two web APIs that cannot be
+  // made to work in there however hard this file tries:
+  //
+  //   Google sign-in   refused outright. Google blocks its OAuth endpoint in embedded WebViews and answers
+  //                    disallowed_useragent, and spoofing the agent string to get around it breaks its terms.
+  //   Push             not implemented. Service workers run in a WebView; PushManager does not exist.
+  //
+  // Both come back natively through the shell, through Credential Manager and Firebase Cloud Messaging. Until
+  // they do, the game says so in the one place each is offered rather than showing a control that does nothing.
+  //
+  // The agent string is the signal because there is no JavaScript bridge yet and nothing here needs one. It is
+  // also the safer of the two: a suffix the shell appends to its own agent cannot be read by a third-party
+  // frame, which an injected object in a WebView can be, and the frames arrive with the advertisements.
+  const shell = { on: / PuzzleApp\/\d/.test(navigator.userAgent) };
   const store = {
     get(k, fb) { try { const v = localStorage.getItem(STORE + k); return v == null ? fb : JSON.parse(v); } catch { return fb; } },
     set(k, v) { try { localStorage.setItem(STORE + k, JSON.stringify(v)); } catch { /* ignore */ } },
@@ -2151,7 +2168,10 @@
     if (el.googleBtn) el.googleBtn.innerHTML = '';
     if (el.signInNote) { el.signInNote.hidden = true; el.signInNote.textContent = ''; }
     openSheet(el.signInSheet);
-    if (auth.providers.google) loadGis();
+    // In the app there is no button to draw: Google will not run its sign-in in a WebView, and one that opened
+    // a browser tab the game never hears back from would be a dead end dressed as a door.
+    if (shell.on) signInNote('Signing in is not in the app yet. Every board plays without an account, and the gold is waiting when it lands.');
+    else if (auth.providers.google) loadGis();
     else signInNote('Sign-in is being switched on. Until then, a challenge link you were sent still works without an account.');
   }
   const signInNote = msg => { if (!el.signInNote) return; el.signInNote.textContent = msg; el.signInNote.hidden = false; };
@@ -2305,7 +2325,11 @@
   const push = { key: '', on: false, busy: false, checked: false, asked: false };
   // isSecureContext rather than a list of protocols: it is the browser's own answer to the same question, and
   // it already knows that https, localhost and 127.0.0.1 all count and that a file:// page does not.
-  const pushable = () => window.isSecureContext && 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+  // The shell is named here rather than left to the feature tests below it. A WebView reports no
+  // PushManager today and the switch would hide itself on that alone, but "today" is the wrong thing to
+  // rest on: a WebView that one day exposes the constructor without a push service behind it would show a
+  // switch that subscribes and never delivers, which is the failure this whole block is written to avoid.
+  const pushable = () => !shell.on && window.isSecureContext && 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
   const pushApi = (path, body) =>
     fetch(`${API_V1}/push/${path}`, {
       method: body ? 'POST' : 'GET', credentials: 'include', cache: 'no-store',

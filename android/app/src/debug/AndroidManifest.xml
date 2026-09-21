@@ -1,8 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Debug only. Points the application at the handler that catches a launch crash and shows it. -->
+<!-- Debug only. Points the application at the handler that catches a launch crash and shows it, and renames the
+     app so that a test build sitting beside the one from Play can be told apart from it on the home screen. -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
-    <application android:name=".CrashLogApp" tools:replace="android:name">
+    <application
+        android:name=".CrashLogApp"
+        android:label="Puzzle debug"
+        tools:replace="android:name,android:label">
         <activity android:name=".CrashActivity" android:exported="false"
             android:process=":crash" android:theme="@android:style/Theme.DeviceDefault" />
     </application>
