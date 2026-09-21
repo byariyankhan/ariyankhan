@@ -2,7 +2,7 @@
    Scope is the whole origin (it has to be, to control the game page), but the fetch
    handler only ever answers for the game's own files; every other request on the
    site is left to the network exactly as if no worker were installed. */
-const VERSION = 'ptw-cache-v80';
+const VERSION = 'ptw-cache-v81';
 const GAME_FILES = new Set([
   '/piece-the-world.html', '/css/style.css', '/css/piece-the-world.css',
   '/js/piece-the-world.js', '/js/site-nav.js', '/js/site-footer.js',
@@ -17,7 +17,24 @@ const GAME_FILES = new Set([
 ]);
 const isLevelData = p => p.startsWith('/games/data/') && p.endsWith('.json');
 
-self.addEventListener('install', () => self.skipWaiting());
+/* Put the game in the cache now, rather than when somebody happens to ask for it again.
+
+   This used to be skipWaiting() alone, and the hole it left only showed up in the Android app. A worker does
+   not control the navigation that registered it, so the first visit was never cached; the cache filled on the
+   *second* online visit. Open the app once, turn the network off, open it again, and the worker was in
+   control, the network was gone, the cache was empty, and the fetch handler below threw — which the WebView
+   reported as net::ERR_FAILED over a blank page. A browser hid the same bug behind its own HTTP cache.
+
+   Only the three files the game cannot start without are fetched here, each tolerating its own failure so one
+   404 cannot fail the install and leave the site with no worker at all. Everything else still arrives the way
+   it always did, on first use. The query strings the page stamps on the CSS and the JS are not known here and
+   do not need to be: the fallback below matches with ignoreSearch. */
+const CORE = ['/puzzle/', '/css/puzzle.css', '/js/puzzle.js'];
+self.addEventListener('install', event => {
+  self.skipWaiting();
+  event.waitUntil(caches.open(VERSION).then(cache =>
+    Promise.all(CORE.map(path => cache.add(new Request(path, { cache: 'reload' })).catch(() => {})))));
+});
 self.addEventListener('activate', event => {
   event.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k.startsWith('ptw-cache-') && k !== VERSION).map(k => caches.delete(k)))).then(() => self.clients.claim()));
 });

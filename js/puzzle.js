@@ -114,7 +114,7 @@
   const PALETTE = ['#FFED54', '#5CD6FF', '#8CFF7A', '#FF9AD5', '#C79BFF', '#FFB347', '#6EE7B7', '#FDBA74', '#F97373', '#38BDF8'];
 
   const el = {
-    select: $('#aaSelect'), tagline: $('#aaTagline'), homeSel: $('#aaHome'), purse: $('#aaPurse'), purseNo: $('#aaPurseNo'), goldAd: $('#aaGoldAd'), hudDiff: $('#aaHudDiff'), play: $('#aaPlay'), path: $('#aaPath'), btnVibe: $('#aaVibe'), btnGuides: $('#aaGuides'), btnMusic: $('#aaMusic'), howTo: $('#aaHowTo'),
+    select: $('#aaSelect'), tagline: $('#aaTagline'), homeSel: $('#aaHome'), purse: $('#aaPurse'), purseNo: $('#aaPurseNo'), goldAd: $('#aaGoldAd'), hudDiff: $('#aaHudDiff'), play: $('#aaPlay'), path: $('#aaPath'), btnVibe: $('#aaVibe'), btnGuides: $('#aaGuides'), btnMusic: $('#aaMusic'),
     sheet: $('#aaSheet'), friends: $('#aaFriends'), signInSheet: $('#aaSignInSheet'), googleBtn: $('#aaGoogleBtn'), signInNote: $('#aaSignInNote'), ranks: $('#aaRanks'), league: $('#aaLeague'), leagueEnds: $('#aaLeagueEnds'), leagueSheet: $('#aaLeagueSheet'), leagueBody: $('#aaLeagueBody'), leagueInfo: $('#aaLeagueInfo'), matchSheet: $('#aaMatchSheet'), matchBody: $('#aaMatchBody'), matchTitle: $('#aaMatchTitle'), accountGroup: $('#aaAccountGroup'), accountCap: $('#aaAccountCap'), accountRow: $('#aaAccountRow'), accountName: $('#aaAccountName'), accountWho: $('#aaAccountWho'), accountGold: $('#aaAccountGold'), accountFace: $('#aaAccountFace'), sessionGroup: $('#aaSessionGroup'), sessionCap: $('#aaSessionCap'), signOutBtn: $('#aaSignOut'), deleteAccBtn: $('#aaDeleteAcc'), settingsBtns: $$('#aaSettings, #aaSettingsG'), themeBtn: $('#aaTheme'), themes: $('#aaThemes'),
     game: $('#aaGame'), boardWrap: $('#aaBoardWrap'), board: $('#aaBoard'), toast: $('#aaToast'), confetti: $('#aaConfetti'),
     hudLevel: $('#aaHudLevel'), hudMode: $('#aaHudMode'), hudTime: $('#aaHudTime'), hudLeft: $('#aaHudLeft'), hudLives: $('#aaHudLives'), hudLivesWrap: $('#aaHudLivesWrap'), hudPct: $('#aaHudPct'), boardBar: $('#aaBoardBar'),
@@ -3814,12 +3814,9 @@
     if (!el.game.hidden && !state.finished && state.lives === 1 && state.startedAt) heartLost();
   });
   el.btnGuides?.addEventListener('click', () => { state.guides = !state.guides; store.set('guides', state.guides); renderToggles(); });
-  const goAbout = () => { closeSheets(); if (!el.game.hidden) goToLevels(); document.getElementById('aaAbout')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); };
-  el.howTo?.addEventListener('click', goAbout);
   // Reset progress used to be here. It wiped this device, which made sense when this device was the only place
   // a tour existed. It is not any more: the account holds it, so clearing local storage would have deleted
   // nothing and then re-downloaded it on the next sync — a button that looks destructive and does nothing.
-  $$('a[href="#aaAbout"]').forEach(a => a.addEventListener('click', e => { e.preventDefault(); goAbout(); }));
   renderToggles();
   document.addEventListener('keydown', e => { if (!el.game.hidden && !state.finished && (e.key === 'h' || e.key === 'H') && !/input|textarea/i.test(document.activeElement?.tagName || '')) hint(); });
   document.addEventListener('visibilitychange', () => { if (document.hidden && state.startedAt && !state.raceBase && !state.finished) { stopTimer(); } });
@@ -3921,10 +3918,6 @@
     window.addEventListener('load', () => { navigator.serviceWorker.register('/piece-the-world-sw.js').catch(() => {}); });
   }
 
-  $$('.faq-item').forEach(item => {
-    const q = item.querySelector('.faq-q'), a = item.querySelector('.faq-a');
-    q?.addEventListener('click', () => { const open = !item.classList.contains('open'); item.classList.toggle('open', open); q.setAttribute('aria-expanded', String(open)); a?.setAttribute('aria-hidden', String(!open)); });
-  });
   const root = document.getElementById('stars');
   if (root && !root.childElementCount) {
     for (let i = 0; i < 90; i++) {
