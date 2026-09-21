@@ -99,7 +99,10 @@ public final class MainActivity extends ComponentActivity {
         super.onResume();
         // A theme picked in Settings changes the page's theme-color without a navigation, so the bars would
         // keep the old contrast until something asked again. Leaving the app and coming back asks again.
-        readThemeColour();
+        //
+        // Not on the first resume, though: that one runs while the page is still on its way, and asking a
+        // WebView with nothing in it what colour it is gets an empty answer.
+        if (web.getUrl() != null) readThemeColour();
     }
 
     /**
@@ -112,24 +115,30 @@ public final class MainActivity extends ComponentActivity {
         web.evaluateJavascript(
                 "(document.querySelector('meta[name=\"theme-color\"]')||{}).content||''",
                 value -> {
-                    // evaluateJavascript hands back a JSON string, quotes and all.
+                    // evaluateJavascript hands back a JSON string, quotes and all — and hands back "" when
+                    // there is no page yet, or no meta in it, or the page is an error page. Color.parseColor
+                    // answers an empty string with StringIndexOutOfBoundsException rather than the
+                    // IllegalArgumentException its name suggests, which is how a cosmetic touch like this one
+                    // managed to kill the app on launch. So the string is checked before it is parsed, and
+                    // anything unparseable afterwards is still caught: the bars keeping the wrong contrast is
+                    // a blemish, and nothing here is worth more than the app staying up.
                     String hex = value == null ? "" : value.replace("\"", "").trim();
-                    int colour;
+                    if (hex.length() < 4 || hex.charAt(0) != '#') return;
                     try {
-                        colour = Color.parseColor(hex);
-                    } catch (IllegalArgumentException notAColour) {
-                        return;
+                        int colour = Color.parseColor(hex);
+                        // Rec. 601 luma, the same rule a browser uses to decide bar contrast.
+                        double luma = (0.299 * Color.red(colour)
+                                + 0.587 * Color.green(colour)
+                                + 0.114 * Color.blue(colour)) / 255.0;
+                        boolean light = luma > 0.6;
+                        findViewById(R.id.root).setBackgroundColor(colour);
+                        WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView())
+                                .setAppearanceLightStatusBars(light);
+                        WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView())
+                                .setAppearanceLightNavigationBars(light);
+                    } catch (RuntimeException notAColour) {
+                        // Leave the bars as they are.
                     }
-                    // Rec. 601 luma, the same rule a browser uses to decide bar contrast.
-                    double luma = (0.299 * Color.red(colour)
-                            + 0.587 * Color.green(colour)
-                            + 0.114 * Color.blue(colour)) / 255.0;
-                    boolean light = luma > 0.6;
-                    findViewById(R.id.root).setBackgroundColor(colour);
-                    WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView())
-                            .setAppearanceLightStatusBars(light);
-                    WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView())
-                            .setAppearanceLightNavigationBars(light);
                 });
     }
 
