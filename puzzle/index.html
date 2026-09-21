@@ -26,7 +26,12 @@
          ON APPROVAL: change data-give to "ad", or delete the attribute. That is the whole switch.
          The publisher id is read from the AdSense tag above. (Plain AdSense does not serve rewarded ads; H5
          Games Ads, requested from the same account, is the one that does.) content="off" sleeps all of it. -->
-    <meta name="puzzle-ads" content="h5" data-give="free" />
+    <!-- data-admob-*: the AdMob ad unit ids, used only when the game is running inside the Android app.
+         The same AdSense tag asks for the same breaks either way; these decide who answers. Empty until the
+         AdMob account has them, and then they are just pasted in — nothing else changes.
+         They look like ca-app-pub-0000000000000000/0000000000 (a slash, where the app id has a tilde). -->
+    <meta name="puzzle-ads" content="h5" data-give="free"
+          data-admob-rewarded="" data-admob-interstitial="" />
     <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-8ZPSNG5X37"></script>
     <script>
@@ -397,6 +402,6 @@
       </div>
     </div>
 
-    <script src="/js/puzzle.js?v=34"></script>
+    <script src="/js/puzzle.js?v=35"></script>
   </body>
 </html>

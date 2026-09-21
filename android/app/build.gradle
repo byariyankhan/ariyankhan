@@ -87,4 +87,8 @@ dependencies {
     // injected into our own page and not into every frame the way addJavascriptInterface would — which
     // matters now and matters more when this bridge is carrying purchases.
     implementation 'androidx.webkit:webkit:1.12.1'
+
+    // AdMob. Not for drawing ads itself — the game's own AdSense tag does that — but for
+    // MobileAds.registerWebView, which is the whole reason this app owns its WebView.
+    implementation 'com.google.android.gms:play-services-ads:23.6.0'
 }

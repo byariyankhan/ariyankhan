@@ -36,6 +36,7 @@ import androidx.webkit.JavaScriptReplyProxy;
 import androidx.webkit.WebViewCompat;
 import androidx.webkit.WebViewFeature;
 
+import com.google.android.gms.ads.MobileAds;
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption;
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential;
 
@@ -113,6 +114,7 @@ public final class MainActivity extends ComponentActivity {
         web.setWebViewClient(new Client(back));
 
         installBridge(web);
+        registerForAds(web);
 
         if (state == null) web.loadUrl(target(getIntent()));
     }
@@ -258,6 +260,36 @@ public final class MainActivity extends ComponentActivity {
         // The same 240ms the Trusted Web Activity faded over, so the way in looks no different than before.
         splash.animate().alpha(0f).setDuration(240)
                 .withEndAction(() -> splash.setVisibility(View.GONE)).start();
+    }
+
+    /**
+     * Hand the WebView to the Mobile Ads SDK.
+     *
+     * <p>This one call is the reason the app stopped being a Trusted Web Activity. AdMob will not serve an H5
+     * game unless the app owns the WebView it runs in, and owning it means being able to pass the instance to
+     * {@code registerWebView}. There was no instance to pass when the renderer belonged to Chrome.
+     *
+     * <p>Nothing here draws an advertisement. The game's own AdSense tag still asks for the breaks; what the
+     * registration changes is where the answer comes from — AdMob's demand rather than AdSense's — which is
+     * the only arrangement Google's own H5 guide calls policy compliant for a game inside an app you own.
+     *
+     * <p>The SDK is initialised on a background thread because its first call does disk and network work and
+     * would otherwise be done on the way to the first frame. Registration is not: it has to be on the main
+     * thread, and it has to be before the page that will ask for an advertisement has loaded.
+     */
+    private void registerForAds(WebView v) {
+        try {
+            MobileAds.registerWebView(v);
+            new Thread(() -> {
+                try {
+                    MobileAds.initialize(this, status -> { });
+                } catch (RuntimeException noPlayServices) {
+                    // A phone without Play services shows no advertisements. It still plays the game.
+                }
+            }, "ads-init").start();
+        } catch (RuntimeException notToday) {
+            // Whatever went wrong here, it is not worth a game that will not open.
+        }
     }
 
     // ── The bridge ────────────────────────────────────────────────────────────────────────────────────
