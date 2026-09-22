@@ -206,15 +206,18 @@ arrangement Google's H5 guide calls policy compliant for a game embedded in an a
 travel the other way, from `meta[name=puzzle-ads]` in the page onto that tag as `data-admob-rewarded-slot` and
 `data-admob-interstitial-slot`, and only when the page can see it is in the app.
 
-**`APPLICATION_ID` is still Google's test id**, in `strings.xml`, and it is not optional: the SDK throws on
-launch if it is missing or malformed, by design. Clicking a real advertisement of your own is invalid traffic
-and invalid traffic costs the account, so development is done against the test ids and the real ones go in
-last.
+**`APPLICATION_ID` is the real one now** — `ca-app-pub-1570944160084395~8956379298`, in `strings.xml` — and it
+is not optional: the SDK throws on launch if it is missing or malformed, by design. It is not a secret; it is
+in the manifest of every copy of the app on every phone. What it does need is care while testing: clicking an
+advertisement of your own is invalid traffic and invalid traffic costs the account, so put the phone in
+AdMob → Settings → Test devices first and the same real ids serve test creatives.
 
 ### Seeing an advertisement before there are any
 
 Settings, seven taps on the build line at the foot, and a **Developer** group appears with the advertising
-mode: **Off**, **Test**, **Live** — stored on that device and nowhere else.
+mode: **Default**, **Test**, **Live** — stored on that device and nowhere else. Default means the page decides,
+which is what every other phone does; it is there so that opening the group to look at it does not change
+anything, and so there is a way back from the other two.
 
 It exists because of a gap that only showed up once the app was real. The mode could be forced with an
 `?ads=test` URL parameter, gated on localhost or a flag set by hand; the app has no address bar to type a
@@ -222,13 +225,33 @@ parameter into and no console to set a flag from, so on a phone there was no way
 advertisement path — not today, and not on the morning approval lands.
 
 - **Test** is the stand-in panel: the offer, the wait, the reward, the refusals, with nothing asked of any
-  network. It is how the flow gets judged before a network will answer at all.
+  network — and nothing asked of the server either, so the gold it talks about is talked about rather than
+  paid. It is how the flow gets judged before a network will answer at all.
 - **Live** asks for the real thing on that one device, which is what turns approval day into a check rather
   than a leap: flip it here, watch one, then flip `data-give` for everybody. Put the phone in AdMob →
   Settings → Test devices first; clicking a real advertisement of your own is invalid traffic.
 
 Seven taps rather than a URL on purpose. A link can be sent to somebody; a gesture on a line at the foot of
 Settings cannot.
+
+### What the app does around an advertisement
+
+Three things in `MainActivity`, none of which draw anything, all of which decide whether a real advertisement
+behaves:
+
+- **It stops when the app does.** `onPause` calls `web.onPause()` and `pauseTimers()`, `onResume` undoes both.
+  Without it a rewarded video keeps playing to a phone nobody is looking at, which is what a player who takes
+  a call halfway through an advertisement would have heard.
+- **A link that is not a web page leaves the app.** A great many creatives click through with an `intent:`
+  URI, and a WebView loads exactly nothing from one: the click is lost and the advertiser got no visit for
+  what they paid. Any scheme this WebView cannot draw — `intent:`, `market:`, `tel:`, `mailto:` — is handed to
+  the phone, from an advertisement's own iframe as much as from the main frame. What comes back from
+  `Intent.parseUri` is stripped of its component and selector and required to be `BROWSABLE` before it is
+  started, because the URI came from somebody else's frame; `browser_fallback_url` is honoured when nothing
+  handles it, and the Play page for the named package after that.
+- **Only a finger can do it.** `hasGesture()` gates that hand-off. Script can start a navigation as easily as
+  a tap can, and a creative that fired one on load would put the Play Store in front of a player who touched
+  nothing.
 
 ### What the SDK changes about the Play listing
 
