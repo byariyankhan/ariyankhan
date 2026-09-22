@@ -1,5 +1,15 @@
 plugins { id 'com.android.application' }
 
+// Firebase Cloud Messaging is what carries a notification to a phone that has the game closed, and its library
+// needs to know which Firebase project it belongs to. That comes from google-services.json, which Google says
+// is not a secret (it is inside every APK that uses it) and which is Ariyan's to put at app/google-services.json,
+// or to hand to CI as a secret -- see android/README.md. Applying the plugin without the file fails the build,
+// so it is applied only when the file is there; without it the app builds exactly as before and tells the page
+// that notifications are unavailable.
+if (file('google-services.json').exists()) {
+    apply plugin: 'com.google.gms.google-services'
+}
+
 android {
     namespace 'com.ariyankhan.puzzle'
     // Google Play has required API 36 of new apps and of every update since 31 August 2026. 35 would be
@@ -91,4 +101,11 @@ dependencies {
     // AdMob. Not for drawing ads itself — the game's own AdSense tag does that — but for
     // MobileAds.registerWebView, which is the whole reason this app owns its WebView.
     implementation 'com.google.android.gms:play-services-ads:23.6.0'
+
+    // Notifications. firebase-messaging is the phone's end of Firebase Cloud Messaging: it minds the
+    // registration token the server addresses a phone by, receives the message when one arrives, and hands it
+    // to PuzzleMessagingService, which draws it. The BOM pins every Firebase library to one release so no two
+    // can disagree. It does nothing, and talks to nobody, until the player turns the switch on.
+    implementation platform('com.google.firebase:firebase-bom:33.7.0')
+    implementation 'com.google.firebase:firebase-messaging'
 }

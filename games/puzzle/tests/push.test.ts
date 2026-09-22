@@ -3,13 +3,18 @@
 // The sending itself is not tested here: it is an HTTPS request to somebody else's push service, and a suite
 // that mocks that tests the mock. What matters on this side is the table — one row per browser, following the
 // account that is signed in on it, disposable — and the words a notification arrives with.
+import { createVerify, generateKeyPairSync } from 'node:crypto';
 import { pool, query } from '../backend/src/db.js';
-import { dropSubscription, hasSubscription, invitedNote, leagueNote, saveSubscription } from '../backend/src/push.js';
+import { appEnabled, dropSubscription, dropToken, hasSubscription, invitedNote, leagueNote, saveSubscription, saveToken } from '../backend/src/push.js';
+import { assertion, enabled as fcmEnabled, messageFor, parseAccount } from '../backend/src/fcm.js';
 import { eq, finish, ok, player, reset, section } from './helpers.js';
 
 const sub = (n: number) => ({ endpoint: `https://push.example.com/e/${n}`, keys: { p256dh: `p${n}`, auth: `a${n}` } });
 const rowsFor = async (userId: number) =>
   (await query<{ endpoint: string }>(pool, `SELECT endpoint FROM push_subscriptions WHERE user_id = $1 ORDER BY id`, [userId])).rows.map(r => r.endpoint);
+const tokensFor = async (userId: number) =>
+  (await query<{ token: string }>(pool, `SELECT token FROM push_tokens WHERE user_id = $1 ORDER BY id`, [userId])).rows.map(r => r.token);
+const fcmToken = (c: string) => `fcm:${c.repeat(40)}`;
 
 await reset();
 
@@ -75,6 +80,92 @@ section('What it says');
   eq(lg.title, 'You finished #3 this week', 'the league says where you came');
   ok(lg.body.includes('1,280,000'), 'and what it paid');
   eq(lg.url, '/puzzle/#league', 'and lands on the table');
+}
+
+section('Remembering a phone');
+{
+  const a = await player('phone-a');
+  await saveToken(pool, a.id, fcmToken('x'), 'PuzzleApp/1 on Android 15');
+  eq(await tokensFor(a.id), [fcmToken('x')], 'a registration token is kept');
+  ok(await hasSubscription(pool, a.id), 'and counts as a device listening, the same as a browser would');
+
+  // The app posts its token every time the game opens with the switch on. The same string is the same phone.
+  await saveToken(pool, a.id, fcmToken('x'), 'PuzzleApp/2 on Android 16');
+  eq(await tokensFor(a.id), [fcmToken('x')], 'posting it again does not add a second row');
+  const row = await query<{ agent: string }>(pool, `SELECT agent FROM push_tokens WHERE token = $1`, [fcmToken('x')]);
+  eq(row.rows[0]?.agent, 'PuzzleApp/2 on Android 16', 'and the row says which build posted it last');
+
+  // A phone and a browser are two rows in two tables, and both are told.
+  await saveSubscription(pool, a.id, sub(9), 'Chrome');
+  ok(await hasSubscription(pool, a.id), 'a phone beside a browser still counts');
+  await dropSubscription(pool, a.id, sub(9).endpoint);
+  ok(await hasSubscription(pool, a.id), 'and losing the browser leaves the phone listening');
+}
+
+section('A phone that changes hands');
+{
+  const a = await player('phone-b');
+  const b = await player('phone-c');
+  await saveToken(pool, a.id, fcmToken('y'), 'app');
+  await query(pool, `UPDATE push_tokens SET fails = 3 WHERE token = $1`, [fcmToken('y')]);
+  await saveToken(pool, b.id, fcmToken('y'), 'app');
+  eq(await tokensFor(a.id), [], 'the token leaves the account that signed out of the app');
+  eq(await tokensFor(b.id), [fcmToken('y')], 'and follows the one signed in on it now');
+  eq((await query<{ fails: number }>(pool, `SELECT fails FROM push_tokens WHERE token = $1`, [fcmToken('y')])).rows[0]?.fails, 0,
+    'and a fresh post says the phone is alive, whatever failed before');
+
+  await dropToken(pool, a.id, fcmToken('y'));
+  eq(await tokensFor(b.id), [fcmToken('y')], 'the account that left cannot drop it from the one that stayed');
+  await dropToken(pool, b.id, fcmToken('y'));
+  eq(await tokensFor(b.id), [], 'the one signed in can');
+  ok(!(await hasSubscription(pool, b.id)), 'and then nothing is listening');
+
+  const c = await player('phone-d');
+  await saveToken(pool, c.id, fcmToken('z'), 'app');
+  await query(pool, `DELETE FROM users WHERE id = $1`, [c.id]);
+  eq((await query(pool, `SELECT 1 FROM push_tokens WHERE token = $1`, [fcmToken('z')])).rowCount, 0, 'a deleted account takes its phones with it');
+}
+
+section('Reaching Firebase with no Firebase library');
+{
+  ok(!fcmEnabled && !appEnabled, 'with no service account configured, phones are simply off');
+  eq(parseAccount(''), null, 'nothing is not an account');
+  eq(parseAccount('not an account'), null, 'nor is junk');
+  eq(parseAccount('{"project_id":"p","client_email":"e@x"}'), null, 'nor a file with no key in it');
+  eq(parseAccount('{"project_id":"p","client_email":"e@x","private_key":"nope"}'), null, 'nor one whose key is not a key');
+
+  // A throwaway keypair stands in for the one Firebase generates; the shape of the file is Google's.
+  const pair = generateKeyPairSync('rsa', { modulusLength: 2048 });
+  const pem = pair.privateKey.export({ type: 'pkcs8', format: 'pem' }) as string;
+  const file = JSON.stringify({ type: 'service_account', project_id: 'puzzle-test', client_email: 'svc@puzzle-test.iam.gserviceaccount.com', private_key: pem, token_uri: 'https://oauth2.googleapis.com/token' });
+  const acct = parseAccount(file);
+  eq(acct?.project_id, 'puzzle-test', 'the JSON Firebase hands out is read as it is');
+  eq(parseAccount(Buffer.from(file).toString('base64'))?.client_email, 'svc@puzzle-test.iam.gserviceaccount.com',
+    'and base64 of it, which is how one .env line carries a file with newlines in it');
+
+  const jwt = assertion(acct!, 1_700_000_000);
+  const [h, c, s] = jwt.split('.') as [string, string, string];
+  eq(JSON.parse(Buffer.from(h, 'base64url').toString()), { alg: 'RS256', typ: 'JWT' }, 'the assertion is an RS256 JWT');
+  const claims = JSON.parse(Buffer.from(c, 'base64url').toString()) as Record<string, unknown>;
+  eq(claims.iss, acct!.client_email, 'issued by the service account');
+  eq(claims.scope, 'https://www.googleapis.com/auth/firebase.messaging', 'for messaging and nothing wider');
+  eq(claims.aud, 'https://oauth2.googleapis.com/token', "to Google's token endpoint");
+  eq([claims.iat, claims.exp], [1_700_000_000, 1_700_003_600], 'good for an hour');
+  const v = createVerify('RSA-SHA256'); v.update(`${h}.${c}`);
+  ok(v.verify(pair.publicKey, Buffer.from(s, 'base64url')), 'and the signature checks against the matching public key');
+  const w = createVerify('RSA-SHA256'); w.update(`${h}.${c}`);
+  ok(!w.verify(generateKeyPairSync('rsa', { modulusLength: 2048 }).publicKey, Buffer.from(s, 'base64url')), "and against nobody else's");
+
+  const m = messageFor('tok', invitedNote('Ariyan', 500, 'ABC123'), 3600) as {
+    message: { token: string; data: Record<string, string>; notification?: unknown; android: { priority: string; ttl: string; collapse_key: string } };
+  };
+  eq(m.message.token, 'tok', 'the message is addressed to the one phone');
+  eq(m.message.data.title, 'Ariyan wants to play', 'and carries the words the browser would get');
+  eq(m.message.data.url, '/puzzle/#m=ABC123', 'and the same place to land');
+  eq(m.message.notification, undefined, 'as data only, so the app draws it the same way open or closed');
+  eq(m.message.android.priority, 'high', 'at high priority, because a room waits minutes');
+  eq(m.message.android.ttl, '3600s', "and for as long as the browser's copy would");
+  eq(m.message.android.collapse_key, m.message.data.tag, 'collapsing on the tag, so five invitations are one');
 }
 
 await finish();

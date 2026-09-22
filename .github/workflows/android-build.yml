@@ -13,6 +13,11 @@
 #   PUZZLE_KEY_ALIAS          puzzle-upload
 #   PUZZLE_KEY_PASSWORD       the key password
 #
+# One more is optional. Notifications need Firebase's google-services.json in android/app/, which Google does
+# not treat as a secret (it is inside every APK that uses it) and which can simply be committed there. If it is
+# not, GOOGLE_SERVICES_JSON_B64 (base64 -w0 google-services.json) is written onto the runner instead; with
+# neither, the bundle builds without Firebase and its notifications switch stays hidden. See android/README.md.
+#
 # Nothing is uploaded to Play from here. The artifact is downloaded and uploaded by hand, on purpose: pushing
 # straight to a track needs a service account with release rights, and that is a second key to look after for
 # a saving of one drag and drop.
@@ -70,6 +75,21 @@ jobs:
           fi
           printf '%s' "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/upload.jks"
           test -s "$RUNNER_TEMP/upload.jks" || { echo "::error::the secret did not decode to a keystore"; exit 1; }
+
+      - name: Firebase configuration, when it is a secret rather than a file
+        env:
+          GS_B64: ${{ secrets.GOOGLE_SERVICES_JSON_B64 }}
+        run: |
+          set -euo pipefail
+          if [ -s android/app/google-services.json ]; then echo "google-services.json is in the checkout"; exit 0; fi
+          if [ -z "$GS_B64" ]; then
+            echo "::warning::no android/app/google-services.json and no GOOGLE_SERVICES_JSON_B64 secret: this bundle cannot receive notifications"
+            exit 0
+          fi
+          printf '%s' "$GS_B64" | base64 -d > android/app/google-services.json
+          python3 -c 'import json; json.load(open("android/app/google-services.json"))' \
+            || { echo "::error::GOOGLE_SERVICES_JSON_B64 did not decode to a JSON file"; exit 1; }
+          echo "google-services.json written from the secret"
 
       - name: Build the bundle
         working-directory: android

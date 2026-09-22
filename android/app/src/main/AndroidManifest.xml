@@ -6,13 +6,14 @@
      Activity has no instance to register because the renderer is Chrome's. Play Billing points the same way.
      See MainActivity for the rest, and android/README.md for what the move cost.
 
-     There is no POST_NOTIFICATIONS here any more. The Push API does not exist in a WebView, so the game's web
-     push cannot work in the app whatever this file says, and a permission the app cannot use has no business
-     on the store listing. It comes back with Firebase Cloud Messaging, which is what will actually deliver an
-     invitation to a phone. -->
+     POST_NOTIFICATIONS is here for a reason the app can now use. The Push API does not exist in a WebView, so
+     the game's web push never could work in the app; what delivers an invitation to a phone is Firebase Cloud
+     Messaging, received by PuzzleMessagingService below. The permission is asked for at one moment only: when
+     the player turns the switch on in Settings. Never on the way in. -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <!-- appCategory="game" is load-bearing. Android 16 ignores android:screenOrientation on any display
          600dp wide or over, so a tablet or an unfolded foldable would hand the game a landscape window
@@ -52,6 +53,35 @@
         <meta-data
             android:name="com.google.android.gms.ads.INTEGRATION_MANAGER"
             android:value="webview" />
+
+        <!-- Where a notification arrives. Firebase Cloud Messaging delivers to this service whether the game is
+             open or not, and the service draws every notification itself: the server sends data, never a
+             ready-made notification, so an invitation looks the same either way. Not exported; only Firebase's
+             own delivery reaches it. -->
+        <service
+            android:name=".PuzzleMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
+        <!-- Firebase minting a token at startup would be Firebase being spoken to on behalf of a player who
+             has turned nothing on. Off, until the switch is: MainActivity turns it on then, and off again. -->
+        <meta-data
+            android:name="firebase_messaging_auto_init_enabled"
+            android:value="false" />
+
+        <!-- What the library itself would draw if a message ever arrived with a notification block instead
+             of data. None of ours do, but a test message sent from the Firebase console does. The same icon
+             and the same channel, so even that lands in the right place and not in a "Miscellaneous" channel
+             of the library's own making. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_stat_puzzle" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="invites" />
 
         <!-- configChanges is the difference between a rotation costing nothing and a rotation throwing the
              board away. Without it Android destroys and rebuilds the activity, and a rebuilt WebView starts

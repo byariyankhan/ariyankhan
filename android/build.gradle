@@ -1,4 +1,8 @@
 plugins {
     // The last 8.x line, and the first that treats compileSdk 36 as released rather than a preview.
     id 'com.android.application' version '8.13.2' apply false
+    // Firebase's configuration plugin: it turns app/google-services.json into the resources the Firebase
+    // library reads at startup. The app module applies it only when that file is there (see its build.gradle),
+    // so a checkout without the file still builds -- with no notifications in it.
+    id 'com.google.gms.google-services' version '4.4.2' apply false
 }

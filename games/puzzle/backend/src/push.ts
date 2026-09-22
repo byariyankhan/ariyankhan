@@ -18,6 +18,7 @@ import webpush from 'web-push';
 import { config } from './config.js';
 import { pool, query, type Sql } from './db.js';
 import { log } from './log.js';
+import * as fcm from './fcm.js';
 
 export interface PushSub { endpoint: string; keys: { p256dh: string; auth: string } }
 
@@ -45,6 +46,29 @@ if (enabled) {
 export const publicKey = (): string => (enabled ? vapid.public : '');
 
 /**
+ * Whether a phone with the app can be reached at all. The app has no Push API, so its notifications go
+ * through Firebase Cloud Messaging (fcm.ts), which is configured or not independently of the browser's keys.
+ */
+export const appEnabled = fcm.enabled;
+
+// ── Phones ──
+
+/** Remember where to reach this phone. One row per token; a token that changes hands follows the sign-in. */
+export async function saveToken(sql: Sql, userId: number, token: string, agent: string): Promise<void> {
+  await query(sql, `
+    INSERT INTO push_tokens (user_id, token, agent)
+         VALUES ($1, $2, $3)
+    ON CONFLICT (token) DO UPDATE
+            SET user_id = EXCLUDED.user_id, agent = EXCLUDED.agent, seen_at = now(), fails = 0`,
+    [userId, token, agent.slice(0, 200)]);
+}
+
+/** The player turning notifications off on this phone. Only their own token is theirs to drop. */
+export async function dropToken(sql: Sql, userId: number, token: string): Promise<void> {
+  await query(sql, `DELETE FROM push_tokens WHERE user_id = $1 AND token = $2`, [userId, token]);
+}
+
+/**
  * Remember where to reach this player.
  *
  * Keyed by endpoint, so the same browser subscribing again updates its row rather than adding another, and a
@@ -65,9 +89,11 @@ export async function dropSubscription(sql: Sql, userId: number, endpoint: strin
   await query(sql, `DELETE FROM push_subscriptions WHERE user_id = $1 AND endpoint = $2`, [userId, endpoint]);
 }
 
-/** Whether this player has any device listening — what the client's toggle reads back. */
+/** Whether this player has any device listening — browser or phone — which is what the client's toggle reads back. */
 export async function hasSubscription(sql: Sql, userId: number): Promise<boolean> {
-  const r = await query<{ n: number }>(sql, `SELECT count(*)::int AS n FROM push_subscriptions WHERE user_id = $1`, [userId]);
+  const r = await query<{ n: number }>(sql, `
+    SELECT (SELECT count(*) FROM push_subscriptions WHERE user_id = $1)::int
+         + (SELECT count(*) FROM push_tokens        WHERE user_id = $1)::int AS n`, [userId]);
   return (r.rows[0]?.n ?? 0) > 0;
 }
 
@@ -82,6 +108,36 @@ const MAX_FAILS = 5;
  * Dead endpoints are deleted as the push service reports them, so the table cleans itself.
  */
 export async function sendToUser(userId: number, note: PushNote): Promise<number> {
+  const [web, app] = await Promise.all([sendToBrowsers(userId, note), sendToPhones(userId, note)]);
+  return web + app;
+}
+
+/** Every phone this player has the app on, through FCM. The same promises as the browsers: never throws, dead rows go. */
+async function sendToPhones(userId: number, note: PushNote): Promise<number> {
+  if (!appEnabled) return 0;
+  let sent = 0;
+  try {
+    const rows = await query<{ id: number; token: string }>(pool, `SELECT id, token FROM push_tokens WHERE user_id = $1`, [userId]);
+    if (!rows.rowCount) return 0;
+    await Promise.all(rows.rows.map(async row => {
+      const how = await fcm.send(row.token, note, config.push.ttlSeconds);
+      if (how === 'sent') {
+        sent++;
+        await query(pool, `UPDATE push_tokens SET seen_at = now(), fails = 0 WHERE id = $1`, [row.id]);
+      } else if (how === 'dead') {
+        await query(pool, `DELETE FROM push_tokens WHERE id = $1`, [row.id]);
+      } else {
+        const r = await query<{ fails: number }>(pool, `UPDATE push_tokens SET fails = fails + 1 WHERE id = $1 RETURNING fails`, [row.id]);
+        if ((r.rows[0]?.fails ?? 0) >= MAX_FAILS) await query(pool, `DELETE FROM push_tokens WHERE id = $1`, [row.id]);
+      }
+    }));
+  } catch (e) {
+    log.err('fcm send threw', e, { kind: note.kind });
+  }
+  return sent;
+}
+
+async function sendToBrowsers(userId: number, note: PushNote): Promise<number> {
   if (!enabled) return 0;
   let sent = 0;
   try {

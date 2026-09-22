@@ -9,6 +9,10 @@
      The shell names it from a layout instead, which the shrinker does follow, so this file is now a belt to
      the layout's braces rather than the only thing holding the splash in. It stays because the failure it
      prevents is invisible in debug builds and fatal in release ones, and because the colours below are still
-     partly referenced from places the walk does not reach. -->
+     partly referenced from places the walk does not reach.
+
+     ic_stat_puzzle is here for the original reason: the manifest names it as Firebase's default notification
+     icon through the same kind of meta-data that lost the splash. Code names it too, which the shrinker does
+     see, but a notification that arrives with no icon is a crash in the shipped build and nowhere else. -->
 <resources xmlns:tools="http://schemas.android.com/tools"
-    tools:keep="@drawable/splash,@color/paper,@color/ink" />
+    tools:keep="@drawable/splash,@drawable/ic_stat_puzzle,@color/paper,@color/ink" />
