@@ -149,7 +149,7 @@
     worldMap: $('#aaWorldMap'), worldCap: $('#aaWorldCap'), worldScroll: $('#aaWorldScroll'),
     brainArt: $('#aaBrainArt'), brainLv: $('#aaBrainLv'), brainDiff: $('#aaBrainDiff'), brainNote: $('#aaBrainNote'),
     deck: $('#aaDeck'), deckTrack: $('#aaDeckTrack'), deckDots: $('#aaDeckDots'),
-    notifyCap: $('#aaNotifyCap'), notifyGroup: $('#aaNotifyGroup'), btnNotify: $('#aaNotify'), notifyNote: $('#aaNotifyNote'), remindRow: $('#aaRemindRow'), btnRemind: $('#aaRemind'),
+    notifyCap: $('#aaNotifyCap'), notifyGroup: $('#aaNotifyGroup'), btnNotify: $('#aaNotify'), notifyNote: $('#aaNotifyNote'), remindRow: $('#aaRemindRow'), btnRemind: $('#aaRemind'), mutedCap: $('#aaMutedCap'), mutedGroup: $('#aaMutedGroup'),
     statBoards: $('#aaStatBoards'), statCountries: $('#aaStatCountries'), statStreak: $('#aaStatStreak'),
   };
   if (!el.board) return;
@@ -3073,37 +3073,21 @@
     if (btn) { btn.disabled = true; btn.textContent = 'Inviting…'; }
     try {
       const d = await matchApi('invite', { code: m.code, user_id: Number(id) });
-      if (btn) btn.textContent = d.delivered ? 'Invited' : 'Sent';
+      // Where it went: onto their screen, to their phone, or nowhere. An older server says only delivered.
+      const reach = d.reach || (d.delivered ? 'live' : 'none');
+      if (btn) btn.textContent = reach === 'none' ? 'Sent' : 'Invited';
       // A batch from the dashboard speaks once for all of them, so it asks for the answer and does the talking.
-      if (!quiet) toast(d.delivered ? `${name} has been asked to join.` : `${name} is not online — send them the link instead.`, d.delivered ? 'good' : 'hint');
-      return !!d.delivered;
+      if (!quiet) toast(reach === 'live' ? `${name} has been asked to join.`
+        : reach === 'push' ? `${name} is away — their phone has been told.`
+        : `${name} is not online — send them the link instead.`, reach === 'none' ? 'hint' : 'good');
+      return reach !== 'none';
     } catch (err) {
       if (btn) { btn.disabled = false; btn.textContent = 'Invite'; }
-      // Asked too recently, or enough for one day: said as what it is, and the button reads "Asked" rather
-      // than going back to "Invite", because an invitation that has just gone is not one to send again.
-      const minutes = Math.max(1, Math.ceil((Number(err.retryAfter) || 0) / 60));
-      if (btn && (err.code === 'too_soon' || err.code === 'enough_today')) { btn.disabled = true; btn.textContent = 'Asked'; }
-      // A limit is not a wall. The ask cannot go again for a while -- a double tap, a room opened by mistake,
-      // three in a day -- but the link works whenever it is tapped, so it is offered here, where the refusal
-      // is, instead of a wait. Taking any invitation of yours starts their count over.
-      if (!quiet && (err.code === 'too_soon' || err.code === 'enough_today')) {
-        const yes = await ask({
-          title: err.code === 'too_soon' ? `${name} was just asked` : `${name} has been asked three times today`,
-          body: (err.code === 'too_soon' ? `You can ask again in ${minutes} min. ` : 'That is the limit for one day, until they take one. ')
-            + 'Or send them the link now: it opens the room whenever they tap it.',
-          ok: 'Share the link',
-          cancel: 'Not now',
-        });
-        if (yes) await sendInvite(m);
-        return false;
-      }
       if (!quiet) toast(err.code === 'not_played_together' ? 'You can only invite people you have played with.'
         : err.code === 'in_a_match' ? `${name} is on a board right now. Try again when they are done.`
-        : err.code === 'too_soon' ? `${name} was asked a few minutes ago. Try again in ${minutes} min.`
-        : err.code === 'enough_today' ? `${name} has been asked enough for one day.`
         : err.code === 'taken' ? 'That room has already started.'
         : err.code === 'already_in' ? `${name} is already in this room.`
-        : 'Could not send that invitation.', err.code === 'too_soon' || err.code === 'enough_today' ? 'hint' : 'bad', 4200);
+        : 'Could not send that invitation.', 'bad', 4200);
       return false;
     }
   }
@@ -3134,7 +3118,7 @@
       if (!r.match || r.match.state !== 'open') return;
       SFX.join?.(); vibe(20);
       closeSheets();
-      showConfirm({ ...r.match, host: d.from || r.match.host, host_pic: d.pic || '' });
+      showConfirm({ ...r.match, host: d.from || r.match.host, host_pic: d.pic || '', host_id: d.from_id || 0 });
     } catch { /* the room went away between the invitation and the tap */ }
   }
 
@@ -3366,11 +3350,64 @@
         <button type="button" class="aa-btn aa-btn--primary" data-mact="join"${short ? ' disabled' : ''}>Confirm game</button>
         <button type="button" class="aa-btn" data-mact="close">Not now</button>
       </div>
+      ${m.host_id ? `<p class="aa-card-out"><button type="button" class="aa-linkbtn" data-mact="mute">Mute ${escapeHtml(m.host)}</button></p>` : ''}
       <p class="aa-flash" hidden></p>`;
     openSheet(el.matchSheet);
     wireFaces(el.matchBody);
     state.pendingMatch = m;
   }
+
+  // ── Muting ──
+  // The one answer to being asked too often: this person's invitations stop coming -- to the screen and to
+  // the phone -- and they leave the list of people to ask. They are never told. Settings lists who is muted,
+  // with a way back, so a tap in irritation is not for ever.
+  const playersApi = (path, body) =>
+    fetch(`${API_V1}/players/${path}`, {
+      method: body ? 'POST' : 'GET', credentials: 'include', cache: 'no-store',
+      headers: body ? { 'Content-Type': 'application/json' } : {},
+      body: body ? JSON.stringify(body) : undefined,
+    }).then(async r => { const d = await r.json().catch(() => ({})); if (!r.ok) throw Object.assign(new Error(d.error || `HTTP ${r.status}`), { code: d.error }); return d; });
+
+  async function muteHost(m) {
+    if (!m?.host_id) return;
+    const yes = await ask({
+      title: `Mute ${m.host}?`,
+      body: 'Their invitations will not reach you any more, on any device, and they leave your list. You can undo this in Settings.',
+      ok: 'Mute', cancel: 'Keep', danger: true,
+    });
+    if (!yes) return;
+    try {
+      const d = await playersApi('mute', { user_id: m.host_id });
+      forgetRecent();
+      closeSheets();
+      renderMuted(d.muted);
+      toast(`${m.host} is muted. Settings has the way back.`, 'hint', 4000);
+    } catch { toast('Could not mute them just now.', 'bad'); }
+  }
+
+  /** The list in Settings. Drawn from what the server last said; asked again each time Settings opens. */
+  function renderMuted(list) {
+    if (!el.mutedGroup) return;
+    const rows = Array.isArray(list) ? list : [];
+    const show = !!auth.user && rows.length > 0;
+    if (el.mutedCap) el.mutedCap.hidden = !show;
+    el.mutedGroup.hidden = !show;
+    if (!show) { el.mutedGroup.innerHTML = ''; return; }
+    el.mutedGroup.innerHTML = rows.map(p => `
+      <div class="aa-row"><span class="aa-rank aa-pl-face${faceClass(p)}" aria-hidden="true">${faceInner(p)}</span><span class="aa-row-label">${escapeHtml(p.name || 'Player')}<small class="aa-row-sub">Their invitations do not reach you</small></span><button type="button" class="aa-btn aa-btn--small" data-unmute="${p.id}">Unmute</button></div>`).join('');
+    wireFaces(el.mutedGroup);
+  }
+  async function loadMuted() {
+    if (!auth.user) { renderMuted([]); return; }
+    try { renderMuted((await playersApi('muted')).muted); } catch { /* the list stays as it was */ }
+  }
+  el.mutedGroup?.addEventListener('click', async e => {
+    const id = e.target.closest('[data-unmute]')?.dataset.unmute;
+    if (!id) return;
+    const btn = e.target.closest('[data-unmute]'); btn.disabled = true;
+    try { const d = await playersApi('unmute', { user_id: Number(id) }); forgetRecent(); renderMuted(d.muted); toast('Unmuted.', 'hint'); }
+    catch { btn.disabled = false; toast('Could not unmute them just now.', 'bad'); }
+  });
 
   function showMatchState(m, goldBefore, celebrate = true) {
     forgetRecent();
@@ -3612,6 +3649,7 @@
     if (!act) return;
     const m = state.pendingMatch;
     if (act === 'stakes') openFriends();
+    else if (act === 'mute') muteHost(m);
     else if (act === 'close') { closeSheets(); if (state.daily?.race && state.finished) goToLevels(); }
     else if (act === 'join' && m) {
       const btn = e.target.closest('[data-mact]'); btn.disabled = true;
@@ -4227,7 +4265,7 @@
     renderAccountRow();                                   // with what the page already knows, at once
     renderNotify();
     renderDev();
-    authLoad(true).then(() => { renderAccountRow(); renderPurse(); syncTour(); return notifyInit(); }).catch(() => {});   // then with the server's answer, tour included
+    authLoad(true).then(() => { renderAccountRow(); renderPurse(); syncTour(); void loadMuted(); return notifyInit(); }).catch(() => {});   // then with the server's answer, tour included
   }));
   el.friends?.addEventListener('click', openFriends);
   el.league?.addEventListener('click', openLeague);
