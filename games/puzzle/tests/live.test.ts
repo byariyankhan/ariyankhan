@@ -169,7 +169,7 @@ section('The board travels with the seat');
 
   const early = { moves: 3, gone: [4, 1, 9], lives: 3, wrong: 1, hintsUsed: 0, hintsMax: 3, checksUsed: 0, checksMax: 4 };
   await tx(c => R.saveProgress(c, code, a.id, 16, R.cleanRun(early)));
-  eq(runOf(a.id) && (await runOf(a.id))?.moves, 3, 'a snapshot posted with progress is kept');
+  eq((await runOf(a.id))?.moves, 3, 'a snapshot posted with progress is kept');
   eq(JSON.stringify((await runOf(a.id))?.gone), '[1,4,9]', 'with the arrows that have gone, in order');
 
   const later = { ...early, moves: 7, gone: [1, 4, 9, 12, 20], lives: 2, wrong: 2 };
