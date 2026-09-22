@@ -93,6 +93,12 @@ public final class MainActivity extends ComponentActivity {
     private ActivityResultLauncher<String> askToNotify;
     /** The page's pushOn, waiting on the permission dialog. One at a time, which is all a switch can be. */
     private JavaScriptReplyProxy notifyWaiting;
+    /**
+     * A way to speak to the page unasked. The bridge is request and reply, so the page introduces itself
+     * with a hello as it loads and this is the reply channel it handed over; Back goes down it. Null until
+     * the page has spoken, and stale after a navigation, which is why every message renews it.
+     */
+    private JavaScriptReplyProxy page;
 
     @Override
     protected void onCreate(@Nullable Bundle state) {
@@ -143,8 +149,11 @@ public final class MainActivity extends ComponentActivity {
             web.reload();
         });
 
-        // Back walks the game's own history first. The callback starts disabled and is only switched on while
-        // there is something to go back to, which leaves the last press to the system: that is what lets
+        // Back goes to the page. The game has no history for the WebView to walk -- it routes with
+        // replaceState, and its sheets are elements that are shown -- so Back is handed over the bridge and
+        // the page closes what it has open, one layer at a time; when nothing is open it says "leave" and
+        // the app steps into the background (see the bridge below). The callback is enabled while there is
+        // a page to ask or history to walk, which leaves the last press to the system: that is what lets
         // Android 16's predictive back animate the app closing instead of it vanishing.
         back = new OnBackPressedCallback(false) {
             @Override public void handleOnBackPressed() {
@@ -152,6 +161,7 @@ public final class MainActivity extends ComponentActivity {
                 // there is nothing in the WebView's history to go back to — so it has to be asked about
                 // first, or back would leave the app with an advertisement still on the screen.
                 if (fullscreen != null) { hideFullscreen(); return; }
+                if (page != null) { answer(page, event("back")); return; }
                 if (web.canGoBack()) web.goBack();
             }
         };
@@ -208,6 +218,9 @@ public final class MainActivity extends ComponentActivity {
     protected void onPause() {
         // Before super, so nothing is still drawing or sounding by the time the activity is told it is gone.
         web.onPause();
+        // The session cookie reaches the disk when the WebView gets round to it, which is not before a player
+        // who signs in and swipes the app away within seconds has lost it. Now is when it gets round to it.
+        CookieManager.getInstance().flush();
         super.onPause();
     }
 
@@ -349,9 +362,16 @@ public final class MainActivity extends ComponentActivity {
         }
     }
 
+    /**
+     * Ours is the game: https, our host, and the game's own path. The rest of the site -- the privacy policy,
+     * the terms, the contact page -- is the site, and it opens in the browser: those pages carry the site's
+     * AdSense tag, which may not be shown inside an app, and they are not what a player pressing Back expects
+     * to be standing in.
+     */
     private boolean ours(Uri u) {
-        return "https".equalsIgnoreCase(u.getScheme())
-                && getString(R.string.host).equalsIgnoreCase(u.getHost());
+        if (!"https".equalsIgnoreCase(u.getScheme()) || !getString(R.string.host).equalsIgnoreCase(u.getHost())) return false;
+        String path = u.getPath();
+        return path == null || path.isEmpty() || path.equals("/puzzle") || path.equals("/puzzle/") || path.equals("/puzzle/index.html");
     }
 
     /**
@@ -502,8 +522,15 @@ public final class MainActivity extends ComponentActivity {
             }
             fullscreenDone = null;
         }
-        if (back != null) back.setEnabled(web.canGoBack());
+        refreshBack();
     }
+
+    /** Back has somewhere to go while there is a page to ask, history to walk or a video to close. */
+    private void refreshBack() {
+        if (back != null) back.setEnabled(fullscreen != null || page != null || web.canGoBack());
+    }
+    /** The document the page channel belongs to, without its fragment: a new one means a new page to hear from. */
+    private String pageDoc = "";
 
     // ── The bridge ────────────────────────────────────────────────────────────────────────────────────
     //
@@ -522,7 +549,12 @@ public final class MainActivity extends ComponentActivity {
                 (view, message, sourceOrigin, isMainFrame, reply) -> {
                     if (!isMainFrame) return;
                     String cmd = message.getData();
+                    if (cmd == null) return;
+                    page = reply;                         // whichever it was, the page is here and this reaches it
+                    refreshBack();
                     if ("signIn".equals(cmd)) signIn(reply);
+                    else if ("leave".equals(cmd)) { answer(reply, ok("left", true)); moveTaskToBack(true); }
+                    else if (cmd.startsWith("share ")) share(reply, cmd.substring(6));
                     else if ("adTest".equals(cmd)) adSelfTest(reply);
                     else if ("pushState".equals(cmd)) pushState(reply);
                     else if ("pushOn".equals(cmd)) pushOn(reply);
@@ -621,6 +653,28 @@ public final class MainActivity extends ComponentActivity {
     // because there is then no Firebase project for the library to belong to. See android/README.md.
 
     /** What the bridge's hello says this build can do. The page shows or hides its switches by it. */
+    /** Something the app says unasked: {"event": name}. The page tells it apart from a reply by the key. */
+    private static JSONObject event(String name) {
+        JSONObject o = new JSONObject();
+        try {
+            o.put("event", name);
+        } catch (JSONException impossible) {
+            // A literal key and a string.
+        }
+        return o;
+    }
+
+    /** The phone's own share sheet, for a result or an invitation: what navigator.share is in a browser. */
+    private void share(JavaScriptReplyProxy reply, String text) {
+        try {
+            Intent send = new Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text);
+            startActivity(Intent.createChooser(send, null));
+            answer(reply, ok("shared", true));
+        } catch (RuntimeException nothingToShareWith) {
+            answer(reply, fail("no_share"));
+        }
+    }
+
     private JSONObject hello() {
         JSONObject o = ok("signIn", true);
         try {
@@ -799,7 +853,11 @@ public final class MainActivity extends ComponentActivity {
 
         @Override
         public void doUpdateVisitedHistory(@NonNull WebView v, @NonNull String url, boolean reload) {
-            back.setEnabled(v.canGoBack());
+            // A hash change is the same page routing; anything else is a new document, whose own hello will
+            // hand over a channel of its own. The old one would only throw.
+            String doc = url.replaceFirst("#.*$", "");
+            if (!doc.equals(pageDoc)) { pageDoc = doc; page = null; }
+            refreshBack();
         }
 
         /**

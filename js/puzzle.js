@@ -64,9 +64,11 @@
         const b = shell.bridge();
         if (!b) { resolve({ ok: false, error: 'no_bridge' }); return; }
         let done = false;
-        const finish = d => { if (done) return; done = true; clearTimeout(timer); b.onmessage = null; resolve(d); };
+        const finish = d => { if (done) return; done = true; clearTimeout(timer); if (b.onmessage === onReply) b.onmessage = null; resolve(d); };
         const timer = setTimeout(() => finish({ ok: false, error: 'timeout' }), ms);
-        b.onmessage = e => { let d; try { d = JSON.parse(e.data); } catch { d = { ok: false, error: 'bad_reply' }; } finish(d); };
+        // The app also speaks unasked -- its Back button arrives as { event } -- and that is never the answer.
+        const onReply = e => { let d; try { d = JSON.parse(e.data); } catch { d = { ok: false, error: 'bad_reply' }; } if (d && d.event) return; finish(d); };
+        b.onmessage = onReply;
         try { b.postMessage(cmd); } catch { finish({ ok: false, error: 'no_bridge' }); }
       });
     },
@@ -126,6 +128,12 @@
   // Hard and Master boards are drawn on a finer grid than the level data asks for: more cells, so more arrows
   // on the same outline. The scale is the same for everybody, so a match is still the same board for both.
   const KSCALE_OF = [1, 1, 1, 1.18, 1.5];
+  // ...within a budget. Brazil at 1.5 is two thousand cells, three hundred five-pixel arrows and six seconds
+  // of drawing on a phone; so the scale is trimmed to what keeps the board under this many cells and this
+  // long a side, and a big country simply stays nearer the size the level data gave it. Small countries,
+  // where the extra cells are the point, get the whole scale.
+  const CELL_CAP_OF = [0, 0, 0, 800, 1100];
+  const SIDE_CAP = 66;
   // How narrow the play is per tier (see generate()): narrow = prefer the end whose run holds more pieces (blocked
   // longer), far = prefer the end with a gap right ahead (the arrow it frees when it goes is that far away), rail =
   // straighter, longer snakes, holes/lane = share and length of the lanes carved out first.
@@ -565,7 +573,19 @@
   let toastTimer = 0;
   // The coin: one struck gold piece with the world on its face, used everywhere gold is named — the purse,
   // the tables, a stake, the prize ladder and the result sheet — so it reads as one currency, not five icons.
-  const COIN = '<img class="aa-coin" src="/images/puzzle-coin.png" alt="" width="128" height="128" decoding="async">';
+  const COIN = '<img class="aa-coin" src="/images/puzzle-coin.png?v=1" alt="" width="128" height="128" decoding="async">';
+  // ── Analytics ──
+  // Google Analytics is loaded by the page, not by the HTML: only after the Terms and Privacy gate has been
+  // accepted, and never inside the app, whose store listing declares what the app itself collects. The
+  // `typeof gtag === 'function'` guards around every event mean a page without it simply sends nothing.
+  const GA_ID = 'G-8ZPSNG5X37';
+  function analyticsOn() {
+    if (shell.on || typeof window.gtag === 'function' || !store.get('welcomed', null)) return;
+    window.dataLayer = window.dataLayer || [];
+    window.gtag = function () { window.dataLayer.push(arguments); };
+    window.gtag('js', new Date()); window.gtag('config', GA_ID);
+    const s = document.createElement('script'); s.async = true; s.src = 'https://www.googletagmanager.com/gtag/js?id=' + GA_ID; document.head.appendChild(s);
+  }
 
   // A rule is explained while the player is still learning it, and then the game trusts them.
   //
@@ -647,6 +667,8 @@
     if (!H) return d.canon.slice();
     return [H].concat(d.canon.filter(L => L !== H).sort((a, b) => kmBetween(H.c, a.c) - kmBetween(H.c, b.c)));
   }
+  const isCountry = L => !L.disc && !L.focus && !L.scene;
+  const firstCountry = () => DATA.levels.find(isCountry);
   function setHome(a2) { store.set('home', a2); store.set('homeAuto', false); DATA.levels = tourFor(DATA, a2); maskCache.clear(); forgetNums(); renderSelect(); }
 
   // ── Lobby world map ──
@@ -654,7 +676,7 @@
   // the next level pulsing. Tap a country to play its level. Built by games/build-world-map.mjs.
   let MAP = null, mapPromise = null, mapDrawn = false;
   function loadMap() {
-    if (!mapPromise) mapPromise = fetch(`/games/data/world-map.json?v=${MAP_VERSION}`, { cache: 'force-cache' }).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }).then(m => { MAP = m; return m; });
+    if (!mapPromise) mapPromise = fetch(`/games/data/world-map.json?v=${MAP_VERSION}`, { cache: 'force-cache' }).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }).then(m => { MAP = m; return m; }).catch(e => { mapPromise = null; throw e; });
     return mapPromise;
   }
   function renderWorld() {
@@ -671,12 +693,14 @@
         // already cleared to its discovery board instead, whenever that board was still open — so the tap
         // opened a different board from the one under their finger. A country nobody has reached yet is still
         // locked: the tour is how you get there, and Play & Discover is what walks you along it.
-        if (i != null) { p.classList.add('is-tour'); p.setAttribute('tabindex', '0'); p.setAttribute('role', 'button'); p.addEventListener('click', () => { if (!unlocked(i)) { toast(`${DATA.levels[i].name} is locked. Clear the levels before it first.`, 'bad'); return; } startLevel(i); }); p.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); p.click(); } }); }
+        // The index is looked up on the tap, not kept from this first draw: choosing a home country reorders
+        // the whole tour, and a position remembered from before that is some other country's.
+        if (i != null) { p.classList.add('is-tour'); p.setAttribute('tabindex', '0'); p.setAttribute('role', 'button'); p.addEventListener('click', () => { const j = DATA.levels.findIndex(L => L.id === c.id); if (j < 0) return; if (!unlocked(j)) { toast(`${DATA.levels[j].name} is locked. Clear the levels before it first.`, 'bad'); return; } startLevel(j); }); p.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); p.click(); } }); }
         land.appendChild(p);
       }
     }
     labels.innerHTML = '';
-    const n = DATA.levels.filter(L => !L.disc && !L.focus).length, done = DATA.levels.filter((L, i) => !L.disc && !L.focus && cleared(i)).length;
+    const n = DATA.levels.filter(isCountry).length, done = DATA.levels.filter((L, i) => isCountry(L) && cleared(i)).length;
     const nextIdx = DATA.levels.findIndex((_, j) => !cleared(j) && unlocked(j)), nextL = DATA.levels[nextIdx];
     const nextId = nextL ? (nextL.disc ? nextL.country.id : nextL.id) : null;
     for (const c of MAP.countries) {
@@ -776,7 +800,7 @@
     if (!DATA || !el.statBoards) return;
     const cleared_ = DATA.levels.filter((_, i) => cleared(i));
     el.statBoards.textContent = String(cleared_.length);
-    el.statCountries.textContent = String(cleared_.filter(L => !L.disc && !L.focus).length);
+    el.statCountries.textContent = String(cleared_.filter(isCountry).length);
     // Days played in a row, and nothing decays the stored record, so it counts only while it is still alive:
     // played today, or played yesterday with today still to come.
     const ps = store.get('playStreak', { count: 0, last: '' });
@@ -955,7 +979,7 @@
   // one numbered list with the countries (see tourFor).
   let DISCB = null, discbPromise = null;
   function loadDiscBoards() {
-    if (!discbPromise) discbPromise = fetch(`/games/data/discover-boards.json?v=${DISCB_VERSION}`, { cache: 'force-cache' }).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }).then(d => { DISCB = d; return d; });
+    if (!discbPromise) discbPromise = fetch(`/games/data/discover-boards.json?v=${DISCB_VERSION}`, { cache: 'force-cache' }).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }).then(d => { DISCB = d; return d; }).catch(e => { discbPromise = null; throw e; });   // a failure is not remembered: the next Play tries again
     return discbPromise;
   }
   const KIND_WORD = { a: 'animal', b: 'bird', p: 'place' };
@@ -1024,7 +1048,19 @@
     if (state.daily) return 'Daily';
     return `Level ${levelNo(state.idx)}${state.level?.scene ? ' · ' + state.level.name : ''}`;
   };
-  const maskFor = (L, tier) => { const key = L.id + ':' + tier; if (!maskCache.has(key)) maskCache.set(key, rasterise(L.d, L.k[tier] * ((L.scene || L.focus) ? 1 : KSCALE_OF[tier]))); return maskCache.get(key); };   // scene and focus boards were sized for their tiers already
+  const maskFor = (L, tier) => {
+    const key = L.id + ':' + tier;
+    if (!maskCache.has(key)) {
+      const k = L.k[tier];
+      let scale = (L.scene || L.focus) ? 1 : KSCALE_OF[tier];   // scene and focus boards were sized for their tiers already
+      if (scale !== 1) {
+        const base = rasterise(L.d, k);
+        scale = Math.max(1, Math.min(scale, Math.sqrt(CELL_CAP_OF[tier] / Math.max(1, base.count)), SIDE_CAP / Math.max(1, base.w, base.h)));
+      }
+      maskCache.set(key, scale === 1 ? rasterise(L.d, k) : rasterise(L.d, k * scale));
+    }
+    return maskCache.get(key);
+  };
 
   // ── Puzzle generation ──
   // Two stages, like a maze that is drawn first and signposted after.
@@ -1399,7 +1435,7 @@
 
   // ── Game lifecycle ──
   async function startLevel(i, bumpSeed = false, daily = null, keepTier = -1) {
-    try { await loadData(); } catch (err) { el.error.textContent = `Could not load the levels (${err.message}).`; el.error.hidden = false; return; }
+    try { await loadData(); el.error.hidden = true; } catch (err) { el.error.textContent = `Could not load the levels (${err.message}). Check your connection and tap Play again.`; el.error.hidden = false; return; }
     if (i < 0 || i >= DATA.levels.length) i = 0;
     if (!daily && !unlocked(i)) i = DATA.levels.findIndex((_, j) => !cleared(j) && unlocked(j));
     if (i < 0) i = 0;
@@ -1453,7 +1489,7 @@
     el.btnHint.disabled = state.finished || (hintsLeft <= 0 && !hintAd);
     el.btnHint.classList.toggle('is-ad', !!hintAd);
     el.btnHint.setAttribute('aria-label', hintAd
-      ? 'No hints left. Watch an advertisement for one more.'
+      ? (ads.isAd() ? 'No hints left. Watch an advertisement for one more.' : 'No hints left. Tap for one more.')
       : `${Math.max(0, hintsLeft)} hint${hintsLeft === 1 ? '' : 's'} left`);
     if (el.btnCheck) {
       const left = checksLeftNow();
@@ -1462,7 +1498,7 @@
       el.btnCheck.classList.toggle('is-spent', left <= 0 && !checkAd);
       el.btnCheck.classList.toggle('is-ad', !!checkAd);
       el.btnCheck.setAttribute('aria-label', checkAd
-        ? `No ${CHECK_WORD}s left. Watch an advertisement for one more.`
+        ? (ads.isAd() ? `No ${CHECK_WORD}s left. Watch an advertisement for one more.` : `No ${CHECK_WORD}s left. Tap for one more.`)
         : `${Math.max(0, left)} ${left === 1 ? CHECK_WORD : CHECK_WORD + 's'} left. Press and hold an arrow to check whether its lane is clear.`);
     }
     const pct = state.pieces.length ? Math.round(((state.pieces.length - state.left) / state.pieces.length) * 100) : 0;
@@ -1779,7 +1815,7 @@
     const t = Math.round(state.elapsed), s = stars();
     const learn = learnFrom(true);
     const R = state.daily?.race ? state.daily : null;
-    const prev = R ? null : state.daily ? store.get(`daily:${state.daily.key}`) : cleared(i);
+    const prev = R ? null : state.daily ? store.get(`daily:${state.daily.key}`) : store.get('lv:' + state.level.id);   // by id: the tour may have been reordered under this board
     const isBest = !prev || t < prev.t;
     // `quiz` is what a board's record used to say about the question at the end. There is no question now, so
     // every cleared board carries it: the name is on the card either way, and a row saved today should not
@@ -1799,8 +1835,9 @@
       if (ds.last !== state.daily.key) store.set('dailyStreak', { count: ds.last === dayKeyBack(1) ? ds.count + 1 : 1, last: state.daily.key });
       syncTour({});   // the daily board lives in the state blob, which every push carries
     } else {
-      countBoard(DATA.levels[i].id, { c: 1, h: state.hintsUsed, l: state.livesMax - state.lives, ms: t });
-      store.set(progressKey(i), rec); forgetNums(); pushOne(DATA.levels[i].id, rec); showBrainNext = true;
+      const lid = state.level.id;
+      countBoard(lid, { c: 1, h: state.hintsUsed, l: state.livesMax - state.lives, ms: t });
+      store.set('lv:' + lid, rec); forgetNums(); pushOne(lid, rec); showBrainNext = true;
     }
     if (R) {
       // How the run went is the player's either way, so the reading goes with them onto the result sheet: the
@@ -1974,6 +2011,7 @@
     const text = `Puzzle – Train Your Brain: I cleared ${what} (${state.daily ? 'daily board ' + state.daily.key : 'level ' + levelNo(state.idx)}) in ${fmtTime(rec?.t ?? state.elapsed, true)} ${'★'.repeat(rec?.stars || stars())} and ${done}/${n} boards so far.\nYour turn: https://ariyankhan.com/puzzle/${state.daily ? '#daily' : '#b-' + state.level.id}`;
     const flash = $('.aa-flash', el.card);
     try {
+      if (shell.on && shell.bridge() && (await shell.ask('share ' + text, 8000)).ok) return;   // the phone's own share sheet
       if (navigator.share) { await navigator.share({ text }); return; }
       await navigator.clipboard.writeText(text);
       if (flash) { flash.textContent = 'Copied. Paste it anywhere.'; flash.hidden = false; }
@@ -2336,7 +2374,7 @@
   // confirm() did: a promise for true or false, and nothing happens until it settles. Escape and the backdrop
   // both mean no, and on a destructive question the safe button is the one holding focus — the OK button of a
   // native confirm is under the thumb that opened it, which is how an account gets deleted by a double tap.
-  let asking = null;
+  let asking = null, askClose = null;   // askClose answers the open question No: it is what the app's Back does
   function ask({ title, body, ok = 'OK', cancel = 'Cancel', danger = false }) {
     if (asking) return asking;   // one question at a time, and the second press is not an answer to the first
     return (asking = new Promise(resolve => {
@@ -2350,7 +2388,8 @@
           <button type="button" class="aa-btn" data-ask="no">${escapeHtml(cancel)}</button>
         </div>
       </div>`;
-      const done = answer => { if (!wrap.isConnected) return; document.removeEventListener('keydown', onKey, true); wrap.remove(); asking = null; resolve(answer); };
+      const done = answer => { if (!wrap.isConnected) return; document.removeEventListener('keydown', onKey, true); wrap.remove(); asking = null; askClose = null; resolve(answer); };
+      askClose = () => done(false);
       const onKey = e => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); done(false); } };
       wrap.addEventListener('click', e => {
         if (e.target === wrap) { done(false); return; }
@@ -2482,7 +2521,7 @@
   }
   let gisAsked = false;
   function openSignIn(why) {
-    if (why && el.signInSheet) { const note = $('.aa-sheet-note', el.signInSheet); if (note) note.textContent = why; }
+    if (el.signInSheet) { const note = $('.aa-sheet-note', el.signInSheet); if (note) { if (note.dataset.own === undefined) note.dataset.own = note.textContent; note.textContent = why || note.dataset.own; } }
     if (el.googleBtn) el.googleBtn.innerHTML = '';
     if (el.signInNote) { el.signInNote.hidden = true; el.signInNote.textContent = ''; }
     openSheet(el.signInSheet);
@@ -3698,6 +3737,7 @@
     const text = `Puzzle – Train Your Brain: I put ${gfmt(m.stake)} gold on a board. Match it and clear it before me.\n${link}`;
     const flash = $('.aa-flash', el.overlay.hidden ? el.matchBody : el.card);
     try {
+      if (shell.on && shell.bridge() && (await shell.ask('share ' + text, 8000)).ok) return;   // the phone's own share sheet
       if (navigator.share) { await navigator.share({ text }); return; }
       await navigator.clipboard.writeText(text);
       if (flash) { flash.textContent = 'Link copied. Paste it to your friend.'; flash.hidden = false; }
@@ -4091,7 +4131,7 @@
   function fxEmit(list) {
     const c = el.confetti; if (!c || !c.getContext) return;
     if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      if (c.classList.contains('is-over')) { c.classList.remove('is-over'); el.boardWrap.insertBefore(c, el.toast); }
+      if (c.classList.contains('is-over')) { c.classList.remove('is-over'); el.boardWrap.appendChild(c); }
       return;
     }
     if (!fx.running && !c.classList.contains('is-over')) { const r = rectOf(el.boardWrap); c.width = Math.round(r.width); c.height = Math.round(r.height); }
@@ -4109,7 +4149,7 @@
         if (p.round) { ctx.beginPath(); ctx.arc(0, 0, p.w / 2, 0, Math.PI * 2); ctx.fill(); } else ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
         ctx.restore(); return true;
       });
-      if (fx.parts.length) requestAnimationFrame(frame); else { ctx.clearRect(0, 0, c.width, c.height); c.hidden = true; if (c.classList.contains('is-over')) { c.classList.remove('is-over'); el.boardWrap.insertBefore(c, el.toast); } fx.running = false; }
+      if (fx.parts.length) requestAnimationFrame(frame); else { ctx.clearRect(0, 0, c.width, c.height); c.hidden = true; if (c.classList.contains('is-over')) { c.classList.remove('is-over'); el.boardWrap.appendChild(c); } fx.running = false; }
     })(last);
   }
   // Level won: a fountain from the middle of the board.
@@ -4142,7 +4182,7 @@
     if (!DATA) return;
     const cur = homeValue();
     const now = homeChoices().find(c => c.v === cur);
-    if (el.homeNow) el.homeNow.textContent = cur === HOME_AUTO ? `Auto · ${DATA.levels[0]?.name || 'where you are'}` : now ? now.name : 'Your tour starts here and spreads out';
+    if (el.homeNow) el.homeNow.textContent = cur === HOME_AUTO ? `Auto · ${firstCountry()?.name || 'where you are'}` : now ? now.name : 'Your tour starts here and spreads out';
     if (el.homeSheet && !el.homeSheet.hidden) renderHomeList();
   }
   function renderHomeList() {
@@ -4172,10 +4212,10 @@
     closeHomePage();
   });
   async function chooseHome(v) {
-    if (v === 'auto') { try { localStorage.removeItem(STORE + 'home'); localStorage.removeItem(STORE + 'homeAuto'); } catch { /* ignore */ } const c = await homeCountry(DATA); DATA.levels = orderFor(DATA, c); maskCache.clear(); renderSelect(); }
+    if (v === 'auto') { try { localStorage.removeItem(STORE + 'home'); localStorage.removeItem(STORE + 'homeAuto'); } catch { /* ignore */ } const c = await homeCountry(DATA); DATA.levels = tourFor(DATA, c); maskCache.clear(); forgetNums(); renderSelect(); }
     else setHome(v);
     renderHome();
-    toast(v === 'auto' ? 'Tour order follows where you are.' : v ? `Your tour now starts from ${DATA.levels[0].name}.` : 'Tour in world order.', 'hint');
+    toast(v === 'auto' ? 'Tour order follows where you are.' : v ? `Your tour now starts from ${firstCountry()?.name || 'there'}.` : 'Tour in world order.', 'hint');
   }
   // ── Board zoom: pinch with two fingers, drag to pan while zoomed, or the − ⤢ + buttons ──
   // On a Master board of 180 arrows a cell is ~9 px on a phone: zooming is how a tap lands on the arrow meant.
@@ -4277,8 +4317,8 @@
   }
   async function loadLeague(force) {
     if (!force && league.data && Date.now() - league.at < 30000) return league.data;
-    try { league.data = await leagueApi(); league.at = Date.now(); }
-    catch { /* the league is a screen, never the game: if it cannot be read, the chip simply stays away */ }
+    try { league.data = await leagueApi(); league.at = Date.now(); league.failed = false; }
+    catch { league.failed = true; /* the league is a screen, never the game: if it cannot be read, the chip simply stays away */ }
     renderLeagueChip();
     return league.data;
   }
@@ -4305,7 +4345,7 @@
   function renderLeague() {
     if (!el.leagueBody) return;
     const d = league.data;
-    if (!d) { el.leagueBody.innerHTML = '<p class="aa-loading">Loading the league…</p>'; return; }
+    if (!d) { el.leagueBody.innerHTML = `<p class="aa-loading">${league.failed ? 'The league could not be reached. Check your connection and open it again.' : 'Loading the league…'}</p>`; return; }
     const prizes = d.prizes || [], mine = d.me;
     const last = d.last && d.last.paid.length ? d.last : null;
     const showing = league.view === 'last' && last ? 'last' : 'now';
@@ -4557,6 +4597,28 @@
       ok: 'Leave the board', cancel: 'Keep playing' })) return;
     goToLevels();
   });
+  // ── The app's Back button ──
+  // In the app, Android's Back arrives here over the bridge, because the page has no history for the WebView
+  // to walk: it routes with replaceState, and a sheet is an element that is shown. So the page does what the
+  // ✕ or the corner arrow would -- one layer at a time: the open question, the Home page, a sheet, the board
+  // (with its "Leave this board?" where that applies) -- and when nothing is open it says so, and the app
+  // steps into the background.
+  function backPressed() {
+    if (askClose) { askClose(); return; }
+    if (el.homeSheet && !el.homeSheet.hidden) { closeHomePage(); return; }
+    if ([el.sheet, el.signInSheet, el.matchSheet, el.leagueSheet].some(s => s && !s.hidden)) { closeSheets(); return; }
+    if (!el.game.hidden) { el.btnLevels.click(); return; }
+    shell.ask('leave', 2000);
+  }
+  let shellWired = null;   // the bridge object already listened to (a new page gets a new one)
+  function shellListen() {
+    const b = shell.bridge();
+    if (!b || b === shellWired) return;
+    try { b.addEventListener('message', e => { let d; try { d = JSON.parse(e.data); } catch { return; } if (d && d.event === 'back') backPressed(); }); } catch { return; }
+    shellWired = b;
+    shell.ask('hello', 4000);   // so the app holds a way to reach this page
+  }
+  if (shell.on) { shellListen(); window.addEventListener('load', shellListen); }
   el.btnSound.addEventListener('click', () => { state.muted = !state.muted; store.set('muted', state.muted); renderSound(); if (!state.muted) SFX.shoot(); });
   el.btnVibe?.addEventListener('click', () => { state.vibe = !state.vibe; store.set('vibe', state.vibe); renderToggles(); vibe(20); });
   // Turning music on while standing in the lobby does not start it: it starts on the next board, the same as
@@ -4648,7 +4710,7 @@
   function showGate(then) {
     if (!el.gate) { then?.(); return; }
     el.gate.hidden = false;
-    el.accept.addEventListener('click', () => { store.set('welcomed', Date.now()); el.gate.hidden = true; showSplash(then); }, { once: true });
+    el.accept.addEventListener('click', () => { store.set('welcomed', Date.now()); analyticsOn(); el.gate.hidden = true; showSplash(then); }, { once: true });
     el.accept.focus({ preventScroll: true });
   }
   {
@@ -4656,7 +4718,7 @@
     let seenThisSession = false;
     try { seenThisSession = sessionStorage.getItem('aa:splash') === '1'; sessionStorage.setItem('aa:splash', '1'); } catch { /* ignore */ }
     if (!store.get('welcomed')) showGate();
-    else if (!deep && !seenThisSession) showSplash();
+    else { analyticsOn(); if (!deep && !seenThisSession) showSplash(); }
   }
 
   renderSound();
@@ -4691,7 +4753,7 @@
     else if (location.hash === '#daily') { const d = dailyPick(); startLevel(d.idx, false, d); }
     // Where a league notification lands: the table it is about, not the lobby it happens to be reached through.
     else if (location.hash === '#league') openLeague();
-  }).catch(err => { el.loading.hidden = true; el.error.textContent = `Could not load the levels (${err.message}). Check your connection and reload.`; el.error.hidden = false; });
+  }).catch(err => { el.loading.hidden = true; el.error.textContent = `Could not load the levels (${err.message}). Check your connection and tap Play again.`; el.error.hidden = false; });
 
   if ('serviceWorker' in navigator && window.isSecureContext) {
     window.addEventListener('load', () => { navigator.serviceWorker.register('/piece-the-world-sw.js').catch(() => {}); });

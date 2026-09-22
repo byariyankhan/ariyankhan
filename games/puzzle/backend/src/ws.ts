@@ -11,6 +11,7 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import type { FastifyInstance } from 'fastify';
 import type { IncomingMessage } from 'node:http';
+import type { Duplex } from 'node:stream';
 import { WS_PATH, config } from './config.js';
 import { pool, tx } from './db.js';
 import * as R from './rooms.js';
@@ -18,6 +19,7 @@ import { userForToken, type User } from './auth.js';
 import { subscribeAll, publish, type MatchEvent } from './events.js';
 import { liveProgress, online, roomPresence } from './presence.js';
 import { check, subjectFor, LIMITS } from './ratelimit.js';
+import { clientIp } from './proxies.js';
 import { cookies } from './httpkit.js';
 import { log } from './log.js';
 
@@ -79,12 +81,21 @@ function tokenFromUpgrade(req: IncomingMessage): string | null {
 export function attachWebSocket(app: FastifyInstance): void {
   const wss = new WebSocketServer({ noServer: true, maxPayload: 16 * 1024 });
 
-  app.server.on('upgrade', async (req, socket, head) => {
+  // An upgrade that fails on our side -- the database not answering while the token is looked up -- is
+  // answered and closed, not left open: a socket nobody writes to sits there until the proxy's hour-long
+  // read timeout gives up on it, and the client meanwhile believes it is connecting.
+  app.server.on('upgrade', (req, socket, head) => {
     const url = new URL(req.url ?? '/', 'http://localhost');
     if (url.pathname !== WS_PATH) return;                 // not ours: leave it for anything else listening
+    void upgrade(req, socket, head).catch(e => {
+      log.err('upgrade failed', e);
+      try { socket.write('HTTP/1.1 500 Internal Server Error\r\n\r\n'); } catch { /* it may already be gone */ }
+      socket.destroy();
+    });
+  });
 
-    const ip = (req.headers['x-forwarded-for'] as string | undefined)?.split(',')[0]?.trim()
-      || req.socket.remoteAddress || 'unknown';
+  async function upgrade(req: IncomingMessage, socket: Duplex, head: Buffer): Promise<void> {
+    const ip = clientIp(req);
     const verdict = await check('ws_connect', subjectFor(LIMITS.ws_connect, ip, null));
     if (!verdict.allowed) {
       socket.write(`HTTP/1.1 429 Too Many Requests\r\nRetry-After: ${Math.max(1, verdict.retryAfter)}\r\n\r\n`);
@@ -171,7 +182,7 @@ export function attachWebSocket(app: FastifyInstance): void {
 
       ws.on('error', e => log.err('socket error', e, { user_id: user.id }));
     });
-  });
+  }
 
   // Fan out what the game logic publishes, from whichever container raised it.
   void subscribeAll((ev: MatchEvent) => {

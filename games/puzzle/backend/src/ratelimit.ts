@@ -20,7 +20,7 @@ export interface Limit { name: string; limit: number; windowSeconds: number; by:
 /** Every limit this service enforces, in one table, so they can be read and documented at a glance. */
 export const LIMITS = {
   auth_signin:   { name: 'auth_signin',   limit: 10,  windowSeconds: 300, by: 'ip'   },
-  auth_read:     { name: 'auth_read',     limit: 120, windowSeconds: 60,  by: 'ip'   },
+  auth_read:     { name: 'auth_read',     limit: 120, windowSeconds: 60,  by: 'user' },
   auth_write:    { name: 'auth_write',    limit: 20,  windowSeconds: 300, by: 'user' },
   account_delete:{ name: 'account_delete',limit: 5,   windowSeconds: 3600,by: 'user' },
   // An ad takes about thirty seconds to watch, and the daily cap is the real bound; this is only here to stop
@@ -28,10 +28,12 @@ export const LIMITS = {
   ad_reward:     { name: 'ad_reward',     limit: 20,  windowSeconds: 600, by: 'user' },
   match_create:  { name: 'match_create',  limit: 20,  windowSeconds: 60,  by: 'user' },
   match_join:    { name: 'match_join',    limit: 40,  windowSeconds: 60,  by: 'user' },
-  match_read:    { name: 'match_read',    limit: 240, windowSeconds: 60,  by: 'ip'   },
+  // Read by the account where there is one: a room is polled every two seconds while the socket is down,
+  // and eight players behind one carrier NAT would otherwise share one address's allowance.
+  match_read:    { name: 'match_read',    limit: 240, windowSeconds: 60,  by: 'user' },
   match_progress:{ name: 'match_progress',limit: 120, windowSeconds: 60,  by: 'user' },
   match_result:  { name: 'match_result',  limit: 20,  windowSeconds: 60,  by: 'user' },
-  lobby_read:    { name: 'lobby_read',    limit: 120, windowSeconds: 60,  by: 'ip'   },
+  lobby_read:    { name: 'lobby_read',    limit: 120, windowSeconds: 60,  by: 'user' },
   // The league screen polls its countdown, and a signed-out visitor may read it too, so this is counted
   // against the address rather than the account.
   league_read:   { name: 'league_read',   limit: 90,  windowSeconds: 60,  by: 'ip'   },

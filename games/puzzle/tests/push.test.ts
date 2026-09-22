@@ -11,7 +11,7 @@ import { k, redis } from '../backend/src/redis.js';
 import { assertion, enabled as fcmEnabled, messageFor, parseAccount } from '../backend/src/fcm.js';
 import { eq, finish, ok, player, reset, section } from './helpers.js';
 
-const sub = (n: number) => ({ endpoint: `https://push.example.com/e/${n}`, keys: { p256dh: `p${n}`, auth: `a${n}` } });
+const sub = (n: number) => ({ endpoint: `https://fcm.googleapis.com/fcm/send/${n}`, keys: { p256dh: `p${n}`, auth: `a${n}` } });
 const rowsFor = async (userId: number) =>
   (await query<{ endpoint: string }>(pool, `SELECT endpoint FROM push_subscriptions WHERE user_id = $1 ORDER BY id`, [userId])).rows.map(r => r.endpoint);
 const tokensFor = async (userId: number) =>
@@ -24,13 +24,13 @@ section('Remembering a device');
 {
   const a = await player('pusher-a');
   await saveSubscription(pool, a.id, sub(1), 'Chrome on Android');
-  eq(await rowsFor(a.id), ['https://push.example.com/e/1'], 'a subscription is kept');
+  eq(await rowsFor(a.id), ['https://fcm.googleapis.com/fcm/send/1'], 'a subscription is kept');
   ok(await hasSubscription(pool, a.id), 'and the player has one');
 
   // A browser re-subscribing hands over the same endpoint with fresh keys. That is the same device saying the
   // same thing twice, and two rows would mean one invitation arriving twice on one phone.
   await saveSubscription(pool, a.id, { endpoint: sub(1).endpoint, keys: { p256dh: 'p1-new', auth: 'a1-new' } }, 'Chrome on Android');
-  eq(await rowsFor(a.id), ['https://push.example.com/e/1'], 'subscribing again with the same endpoint does not add a second row');
+  eq(await rowsFor(a.id), ['https://fcm.googleapis.com/fcm/send/1'], 'subscribing again with the same endpoint does not add a second row');
   const keys = await query<{ p256dh: string; auth: string }>(pool, `SELECT p256dh, auth FROM push_subscriptions WHERE endpoint = $1`, [sub(1).endpoint]);
   eq([keys.rows[0]?.p256dh, keys.rows[0]?.auth], ['p1-new', 'a1-new'], 'and the new keys replace the old ones');
 
@@ -46,7 +46,7 @@ section('A device that changes hands');
   await saveSubscription(pool, a.id, sub(3), 'a shared laptop');
   await saveSubscription(pool, b.id, sub(3), 'a shared laptop');
   eq(await rowsFor(a.id), [], 'the endpoint leaves the account that signed out of it');
-  eq(await rowsFor(b.id), ['https://push.example.com/e/3'], 'and follows the one signed in on it now');
+  eq(await rowsFor(b.id), ['https://fcm.googleapis.com/fcm/send/3'], 'and follows the one signed in on it now');
   ok(!(await hasSubscription(pool, a.id)), 'so the first account has nothing listening');
 }
 
@@ -56,12 +56,12 @@ section('Letting go');
   await saveSubscription(pool, a.id, sub(4), 'Chrome');
   await saveSubscription(pool, a.id, sub(5), 'Firefox');
   await dropSubscription(pool, a.id, sub(4).endpoint);
-  eq(await rowsFor(a.id), ['https://push.example.com/e/5'], 'turning it off on one device leaves the other alone');
+  eq(await rowsFor(a.id), ['https://fcm.googleapis.com/fcm/send/5'], 'turning it off on one device leaves the other alone');
 
   // Somebody else's endpoint is not this player's to drop.
   const b = await player('pusher-e');
   await dropSubscription(pool, b.id, sub(5).endpoint);
-  eq(await rowsFor(a.id), ['https://push.example.com/e/5'], 'and a player cannot unsubscribe somebody else');
+  eq(await rowsFor(a.id), ['https://fcm.googleapis.com/fcm/send/5'], 'and a player cannot unsubscribe somebody else');
 
   await query(pool, `DELETE FROM users WHERE id = $1`, [a.id]);
   eq((await query(pool, `SELECT 1 FROM push_subscriptions WHERE endpoint = $1`, [sub(5).endpoint])).rowCount, 0,

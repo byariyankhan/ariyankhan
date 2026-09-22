@@ -77,6 +77,28 @@ the whole run — board two of three starts at a third — and the snapshot carr
 a device resuming the match lands on the right board. Clearing the last board finishes the run; running out
 of hearts on any board ends it there.
 
+### Who the player is, behind two proxies
+
+A request arrives through Cloudflare and then nginx, and each appends the address it saw to
+`X-Forwarded-For`. The service trusts exactly those (`PUZZLE_TRUSTED_PROXIES`, default
+`loopback,linklocal,uniquelocal,cloudflare` — proxy-addr's names plus Cloudflare's published ranges, or any
+CIDR), so `req.ip` and the socket's `clientIp` are the rightmost address that is not a proxy of ours, and an
+`X-Forwarded-For` a script invents is ignored rather than believed. Before this the leftmost entry was
+trusted, and every per-address limit was a suggestion. The read limits a signed-in player hits every two
+seconds (`auth_read`, `lobby_read`, `match_read`) count against the account where there is one, so eight
+players behind one carrier NAT do not share an address's allowance.
+
+`/health` (the full report: containers, versions, error text) answers only to the host, which nginx enforces
+at `/api/puzzle/health`; the one under the public prefix says `{ok}` from a reading at most ten seconds old.
+A request Fastify itself refused — unreadable JSON, a body over the limit — is answered with its own 4xx as
+`bad_request`, not dressed up as a 500. A tier that is not one of the five is `400 bad_tier`; a `pct` that is
+not a number is `400 bad_pct`; a push endpoint is stored only when it points at a push service browsers use
+(`PUZZLE_PUSH_HOSTS`), since this service will make a request to it. Taking a seat holds an advisory lock on
+the account (`seatLock`), so a double tap on Create cannot seat one account twice; two first sign-ins at once
+land on the same row (`ON CONFLICT DO NOTHING`); a subscribe to Redis that failed at boot is asked again
+when the connection comes up; an upgrade that fails on our side is answered and closed rather than left
+hanging until the proxy's hour; and a connection whose ROLLBACK failed is destroyed, not returned to the pool.
+
 ### The gold ledger
 
 Every movement of gold is a row in `gold_ledger` with a unique `idem_key`, written in the same transaction as

@@ -44,13 +44,16 @@ export async function tx<T>(fn: (c: pg.PoolClient) => Promise<T>, tries = 3): Pr
   let last: unknown;
   for (let attempt = 1; attempt <= tries; attempt++) {
     const c = await pool.connect();
+    let broken = false;
     try {
       await c.query('BEGIN');
       const out = await fn(c);
       await c.query('COMMIT');
       return out;
     } catch (e) {
-      try { await c.query('ROLLBACK'); } catch { /* the connection is going back to the pool either way */ }
+      // A ROLLBACK that fails means the connection itself is gone; handing it back as healthy would give the
+      // next request a dead client. release(true) destroys it instead and the pool opens a fresh one.
+      try { await c.query('ROLLBACK'); } catch { broken = true; }
       last = e;
       const code = (e as { code?: string }).code;
       if (code === '40001' || code === '40P01') { // serialization_failure, deadlock_detected
@@ -59,7 +62,7 @@ export async function tx<T>(fn: (c: pg.PoolClient) => Promise<T>, tries = 3): Pr
       }
       throw e;
     } finally {
-      c.release();
+      c.release(broken ? true : undefined);
     }
   }
   throw last;

@@ -57,8 +57,15 @@ export async function subscribeAll(h: Handler): Promise<() => void> {
       try { ev = JSON.parse(payload) as MatchEvent; } catch { return; }
       for (const fn of handlers) { try { fn(ev); } catch (e) { log.err('event handler threw', e, { type: ev.type }); } }
     });
-    await soft(() => redisSub.psubscribe(pattern), 0);
-    log.info('subscribed to room events', { pattern });
+    // If Redis is not there yet when this runs, the subscribe fails quietly and nothing would ever retry it:
+    // ioredis re-subscribes on its own after a reconnect, but only what it had subscribed once. So it is
+    // asked again each time the connection comes up; asking twice for the same pattern is harmless.
+    const subscribe = async () => {
+      const ok = await soft(async () => { await redisSub.psubscribe(pattern); return true; }, false);
+      if (ok) log.info('subscribed to room events', { pattern }); else log.warn('room events not subscribed yet', { pattern });
+    };
+    redisSub.on('ready', () => { void subscribe(); });
+    await subscribe();
   }
   return () => { handlers.delete(h); };
 }

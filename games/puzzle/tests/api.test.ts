@@ -43,11 +43,16 @@ await reset();
 
 section('Health says which part is unwell');
 {
-  const h = await call('/health');
+  // The full report answers at the root, which nginx keeps for the host; the one under the public prefix says
+  // only whether the service is up. Container statistics and error text are for the host, not for whoever asks.
+  const h = await call('/health', { base: BASE });
   eq(h.status, 200, 'health answers');
   eq((h.json.postgres as { ok: boolean }).ok, true, 'and reports PostgreSQL up');
   eq((h.json.redis as { ok: boolean }).ok, true, 'and Redis up');
   eq(h.json.product, 'puzzle', 'tagged with the product, not a generic name');
+  const pub = await call('/health');
+  eq(pub.status, 200, 'the public health answers');
+  eq(JSON.stringify(Object.keys(pub.json)), '["ok"]', 'and says only that the service is up');
 
   // The prefix the game had before its rename is gone, and gone on purpose: it was carried for exactly as
   // long as it took every copy of the client to move over. Nothing should answer there now.
@@ -527,6 +532,22 @@ section('A phone registers for notifications the way a browser does, and is told
   eq(((await call('/auth/me', { token: p.token })).json.user as { reminder: boolean }).reminder, false, 'which /auth/me then says');
   eq((await call('/push/reminder', { token: p.token, body: { on: true } })).json.reminder, true, 'and back on');
   eq((await call('/push/reminder', { body: { on: false } })).status, 401, 'but not by a stranger');
+}
+
+section('What a client sends is checked, not passed to the database');
+{
+  const t = (await mint('checked-host')).token;
+  const tier = await call('/matches', { token: t, body: { stake: 500, open_to_all: false, tier: 'hard' } });
+  eq(tier.status, 400, 'a tier that is not a number is refused as the client\'s mistake');
+  eq(tier.json.error, 'bad_tier', 'and named');
+  const half = await call('/matches', { token: t, body: { stake: 500, open_to_all: false, tier: 2.5 } });
+  eq(half.status, 400, 'so is a tier between two of the five');
+  const bad = await fetch(`${V}/matches`, { method: 'POST', headers: { Authorization: `Bearer ${t}`, 'Content-Type': 'application/json' }, body: '{not json' });
+  eq(bad.status, 400, 'unreadable JSON is a 400, not a failure of ours');
+  eq(((await bad.json()) as { error: string }).error, 'bad_request', 'with a shape the client can handle');
+  const sub = await call('/push/subscribe', { token: t, body: { endpoint: 'https://puzzle-postgres.internal/x', keys: { p256dh: 'p', auth: 'a' } } });
+  eq([400, 503].includes(sub.status), true, 'a push endpoint inside our own network is not stored');
+  if (sub.status === 400) eq(sub.json.error, 'bad_subscription', 'and is called a bad subscription');
 }
 
 section('A room says how long it is');

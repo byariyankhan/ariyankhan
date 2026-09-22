@@ -18,6 +18,18 @@ import * as push from './push.js';
 import { body, caller, clearSessionCookie, limited, noStore, setSessionCookie, shapeUser, type Caller } from './httpkit.js';
 import { log } from './log.js';
 
+/** A tier is one of the five, as a whole number; anything else is the client's mistake, not a 500. */
+const tierOf = (v: unknown): number | null => {
+  const t = v === undefined || v === null ? 2 : Number(v);
+  return Number.isInteger(t) && t >= 0 && t <= 4 ? t : null;
+};
+/** A push endpoint is kept only when it points at a push service browsers use: this service will call it. */
+const pushHostOk = (endpoint: string): boolean => {
+  let host: string;
+  try { host = new URL(endpoint).hostname.toLowerCase(); } catch { return false; }
+  return config.push.hosts.some(h => host === h || host.endsWith('.' + h));
+};
+
 type Req = FastifyRequest; type Res = FastifyReply;
 
 const codeOf = (req: Req): string => {
@@ -88,7 +100,9 @@ const H = {
     await noStore(res).send({ user: shapeUser({ ...me.user, name }) });
   },
 
-  async logout(_req: Req, res: Res, me: Caller) {
+  async logout(req: Req, res: Res, me: Caller) {
+    // A write, and one a stranger can make with an invented token: limited like the other account writes.
+    if (!(await limited('auth_write', req, res, me.user?.id ?? null))) return;
     await endSession(me.token);
     clearSessionCookie(res);
     await noStore(res).send({ user: null });
@@ -287,7 +301,7 @@ const H = {
     const auth = String(sub.keys?.auth ?? '').trim();
     // An endpoint is a URL at the browser's own push service and nowhere else: this service will make a
     // request to whatever is stored here, so it is checked before it is kept, not before it is used.
-    if (!/^https:\/\/[^\s]+$/i.test(endpoint) || endpoint.length > 1000 || !p256dh || !auth) {
+    if (!/^https:\/\/[^\s]+$/i.test(endpoint) || endpoint.length > 1000 || !p256dh || !auth || !pushHostOk(endpoint)) {
       await noStore(res).code(400).send({ error: 'bad_subscription' }); return;
     }
     await push.saveSubscription(pool, me.user.id, { endpoint, keys: { p256dh, auth } }, String(req.headers['user-agent'] ?? ''), push.cleanTz(b.tz));
@@ -371,7 +385,9 @@ const H = {
     if (!(await limited('match_create', req, res, me.user.id))) return;
     const b = body(req);
     // How long: the client sends what it offered, and the server checks it against its own list.
-    const made = await R.createMatch(me.user, Number(b.stake ?? 0), Boolean(b.open_to_all), Number(b.tier ?? 2), b.boards === undefined ? 1 : Number(b.boards));
+    const tier = tierOf(b.tier);
+    if (tier === null) { await noStore(res).code(400).send({ error: 'bad_tier' }); return; }
+    const made = await R.createMatch(me.user, Number(b.stake ?? 0), Boolean(b.open_to_all), tier, b.boards === undefined ? 1 : Number(b.boards));
     if (!made.ok) {
       // Already in one: 409, and the code, because the only useful answer to "you are already in a match" is
       // the way back to it. The client turns this into a tap rather than a dead end.
@@ -407,7 +423,9 @@ const H = {
     if (!me.user) { await noStore(res).code(401).send({ error: 'signed_out' }); return; }
     if (!(await limited('match_join', req, res, me.user.id))) return;
     const code = codeOf(req);
-    const out = await tx(c => R.joinRoomTx(c, me.user!.id, code, Number(body(req).tier ?? 2)));
+    const tier = tierOf(body(req).tier);
+    if (tier === null) { await noStore(res).code(400).send({ error: 'bad_tier' }); return; }
+    const out = await tx(c => R.joinRoomTx(c, me.user!.id, code, tier));
     if (!out.ok) {
       if (out.error === 'in_match') { await noStore(res).code(409).send({ error: 'in_match', match_code: out.code }); return; }
       const status = out.error === 'no_match' ? 404 : out.error === 'not_enough_gold' ? 400 : 409;
@@ -470,7 +488,9 @@ const H = {
     const seats = await R.room(pool, code);
     if (!seats.some(p => p.user_id === me.user!.id)) { await noStore(res).code(403).send({ error: 'not_yours' }); return; }
     if (m.state === 'playing' && body(req).pct !== undefined) {
-      const pct = await tx(c => R.saveProgress(c, code, me.user!.id, Number(body(req).pct), R.cleanRun(body(req).run)));
+      const sent = Number(body(req).pct);
+      if (!Number.isFinite(sent)) { await noStore(res).code(400).send({ error: 'bad_pct' }); return; }
+      const pct = await tx(c => R.saveProgress(c, code, me.user!.id, sent, R.cleanRun(body(req).run)));
       await liveProgress.set(code, me.user.id, pct);
       await publish(code, 'progress_updated', { user_id: me.user.id, name: me.user.name, pct });
     }
