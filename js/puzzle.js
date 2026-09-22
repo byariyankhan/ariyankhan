@@ -1982,7 +1982,10 @@
         // not allowed to do: AdSense's policy says Google ads may not be integrated into a software
         // application, and excepts AdMob. It also makes a failure honest. Without it, a break that AdMob
         // could not fill can be quietly answered by AdSense and we would never know which we had shown.
-        if (ads.admob.rewarded || ads.admob.interstitial) sc.dataset.admobAdsOnly = 'on';
+        // Not in the mock mode. admob-ads-only is a rule about where a REAL advertisement may come from, and
+        // in the test mode there is no real advertisement and no request at all — all the rule can do there
+        // is refuse the mock one, which is the only thing that mode exists to show.
+        if (!ads.mock && (ads.admob.rewarded || ads.admob.interstitial)) sc.dataset.admobAdsOnly = 'on';
       }
       sc.src = `https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${encodeURIComponent(ads.client)}`;
       document.head.appendChild(sc);
@@ -2070,6 +2073,10 @@
       let waitEnd = 0;
       const waitAd = setTimeout(() => { if (!started) done('unavailable', 'nothing answered'); }, 8000);
       try {
+        // Written before the break, not only after it. A break that never comes back at all — the library
+        // showing an advertisement and waiting on a player who put the phone down — would otherwise leave
+        // the developer line saying nothing had been asked for, which is the one reading that is never true.
+        adNote(name, 'asked', '', 0);
         window.adBreak({
           type: 'reward',
           name,
@@ -4043,7 +4050,9 @@
       : 'Library has not reported ready';
     const L = ads.last;
     if (!L) { el.devLast.textContent = `${lib} \u00b7 nothing asked for yet`; return; }
-    const said = L.how === 'watched' ? 'watched through' : L.how === 'dismissed' ? 'closed early' : 'nothing to show';
+    if (L.how === 'asked') { el.devLast.textContent = `${lib} \u00b7 ${L.name} \u00b7 asked for, still waiting`; return; }
+    const said = L.how === 'watched' ? 'watched through' : L.how === 'dismissed' ? 'closed early'
+      : L.how === 'asked' ? 'asked for, still waiting' : 'nothing to show';
     el.devLast.textContent = `${lib} \u00b7 ${L.name} \u00b7 ${said}${L.why ? ` \u00b7 ${L.why}` : ''} \u00b7 ${(L.ms / 1000).toFixed(1)}s`;
   }
 
