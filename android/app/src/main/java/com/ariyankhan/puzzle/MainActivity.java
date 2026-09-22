@@ -4,6 +4,7 @@ import android.Manifest;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.net.Uri;
@@ -316,7 +317,10 @@ public final class MainActivity extends ComponentActivity {
         // How the game and the server know they are in the app rather than in a browser tab. There is no
         // JavaScript bridge yet — nothing needs one until sign-in — and a suffix on the agent string cannot
         // be reached by a third-party frame the way an injected object can.
-        s.setUserAgentString(s.getUserAgentString() + " PuzzleApp/1");
+        // A debug build says so, and that word is what lets the page open its developer settings: the seven
+        // taps on the build line do nothing in the release build or on the site, where anybody could tap them.
+        boolean debuggable = (getApplicationInfo().flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0;
+        s.setUserAgentString(s.getUserAgentString() + " PuzzleApp/1" + (debuggable ? " debug" : ""));
     }
 
     /** Where to open: a link if we were started by one, the game's own front door otherwise. */

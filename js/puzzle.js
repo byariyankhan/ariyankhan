@@ -48,6 +48,9 @@
   // frame, which an injected object in a WebView can be, and the frames arrive with the advertisements.
   const shell = {
     on: / PuzzleApp\/\d/.test(navigator.userAgent),
+    // The debug build of the app says so on its agent string. It is where a developer is; the release build
+    // and the site are where players are, and the developer settings do not open there.
+    debug: / PuzzleApp\/\d+ debug\b/.test(navigator.userAgent),
     // window.PuzzleShell is put there by the app, and only on this origin: it is injected with
     // addWebMessageListener and an origin rule, not addJavascriptInterface, so an advertisement's iframe
     // cannot reach it. Absent on an old System WebView, where the feature does not exist — hence a function
@@ -2150,7 +2153,7 @@
     // hand out a few hundred gold a day, whatever the page claims to have shown -- but a free-gold link in a
     // share sheet is not a thing to leave lying about.
     const wanted = new URLSearchParams(location.search).get('ads');
-    const local = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+    const local = devAllowed();
     // The stored switch, set from Settings after seven taps on the build line. It exists because the URL
     // parameter needs an address bar and the app has none: without it there is no way at all to watch the
     // advertisement path on a phone, which is the one place it has to work.
@@ -4576,8 +4579,12 @@
    * what makes approval day a check rather than a leap: flip it here, watch one, then flip data-give for
    * everybody.
    */
+  // Where the developer settings may exist at all: a page served from this machine, or the app's debug build.
+  // Anywhere else -- the site, the release build -- the seven taps do nothing and a flag left over from
+  // before is ignored, because a switch anybody can find is not a developer's switch.
+  function devAllowed() { return location.hostname === 'localhost' || location.hostname === '127.0.0.1' || shell.debug; }   // a declaration: adsConfigure runs before this line is reached
   function renderDev() {
-    const on = !!store.get('adsdev', '');
+    const on = devAllowed() && !!store.get('adsdev', '');
     if (el.devCap) el.devCap.hidden = !on;
     if (el.devGroup) el.devGroup.hidden = !on;
     if (!on || !el.devAds) return;
@@ -4646,6 +4653,7 @@
       tapTimer = setTimeout(() => { taps = 0; }, 1500);
       if (++taps < 7) return;
       taps = 0;
+      if (!devAllowed()) return;   // players' devices: nothing happens, and nothing says so
       if (!store.get('adsdev', '')) store.set('adsdev', 'site');
       renderDev();
       el.devGroup?.scrollIntoView({ behavior: 'smooth', block: 'center' });
