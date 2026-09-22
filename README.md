@@ -894,6 +894,11 @@ links.
   the same rose-to-coral gradient, a faint rose brain sits behind the home screen in every theme, and the
   splash mark is the rose one (`images/puzzle-brain-mark-rose.svg`) everywhere but Night. There is no
   separate Brain theme: the brain is in Paper.
+- **The out-of-hearts card, as drawn:** "Get a free life" first and biggest, orange with the play icon
+  and an AD pill on the right when it is a real advertisement (no pill in free mode); "Try again" under it
+  in a soft rose tint; "New layout" / "Easier layout", "Skip level" and "Back to the World Tour" as links
+  under that (`.aa-actions--out`, `.aa-btn--big`, `.aa-btn--soft`, `.aa-ad-pill`, `.aa-card-links`). The
+  home buttons carry no subtitle: the icon says it.
 - **Interstitials, guarded** (`interShow`, `adH5Next`, `tests/puzzle-ads.test.mjs`): a full-screen
   advertisement on the tap on Next after every fourth tour clear (`INTER_EVERY`), never in a challenge or
   on the daily board, never within three minutes of the last one (`INTER_GAP_MS`), never within two

@@ -186,7 +186,6 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 /* the second button is the second button: its label was the same 30px as the first, which wrapped onto two
    lines on a narrow phone and read as a second first button */
 .aa-play--ghost .aa-play-label{ font-size:23px; }
-.aa-play--ghost .aa-play-sub{ color:var(--muted); }
 .aa-play--ghost:active{ box-shadow:0 1px 0 var(--line-soft); }
 .aa-row--soon{ opacity:.55; }
 .aa-signin{ display:flex; justify-content:center; min-height:44px; margin:4px 0 12px; }
@@ -277,8 +276,7 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 @keyframes aapop{ 0%{ transform:scale(1); } 40%{ transform:scale(1.18); } 100%{ transform:scale(1); } }
 .aa-vs-row b{ font-variant-numeric:tabular-nums; }
 .aa-play:active{ transform:translateY(3px); box-shadow:0 3px 0 color-mix(in srgb, var(--accent2) 70%, #000); }
-.aa-play-label{ font-size:27px; font-weight:900; line-height:1; }
-.aa-play-sub{ font-size:12px; font-weight:800; opacity:.85; letter-spacing:.2px; }
+.aa-play-label{ font-size:28px; font-weight:900; line-height:1; }
 
 /* ── League ──
    The week's table. It borrows the pieces the game already has — the round face, the card group, the gold
@@ -648,6 +646,15 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 /* An offer, not an action: it is the only warm one in the card, so it reads as the extra thing on the row
    rather than as a second way of doing what the primary does. */
 .aa-actions .aa-btn--ad{ background:var(--accent); color:var(--accent-ink); }
+/* the out-of-hearts card, as drawn: the free life first and biggest, Try again under it in a soft tint, and the
+   rest as links -- one decision on top, the others a glance below */
+.aa-actions--out{ grid-template-columns:1fr; gap:10px; }
+.aa-btn--big{ grid-column:1 / -1; position:relative; padding:16px 44px !important; font-size:18px; border-radius:18px; }
+.aa-actions .aa-btn--soft{ background:color-mix(in srgb, var(--accent2) 12%, var(--card)); color:var(--accent2); box-shadow:none; }
+.aa-ad-pill{ position:absolute; right:14px; top:50%; transform:translateY(-50%); background:rgba(255,255,255,.88); color:var(--accent); font-size:11px; font-weight:900; letter-spacing:.6px; padding:3px 9px; border-radius:999px; }
+.aa-card .aa-btn:focus:not(:focus-visible){ outline:none; }   /* the first action is focused for the keyboard's sake; a tap draws no ring */
+.aa-card-links{ display:flex; flex-wrap:wrap; justify-content:center; align-items:center; gap:4px 10px; margin:12px 0 0; }
+.aa-card-links .aa-linkbtn{ display:inline; width:auto; margin:0; padding:4px 2px; font-size:13px; white-space:nowrap; }
 /* The one that does the damage. Tinted rather than solid, because --bad is a light red in the dark themes and
    white on that cannot be read; the outline is what makes it look like a decision. */
 .aa-actions .aa-btn--danger{ background:color-mix(in srgb, var(--bad) 14%, transparent); color:var(--bad);
