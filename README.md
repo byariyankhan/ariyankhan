@@ -874,6 +874,22 @@ links.
   declares what the app collects. The `typeof gtag === 'function'` guards mean a
   page without it simply sends nothing. The gate sits above every sheet
   (`z-index` 60), so a first open through `#m=` or `#league` cannot skip it.
+- **One tour on every device.** Every board syncs now, the focus boards included: they
+  used to be kept on the device alone (`isLocalOnly`), so one phone stood on level
+  106 with the brain and the key behind it while the tablet, with the same countries
+  from the server, met the brain again at level 81. And the sync runs at more than
+  sign-in and each clear: a push that failed (a board cleared on the train) is owed
+  and made whole on the `online` event, the game syncs whenever it comes back on
+  screen (`syncIfStale`, at most once a minute) and every five minutes while it is
+  looked at — each of those pulls as well as pushes, which is how the other device's
+  clears arrive without a restart. The server keeps `tier` up to 4 (Master was being
+  clamped to 3).
+- **Home clarity, and the Brain theme.** The two big buttons carry a line each —
+  "Solo tour · 197 countries · works offline", "Online · challenge a friend for gold"
+  (`.aa-play-sub`) — so nobody has to guess which is which. A fourth theme, `brain`,
+  is the slogan's own colour: rose `#DB3A5E` for the primary, coral `#F26B4E` for
+  hints and the lamp, plum ink on blush paper, with a rose brain mark on the splash
+  (`images/puzzle-brain-mark-rose.svg`). Paper stays the default until it is chosen.
 - **Pre-publish audit fixes** (September 2026): a tap on the world map looks the
   board up by id when tapped, and a clear is saved under `state.level.id`, because
   choosing a home country reorders the tour under both; "Auto" home rebuilds the

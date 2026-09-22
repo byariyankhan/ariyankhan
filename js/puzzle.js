@@ -1014,7 +1014,10 @@
       return focusCache.get(b.id);
     });
   }
-  const isLocalOnly = id => String(id).startsWith('f:');   // a focus board: cleared here, kept here
+  // Every board syncs, the focus boards included. They used to be kept on the device alone, and the account
+  // then looked different on every phone: one had cleared the brain and the key and stood on level 106, the
+  // other had the same countries from the server but met the brain again at level 81. One tour, one number.
+  const isLocalOnly = () => false;
   // ── Scene boards ──
   // Big, plain shapes that exist to be full of arrows -- a tower, a pair of towers, an arena, a cross -- the
   // size a long game is (games/build-scene-boards.mjs draws them). One sits in the tour after every fourth
@@ -2688,19 +2691,31 @@
     return true;
   }
 
-  let syncing = null;
+  let syncing = null, syncedAt = 0, syncOwed = false;
   /** Push what this device has, adopt what comes back. Safe to call as often as it is useful to. */
   function syncTour(levels) {
     if (!auth.user) return Promise.resolve(false);
     if (syncing) return syncing;
-    const body = levels ? { levels, state: localState() } : { levels: localTour(), state: localState() };
+    // A push that could not be made -- the phone was offline when the board was cleared -- is owed, and the
+    // next chance (the network back, the app back on screen) pushes the whole tour rather than that one board.
+    const body = levels && !syncOwed ? { levels, state: localState() } : { levels: localTour(), state: localState() };
     body.stats = localStats(); body.device = DEVICE;
     syncing = progressApi(body)
-      .then(d => adoptTour(d))
-      .catch(() => false)
+      .then(d => { syncedAt = Date.now(); syncOwed = false; return adoptTour(d); })
+      .catch(() => { syncOwed = true; return false; })
       .finally(() => { syncing = null; });
     return syncing;
   }
+  /**
+   * The tour used to sync at sign-in and after each clear, and at no other time -- so a phone left open for
+   * days never saw what the tablet had cleared, and a board cleared on the train was pushed only when the app
+   * was next started. Now it also syncs when the network comes back, whenever the game comes back on screen
+   * (at most once a minute), and every few minutes while it is looked at; each of those pulls as well as
+   * pushes, which is how the other device's progress arrives.
+   */
+  function syncIfStale(minMs = 60_000) { if (auth.user && (syncOwed || Date.now() - syncedAt > minMs)) void syncTour(); }
+  window.addEventListener('online', () => { syncOwed = true; syncIfStale(0); });
+  setInterval(() => { if (!document.hidden) syncIfStale(5 * 60_000); }, 60_000);
   /** One board, the moment it is cleared. The full sync would do the same thing, more slowly and less often. */
   function pushOne(id, rec) {
     if (!auth.user || !id || isLocalOnly(id)) return;
@@ -4481,8 +4496,8 @@
   $$('.aa-sheet').forEach(sh => sh.addEventListener('click', e => { if (e.target === sh) closeSheets(); }));
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSheets(); });
   // Themes
-  const THEMES = ['paper', 'night', 'mint'];
-  function applyTheme(t) { document.documentElement.dataset.theme = t; store.set('theme', t); $('meta[name="theme-color"]')?.setAttribute('content', t === 'night' ? '#0E0E10' : t === 'mint' ? '#E6F2EC' : '#F4EDE0'); renderThemes(); }
+  const THEMES = ['paper', 'brain', 'night', 'mint'];
+  function applyTheme(t) { document.documentElement.dataset.theme = t; store.set('theme', t); $('meta[name="theme-color"]')?.setAttribute('content', t === 'night' ? '#0E0E10' : t === 'mint' ? '#E6F2EC' : t === 'brain' ? '#FBF1EC' : '#F4EDE0'); $('.aa-splash-logo img')?.setAttribute('src', t === 'brain' ? '/images/puzzle-brain-mark-rose.svg?v=1' : '/images/puzzle-brain-mark.svg?v=2'); renderThemes(); }
   // ── The build line, and the developer switch behind it ────────────────────────────────────────────
   //
   // The version is not hardcoded: it is the one the page asked for, read back off the script tag, so it can
@@ -4630,6 +4645,7 @@
   document.addEventListener('pointerdown', () => { try { if (music.on && audio?.state === 'suspended') audio.resume(); } catch { /* ignore */ } }, { passive: true });
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) { musicStop(); heartbeatStop(); deckStop(); return; }
+    syncIfStale();                        // what another device cleared meanwhile, and what this one owes
     if (!el.select.hidden) deckStart();   // the home deck turns while somebody is looking at it, and not otherwise
     // Back on a board that was left mid-play. Nothing else restarts it now that music begins with a board
     // rather than with the first tap anywhere, so coming back is its own beginning.
