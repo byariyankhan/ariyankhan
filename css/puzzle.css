@@ -675,6 +675,14 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-about-summary{ cursor:pointer; list-style:none; font-weight:900; font-size:15px; }
 .aa-about-summary::-webkit-details-marker{ display:none; }
 .aa-credit{ font-size:13px; color:var(--muted); text-align:center; margin:14px 0 0; }
+/* The build line, and the way in to the developer switch. Quiet enough that nobody reads it twice, and
+   un-selectable so that seven taps do not end in a highlighted word and a copy menu. */
+.aa-build{ font-size:11px; color:var(--muted); text-align:center; margin:6px 0 0; opacity:.65; cursor:default;
+  -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
+.aa-dev{ display:flex; gap:8px; width:100%; margin-top:10px; }
+.aa-dev-opt{ flex:1; padding:10px; border-radius:12px; border:2px solid transparent; background:var(--bg2);
+  color:var(--ink); cursor:pointer; font-weight:900; font-size:13px; }
+.aa-dev-opt.is-active{ border-color:var(--accent); }
 /* the About / how-to / FAQ copy sits under the app, visible to readers and crawlers */
 /* Two lines now — a licence credit and the policy links — so it is the foot of the page rather than a
    section of it, and its bottom padding has to clear the gesture bar in the app. */

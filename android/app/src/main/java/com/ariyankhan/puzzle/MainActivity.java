@@ -13,7 +13,9 @@ import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
+import android.webkit.WebChromeClient;
 import android.webkit.WebViewClient;
+import android.widget.FrameLayout;
 import android.widget.ImageView;
 
 import androidx.activity.ComponentActivity;
@@ -66,6 +68,11 @@ public final class MainActivity extends ComponentActivity {
     private ImageView splash;
     private boolean splashGone;
 
+    /** The view a fullscreen video hands us, and the callback that takes it back. Null when none is up. */
+    private View fullscreen;
+    private WebChromeClient.CustomViewCallback fullscreenDone;
+    private OnBackPressedCallback back;
+
     @Override
     protected void onCreate(@Nullable Bundle state) {
         super.onCreate(state);
@@ -105,13 +112,18 @@ public final class MainActivity extends ComponentActivity {
         // Back walks the game's own history first. The callback starts disabled and is only switched on while
         // there is something to go back to, which leaves the last press to the system: that is what lets
         // Android 16's predictive back animate the app closing instead of it vanishing.
-        OnBackPressedCallback back = new OnBackPressedCallback(false) {
+        back = new OnBackPressedCallback(false) {
             @Override public void handleOnBackPressed() {
+                // A fullscreen advertisement is the thing back should close, and it is the one state where
+                // there is nothing in the WebView's history to go back to — so it has to be asked about
+                // first, or back would leave the app with an advertisement still on the screen.
+                if (fullscreen != null) { hideFullscreen(); return; }
                 if (web.canGoBack()) web.goBack();
             }
         };
         getOnBackPressedDispatcher().addCallback(this, back);
         web.setWebViewClient(new Client(back));
+        web.setWebChromeClient(new Chrome());
 
         installBridge(web);
         registerForAds(web);
@@ -290,6 +302,49 @@ public final class MainActivity extends ComponentActivity {
         } catch (RuntimeException notToday) {
             // Whatever went wrong here, it is not worth a game that will not open.
         }
+    }
+
+    /**
+     * What a video does when it asks for the whole screen.
+     *
+     * <p>Without a WebChromeClient the request is simply dropped: the page thinks it went fullscreen, the
+     * WebView draws nothing, and a rewarded video advertisement — the one thing this app exists to be paid
+     * for — is a black rectangle. The view arrives here instead, goes over everything including the splash,
+     * and comes back out the same way.
+     */
+    private final class Chrome extends WebChromeClient {
+        @Override
+        public void onShowCustomView(View view, CustomViewCallback callback) {
+            if (fullscreen != null) { callback.onCustomViewHidden(); return; }   // one at a time
+            fullscreen = view;
+            fullscreenDone = callback;
+            ((FrameLayout) findViewById(R.id.root)).addView(view, new FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+            findViewById(R.id.content).setVisibility(View.GONE);
+            // Back belongs to the advertisement while it is up, whatever the page's history says.
+            if (back != null) back.setEnabled(true);
+        }
+
+        @Override
+        public void onHideCustomView() {
+            hideFullscreen();
+        }
+    }
+
+    private void hideFullscreen() {
+        if (fullscreen == null) return;
+        ((FrameLayout) findViewById(R.id.root)).removeView(fullscreen);
+        fullscreen = null;
+        findViewById(R.id.content).setVisibility(View.VISIBLE);
+        if (fullscreenDone != null) {
+            try {
+                fullscreenDone.onCustomViewHidden();
+            } catch (RuntimeException alreadyGone) {
+                // The player left while it was up. There is nothing to hand back to.
+            }
+            fullscreenDone = null;
+        }
+        if (back != null) back.setEnabled(web.canGoBack());
     }
 
     // ── The bridge ────────────────────────────────────────────────────────────────────────────────────
