@@ -2224,14 +2224,16 @@
       const r = await fetch(`${API_V1}/ads/reward`, { method: 'POST', credentials: 'include', cache: 'no-store', headers: { 'Content-Type': 'application/json' }, body: '{}' });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) {
-        if (d.error === 'ad_cap') toast('That is all the gold advertisements give today. Come back tomorrow.', 'hint', 4000);
+        if (d.error === 'ad_cap') toast(ads.isAd() ? 'That is all the gold advertisements give today. Come back tomorrow.'
+          : 'That is all the free gold today. Come back tomorrow.', 'hint', 4000);
         else if (d.error === 'signed_out') openSignIn('Sign in first, so the gold has a purse to go into.');
         else toast('The gold could not be added. Try again in a moment.', 'bad');
         if (typeof d.gold === 'number') setGold(d.gold);
         return;
       }
       setGold(d.gold);
-      toast(d.granted ? `${gfmt(d.granted)} gold. ${d.left} more advertisement${d.left === 1 ? '' : 's'} today.` : 'That one was already counted.', 'good', 3500);
+      const more = ads.isAd() ? `${d.left} more advertisement${d.left === 1 ? '' : 's'} today.` : `${d.left} more today.`;
+      toast(d.granted ? `${gfmt(d.granted)} gold. ${more}` : 'That one was already counted.', 'good', 3500);
     } catch { toast('The gold could not be added. Try again in a moment.', 'bad'); }
   }
 
@@ -3376,7 +3378,13 @@
     const win = purseWin && purseWin.to === gold ? purseWin : null;
     purseWin = null;
     el.purse.className = 'aa-chip aa-chip--purse';
-    if (el.goldAd) el.goldAd.hidden = !ads.on();
+    if (el.goldAd) {
+      el.goldAd.hidden = !ads.on();
+      // The same rule the fail card follows: the offer never calls itself an advertisement unless one is
+      // going to play. With data-give="free" nothing is requested and nothing is shown, and a button that
+      // says "watch an advertisement" to somebody reading the screen with their ears is simply untrue.
+      el.goldAd.setAttribute('aria-label', ads.isAd() ? 'Watch an advertisement for gold' : 'Free gold');
+    }
     el.purse.title = `${gfmt(gold)} gold`;
     el.purseNo.textContent = gpurse(win ? win.from : gold);
     if (!win) { el.purse.classList.remove('is-won'); return; }
