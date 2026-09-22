@@ -2052,7 +2052,7 @@
     mode: 'off',
     give: 'ad',
     client: '',
-    admob: { rewarded: '', interstitial: '' },
+    admob: { rewarded: '' },
     showing: false,
     // Google's own test advertisements, asked for with data-adbreak-test on the script tag. Not our stand-in
     // panel: the real library runs the whole break and reports it, and nothing leaves the phone.
@@ -2081,10 +2081,9 @@
     // AdSense tag — the same tag asks for the same breaks — they are what decides who answers: AdMob's demand
     // instead of AdSense's, which is the only arrangement Google's H5 guide calls policy compliant for a game
     // embedded in an app you own. Empty until the AdMob account has them; the browser never uses them.
-    ads.admob = {
-      rewarded: (meta?.dataset.admobRewarded || '').trim(),
-      interstitial: (meta?.dataset.admobInterstitial || '').trim(),
-    };
+    // One unit: the rewarded one. Nothing in this game shows an advertisement of its own accord, so there is
+    // no interstitial unit and no slot for one.
+    ads.admob = { rewarded: (meta?.dataset.admobRewarded || '').trim() };
     // The test mode is a developer's switch, not a URL anybody can find: on the live site it needs a flag set
     // by hand on that device first. The server's daily cap is the real defence either way -- it can only ever
     // hand out a few hundred gold a day, whatever the page claims to have shown -- but a free-gold link in a
@@ -2114,7 +2113,10 @@
     if (forced === 'mock') { ads.mock = true; forced = 'h5'; }
     if (forced) mode = forced;
     ads.mode = ADS_MODES.includes(mode) ? mode : 'off';
-    const give = (meta?.dataset.give || 'ad').trim();
+    // What the offer is: a real advertisement, or a free lifeline. data-give says it for the app; data-give-web,
+    // when present, says it for a browser -- the two are approved separately (AdMob for the app, H5 Games Ads
+    // for the site), and a button that asks a network that has not approved the site yet gives nothing.
+    const give = ((!shell.on && meta?.dataset.giveWeb) || meta?.dataset.give || 'ad').trim();
     ads.give = give === 'free' ? 'free' : 'ad';
     // Asking for the advertisement path and being handed a free lifeline is not a test of anything: the free
     // mode short-circuits every line of it. Keyed off what was actually forced, not off what is stored —
@@ -2143,7 +2145,6 @@
       // one that has been proven to work.
       if (shell.on) {
         if (ads.admob.rewarded) sc.dataset.admobRewardedSlot = ads.admob.rewarded;
-        if (ads.admob.interstitial) sc.dataset.admobInterstitialSlot = ads.admob.interstitial;
         // Inside the app, AdMob or nothing. Google's own words for this parameter are that it stops the game
         // falling back to AdSense "in cases where the game is being played in an environment which doesn't
         // support AdMob requests" — and for us that fallback is not a safety net, it is the one thing we are
@@ -2153,7 +2154,7 @@
         // Not in the mock mode. admob-ads-only is a rule about where a REAL advertisement may come from, and
         // in the test mode there is no real advertisement and no request at all — all the rule can do there
         // is refuse the mock one, which is the only thing that mode exists to show.
-        if (!ads.mock && (ads.admob.rewarded || ads.admob.interstitial)) sc.dataset.admobAdsOnly = 'on';
+        if (!ads.mock && ads.admob.rewarded) sc.dataset.admobAdsOnly = 'on';
       }
       sc.src = `https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${encodeURIComponent(ads.client)}`;
       document.head.appendChild(sc);
