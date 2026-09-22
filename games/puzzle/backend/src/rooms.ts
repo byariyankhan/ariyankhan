@@ -645,6 +645,7 @@ export async function createMatch(me: { id: number }, stake: number, openToAll: 
     // looking at, and the other room sat with a player who was never coming back. Refusing here is the half
     // of the fix that stops it; telling the client which room it already has is the half that makes the
     // refusal useful, because the answer to "you are already in a match" is a way back to it.
+    await seatLock(c, me.id);
     const live = await liveMatchOf(c, me.id);
     if (live) return { ok: false, error: 'in_match', code: live.code };
 
@@ -683,7 +684,20 @@ export type JoinResult =
   | { ok: false; error: 'in_match'; code: string };
 
 /** Sit down in a room. Used by a friend opening an invitation link and by a player asking for any free seat. */
+/**
+ * The one-match rule is checked by reading, and two transactions can read "no live match" at the same moment:
+ * a double tap on Create, or Create in one tab and Accept in another, seated one account twice and took two
+ * stakes. This lock makes the account's seat-taking serial -- held to the end of the transaction, so the
+ * second one waits, then sees the first one's seat. It is taken before any row lock, always, so the two
+ * never wait on each other in opposite orders.
+ */
+async function seatLock(c: PoolClient, userId: number): Promise<void> {
+  await c.query('SELECT pg_advisory_xact_lock($1, $2)', [SEAT_LOCK, userId]);
+}
+const SEAT_LOCK = 7301;
+
 export async function joinRoomTx(c: PoolClient, userId: number, code: string, tier: number): Promise<JoinResult> {
+  await seatLock(c, userId);
   const m = await matchRowLocked(c, code);
   if (!m) return { ok: false, error: 'no_match' };
   if (m.state !== 'open') return { ok: false, error: 'taken' };

@@ -34,6 +34,11 @@ on:
         description: 'What changed, for your own reference in the artifact name'
         required: false
         default: ''
+      debug_apk:
+        description: 'Build a debug APK instead of the signed bundle: no upload key needed, for a test phone or to check the code compiles'
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: read
@@ -54,9 +59,20 @@ jobs:
       # already on PATH there, so this adds only what is missing and stays a first-party dependency.
       - name: Android SDK 36
         run: |
-          yes | sdkmanager --licenses > /dev/null 2>&1 || true
-          sdkmanager --install "platforms;android-36" "build-tools;36.0.0" > /dev/null
-          echo "ANDROID_HOME=$ANDROID_SDK_ROOT" >> "$GITHUB_ENV"
+          # The runner image is not promised to keep sdkmanager on the PATH (ubuntu-latest moved and it went),
+          # so it is found where the SDK keeps it, and fetched from Google when the image has none at all.
+          SDK="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-$HOME/android-sdk}}"
+          SM="$SDK/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -x "$SM" ]; then
+            mkdir -p "$SDK/cmdline-tools" && cd "$SDK/cmdline-tools"
+            curl -sSLo tools.zip https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
+            unzip -q tools.zip && rm tools.zip && rm -rf latest && mv cmdline-tools latest
+            cd "$GITHUB_WORKSPACE"
+          fi
+          yes | "$SM" --licenses > /dev/null 2>&1 || true
+          "$SM" --install "platforms;android-36" "build-tools;36.0.0" > /dev/null
+          echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$SDK" >> "$GITHUB_ENV"
 
       # versionCode has to rise and never repeat. run_number does exactly that, and the +1 steps over the 1
       # that the first hand-built bundle already spent on the internal track.
@@ -66,6 +82,7 @@ jobs:
           echo "code=$(( ${{ github.run_number }} + 1 ))" >> "$GITHUB_OUTPUT"
 
       - name: Unpack the upload key
+        if: ${{ !inputs.debug_apk }}
         env:
           KEYSTORE_B64: ${{ secrets.PUZZLE_KEYSTORE_B64 }}
         run: |
@@ -91,7 +108,25 @@ jobs:
             || { echo "::error::GOOGLE_SERVICES_JSON_B64 did not decode to a JSON file"; exit 1; }
           echo "google-services.json written from the secret"
 
+      - name: Build the debug APK
+        if: ${{ inputs.debug_apk }}
+        working-directory: android
+        env:
+          PUZZLE_VERSION_CODE: ${{ steps.ver.outputs.code }}
+          PUZZLE_VERSION_NAME: ${{ github.event.inputs.version_name }}
+        run: ./gradlew --no-daemon assembleDebug
+
+      - name: Keep the debug APK
+        if: ${{ inputs.debug_apk }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: puzzle-debug-${{ github.event.inputs.version_name }}-${{ steps.ver.outputs.code }}
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Build the bundle
+        if: ${{ !inputs.debug_apk }}
         working-directory: android
         env:
           PUZZLE_KEYSTORE: ${{ runner.temp }}/upload.jks
@@ -105,6 +140,7 @@ jobs:
       # A bundle that is not signed, or is signed with the wrong key, looks fine until Play refuses it. Say so
       # here instead, where the run is still on screen.
       - name: Check it is signed, carries its splash, and say what with
+        if: ${{ !inputs.debug_apk }}
         working-directory: android
         run: |
           AAB=app/build/outputs/bundle/release/app-release.aab
@@ -117,6 +153,7 @@ jobs:
           keytool -printcert -jarfile "$AAB" | grep -E 'Owner:|SHA256:' || true
 
       - name: Keep it
+        if: ${{ !inputs.debug_apk }}
         uses: actions/upload-artifact@v4
         with:
           name: puzzle-${{ github.event.inputs.version_name }}-${{ steps.ver.outputs.code }}

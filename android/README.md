@@ -143,10 +143,17 @@ stays the game's paper — so what shows behind the clock is the same cream as t
 light whatever the phone's dark mode says.
 
 **Predictive back is on by default**, and `onBackPressed()` is not called. The shell uses
-`OnBackPressedDispatcher` with `android:enableOnBackInvokedCallback="true"`, and the callback is only enabled
-while `WebView.canGoBack()` is true. That last detail is the point: with nothing left to go back to the
-callback switches itself off, the press reaches the system, and Android animates the app closing instead of it
-vanishing.
+`OnBackPressedDispatcher` with `android:enableOnBackInvokedCallback="true"`. **Back belongs to the page:** the
+game has no history for the WebView to walk (it routes with `replaceState`, and a sheet is an element that is
+shown), so a press is sent down the bridge as `{"event":"back"}` and the page closes what it has open one layer
+at a time — the open question, the Home page, a sheet, the board with its "Leave this board?" — and, with
+nothing left open, posts `leave`, on which the activity calls `moveTaskToBack(true)`. The page hands the shell
+its reply channel by saying `hello` as it loads (`page`, renewed on every message and dropped when a new
+document starts). The callback is enabled while there is a page to ask, history to walk or a fullscreen video
+to close (`refreshBack()`); with none of those it switches itself off, the press reaches the system, and
+Android animates the app closing instead of it vanishing. The bridge also answers `share <text>` with the
+phone's own share sheet. `ours()` keeps only the game's own path in the WebView; the rest of the site — the
+privacy policy, the terms, the contact page, which carry the site's AdSense tag — opens in the browser.
 
 **`configChanges` is load-bearing.** Without it a rotation, a font-size change or a foldable opening destroys
 the activity, and a rebuilt WebView starts the page again — `saveState()` restores a URL and a history list,

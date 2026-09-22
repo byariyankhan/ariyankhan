@@ -95,12 +95,18 @@ export async function upsertUser(c: PoolClient, provider: string, claims: Google
     await query(c, `UPDATE users SET seen_at = now(), pic = $2,
                     name = CASE WHEN name = '' THEN $3 ELSE name END WHERE id = $1`, [id, claims.pic, claims.name]);
   } else {
+    // The same new account signing in twice at once -- a double tap, the app and a tab -- races here, and
+    // the loser must find the row the winner made rather than fall over its unique key.
     const ins = await query<{ id: number }>(c,
-      'INSERT INTO users (provider, sub, name, pic, gold) VALUES ($1, $2, $3, $4, 0) RETURNING id',
+      'INSERT INTO users (provider, sub, name, pic, gold) VALUES ($1, $2, $3, $4, 0) ON CONFLICT (provider, sub) DO NOTHING RETURNING id',
       [provider, claims.sub, claims.name, claims.pic]);
-    id = ins.rows[0]!.id;
-    created = true;
-    await give(c, id, config.game.signupGold, 'signup', idem.signup(id));
+    if (ins.rowCount) {
+      id = ins.rows[0]!.id;
+      created = true;
+      await give(c, id, config.game.signupGold, 'signup', idem.signup(id));
+    } else {
+      id = (await query<{ id: number }>(c, 'SELECT id FROM users WHERE provider = $1 AND sub = $2', [provider, claims.sub])).rows[0]!.id;
+    }
   }
   const row = await query<User>(c, 'SELECT id, name, provider, pic, gold, reminder FROM users WHERE id = $1', [id]);
   return { user: row.rows[0]!, created };

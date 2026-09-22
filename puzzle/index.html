@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="en-US">
   <head>
+    <meta charset="UTF-8" />
     <!-- Google AdSense is NOT loaded here.
          It used to be, as a bare verification tag: 655 KB of somebody else's JavaScript fetched and parsed on
          every single cold start of the game, for a page that has no ad units on it and no Auto ads enabled.
@@ -38,24 +39,15 @@
          They look like ca-app-pub-0000000000000000/0000000000 (a slash, where the app id has a tilde). -->
     <meta name="puzzle-ads" content="h5" data-give="free" data-client="ca-pub-1570944160084395"
           data-admob-rewarded="ca-app-pub-1570944160084395/3154222428" data-admob-interstitial="" />
-    <!-- Google tag (gtag.js) -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-8ZPSNG5X37"></script>
-    <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag() {
-        dataLayer.push(arguments);
-      }
-      gtag("js", new Date());
-      gtag("config", "G-8ZPSNG5X37");
-    </script>
-    <meta charset="UTF-8" />
+    <!-- Google Analytics is loaded by the game (analyticsOn in js/puzzle.js): only once the Terms and Privacy
+         gate below has been accepted, and never inside the Android app. -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
 
     <!-- SEO -->
     <title>Puzzle – Train Your Brain – Free Arrow Puzzle Game on Real Country Maps</title>
     <meta
       name="description"
-      content="Puzzle – Train Your Brain is a free arrow puzzle game: tap arrows to shoot them off a board shaped like a real country, keep your 4 hearts, then name the country. 197 countries, adaptive difficulty, no sign-up to play, works offline. Play the arrow game online now."
+      content="Puzzle – Train Your Brain is a free arrow puzzle game: tap arrows to shoot them off a board shaped like a real country, keep your 4 hearts and reveal the country. 197 countries, adaptive difficulty, no sign-up to play, works offline. Play the arrow game online now."
     />
     <meta name="author" content="Ariyan Khan" />
     <meta name="keywords" content="puzzle, train your brain, brain games, arrow puzzle, arrow game, tap away arrow puzzle, arrow puzzle game online, free arrow game, geography puzzle game, country map puzzle, brain teaser, focus game" />
@@ -72,7 +64,7 @@
     <meta property="og:title" content="Puzzle – Train Your Brain – Free Arrow Puzzle Game on Real Country Maps" />
     <meta
       property="og:description"
-      content="Tap arrows to clear a board shaped like a real country, keep your hearts, then name the country. 197 countries, free, no sign-up to play, in your browser."
+      content="Tap arrows to clear a board shaped like a real country, keep your hearts and reveal the country. 197 countries, free, no sign-up to play, in your browser."
     />
     <meta property="og:image" content="https://ariyankhan.com/images/puzzle-og.jpg" />
     <meta property="og:image:width" content="1200" />
@@ -83,7 +75,7 @@
     <meta name="twitter:title" content="Puzzle – Train Your Brain – Free Arrow Puzzle Game on Real Country Maps" />
     <meta
       name="twitter:description"
-      content="Tap arrows to clear a country-shaped board, keep your hearts, then name the country. 197 countries, free."
+      content="Tap arrows to clear a country-shaped board, keep your hearts and reveal the country. 197 countries, free."
     />
     <meta name="twitter:image" content="https://ariyankhan.com/images/puzzle-og.jpg" />
     <meta name="twitter:image:alt" content="Puzzle – Train Your Brain, a free arrow puzzle game on real country maps" />
@@ -106,7 +98,7 @@
          set these two when the backend moves to a host of its own and the client follows without a change:
          <meta name="puzzle-api" content="https://api.example.com" />
          <meta name="puzzle-ws"  content="wss://api.example.com" /> -->
-    <link rel="stylesheet" href="/css/puzzle.css?v=31" />
+    <link rel="stylesheet" href="/css/puzzle.css?v=32" />
     <link rel="preload" href="/games/data/puzzle.json?v=11" as="fetch" crossorigin="anonymous" />
 
     <!-- SCHEMA -->
@@ -153,11 +145,11 @@
             "197 country boards on a world tour: every country in the world, from Italy and Bangladesh to Luxembourg and Vanuatu",
             "Tap-away mechanic: shoot arrows off the board when their path is clear",
             "4 hearts per level; a blocked arrow costs one",
-            "394 levels: every country is followed by a board shaped like its animal, its bird or a landmark, with its own quiz. Difficulty that follows you, not the level number: Easy, Normal, Hard, Expert and Master boards from about 20 arrows to 80 and more; a flawless, fast clear steps the boards up at once, two first-try clears in a row step them up too, two losses in a row ease them off; milestones every 10 levels; win streaks; combo counter; daily bonus board",
-            "Board clears reveal the country shape; a 3-option quiz asks which country it was",
+            "Over 450 levels: every country is followed by a board shaped like its animal, its bird or a landmark, with scene boards between them. Difficulty that follows you, not the level number: Easy, Normal, Hard, Expert and Master boards from about 20 arrows to 80 and more; a flawless, fast clear steps the boards up at once, two first-try clears in a row step them up too, two losses in a row ease them off; milestones every 10 levels; win streaks; combo counter; daily bonus board",
+            "Board clears reveal the country shape and its name",
             "Country facts on every clear: capital, population, region",
             "Stars, best times and tour progress saved in your browser",
-            "Same puzzle for everyone on each level, so results are comparable",
+            "A tour that starts from your home country and spreads out, at a difficulty that follows your form",
             "Works on phones and desktops, installable as an app, solo play needs no account"
           ],
           "author": {
@@ -218,7 +210,7 @@
       <!-- ── HOME ── -->
       <section class="aa-screen aa-home" id="aaSelect" aria-label="Home">
         <header class="aa-home-top">
-          <span class="aa-chip aa-chip--purse" id="aaPurse" hidden title="Your gold"><img class="aa-coin" src="/images/puzzle-coin.png" alt="" width="128" height="128" decoding="async"><b id="aaPurseNo">0</b><button type="button" class="aa-purse-add" id="aaGoldAd" hidden aria-label="More gold">+</button></span>
+          <span class="aa-chip aa-chip--purse" id="aaPurse" hidden title="Your gold"><img class="aa-coin" src="/images/puzzle-coin.png?v=1" alt="" width="128" height="128" decoding="async"><b id="aaPurseNo">0</b><button type="button" class="aa-purse-add" id="aaGoldAd" hidden aria-label="More gold">+</button></span>
           <button type="button" class="aa-chip aa-chip--league" id="aaLeague" hidden aria-label="This week's league"><span aria-hidden="true">🏆</span><b id="aaLeagueEnds"></b></button>
           <button type="button" class="aa-icon" id="aaSettings" aria-label="Settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5 19.4 7.7v8.6L12 20.5 4.6 16.3V7.7z"/><circle cx="12" cy="12" r="3"/></svg></button>
         </header>
@@ -447,6 +439,6 @@
       </div>
     </div>
 
-    <script src="/js/puzzle.js?v=52"></script>
+    <script src="/js/puzzle.js?v=53"></script>
   </body>
 </html>

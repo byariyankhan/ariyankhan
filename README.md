@@ -847,14 +847,46 @@ links.
   meets The Tower at Expert (~140 arrows) and an Expert player Twin Towers at Master
   (~160). The result card has no fact box and no YouTube line, as on focus boards,
   and the HUD reads `Level N · The Tower`.
-- **Hard and Master are harder** than they were: snakes run to 14 and 16 cells
+- **Expert and Master are harder** than they were: snakes run to 14 and 16 cells
   (`MAXLEN_OF`), nearly every arrow points far (`FAR_OF` 0.85/0.95), runs are
   straighter and longer (`RAIL_OF`), and the country outline is rasterised on a
-  finer grid (`KSCALE_OF` 1.18 on Hard, 1.5 on Master, applied only to countries and
-  discovery boards; scene and focus boards are sized for their tiers already), so
-  a Master country holds ~120 long arrows instead of ~90, and the tightening pass
-  runs more flips (`TIGHTEN_OF` 380/420). A board still generates in about two
-  seconds on a phone-sized Chromium.
+  finer grid (`KSCALE_OF` 1.18 on Expert, 1.5 on Master, applied only to countries
+  and discovery boards; scene and focus boards are sized for their tiers already),
+  so a Master country holds ~120 long arrows instead of ~90, and the tightening
+  pass runs more flips (`TIGHTEN_OF` 380/420). The finer grid has a budget
+  (`CELL_CAP_OF` 800/1100 cells, `SIDE_CAP` 66): Brazil at 1.5 would be two
+  thousand cells and three hundred five-pixel arrows, so `maskFor` trims the scale
+  to what fits, and a big country stays nearer the size its level data gave it. A
+  board still generates in about two seconds on a phone-sized Chromium.
+- **In the app, Back is the page's.** The game has no history for the WebView to
+  walk (it routes with `replaceState`; a sheet is an element that is shown), so the
+  shell hands Android's Back over the bridge as `{event:"back"}` and `backPressed()`
+  closes what is open one layer at a time — the open `ask()` question (answered No),
+  the Home page, a sheet, the board (with its "Leave this board?" where that
+  applies) — and when nothing is open sends `leave`, on which the app steps into the
+  background. The page says `hello` as it loads (`shellListen`) so the app holds a
+  reply channel to it; `shell.ask` ignores `{event}` messages, and a timed-out
+  question no longer clears the next question's handler. `share <text>` opens the
+  phone's own share sheet, which is what `navigator.share` is in a browser.
+- **Analytics after the gate, never in the app.** The gtag snippet is gone from the
+  HTML; `analyticsOn()` loads it once `welcomed` is set (the Terms and Privacy
+  gate accepted) and not when the page runs inside the shell, whose store listing
+  declares what the app collects. The `typeof gtag === 'function'` guards mean a
+  page without it simply sends nothing. The gate sits above every sheet
+  (`z-index` 60), so a first open through `#m=` or `#league` cannot skip it.
+- **Pre-publish audit fixes** (September 2026): a tap on the world map looks the
+  board up by id when tapped, and a clear is saved under `state.level.id`, because
+  choosing a home country reorders the tour under both; "Auto" home rebuilds the
+  whole tour (`tourFor`, not `orderFor`); the home row and the toast name the first
+  *country*, not the brain focus board; scene boards are not counted as countries
+  (`isCountry`); a discover-boards or map fetch that failed is forgotten so the next
+  Play tries again; the confetti canvas goes back with `appendChild` (the toast it
+  used to be inserted before had moved out of the board wrap, which threw on every
+  win with reduced motion on); the sign-in sheet's line returns to its own words;
+  the hint and check labels only mention an advertisement when there is one; the
+  League sheet says when it could not be reached; the coin is versioned; the
+  service worker precaches the brain mark, serves the cached page over a 5xx and
+  lists `/puzzle` without the slash.
 - **Focus boards** (`games/build-focus-boards.mjs` → `games/data/focus-boards.json`,
   26 boards, 18 KB) are the boards the game opens on: a brain, a lightbulb, a
   key, a cog, a puzzle piece, a labyrinth, a knight — the game's own language

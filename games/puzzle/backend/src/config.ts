@@ -37,7 +37,12 @@ export const config = {
   // Which origins may call the API with credentials. Empty = same-origin only, which is the web case; a phone
   // app sends no Origin at all and is allowed through on its Bearer token.
   allowedOrigins: str('PUZZLE_ALLOWED_ORIGINS').split(',').map(s => s.trim()).filter(Boolean),
-  trustProxy: bool('PUZZLE_TRUST_PROXY', true),
+  // Who may speak for the player. nginx on this host and Cloudflare in front of it each append the address
+  // they saw to X-Forwarded-For, so the player's own address is the first one, counted from the right, that is
+  // not on this list -- and an X-Forwarded-For a script invents on the left is ignored rather than believed,
+  // which is what keeps the per-address rate limits meaning something. Names are proxy-addr's (loopback,
+  // linklocal, uniquelocal) plus `cloudflare` for its published ranges; anything else is a CIDR.
+  trustedProxies: str('PUZZLE_TRUSTED_PROXIES', 'loopback,linklocal,uniquelocal,cloudflare').split(',').map(s => s.trim()).filter(Boolean),
   cookieSecure: bool('PUZZLE_COOKIE_SECURE', true),
 
   pg: {
@@ -121,6 +126,9 @@ export const config = {
     // How long a push service should hold a notification for a phone that is off. An invitation is worth
     // nothing tomorrow (the room is gone), so it expires with the room; the league can wait a day.
     ttlSeconds: num('PUZZLE_PUSH_TTL', 3600),
+    // Where a browser's push endpoint may point. This service makes a request to whatever it stores here, so
+    // it stores only addresses at the push services browsers actually use, never one inside our own network.
+    hosts: str('PUZZLE_PUSH_HOSTS', 'fcm.googleapis.com,android.googleapis.com,push.services.mozilla.com,notify.windows.com,wns.windows.com,push.apple.com,push.samsungosp.com,push.opera.com').split(',').map(s => s.trim().toLowerCase()).filter(Boolean),
   },
 
   // ── The app's notifications ──

@@ -17,10 +17,11 @@ import { startReminderTimer, stopReminderTimer } from './reminder.js';
 import { pruneSessions } from './auth.js';
 import { online } from './presence.js';
 import { log } from './log.js';
+import { trust } from './proxies.js';
 
 const app = Fastify({
   logger: false,                          // we write our own structured lines, with redaction
-  trustProxy: config.trustProxy,           // the host nginx is in front; req.ip must be the player, not the proxy
+  trustProxy: trust,                       // nginx and Cloudflare are in front; req.ip must be the player, not either of them
   bodyLimit: 64 * 1024,
 });
 
@@ -44,9 +45,15 @@ app.addHook('onRequest', async (req, reply) => {
 });
 
 app.setErrorHandler(async (err, req, reply) => {
-  // The player gets a shape they can handle; the detail goes to the log, never to the response.
-  log.err('request failed', err, { method: req.method, url: req.url });
-  if (!reply.sent) await reply.header('Cache-Control', 'no-store').code(500).send({ error: 'server_error' });
+  // The player gets a shape they can handle; the detail goes to the log, never to the response. A request
+  // Fastify itself refused -- unreadable JSON, a body over the limit, a content type it does not parse --
+  // carries its own 4xx and is the client's to fix, so it is answered as such rather than dressed up as a
+  // failure of ours and logged as one.
+  const e = err as { statusCode?: unknown; code?: unknown };
+  const status = typeof e.statusCode === 'number' && e.statusCode >= 400 && e.statusCode < 500 ? e.statusCode : 500;
+  if (status === 500) log.err('request failed', err, { method: req.method, url: req.url });
+  else log.warn('request refused', { status, code: String(e.code ?? ''), method: req.method, url: req.url });
+  if (!reply.sent) await reply.header('Cache-Control', 'no-store').code(status).send({ error: status === 500 ? 'server_error' : 'bad_request' });
 });
 
 app.setNotFoundHandler(async (_req, reply) => {
@@ -71,12 +78,18 @@ async function health() {
     online_players: await online.count(),
   };
 }
-for (const path of ['/health', `${API_PREFIX}/health`]) {
-  app.get(path, async (_req, reply) => {
-    const h = await health();
-    await reply.header('Cache-Control', 'no-store').code(h.ok ? 200 : 503).send(h);
-  });
-}
+// The full report is for the host: nginx lets only the host itself through to it. The one at the public
+// prefix says whether the service is up and nothing else -- no container statistics, no error text, and no
+// database round trip per request from whoever is asking: it answers from a reading at most ten seconds old.
+app.get('/health', async (_req, reply) => {
+  const h = await health();
+  await reply.header('Cache-Control', 'no-store').code(h.ok ? 200 : 503).send(h);
+});
+let publicOk: { at: number; ok: boolean } | null = null;
+app.get(`${API_PREFIX}/health`, async (_req, reply) => {
+  if (!publicOk || Date.now() - publicOk.at > 10_000) publicOk = { at: Date.now(), ok: (await dbHealthy()).ok };
+  await reply.header('Cache-Control', 'no-store').code(publicOk.ok ? 200 : 503).send({ ok: publicOk.ok });
+});
 // A liveness probe must not touch the database: it answers "this process is running", nothing more.
 app.get('/health/live', async (_req, reply) => reply.header('Cache-Control', 'no-store').send({ ok: true }));
 
