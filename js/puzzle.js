@@ -2067,11 +2067,16 @@
         adNote(name, how, why, Math.round(performance.now() - asked));
         resolve(how);
       };
-      // Two clocks, because the two silences mean different things. If beforeReward has not fired in eight
-      // seconds there is nothing to show and the player should not be left looking at a spinner. Once it has
-      // fired an ad is actually running, and a rewarded one is allowed to be a minute long.
+      // Two clocks, because the two silences mean different things. The first is a leak guard, not a
+      // deadline: adBreakDone is documented to fire for every break, so a break that has found nothing says
+      // so in well under a second, and the only thing this clock ever catches is a library that has gone
+      // quiet altogether. It was eight seconds and a phone proved that too short — the first advertisement
+      // of a session has to be fetched, it arrived late, and the game had already told the player there was
+      // none. Twenty is long to look at a panel, but losing an advertisement the player asked for and then
+      // waited for is worse. Once beforeReward has fired an ad is actually running, and a rewarded one is
+      // allowed to be minutes long.
       let waitEnd = 0;
-      const waitAd = setTimeout(() => { if (!started) done('unavailable', 'nothing answered'); }, 8000);
+      const waitAd = setTimeout(() => { if (!started) done('unavailable', 'nothing answered'); }, 20000);
       try {
         // Written before the break, not only after it. A break that never comes back at all — the library
         // showing an advertisement and waiting on a player who put the phone down — would otherwise leave
