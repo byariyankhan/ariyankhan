@@ -34,6 +34,11 @@ on:
         description: 'What changed, for your own reference in the artifact name'
         required: false
         default: ''
+      debug_apk:
+        description: 'Build a debug APK instead of the signed bundle: no upload key needed, for a test phone or to check the code compiles'
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: read
@@ -77,6 +82,7 @@ jobs:
           echo "code=$(( ${{ github.run_number }} + 1 ))" >> "$GITHUB_OUTPUT"
 
       - name: Unpack the upload key
+        if: ${{ !inputs.debug_apk }}
         env:
           KEYSTORE_B64: ${{ secrets.PUZZLE_KEYSTORE_B64 }}
         run: |
@@ -102,7 +108,25 @@ jobs:
             || { echo "::error::GOOGLE_SERVICES_JSON_B64 did not decode to a JSON file"; exit 1; }
           echo "google-services.json written from the secret"
 
+      - name: Build the debug APK
+        if: ${{ inputs.debug_apk }}
+        working-directory: android
+        env:
+          PUZZLE_VERSION_CODE: ${{ steps.ver.outputs.code }}
+          PUZZLE_VERSION_NAME: ${{ github.event.inputs.version_name }}
+        run: ./gradlew --no-daemon assembleDebug
+
+      - name: Keep the debug APK
+        if: ${{ inputs.debug_apk }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: puzzle-debug-${{ github.event.inputs.version_name }}-${{ steps.ver.outputs.code }}
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Build the bundle
+        if: ${{ !inputs.debug_apk }}
         working-directory: android
         env:
           PUZZLE_KEYSTORE: ${{ runner.temp }}/upload.jks
@@ -116,6 +140,7 @@ jobs:
       # A bundle that is not signed, or is signed with the wrong key, looks fine until Play refuses it. Say so
       # here instead, where the run is still on screen.
       - name: Check it is signed, carries its splash, and say what with
+        if: ${{ !inputs.debug_apk }}
         working-directory: android
         run: |
           AAB=app/build/outputs/bundle/release/app-release.aab
@@ -128,6 +153,7 @@ jobs:
           keytool -printcert -jarfile "$AAB" | grep -E 'Owner:|SHA256:' || true
 
       - name: Keep it
+        if: ${{ !inputs.debug_apk }}
         uses: actions/upload-artifact@v4
         with:
           name: puzzle-${{ github.event.inputs.version_name }}-${{ steps.ver.outputs.code }}
