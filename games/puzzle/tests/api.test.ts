@@ -527,4 +527,24 @@ section('One match at a time, and a device that knows nothing can still find it'
   void two;
 }
 
+section('A phone registers for notifications the way a browser does, and is told when it cannot');
+{
+  const key = await call('/push/key');
+  eq(key.status, 200, 'the key endpoint answers signed out');
+  eq(key.json.app, false, 'and says whether phones can be reached at all -- not on a box with no service account');
+
+  const p = await mint('phoneOwner');
+  const out = await call('/push/token', { body: { token: 'x'.repeat(40) } });
+  eq(out.status, 401, 'a token needs an account to be attached to');
+  const junk = await call('/push/token', { token: p.token, body: { token: 'short' } });
+  eq(junk.status, 400, 'and has to look like one');
+  eq(junk.json.error, 'bad_token', 'which is said before anything else is checked');
+  const off = await call('/push/token', { token: p.token, body: { token: 'x'.repeat(40) } });
+  eq(off.status, 503, 'with no service account the server refuses the token');
+  eq(off.json.error, 'push_off', 'in the same word the browser is given');
+  const drop = await call('/push/token/drop', { token: p.token, body: { token: 'x'.repeat(40) } });
+  eq(drop.status, 200, 'dropping a token never needs the service account');
+  eq(drop.json.on, false, 'and answers with whether anything is still listening');
+}
+
 await finish();

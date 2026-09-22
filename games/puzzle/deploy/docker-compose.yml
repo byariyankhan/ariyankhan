@@ -103,6 +103,9 @@ services:
       PUZZLE_VAPID_PUBLIC: ${PUZZLE_VAPID_PUBLIC:-}
       PUZZLE_VAPID_PRIVATE: ${PUZZLE_VAPID_PRIVATE:-}
       PUZZLE_VAPID_SUBJECT: ${PUZZLE_VAPID_SUBJECT:-mailto:ariyanfiles@gmail.com}
+      # The app's notifications: the Firebase service account, base64, written into this host's .env by the
+      # fcm-key mode of puzzle-ops from a repository secret. A secret. Unset means phones are simply not told.
+      PUZZLE_FCM_SERVICE_ACCOUNT: ${PUZZLE_FCM_SERVICE_ACCOUNT:-}
     working_dir: /srv/puzzle
     command:
       - sh

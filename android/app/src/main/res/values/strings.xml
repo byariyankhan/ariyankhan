@@ -34,4 +34,11 @@
          traffic, and invalid traffic costs the account. Put the phone in AdMob → Settings → Test devices
          before pressing anything, and it will serve test creatives through these same real ids. -->
     <string name="admob_app_id" translatable="false">ca-app-pub-1570944160084395~8956379298</string>
+
+    <!-- The notification channels. Android lists these by name in the app's own notification settings, where
+         a player can silence one kind and keep the other. -->
+    <string name="notify_invites">Invitations</string>
+    <string name="notify_invites_about">Somebody asking you to a match. The room waits minutes, not hours.</string>
+    <string name="notify_league">League</string>
+    <string name="notify_league_about">Where you finished, when the week\'s league pays out.</string>
 </resources>

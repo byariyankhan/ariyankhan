@@ -126,6 +126,15 @@ export const config = {
     ttlSeconds: num('PUZZLE_PUSH_TTL', 3600),
   },
 
+  // ── The app's notifications ──
+  // The Firebase service account, as the JSON Firebase hands out -- raw, or base64 so it fits on one .env
+  // line, which is how the fcm-key mode of puzzle-ops writes it. A secret: it lives in the host's .env and
+  // nowhere else. Empty means the app's notifications are simply off, the way no VAPID keys mean the
+  // browser's are.
+  fcm: {
+    serviceAccount: str('PUZZLE_FCM_SERVICE_ACCOUNT'),
+  },
+
   // How often the housekeeping loop runs. The PHP service swept on every request, which is what made a busy
   // lobby slow; one timer in one process does the same work without taxing the players.
   sweepSeconds: num('PUZZLE_SWEEP_SECONDS', 2),

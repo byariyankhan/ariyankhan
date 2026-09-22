@@ -224,7 +224,32 @@ const H = {
   // answer when this deploy has no keys: the client then says notifications are unavailable rather than
   // offering a switch that does nothing.
   async pushKey(_req: Req, res: Res, _me: Caller) {
-    await noStore(res).send({ enabled: push.enabled, key: push.publicKey() });
+    // `app` is whether a phone with the app can be reached at all; the browser reads `enabled` and `key`.
+    await noStore(res).send({ enabled: push.enabled, key: push.publicKey(), app: push.appEnabled });
+  },
+
+  // A phone with the app has no Push API. What it has is a Firebase registration token, which the app hands
+  // the page over the bridge and the page posts here. One row per token, refreshed on every open with
+  // notifications on, so the row follows the sign-in and the token stays current.
+  async pushToken(req: Req, res: Res, me: Caller) {
+    if (!me.user) { await noStore(res).code(401).send({ error: 'signed_out' }); return; }
+    if (!(await limited('push_write', req, res, me.user.id))) return;
+    const token = String(body(req).token ?? '').trim();
+    // A registration token is a long opaque string of a known alphabet. Nothing else is stored, because
+    // whatever is stored here is sent to Google with our name on it.
+    if (!/^[A-Za-z0-9_:\-]{20,4096}$/.test(token)) { await noStore(res).code(400).send({ error: 'bad_token' }); return; }
+    // The same word the browser is given by a deploy with no keys: the switch then says so instead of failing.
+    if (!push.appEnabled) { await noStore(res).code(503).send({ error: 'push_off' }); return; }
+    await push.saveToken(pool, me.user.id, token, String(req.headers['user-agent'] ?? ''));
+    await noStore(res).send({ ok: true, on: true });
+  },
+
+  async pushTokenDrop(req: Req, res: Res, me: Caller) {
+    if (!me.user) { await noStore(res).code(401).send({ error: 'signed_out' }); return; }
+    if (!(await limited('push_write', req, res, me.user.id))) return;
+    const token = String(body(req).token ?? '').trim();
+    if (token) await push.dropToken(pool, me.user.id, token);
+    await noStore(res).send({ ok: true, on: token ? await push.hasSubscription(pool, me.user.id) : true });
   },
 
   async pushSubscribe(req: Req, res: Res, me: Caller) {
@@ -447,6 +472,8 @@ export function registerRoutes(app: FastifyInstance): void {
   app.get(`${v1}/push/key`, withCaller(H.pushKey));
   app.post(`${v1}/push/subscribe`, withCaller(H.pushSubscribe));
   app.post(`${v1}/push/unsubscribe`, withCaller(H.pushUnsubscribe));
+  app.post(`${v1}/push/token`, withCaller(H.pushToken));
+  app.post(`${v1}/push/token/drop`, withCaller(H.pushTokenDrop));
 
   app.get(`${v1}/lobby`, withCaller(H.lobby));
   app.get(`${v1}/players/recent`, withCaller(H.recent));

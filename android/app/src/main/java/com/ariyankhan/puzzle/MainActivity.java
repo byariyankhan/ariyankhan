@@ -1,9 +1,13 @@
 package com.ariyankhan.puzzle;
 
+import android.Manifest;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
+import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -20,8 +24,11 @@ import android.widget.ImageView;
 
 import androidx.activity.ComponentActivity;
 import androidx.activity.OnBackPressedCallback;
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.content.ContextCompat;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
@@ -42,6 +49,8 @@ import com.google.android.gms.ads.MobileAds;
 import com.google.android.gms.ads.h5.H5AdsWebViewClient;
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption;
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential;
+import com.google.firebase.FirebaseApp;
+import com.google.firebase.messaging.FirebaseMessaging;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -80,6 +89,11 @@ public final class MainActivity extends ComponentActivity {
     private WebChromeClient.CustomViewCallback fullscreenDone;
     private OnBackPressedCallback back;
 
+    /** Asks for POST_NOTIFICATIONS on Android 13 and up. Registered in onCreate, which is the one rule it has. */
+    private ActivityResultLauncher<String> askToNotify;
+    /** The page's pushOn, waiting on the permission dialog. One at a time, which is all a switch can be. */
+    private JavaScriptReplyProxy notifyWaiting;
+
     @Override
     protected void onCreate(@Nullable Bundle state) {
         super.onCreate(state);
@@ -108,6 +122,19 @@ public final class MainActivity extends ComponentActivity {
                     WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout());
             v.setPadding(bars.left, bars.top, bars.right, bars.bottom);
             return insets;
+        });
+
+        // The notification channels exist from the first launch, so that Android's own settings page for the
+        // app lists them, and so a test message sent from the Firebase console lands in one of them.
+        PuzzleMessagingService.ensureChannels(this);
+        // The permission dialog's answer comes back here. Registered before the activity is started, which is
+        // the one rule registerForActivityResult has; used from the bridge's pushOn, below.
+        askToNotify = registerForActivityResult(new ActivityResultContracts.RequestPermission(), granted -> {
+            JavaScriptReplyProxy waiting = notifyWaiting;
+            notifyWaiting = null;
+            if (waiting == null) return;
+            if (granted) fetchToken(waiting);
+            else answer(waiting, fail("denied"));
         });
 
         configure(web);
@@ -497,7 +524,10 @@ public final class MainActivity extends ComponentActivity {
                     String cmd = message.getData();
                     if ("signIn".equals(cmd)) signIn(reply);
                     else if ("adTest".equals(cmd)) adSelfTest(reply);
-                    else if ("hello".equals(cmd)) answer(reply, ok("signIn", true));
+                    else if ("pushState".equals(cmd)) pushState(reply);
+                    else if ("pushOn".equals(cmd)) pushOn(reply);
+                    else if ("pushOff".equals(cmd)) pushOff(reply);
+                    else if ("hello".equals(cmd)) answer(reply, hello());
                 });
     }
 
@@ -577,6 +607,120 @@ public final class MainActivity extends ComponentActivity {
             away = true;
             web.loadUrl("https://google.github.io/webview-ads/test/#api-for-ads-tests");
         });
+    }
+
+    // ── Notifications ─────────────────────────────────────────────────────────────────────────────────
+    //
+    // A WebView has no Push API, so the page cannot subscribe the way a browser does. What a phone has is
+    // Firebase Cloud Messaging, and what FCM hands an app is one string, the registration token, which is the
+    // address the server sends to. Three commands carry it. pushState says what this phone already has; pushOn
+    // asks Android for permission (once, on 13 and up) and Firebase for the token, and hands it over; pushOff
+    // lets the token go. The page posts the token to the account -- nothing here talks to our server.
+    //
+    // Every one of them answers "unavailable" honestly when the app was built without google-services.json,
+    // because there is then no Firebase project for the library to belong to. See android/README.md.
+
+    /** What the bridge's hello says this build can do. The page shows or hides its switches by it. */
+    private JSONObject hello() {
+        JSONObject o = ok("signIn", true);
+        try {
+            o.put("push", firebaseReady());
+        } catch (JSONException impossible) {
+            // A literal key and a boolean.
+        }
+        return o;
+    }
+
+    private boolean firebaseReady() {
+        try {
+            return !FirebaseApp.getApps(this).isEmpty();
+        } catch (RuntimeException notEvenThat) {
+            return false;
+        }
+    }
+
+    private SharedPreferences pushPrefs() {
+        return PuzzleMessagingService.prefs(this);
+    }
+
+    private boolean notifyGranted() {
+        return Build.VERSION.SDK_INT < 33
+                || ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+                        == PackageManager.PERMISSION_GRANTED;
+    }
+
+    private void pushState(JavaScriptReplyProxy reply) {
+        JSONObject o = ok("available", firebaseReady());
+        try {
+            o.put("granted", notifyGranted());
+            o.put("enabled", PuzzleMessagingService.canPost(this));
+            o.put("on", pushPrefs().getBoolean(PuzzleMessagingService.PREF_ON, false));
+            o.put("token", pushPrefs().getString(PuzzleMessagingService.PREF_TOKEN, ""));
+        } catch (JSONException impossible) {
+            // Literal keys; booleans and a string.
+        }
+        answer(reply, o);
+    }
+
+    private void pushOn(JavaScriptReplyProxy reply) {
+        if (!firebaseReady()) { answer(reply, fail("unavailable")); return; }
+        if (!notifyGranted()) {
+            if (notifyWaiting != null) { answer(reply, fail("busy")); return; }
+            notifyWaiting = reply;
+            // On the main thread, whichever thread the bridge delivered the ask on: a dialog is a view.
+            new Handler(Looper.getMainLooper()).post(() -> {
+                try {
+                    askToNotify.launch(Manifest.permission.POST_NOTIFICATIONS);
+                } catch (RuntimeException couldNotAsk) {
+                    notifyWaiting = null;
+                    answer(reply, fail("failed"));
+                }
+            });
+            return;
+        }
+        fetchToken(reply);
+    }
+
+    /** The token from Firebase, minted if this phone has none yet, and remembered so pushState can say so. */
+    private void fetchToken(JavaScriptReplyProxy reply) {
+        try {
+            FirebaseMessaging fm = FirebaseMessaging.getInstance();
+            // Auto-init is off in the manifest, so the library mints and refreshes tokens only for a phone
+            // whose player has turned the switch on. A player who never does never has Firebase spoken to.
+            fm.setAutoInitEnabled(true);
+            fm.getToken().addOnCompleteListener(task -> {
+                String token = task.isSuccessful() ? task.getResult() : null;
+                if (token == null || token.isEmpty()) { answer(reply, fail("failed")); return; }
+                pushPrefs().edit()
+                        .putString(PuzzleMessagingService.PREF_TOKEN, token)
+                        .putBoolean(PuzzleMessagingService.PREF_ON, true)
+                        .apply();
+                answer(reply, ok("token", token));
+            });
+        } catch (RuntimeException noFirebase) {
+            answer(reply, fail("unavailable"));
+        }
+    }
+
+    /**
+     * Off means off on this phone: the switch, and the token Firebase would have delivered to. The old token
+     * goes back to the page so it can drop the server's row; the library is told to stop minting new ones.
+     */
+    private void pushOff(JavaScriptReplyProxy reply) {
+        SharedPreferences p = pushPrefs();
+        boolean was = p.getBoolean(PuzzleMessagingService.PREF_ON, false);
+        String token = p.getString(PuzzleMessagingService.PREF_TOKEN, "");
+        p.edit().putBoolean(PuzzleMessagingService.PREF_ON, false).remove(PuzzleMessagingService.PREF_TOKEN).apply();
+        if (was && firebaseReady()) {
+            try {
+                FirebaseMessaging fm = FirebaseMessaging.getInstance();
+                fm.setAutoInitEnabled(false);
+                fm.deleteToken();
+            } catch (RuntimeException alreadyGone) {
+                // Forgotten here either way; Firebase reports it dead the first time it is sent to.
+            }
+        }
+        answer(reply, ok("token", was ? token : ""));
     }
 
     private static JSONObject ok(String key, Object value) {

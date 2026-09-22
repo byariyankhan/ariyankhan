@@ -133,6 +133,18 @@ proportion, without a deploy of anything but the environment.
 
 ---
 
+### Notifications
+
+Two things are worth interrupting somebody for: an invitation, because the room it is about waits minutes,
+and the league paying out, because the gold is real. Nothing else is sent. A browser gets them through Web
+Push — `push_subscriptions`, and the VAPID keys the `push-keys` mode of puzzle-ops generates on the host. The
+app gets them through Firebase Cloud Messaging — `push_tokens`, and a service account the `fcm-key` mode
+writes into the host's `.env` as `PUZZLE_FCM_SERVICE_ACCOUNT` from a repository secret. `sendToUser` tells
+every device the account has, on both; either channel left unconfigured is simply that channel off, and
+`/push/key` says which are on. Dead endpoints and dead tokens delete themselves as the push service reports
+them. No Firebase SDK is involved on the server: `fcm.ts` signs a JWT with the account's key and posts to
+FCM's HTTP v1 endpoint.
+
 ## Public URLs
 
 ```
@@ -166,6 +178,11 @@ in the path.
 | POST | `/matches/:code/leave` | walk out, taking your stake |
 | POST | `/matches/:code/progress` | how far along you are |
 | POST | `/matches/:code/result` | your run is over |
+| GET | `/push/key` | whether notifications are on: the VAPID public key for a browser, and whether phones can be reached |
+| POST | `/push/subscribe` | a browser's push subscription, for this account |
+| POST | `/push/unsubscribe` | let it go |
+| POST | `/push/token` | a phone's Firebase registration token, for this account |
+| POST | `/push/token/drop` | let it go |
 
 ### WebSocket
 

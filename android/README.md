@@ -315,6 +315,48 @@ android.permission.WAKE_LOCK
 row in **Data safety**, were both answered *no* when this app had no advertising SDK in it. With one, both
 answers are yes, and an upload that says otherwise is a false declaration.
 
+## Notifications
+
+An invitation, and the league paying out — the same two things the web sends, and nothing else. The web's go
+through the browser's push service; a WebView has no such thing, so the app's go through **Firebase Cloud
+Messaging**: the server sends one message per phone to Google, Google wakes `PuzzleMessagingService`, and the
+service draws it. What the server sends is data (a title, a body, a path into the game, a tag), never a
+ready-made notification, so it looks the same whether the game was open or the phone was in a pocket. A tap
+opens the game at the room, or at the league table, through the same activity a link in a chat reaches.
+
+It is **off until the player turns it on**, in Settings, with the switch the browser shows in the same place.
+Turning it on is the one moment the app asks Android for `POST_NOTIFICATIONS` (13 and up), fetches the phone's
+registration token from Firebase, and hands it to the page over the bridge (`pushOn`); the page posts it to
+the account with `POST /push/token`, and posts it again on every open so the row follows whoever is signed in.
+Off deletes the token on the phone and the row on the server, and so does signing out. Nothing is asked on the
+way in, and Firebase is not spoken to at all — auto-init is off in the manifest — until the switch is.
+
+Two files make it work, and neither is in this repository:
+
+1. **`android/app/google-services.json`**, from the Firebase console: *Add app → Android*, package name
+   `com.ariyankhan.puzzle`, then download the file. It tells the library which Firebase project it belongs to.
+   Google's own position is that it is not a secret — it is inside every APK that uses it — so it can simply be
+   committed at that path. If you would rather not, put its base64 (`base64 -w0 google-services.json`) in the
+   repository secret `GOOGLE_SERVICES_JSON_B64` and `android-build.yml` writes it onto the runner instead.
+   Without it the app still builds, because the Firebase plugin is applied only when the file is there, and
+   the switch stays hidden: the app answers the page's `pushState` with `available: false`. The debug build
+   carries the suffix `.debug` on its package name, so for a debug APK to receive anything the Firebase
+   project needs a second Android app registered as `com.ariyankhan.puzzle.debug`, in the same file.
+
+2. **The service account**, for the server: Firebase console → *Project settings → Service accounts →
+   Generate new private key*. That JSON file **is** a secret — it signs the requests the server makes to Google
+   in the project's name — and it never goes in git. Paste the whole file into the repository secret
+   `PUZZLE_FCM_SERVICE_ACCOUNT` and run the `fcm-key` mode of *Puzzle ops* with `confirm=DEPLOY`: it carries
+   the file to the VPS on the connection's own stdin (never a command line), writes it base64 into the
+   project's `.env` as `PUZZLE_FCM_SERVICE_ACCOUNT`, passes it through the compose file, recreates the API,
+   and checks that `/api/puzzle/v1/push/key` now answers `"app": true`. Until it has run, the server answers
+   `push_off` to every token and the app's switch is not offered.
+
+The server side is `games/puzzle/backend/src/fcm.ts`: a JWT signed with the account's key, traded for an
+access token, and one `POST` per phone to FCM's HTTP v1 endpoint — no Firebase SDK on the server, because it
+would be a hundred dependencies for four requests. A token Google reports as `UNREGISTERED` (the app
+uninstalled, the token rotated away) is deleted the moment it does.
+
 ## What is not here yet
 
 In the order it is meant to arrive:
@@ -323,4 +365,4 @@ In the order it is meant to arrive:
 2. **Play Billing.** Consumable products for hints and lifelines, verified server-side, acknowledged inside
    three days or Play refunds them, and clawed back through the Voided Purchases API when somebody refunds a
    purchase they have already spent.
-3. **Firebase Cloud Messaging**, and `POST_NOTIFICATIONS` back in the manifest with it.
+3. **The two Firebase files** described above, without which the notifications built here reach nobody.

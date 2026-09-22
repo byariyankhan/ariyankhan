@@ -2599,7 +2599,7 @@
   // this and a server that has keys, because a notification has to be addressed to an account, and a switch
   // that cannot do anything is worse than no switch. The permission prompt is only ever raised by that switch
   // being turned on: a game that asks for notifications on the way in is a game people close.
-  const push = { key: '', on: false, busy: false, checked: false, asked: false };
+  const push = { key: '', on: false, busy: false, checked: false, asked: false, app: false, granted: true, blocked: false, posted: '' };
   // isSecureContext rather than a list of protocols: it is the browser's own answer to the same question, and
   // it already knows that https, localhost and 127.0.0.1 all count and that a file:// page does not.
   // The shell is named here rather than left to the feature tests below it. A WebView reports no
@@ -2607,6 +2607,11 @@
   // rest on: a WebView that one day exposes the constructor without a push service behind it would show a
   // switch that subscribes and never delivers, which is the failure this whole block is written to avoid.
   const pushable = () => !shell.on && window.isSecureContext && 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+  // The app is the other way in. A WebView has no Push API; what a phone has is Firebase Cloud Messaging, and
+  // the app minds the registration token FCM hands it and passes it over the bridge (pushState, pushOn,
+  // pushOff). The page posts that token to the same account a browser's subscription goes to, and the player
+  // sees one switch that means the same thing in both places.
+  const appPush = () => shell.on && !!shell.bridge();
   const pushApi = (path, body) =>
     fetch(`${API_V1}/push/${path}`, {
       method: body ? 'POST' : 'GET', credentials: 'include', cache: 'no-store',
@@ -2630,18 +2635,20 @@
 
   function renderNotify() {
     if (!el.btnNotify) return;
-    const show = push.checked && !!push.key && !!auth.user && pushable();
+    const app = appPush();
+    const show = push.checked && !!auth.user && (app ? push.app : (!!push.key && pushable()));
     if (el.notifyCap) el.notifyCap.hidden = !show;
     if (el.notifyGroup) el.notifyGroup.hidden = !show;
     if (!show) return;
     el.btnNotify.setAttribute('aria-checked', String(push.on));
     el.btnNotify.disabled = push.busy;
-    // The one state a switch cannot get itself out of: the browser has been told no, and only the browser's
-    // own settings can change that. Saying so is the difference between a broken switch and a closed door.
-    const blocked = Notification.permission === 'denied';
+    // The one state a switch cannot get itself out of: the browser, or the phone, has been told no, and only
+    // its own settings can change that. Saying so is the difference between a broken switch and a closed door.
+    // Notification is the browser's global and a WebView need not have it, so in the app the app is asked.
+    const blocked = app ? push.blocked : Notification.permission === 'denied';
     if (el.notifyNote) el.notifyNote.textContent = blocked
-      ? 'Blocked in this browser — turn it back on in the site settings.'
-      : push.on ? 'On for this device.' : 'Only when somebody invites you, and when the league pays out.';
+      ? (app ? 'Blocked for Puzzle in your phone\u2019s settings.' : 'Blocked in this browser — turn it back on in the site settings.')
+      : push.on ? (app ? 'On for this phone.' : 'On for this device.') : 'Only when somebody invites you, and when the league pays out.';
   }
 
   /**
@@ -2652,6 +2659,7 @@
   async function notifyInit() {
     if (!el.btnNotify) return;
     push.checked = true;
+    if (appPush()) { await notifyInitApp(); return; }
     if (!pushable() || !auth.user) { renderNotify(); return; }
     if (!push.asked) {
       push.asked = true;
@@ -2663,7 +2671,76 @@
     renderNotify();
   }
 
+  /**
+   * The app's side of the same question. The server is asked once whether phones can be reached at all -- a
+   * deploy with no Firebase key has no switch to offer, the way one with no VAPID keys has none for browsers
+   * -- and the app is asked what this phone already has. A phone with the switch on posts its token again on
+   * every open: the row follows whoever is signed in, and a token Firebase rotated while the game was closed
+   * replaces the one the server was still addressing.
+   */
+  async function notifyInitApp() {
+    if (!auth.user) { renderNotify(); return; }
+    if (!push.asked) {
+      push.asked = true;
+      try { const d = await pushApi('key'); push.app = !!d.app; }
+      catch { push.app = false; push.asked = false; }
+    }
+    if (!push.app) { renderNotify(); return; }
+    const s = await shell.ask('pushState', 4000);
+    if (!s?.ok || !s.available) { push.app = false; renderNotify(); return; }
+    push.granted = s.granted !== false;
+    push.on = !!s.on && !!s.token;
+    push.blocked = push.on && s.enabled === false;
+    if (push.on && s.token !== push.posted) {
+      try { await pushApi('token', { token: s.token }); push.posted = s.token; }
+      catch (err) { if (err.code === 'push_off') push.app = false; }
+    }
+    renderNotify();
+  }
+
+  async function notifyToggleApp() {
+    if (push.busy || !push.app) return;
+    push.busy = true; renderNotify();
+    try {
+      if (push.on) {
+        // Off means off on this phone: the app lets its token go, and so does the row that would have been
+        // sent to.
+        const r = await shell.ask('pushOff', 8000);
+        if (r?.token) await pushApi('token/drop', { token: r.token }).catch(() => {});
+        push.on = false; push.blocked = false; push.posted = '';
+        toast('Notifications off on this phone.', 'hint');
+      } else {
+        // The same words before Android's dialog as before the browser's, for the same reason: the system's
+        // dialog names the app and nothing else, and on Android 13 and up two refusals close it for good.
+        if (!push.granted && !(await ask({
+          title: 'Turn on notifications?',
+          body: 'An invite, and the league. Nothing else.\n\nYour phone asks next.',
+          ok: 'Ask me',
+          cancel: 'Not now',
+        }))) return;
+        const r = await shell.ask('pushOn', 120000);
+        if (!r?.ok || !r.token) {
+          if (r?.error === 'denied') { push.granted = false; toast('Notifications are blocked for Puzzle in your phone\u2019s settings.', 'hint'); }
+          else if (r?.error === 'unavailable') { push.app = false; toast('This build of the app cannot receive notifications.', 'bad'); }
+          else toast(`Could not turn notifications on (${r?.error || 'failed'}).`, 'bad');
+          return;
+        }
+        push.granted = true;
+        await pushApi('token', { token: r.token });
+        push.on = true; push.blocked = false; push.posted = r.token;
+        toast('Notifications on. Only an invite, and the league.', 'good');
+      }
+    } catch (err) {
+      const why = typeof err.code === 'string' ? err.code : (err.name || err.message || 'failed');
+      if (why === 'push_off') push.app = false;
+      toast(`Could not change notifications (${why}).`, 'bad');
+    } finally {
+      push.busy = false; renderNotify();
+    }
+  }
+
   async function notifyToggle() {
+    if (appPush()) { await notifyToggleApp(); return; }
     if (push.busy || !push.key) return;
     push.busy = true; renderNotify();
     try {
@@ -2714,6 +2791,16 @@
 
   /** Give up this device's subscription, quietly. Used when the account leaves the browser. */
   async function notifyDrop() {
+    if (appPush()) {
+      // The phone's token goes with the account the way a browser's subscription does: off is off, and
+      // whoever signs in next turns it on for themselves.
+      try {
+        const r = await shell.ask('pushOff', 8000);
+        if (r?.token) await pushApi('token/drop', { token: r.token }).catch(() => {});
+      } catch { /* an app with no bridge has nothing to drop */ }
+      push.on = false; push.posted = '';
+      return;
+    }
     if (!pushable()) return;
     try {
       const sub = await pushSub();

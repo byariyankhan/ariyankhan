@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The status-bar icon. Android draws these as a white silhouette on whatever the bar is, so this is white on
+     nothing, and it is the brain mark's own idea at a size the bar can hold: two right-angled arrows, one
+     climbing and one falling, the way every stroke of that mark is drawn. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:pathData="M4,15.5 H9.5 V6.5 H14"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="2.4"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="#00000000" />
+    <path
+        android:pathData="M13.6,3.4 L18.4,6.5 L13.6,9.6 Z"
+        android:fillColor="#FFFFFFFF" />
+    <path
+        android:pathData="M20,8.5 H14.5 V17.5 H10"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="2.4"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="#00000000" />
+    <path
+        android:pathData="M10.4,14.4 L5.6,17.5 L10.4,20.6 Z"
+        android:fillColor="#FFFFFFFF" />
+</vector>

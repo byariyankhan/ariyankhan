@@ -15,6 +15,9 @@ set -uo pipefail
 MODE="${MODE:-inspect}"
 DOMAIN="${DOMAIN:-ariyankhan.com}"
 SNIPPET_B64="${SNIPPET_B64:-}"
+# The Firebase service account, base64, for fcm-key only. The workflow puts it on this script's own stdin as
+# its first line rather than on the command line, which every process on the host can read.
+FCM_B64="${FCM_B64:-}"
 SRC_SHA="${SRC_SHA:-}"
 CONFIRM="${CONFIRM:-}"
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
@@ -2253,6 +2256,125 @@ PATCH
   note "the private key is in $ENVF on this host and nowhere else; it has not been printed"
 }
 
+mode_fcm_key() {
+  echo "Puzzle — fcm-key  ($(date -u))"
+  PROJ=$(projdir)
+  [ -n "$PROJ" ] || { bad "could not find the project directory"; return; }
+  ENVF="$PROJ/.env"; COMP="$PROJ/docker-compose.yml"
+  $SUDO test -f "$ENVF" || { bad "no .env in $PROJ"; return; }
+  $SUDO test -f "$COMP" || { bad "no docker-compose.yml in $PROJ"; return; }
+  note "project $PROJ"
+
+  say "1. is what was sent a service account?"
+  [ -n "$FCM_B64" ] || { bad "nothing was sent: add the PUZZLE_FCM_SERVICE_ACCOUNT repository secret (the JSON file Firebase generates) and run this again"; return; }
+  # Only its shape is checked, and only the two public fields are shown. The key inside is never printed.
+  WHO=$(printf '%s' "$FCM_B64" | base64 -d 2>/dev/null | python3 -c '
+import json, sys
+try:
+    j = json.load(sys.stdin)
+except Exception:
+    sys.exit(0)
+fields = ("project_id", "client_email", "private_key")
+good = isinstance(j, dict) and j.get("type") == "service_account" \
+    and all(isinstance(j.get(f), str) and j.get(f) for f in fields) and "PRIVATE KEY" in j["private_key"]
+if good:
+    print(j["project_id"] + " " + j["client_email"])
+' 2>/dev/null)
+  [ -n "$WHO" ] || { bad "the secret does not decode to a Firebase service account (type, project_id, client_email, private_key)"; return; }
+  ok "a service account for the Firebase project ${WHO%% *}"
+  note "as ${WHO#* }"
+
+  say "2. writing it into the .env"
+  EBK="$ENVF.before-fcm-$STAMP"
+  $SUDO cp -a "$ENVF" "$EBK" || { bad "could not back the .env up"; return; }
+  $SUDO chmod 600 "$EBK"
+  kept "$EBK  (the way back)"
+  # Every other value in the file, hashed, so the edit can be shown to have touched one line and nothing else.
+  BEFORE=$($SUDO grep -v '^PUZZLE_FCM_SERVICE_ACCOUNT=' "$ENVF" | sed -n 's/^[A-Za-z_][A-Za-z0-9_]*=//p' | sha256sum | cut -d" " -f1)
+  # The value reaches python on its stdin -- never on a command line, never in a temporary file.
+  cat > /tmp/puzzle-fcm-env.py <<'PYEOF'
+import sys
+path = sys.argv[1]
+value = sys.stdin.read().strip()
+key = "PUZZLE_FCM_SERVICE_ACCOUNT="
+lines = open(path).read().split("\n")
+out, done = [], False
+for line in lines:
+    if line.startswith(key):
+        if not done:
+            out.append(key + value)
+            done = True
+        continue
+    out.append(line)
+if not done:
+    while out and out[-1] == "":
+        out.pop()
+    out.append("")
+    out.append("# App notifications (written by puzzle-ops fcm-key). The Firebase service account, base64. A secret.")
+    out.append(key + value)
+    out.append("")
+open(path, "w").write("\n".join(out))
+PYEOF
+  if ! printf '%s' "$FCM_B64" | $SUDO python3 /tmp/puzzle-fcm-env.py "$ENVF"; then
+    rm -f /tmp/puzzle-fcm-env.py
+    bad "could not write to the .env; putting it back"; $SUDO cp -a "$EBK" "$ENVF"; return
+  fi
+  rm -f /tmp/puzzle-fcm-env.py
+  $SUDO chmod 600 "$ENVF"
+  AFTER=$($SUDO grep -v '^PUZZLE_FCM_SERVICE_ACCOUNT=' "$ENVF" | sed -n 's/^[A-Za-z_][A-Za-z0-9_]*=//p' | sha256sum | cut -d" " -f1)
+  HAVE=$($SUDO grep -c '^PUZZLE_FCM_SERVICE_ACCOUNT=.\+' "$ENVF" || true)
+  if [ "$BEFORE" = "$AFTER" ] && [ "${HAVE:-0}" -eq 1 ]; then ok "the account is in the .env and nothing else in the file moved"
+  else bad "the .env changed in a way this did not intend; putting it back"; $SUDO cp -a "$EBK" "$ENVF"; return; fi
+  unset FCM_B64
+
+  say "3. does the compose file pass it to the API?"
+  if $SUDO grep -q 'PUZZLE_FCM_SERVICE_ACCOUNT' "$COMP"; then
+    ok "it already does"
+  else
+    CBK="$COMP.before-fcm-$STAMP"
+    $SUDO cp -a "$COMP" "$CBK"; kept "$CBK  (the way back)"
+    # Anchored on a line already in the API's environment block -- the Web Push subject if push-keys put it
+    # there, the log level otherwise -- so the variable goes where it belongs and nowhere else.
+    $SUDO python3 - "$COMP" <<'PATCH' || { bad "could not add it; the compose file is unchanged"; $SUDO cp -a "$CBK" "$COMP"; return; }
+import sys
+p = sys.argv[1]
+src = open(p).read()
+line = "      PUZZLE_FCM_SERVICE_ACCOUNT: ${PUZZLE_FCM_SERVICE_ACCOUNT:-}\n"
+for anchor in ("      PUZZLE_VAPID_SUBJECT: ${PUZZLE_VAPID_SUBJECT:-mailto:ariyanfiles@gmail.com}\n",
+               "      PUZZLE_LOG_LEVEL: ${PUZZLE_LOG_LEVEL:-info}\n"):
+    if anchor in src:
+        open(p, "w").write(src.replace(anchor, anchor + line, 1))
+        sys.exit(0)
+sys.exit("the API's environment block does not look the way this expects")
+PATCH
+    if (cd "$PROJ" && $SUDO docker compose config -q 2>&1 | sed 's/^/      /'); then
+      ok "compose still renders, with the variable in it"
+    else
+      bad "compose refused the edited file; putting it back"; $SUDO cp -a "$CBK" "$COMP"; return
+    fi
+  fi
+
+  say "4. recreating the API so it reads it"
+  # Passed at create time, so a restart is not enough. The container fetches the repository again on the way
+  # up, so this is also a deploy of whatever main holds; run it after the notifications change has merged.
+  (cd "$PROJ" && $SUDO docker compose up -d --force-recreate puzzle-api >/dev/null 2>&1) \
+    || { bad "could not recreate $API"; return; }
+  for i in $(seq 1 90); do
+    h=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$API" 2>/dev/null)
+    [ "$h" = "healthy" ] && break
+    sleep 5
+  done
+  [ "$h" = "healthy" ] && ok "the API is healthy again" || bad "the API did not come back healthy (state: ${h:-unknown})"
+
+  say "5. what the app will be told"
+  K=$(curl -s -m 15 "https://$DOMAIN/api/puzzle/v1/push/key" || true)
+  case "$K" in
+    *'"app":true'*) ok "phones with the app can be reached" ;;
+    *) bad "the API still says phones cannot be reached: ${K:-no answer}" ;;
+  esac
+  note "the service account is in $ENVF on this host and nowhere else; it has not been printed"
+}
+
 case "$MODE" in
   inspect)       mode_inspect ;;
   logs)          mode_logs ;;
@@ -2261,6 +2383,7 @@ case "$MODE" in
   git-access)    mode_git_access ;;
   git-sync)      mode_git_sync ;;
   push-keys)     mode_push_keys ;;
+  fcm-key)       mode_fcm_key ;;
   push-source)   mode_push_source ;;
   web-safe-fetch) mode_web_safe_fetch ;;
   backup-verify) mode_backup_verify ;;
