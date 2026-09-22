@@ -211,6 +211,25 @@ launch if it is missing or malformed, by design. Clicking a real advertisement o
 and invalid traffic costs the account, so development is done against the test ids and the real ones go in
 last.
 
+### Seeing an advertisement before there are any
+
+Settings, seven taps on the build line at the foot, and a **Developer** group appears with the advertising
+mode: **Off**, **Test**, **Live** — stored on that device and nowhere else.
+
+It exists because of a gap that only showed up once the app was real. The mode could be forced with an
+`?ads=test` URL parameter, gated on localhost or a flag set by hand; the app has no address bar to type a
+parameter into and no console to set a flag from, so on a phone there was no way at all to watch the
+advertisement path — not today, and not on the morning approval lands.
+
+- **Test** is the stand-in panel: the offer, the wait, the reward, the refusals, with nothing asked of any
+  network. It is how the flow gets judged before a network will answer at all.
+- **Live** asks for the real thing on that one device, which is what turns approval day into a check rather
+  than a leap: flip it here, watch one, then flip `data-give` for everybody. Put the phone in AdMob →
+  Settings → Test devices first; clicking a real advertisement of your own is invalid traffic.
+
+Seven taps rather than a URL on purpose. A link can be sent to somebody; a gesture on a line at the foot of
+Settings cannot.
+
 ### What the SDK changes about the Play listing
 
 It merges these into the manifest whether or not an advertisement is ever shown:

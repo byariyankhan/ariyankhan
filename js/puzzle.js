@@ -139,7 +139,7 @@
 
   const el = {
     select: $('#aaSelect'), tagline: $('#aaTagline'), homeSel: $('#aaHome'), purse: $('#aaPurse'), purseNo: $('#aaPurseNo'), goldAd: $('#aaGoldAd'), hudDiff: $('#aaHudDiff'), play: $('#aaPlay'), path: $('#aaPath'), btnVibe: $('#aaVibe'), btnGuides: $('#aaGuides'), btnMusic: $('#aaMusic'),
-    sheet: $('#aaSheet'), friends: $('#aaFriends'), signInSheet: $('#aaSignInSheet'), googleBtn: $('#aaGoogleBtn'), signInNote: $('#aaSignInNote'), ranks: $('#aaRanks'), league: $('#aaLeague'), leagueEnds: $('#aaLeagueEnds'), leagueSheet: $('#aaLeagueSheet'), leagueBody: $('#aaLeagueBody'), leagueInfo: $('#aaLeagueInfo'), matchSheet: $('#aaMatchSheet'), matchBody: $('#aaMatchBody'), matchTitle: $('#aaMatchTitle'), accountGroup: $('#aaAccountGroup'), accountCap: $('#aaAccountCap'), accountRow: $('#aaAccountRow'), accountName: $('#aaAccountName'), accountWho: $('#aaAccountWho'), accountGold: $('#aaAccountGold'), accountFace: $('#aaAccountFace'), sessionGroup: $('#aaSessionGroup'), sessionCap: $('#aaSessionCap'), signOutBtn: $('#aaSignOut'), deleteAccBtn: $('#aaDeleteAcc'), settingsBtns: $$('#aaSettings, #aaSettingsG'), themeBtn: $('#aaTheme'), themes: $('#aaThemes'),
+    sheet: $('#aaSheet'), friends: $('#aaFriends'), signInSheet: $('#aaSignInSheet'), googleBtn: $('#aaGoogleBtn'), signInNote: $('#aaSignInNote'), ranks: $('#aaRanks'), league: $('#aaLeague'), leagueEnds: $('#aaLeagueEnds'), leagueSheet: $('#aaLeagueSheet'), leagueBody: $('#aaLeagueBody'), leagueInfo: $('#aaLeagueInfo'), matchSheet: $('#aaMatchSheet'), matchBody: $('#aaMatchBody'), matchTitle: $('#aaMatchTitle'), accountGroup: $('#aaAccountGroup'), accountCap: $('#aaAccountCap'), accountRow: $('#aaAccountRow'), accountName: $('#aaAccountName'), accountWho: $('#aaAccountWho'), accountGold: $('#aaAccountGold'), accountFace: $('#aaAccountFace'), sessionGroup: $('#aaSessionGroup'), sessionCap: $('#aaSessionCap'), signOutBtn: $('#aaSignOut'), deleteAccBtn: $('#aaDeleteAcc'), settingsBtns: $$('#aaSettings, #aaSettingsG'), themeBtn: $('#aaTheme'), themes: $('#aaThemes'), build: $('#aaBuild'), devCap: $('#aaDevCap'), devGroup: $('#aaDevGroup'), devAds: $('#aaDevAds'), devAdsNote: $('#aaDevAdsNote'),
     game: $('#aaGame'), boardWrap: $('#aaBoardWrap'), board: $('#aaBoard'), toast: $('#aaToast'), confetti: $('#aaConfetti'),
     hudLevel: $('#aaHudLevel'), hudMode: $('#aaHudMode'), hudTime: $('#aaHudTime'), hudLeft: $('#aaHudLeft'), hudLives: $('#aaHudLives'), hudLivesWrap: $('#aaHudLivesWrap'), hudPct: $('#aaHudPct'), boardBar: $('#aaBoardBar'),
     btnHint: $('#aaHint'), btnCheck: $('#aaCheck'), hintVal: $('#aaHintVal'), checkVal: $('#aaCheckVal'), btnLevels: $('#aaBackToLevels'), btnSound: $('#aaSound'),
@@ -1890,6 +1890,7 @@
     on() { return this.mode !== 'off'; },
     isAd() { return this.give === 'ad'; },
   };
+  const ADS_MODES = ['off', 'test', 'h5'];
   (function adsConfigure() {
     const meta = document.querySelector('meta[name="puzzle-ads"]');
     let mode = (meta?.content || 'off').trim();
@@ -1908,10 +1909,30 @@
     // share sheet is not a thing to leave lying about.
     const wanted = new URLSearchParams(location.search).get('ads');
     const local = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
-    if (wanted && ['off', 'test', 'h5'].includes(wanted) && (wanted === 'off' || local || store.get('adsdev', false))) mode = wanted;
-    ads.mode = ['off', 'test', 'h5'].includes(mode) ? mode : 'off';
+    // The stored switch, set from Settings after seven taps on the build line. It exists because the URL
+    // parameter needs an address bar and the app has none: without it there is no way at all to watch the
+    // advertisement path on a phone, which is the one place it has to work.
+    // 'site' is what revealing the switch writes, and it means exactly what it says: leave the page alone.
+    // It has to exist. The first version wrote 'off' instead, which is a mode — so seven taps to look at the
+    // developer settings silently turned off the free lifeline every player is being given, on a screen with
+    // no way to put it back, because choosing Off again changes nothing.
+    const stored = store.get('adsdev', '');
+    const dev = ADS_MODES.includes(stored) ? stored : '';
+    let forced = '';
+    // Every mode is gated the same way now, Off included. It used to be exempt on the grounds that turning
+    // advertising off can only ever be the safe direction — true when off meant no advertisement, and false
+    // now that it also means no free lifeline, which makes a link somebody can be sent worth closing.
+    if (wanted && ADS_MODES.includes(wanted) && (local || stored)) forced = wanted;
+    else if (dev) forced = dev;
+    if (forced) mode = forced;
+    ads.mode = ADS_MODES.includes(mode) ? mode : 'off';
     const give = (meta?.dataset.give || 'ad').trim();
     ads.give = give === 'free' ? 'free' : 'ad';
+    // Asking for the advertisement path and being handed a free lifeline is not a test of anything: the free
+    // mode short-circuits every line of it. Keyed off what was actually forced, not off what is stored —
+    // otherwise the URL parameter half of the switch sets a mode and leaves the offer free, which is the one
+    // combination that looks like it worked and tests nothing.
+    if (forced === 'test' || forced === 'h5') ads.give = 'ad';
     // Nothing of the advertising library is wired up for a free lifeline: it is not an advertisement, so it
     // does not ask for one, does not preload one, and does not report one.
     if (ads.mode !== 'h5' || !ads.isAd()) return;
@@ -2002,12 +2023,23 @@
           type: 'reward',
           name,
           beforeReward(showAdFn) {
+            // The five seconds above are a promise to the player that nothing was found, and this is where
+            // that promise is kept. The break is still live when the clock runs out — the library has no
+            // cancel — so a fill that arrives at the sixth second would take the whole screen for an
+            // advertisement nobody is waiting for any more, and adViewed would land on a settled promise and
+            // pay nothing. Declining is simply not calling showAdFn: the library skips the break and reports
+            // it. Not showing one at all is the only honest end to a break we have already given up on.
+            if (settled) return;
             started = true; clearTimeout(waitAd);
             // The waiting panel goes now, not when this promise settles: an advertisement is about to take the
             // screen, and leaving "looking for one" on top of the thing it was looking for is worse than no
             // panel at all.
             try { onStart(); } catch { /* it was only a panel */ }
-            waitEnd = setTimeout(() => done('unavailable'), 120000);
+            // Once showAdFn has been called an advertisement is on the screen and the player is watching
+            // it; this clock is a leak guard, not a deadline. Two minutes used to be it, which is inside the
+            // length of a rewarded advertisement that buffers badly — and resolving here while the thing is
+            // still playing is the same unkept promise as above, with the player's attention already spent.
+            waitEnd = setTimeout(() => done('unavailable'), 300000);
             try { showAdFn(); } catch { done('unavailable'); }
           },
           adViewed() { done('watched'); },
@@ -3833,6 +3865,7 @@
     openSheet(el.sheet);
     renderAccountRow();                                   // with what the page already knows, at once
     renderNotify();
+    renderDev();
     authLoad(true).then(() => { renderAccountRow(); renderPurse(); syncTour(); return notifyInit(); }).catch(() => {});   // then with the server's answer, tour included
   }));
   el.friends?.addEventListener('click', openFriends);
@@ -3853,6 +3886,63 @@
   // Themes
   const THEMES = ['paper', 'night', 'mint'];
   function applyTheme(t) { document.documentElement.dataset.theme = t; store.set('theme', t); $('meta[name="theme-color"]')?.setAttribute('content', t === 'night' ? '#0E0E10' : t === 'mint' ? '#E6F2EC' : '#F4EDE0'); renderThemes(); }
+  // ── The build line, and the developer switch behind it ────────────────────────────────────────────
+  //
+  // The version is not hardcoded: it is the one the page asked for, read back off the script tag, so it can
+  // never drift from what is actually running. Saying whether this is the app is worth as much again — the
+  // first question about any report is which of the two it came from.
+  const BUILD = (() => {
+    try { return new URL($('script[src*="js/puzzle.js"]')?.src || '').searchParams.get('v') || '?'; }
+    catch { return '?'; }
+  })();
+
+  /**
+   * What the developer switch is for.
+   *
+   * Off is what every player gets. Test is the stand-in panel: the whole flow — the offer, the wait, the
+   * reward, the refusals — with nothing asked of any network, which is the only way to judge how it feels
+   * before a network will answer at all. Live asks for the real thing, on this device and no other, which is
+   * what makes approval day a check rather than a leap: flip it here, watch one, then flip data-give for
+   * everybody.
+   */
+  function renderDev() {
+    const on = !!store.get('adsdev', '');
+    if (el.devCap) el.devCap.hidden = !on;
+    if (el.devGroup) el.devGroup.hidden = !on;
+    if (!on || !el.devAds) return;
+    const cur = ADS_MODES.includes(store.get('adsdev', '')) ? store.get('adsdev', '') : 'site';
+    el.devAds.innerHTML = '';
+    for (const [m, label] of [['site', 'Default'], ['test', 'Test'], ['h5', 'Live']]) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'aa-dev-opt' + (m === cur ? ' is-active' : '');
+      b.textContent = label;
+      // A reload, because the modes are read once on the way in and a half-configured advertising library is
+      // a worse thing to debug than a second of black.
+      b.addEventListener('click', () => { store.set('adsdev', m); location.reload(); });
+      el.devAds.appendChild(b);
+    }
+    if (el.devAdsNote) el.devAdsNote.textContent = cur === 'h5'
+      ? 'Real advertisements, on this device only. Put the phone in AdMob test devices first.'
+      : cur === 'test' ? 'A stand-in panel. The same flow and the same reward, with no network asked.'
+      : 'Whatever the page says — the same as every player gets.';
+  }
+
+  if (el.build) {
+    el.build.textContent = `Build ${BUILD}${shell.on ? ' · app' : ''}`;
+    let taps = 0, tapTimer = null;
+    el.build.addEventListener('click', () => {
+      clearTimeout(tapTimer);
+      tapTimer = setTimeout(() => { taps = 0; }, 1500);
+      if (++taps < 7) return;
+      taps = 0;
+      if (!store.get('adsdev', '')) store.set('adsdev', 'site');
+      renderDev();
+      el.devGroup?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      toast('Developer settings are on.', 'good');
+    });
+  }
+
   function renderThemes() {
     if (!el.themes) return;
     const cur = document.documentElement.dataset.theme || 'paper';
@@ -3894,6 +3984,7 @@
   // a tour existed. It is not any more: the account holds it, so clearing local storage would have deleted
   // nothing and then re-downloaded it on the next sync — a button that looks destructive and does nothing.
   renderToggles();
+  renderDev();
   document.addEventListener('keydown', e => { if (!el.game.hidden && !state.finished && (e.key === 'h' || e.key === 'H') && !/input|textarea/i.test(document.activeElement?.tagName || '')) hint(); });
   document.addEventListener('visibilitychange', () => { if (document.hidden && state.startedAt && !state.raceBase && !state.finished) { stopTimer(); } });
 
