@@ -54,9 +54,20 @@ jobs:
       # already on PATH there, so this adds only what is missing and stays a first-party dependency.
       - name: Android SDK 36
         run: |
-          yes | sdkmanager --licenses > /dev/null 2>&1 || true
-          sdkmanager --install "platforms;android-36" "build-tools;36.0.0" > /dev/null
-          echo "ANDROID_HOME=$ANDROID_SDK_ROOT" >> "$GITHUB_ENV"
+          # The runner image is not promised to keep sdkmanager on the PATH (ubuntu-latest moved and it went),
+          # so it is found where the SDK keeps it, and fetched from Google when the image has none at all.
+          SDK="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-$HOME/android-sdk}}"
+          SM="$SDK/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -x "$SM" ]; then
+            mkdir -p "$SDK/cmdline-tools" && cd "$SDK/cmdline-tools"
+            curl -sSLo tools.zip https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
+            unzip -q tools.zip && rm tools.zip && rm -rf latest && mv cmdline-tools latest
+            cd "$GITHUB_WORKSPACE"
+          fi
+          yes | "$SM" --licenses > /dev/null 2>&1 || true
+          "$SM" --install "platforms;android-36" "build-tools;36.0.0" > /dev/null
+          echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$SDK" >> "$GITHUB_ENV"
 
       # versionCode has to rise and never repeat. run_number does exactly that, and the +1 steps over the 1
       # that the first hand-built bundle already spent on the internal track.
