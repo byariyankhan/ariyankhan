@@ -906,6 +906,9 @@ links.
   press-and-hold check, and what clearing the board does. The layer lets taps through, so the board is playable
   under it. Shown once (`coached`), never in a race or on the daily board, closed by winning, losing or
   leaving the board, and Settings → Help → "Show the tutorial again" brings it back on the next board.
+- **The build line is hidden where players are.** "Build N" under the credit shows only on localhost or
+  in the debug app (`el.build.hidden = !devAllowed()`), the same places the seven taps work; a player's
+  Settings ends at the credit line.
 - **The developer switch exists only where a developer is.** Seven taps on the build line reveal the
   Developer group (Default / Test / Mock / Live, and the last advertisement's report), stored as `adsdev`
   on that device, but only on a page served from localhost or inside the app's debug build, which says
