@@ -196,9 +196,25 @@ after, to save one drag and drop.
 
 ## AdMob
 
-`MobileAds.registerWebView(web)` in `MainActivity`, and two manifest meta-data entries the SDK reads at
-startup: `APPLICATION_ID`, and `INTEGRATION_MANAGER` set to `webview` — the second is what tells AdMob this is
-an H5 integration and not a native one.
+Three things in `MainActivity`, and two manifest meta-data entries the SDK reads at startup: `APPLICATION_ID`,
+and `INTEGRATION_MANAGER` set to `webview` — the second is what tells AdMob this is an H5 integration and not
+a native one.
+
+The three, in the order Google's own example sets them:
+
+```java
+h5 = new H5AdsWebViewClient(this, web);
+web.setWebViewClient(h5);
+h5.setDelegateWebViewClient(new Client(back));
+MobileAds.registerWebView(web);
+```
+
+**`H5AdsWebViewClient` is the one that was missing**, and it is not decoration. `registerWebView` says *this
+WebView belongs to this app*; the client is what intercepts the ad requests the page makes and turns them
+into advertisements. With only the first of the two, the page asks and nothing answers. Ours is the delegate
+behind it: the library's base class overrides every `WebViewClient` callback and forwards what it does not
+handle itself, so the URL policy, the splash, the offline check and the back button all still see everything
+they saw before. It is one per WebView, and `clearAdObjects()` goes with the WebView it was built for.
 
 Nothing in this app draws an advertisement. The game's own Ad Placement API tag still asks for the breaks;
 what the registration changes is who answers — AdMob's demand rather than AdSense's, which is the only
@@ -226,13 +242,41 @@ advertisement path — not today, and not on the morning approval lands.
 
 - **Test** is the stand-in panel: the offer, the wait, the reward, the refusals, with nothing asked of any
   network — and nothing asked of the server either, so the gold it talks about is talked about rather than
-  paid. It is how the flow gets judged before a network will answer at all.
+  paid. It is how the flow gets judged before a network will answer at all. It proves our screens; it proves
+  nothing whatever about the library, because it never loads it.
+- **Mock** is `data-adbreak-test="on"` on the script tag — Google's own documented test mode. The real
+  library loads, the real `adBreak` runs, `beforeReward` and `adViewed` and `adBreakDone` are the library's
+  own, and no request leaves the phone. It is the only way to watch the *integration* work before there is
+  any demand to fill it. It refuses roughly every other break on purpose, which is the point: a flow that
+  only works when an advertisement is there is a flow that has not been tested.
 - **Live** asks for the real thing on that one device, which is what turns approval day into a check rather
   than a leap: flip it here, watch one, then flip `data-give` for everybody. Put the phone in AdMob →
   Settings → Test devices first; clicking a real advertisement of your own is invalid traffic.
 
 Seven taps rather than a URL on purpose. A link can be sent to somebody; a gesture on a line at the foot of
 Settings cannot.
+
+Under the modes is **Last advertisement**, which is the whole of the reporting: whether the library ever said
+it was ready, what the last break was asked for, what came back, and — the part that was being thrown away —
+the library's own word for why. `adBreakDone` is handed a `placementInfo` whose `breakStatus` is one of ten
+documented values, and `noAdPreloaded`, `frequencyCapped`, `timeout` and `error` are four quite different
+problems that all used to read as "no advertisement was available". A phone has no console; a value that is
+only ever logged is a value nobody will ever read.
+
+### Is the connection actually there?
+
+Google publishes a page that answers exactly that, and the developer group has a button for it:
+**Check the ad connection**, which loads
+
+    https://google.github.io/webview-ads/test/#api-for-ads-tests
+
+into this WebView. Green bars mean the page really is joined to the Mobile Ads SDK, so anything still missing
+is on the account side — an approval not granted, an app not reviewed — and no amount of changing this code
+will help. Red means the fault is here and waiting will never fix it. There is no other way to tell those two
+apart from a phone, which is why it is a button rather than a note in this file.
+
+It is loaded rather than opened in a browser on purpose: a browser tab is not this WebView, and this WebView
+is the thing being asked about. Back returns to the game.
 
 ### What the app does around an advertisement
 

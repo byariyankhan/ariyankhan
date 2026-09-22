@@ -139,7 +139,7 @@
 
   const el = {
     select: $('#aaSelect'), tagline: $('#aaTagline'), homeSel: $('#aaHome'), purse: $('#aaPurse'), purseNo: $('#aaPurseNo'), goldAd: $('#aaGoldAd'), hudDiff: $('#aaHudDiff'), play: $('#aaPlay'), path: $('#aaPath'), btnVibe: $('#aaVibe'), btnGuides: $('#aaGuides'), btnMusic: $('#aaMusic'),
-    sheet: $('#aaSheet'), friends: $('#aaFriends'), signInSheet: $('#aaSignInSheet'), googleBtn: $('#aaGoogleBtn'), signInNote: $('#aaSignInNote'), ranks: $('#aaRanks'), league: $('#aaLeague'), leagueEnds: $('#aaLeagueEnds'), leagueSheet: $('#aaLeagueSheet'), leagueBody: $('#aaLeagueBody'), leagueInfo: $('#aaLeagueInfo'), matchSheet: $('#aaMatchSheet'), matchBody: $('#aaMatchBody'), matchTitle: $('#aaMatchTitle'), accountGroup: $('#aaAccountGroup'), accountCap: $('#aaAccountCap'), accountRow: $('#aaAccountRow'), accountName: $('#aaAccountName'), accountWho: $('#aaAccountWho'), accountGold: $('#aaAccountGold'), accountFace: $('#aaAccountFace'), sessionGroup: $('#aaSessionGroup'), sessionCap: $('#aaSessionCap'), signOutBtn: $('#aaSignOut'), deleteAccBtn: $('#aaDeleteAcc'), settingsBtns: $$('#aaSettings, #aaSettingsG'), themeBtn: $('#aaTheme'), themes: $('#aaThemes'), build: $('#aaBuild'), devCap: $('#aaDevCap'), devGroup: $('#aaDevGroup'), devAds: $('#aaDevAds'), devAdsNote: $('#aaDevAdsNote'),
+    sheet: $('#aaSheet'), friends: $('#aaFriends'), signInSheet: $('#aaSignInSheet'), googleBtn: $('#aaGoogleBtn'), signInNote: $('#aaSignInNote'), ranks: $('#aaRanks'), league: $('#aaLeague'), leagueEnds: $('#aaLeagueEnds'), leagueSheet: $('#aaLeagueSheet'), leagueBody: $('#aaLeagueBody'), leagueInfo: $('#aaLeagueInfo'), matchSheet: $('#aaMatchSheet'), matchBody: $('#aaMatchBody'), matchTitle: $('#aaMatchTitle'), accountGroup: $('#aaAccountGroup'), accountCap: $('#aaAccountCap'), accountRow: $('#aaAccountRow'), accountName: $('#aaAccountName'), accountWho: $('#aaAccountWho'), accountGold: $('#aaAccountGold'), accountFace: $('#aaAccountFace'), sessionGroup: $('#aaSessionGroup'), sessionCap: $('#aaSessionCap'), signOutBtn: $('#aaSignOut'), deleteAccBtn: $('#aaDeleteAcc'), settingsBtns: $$('#aaSettings, #aaSettingsG'), themeBtn: $('#aaTheme'), themes: $('#aaThemes'), build: $('#aaBuild'), devCap: $('#aaDevCap'), devGroup: $('#aaDevGroup'), devAds: $('#aaDevAds'), devAdsNote: $('#aaDevAdsNote'), devLast: $('#aaDevLast'), devTools: $('#aaDevTools'),
     game: $('#aaGame'), boardWrap: $('#aaBoardWrap'), board: $('#aaBoard'), toast: $('#aaToast'), confetti: $('#aaConfetti'),
     hudLevel: $('#aaHudLevel'), hudMode: $('#aaHudMode'), hudTime: $('#aaHudTime'), hudLeft: $('#aaHudLeft'), hudLives: $('#aaHudLives'), hudLivesWrap: $('#aaHudLivesWrap'), hudPct: $('#aaHudPct'), boardBar: $('#aaBoardBar'),
     btnHint: $('#aaHint'), btnCheck: $('#aaCheck'), hintVal: $('#aaHintVal'), checkVal: $('#aaCheckVal'), btnLevels: $('#aaBackToLevels'), btnSound: $('#aaSound'),
@@ -1886,11 +1886,25 @@
     client: '',
     admob: { rewarded: '', interstitial: '' },
     showing: false,
+    // Google's own test advertisements, asked for with data-adbreak-test on the script tag. Not our stand-in
+    // panel: the real library runs the whole break and reports it, and nothing leaves the phone.
+    mock: false,
+    // Which developer mode forced this, if any. It is what decides whether a failure is allowed to name
+    // itself on screen — a player is owed a plain sentence, a developer is owed the reason.
+    dev: '',
+    // The last break the library was asked for: what came back, why, and how long it took. Read by the
+    // developer group in Settings, which is the only place on a phone that can show it.
+    last: null,
+    // Milliseconds from adConfig to the library saying it was ready, or 0 if it never said so.
+    libReady: 0,
     ready() { return this.mode !== 'off' && !this.showing; },
     on() { return this.mode !== 'off'; },
     isAd() { return this.give === 'ad'; },
   };
   const ADS_MODES = ['off', 'test', 'h5'];
+  // What the switch on a device may be set to. 'site' is not a mode — it means leave the page alone — and
+  // 'mock' is not one either: it is 'h5' with Google's test advertisements in place of real ones.
+  const ADS_DEV = ['site', 'off', 'test', 'mock', 'h5'];
   (function adsConfigure() {
     const meta = document.querySelector('meta[name="puzzle-ads"]');
     let mode = (meta?.content || 'off').trim();
@@ -1917,13 +1931,19 @@
     // developer settings silently turned off the free lifeline every player is being given, on a screen with
     // no way to put it back, because choosing Off again changes nothing.
     const stored = store.get('adsdev', '');
-    const dev = ADS_MODES.includes(stored) ? stored : '';
+    const dev = ADS_DEV.includes(stored) && stored !== 'site' ? stored : '';
     let forced = '';
     // Every mode is gated the same way now, Off included. It used to be exempt on the grounds that turning
     // advertising off can only ever be the safe direction — true when off meant no advertisement, and false
     // now that it also means no free lifeline, which makes a link somebody can be sent worth closing.
-    if (wanted && ADS_MODES.includes(wanted) && (local || stored)) forced = wanted;
+    if (wanted && ADS_DEV.includes(wanted) && wanted !== 'site' && (local || stored)) forced = wanted;
     else if (dev) forced = dev;
+    ads.dev = forced;
+    // 'mock' is the whole live path — the real library, the real callbacks, the real breakStatus — with
+    // Google's mock advertisements standing in for demand we do not have yet. It is the only way to watch
+    // the integration itself work before an approval lands, because our own Test panel never touches the
+    // library at all and therefore proves nothing about it.
+    if (forced === 'mock') { ads.mock = true; forced = 'h5'; }
     if (forced) mode = forced;
     ads.mode = ADS_MODES.includes(mode) ? mode : 'off';
     const give = (meta?.dataset.give || 'ad').trim();
@@ -1946,12 +1966,23 @@
       const sc = document.createElement('script');
       sc.async = true; sc.crossOrigin = 'anonymous';
       sc.dataset.adFrequencyHint = '30s';
+      // Documented, and the only value it takes: mock advertisements, no request to Google, and the
+      // library's own frequency rules still applied. It deliberately fails every other break, which is the
+      // point — a flow that only works when an advertisement is there is a flow that has not been tested.
+      if (ads.mock) sc.dataset.adbreakTest = 'on';
       // Only in the app, and only if there is something to put there. In a browser these attributes mean
       // nothing, and leaving them off keeps the page that is serving real visitors today byte for byte the
       // one that has been proven to work.
       if (shell.on) {
         if (ads.admob.rewarded) sc.dataset.admobRewardedSlot = ads.admob.rewarded;
         if (ads.admob.interstitial) sc.dataset.admobInterstitialSlot = ads.admob.interstitial;
+        // Inside the app, AdMob or nothing. Google's own words for this parameter are that it stops the game
+        // falling back to AdSense "in cases where the game is being played in an environment which doesn't
+        // support AdMob requests" — and for us that fallback is not a safety net, it is the one thing we are
+        // not allowed to do: AdSense's policy says Google ads may not be integrated into a software
+        // application, and excepts AdMob. It also makes a failure honest. Without it, a break that AdMob
+        // could not fill can be quietly answered by AdSense and we would never know which we had shown.
+        if (ads.admob.rewarded || ads.admob.interstitial) sc.dataset.admobAdsOnly = 'on';
       }
       sc.src = `https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${encodeURIComponent(ads.client)}`;
       document.head.appendChild(sc);
@@ -1961,7 +1992,17 @@
     window.adsbygoogle = window.adsbygoogle || [];
     if (typeof window.adBreak !== 'function') window.adBreak = o => window.adsbygoogle.push(o);
     if (typeof window.adConfig !== 'function') window.adConfig = o => window.adsbygoogle.push(o);
-    try { window.adConfig({ preloadAdBreaks: 'on', sound: state.muted ? 'off' : 'on' }); } catch { /* the library decides */ }
+    // onReady is the library saying it has initialised and finished preloading. Without it there is no way
+    // to tell a break that found no advertisement from a break asked of a library that never came up at all,
+    // and those two have nothing in common: one is demand, the other is us.
+    const configuredAt = performance.now();
+    try {
+      window.adConfig({
+        preloadAdBreaks: 'on',
+        sound: state.muted ? 'off' : 'on',
+        onReady() { ads.libReady = Math.round(performance.now() - configuredAt); renderDevLast(); },
+      });
+    } catch { /* the library decides */ }
   })();
 
   // When an ad may be offered for a lifeline.
@@ -2010,14 +2051,24 @@
   // callback that means the ad was seen through, and it is the only one that resolves 'watched'.
   function adH5Show(name, onStart = () => {}) {
     return new Promise(resolve => {
-      if (typeof window.adBreak !== 'function') { resolve('unavailable'); return; }
+      if (typeof window.adBreak !== 'function') { adNote(name, 'unavailable', 'no library', 0); resolve('unavailable'); return; }
+      const asked = performance.now();
       let settled = false, started = false;
-      const done = how => { if (!settled) { settled = true; clearTimeout(waitAd); clearTimeout(waitEnd); resolve(how); } };
+      // `why` is the library's own word for what happened: adBreakDone is handed a placementInfo whose
+      // breakStatus is one of a documented set — noAdPreloaded, frequencyCapped, timeout, error, and the
+      // rest. It was being thrown away, which is why a phone could only ever say "no advertisement was
+      // available" and never which of nine quite different things that meant.
+      const done = (how, why = '') => {
+        if (settled) return;
+        settled = true; clearTimeout(waitAd); clearTimeout(waitEnd);
+        adNote(name, how, why, Math.round(performance.now() - asked));
+        resolve(how);
+      };
       // Two clocks, because the two silences mean different things. If beforeReward has not fired in eight
       // seconds there is nothing to show and the player should not be left looking at a spinner. Once it has
       // fired an ad is actually running, and a rewarded one is allowed to be a minute long.
       let waitEnd = 0;
-      const waitAd = setTimeout(() => { if (!started) done('unavailable'); }, 5000);
+      const waitAd = setTimeout(() => { if (!started) done('unavailable', 'nothing answered'); }, 8000);
       try {
         window.adBreak({
           type: 'reward',
@@ -2039,15 +2090,25 @@
             // it; this clock is a leak guard, not a deadline. Two minutes used to be it, which is inside the
             // length of a rewarded advertisement that buffers badly — and resolving here while the thing is
             // still playing is the same unkept promise as above, with the player's attention already spent.
-            waitEnd = setTimeout(() => done('unavailable'), 300000);
-            try { showAdFn(); } catch { done('unavailable'); }
+            waitEnd = setTimeout(() => done('unavailable', 'never ended'), 300000);
+            try { showAdFn(); } catch { done('unavailable', 'would not show'); }
           },
           adViewed() { done('watched'); },
           adDismissed() { done('dismissed'); },
-          adBreakDone() { done('unavailable'); },    // fires last; only lands if nothing above did
+          // Fires last, and only lands here if nothing above did. Its placementInfo carries the one word
+          // that says why nothing did.
+          adBreakDone(info) { done('unavailable', (info && info.breakStatus) || 'no reason given'); },
         });
-      } catch { done('unavailable'); }
+      } catch (badCall) { done('unavailable', 'the call threw'); }
     });
+  }
+
+  // What happened last time the library was asked, kept for the developer group in Settings. A phone has no
+  // console, so a value that is only ever logged is a value nobody will ever read: this is the whole of the
+  // reporting, and it holds one attempt, the last.
+  function adNote(name, how, why, ms) {
+    ads.last = { name, how, why, ms, at: Date.now() };
+    renderDevLast();
   }
 
   // Asking the network takes a moment, and a moment of nothing at all reads as a button that did not work.
@@ -2188,8 +2249,11 @@
       const how = await adShow(`${PRODUCT_AD}-${kind}`, earn);
       // Watched through, or nothing. There is no third answer, and each of the others says which one it was.
       if (how !== 'watched') {
+        // The reason rides along only on a device where somebody turned the switch on. A player is owed a
+        // plain sentence about their heart; a developer is owed "frequencyCapped".
+        const why = ads.dev && ads.last?.why ? ` (${ads.last.why})` : '';
         toast(how === 'dismissed' ? 'The advertisement was not watched through, so nothing was added.'
-          : 'No advertisement was available, so nothing was added. Try again in a moment.', 'hint', 3200);
+          : `No advertisement was available, so nothing was added.${why} Try again in a moment.`, 'hint', 4200);
         return;
       }
       // adShow gave the lock back when its panel came down, and the reward has not been handed over yet —
@@ -3948,9 +4012,10 @@
     if (el.devCap) el.devCap.hidden = !on;
     if (el.devGroup) el.devGroup.hidden = !on;
     if (!on || !el.devAds) return;
-    const cur = ADS_MODES.includes(store.get('adsdev', '')) ? store.get('adsdev', '') : 'site';
+    const stored = store.get('adsdev', '');
+    const cur = ADS_DEV.includes(stored) ? stored : 'site';
     el.devAds.innerHTML = '';
-    for (const [m, label] of [['site', 'Default'], ['test', 'Test'], ['h5', 'Live']]) {
+    for (const [m, label] of [['site', 'Default'], ['test', 'Test'], ['mock', 'Mock'], ['h5', 'Live']]) {
       const b = document.createElement('button');
       b.type = 'button';
       b.className = 'aa-dev-opt' + (m === cur ? ' is-active' : '');
@@ -3962,8 +4027,44 @@
     }
     if (el.devAdsNote) el.devAdsNote.textContent = cur === 'h5'
       ? 'Real advertisements, on this device only. Put the phone in AdMob test devices first.'
+      : cur === 'mock' ? 'Google\u2019s own test advertisements, through the real library. Nothing leaves the phone, and it refuses every other break on purpose.'
       : cur === 'test' ? 'A stand-in panel. The same flow and the same reward, with no network asked.'
-      : 'Whatever the page says — the same as every player gets.';
+      : 'Whatever the page says \u2014 the same as every player gets.';
+    renderDevLast();
+    renderDevTools();
+  }
+
+  // The last break, in one line. "puzzle-heart \u00b7 nothing to show \u00b7 noAdPreloaded \u00b7 0.4s" is the
+  // difference between guessing and knowing, and Settings is the only screen on a phone that can hold it.
+  function renderDevLast() {
+    if (!el.devLast) return;
+    const lib = ads.mode !== 'h5' ? 'Library not in use'
+      : ads.libReady ? `Library ready in ${(ads.libReady / 1000).toFixed(1)}s`
+      : 'Library has not reported ready';
+    const L = ads.last;
+    if (!L) { el.devLast.textContent = `${lib} \u00b7 nothing asked for yet`; return; }
+    const said = L.how === 'watched' ? 'watched through' : L.how === 'dismissed' ? 'closed early' : 'nothing to show';
+    el.devLast.textContent = `${lib} \u00b7 ${L.name} \u00b7 ${said}${L.why ? ` \u00b7 ${L.why}` : ''} \u00b7 ${(L.ms / 1000).toFixed(1)}s`;
+  }
+
+  // One button, and only inside the app: Google publishes a page that reports whether this WebView is
+  // actually joined to the Mobile Ads SDK. Green there means registerWebView worked and anything still
+  // missing is on the account side; red means the fault is ours and no amount of waiting fixes it. There is
+  // no other way to tell those two apart from a phone.
+  function renderDevTools() {
+    if (!el.devTools) return;
+    el.devTools.innerHTML = '';
+    if (!shell.on) { el.devTools.hidden = true; return; }
+    el.devTools.hidden = false;
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'aa-dev-opt';
+    b.textContent = 'Check the ad connection';
+    b.addEventListener('click', async () => {
+      const r = await shell.ask('adTest');
+      if (!r?.ok) toast('This app is too old for that check. Install the latest build.', 'bad', 3600);
+    });
+    el.devTools.appendChild(b);
   }
 
   if (el.build) {
