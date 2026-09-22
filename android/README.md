@@ -227,7 +227,9 @@ Nothing in this app draws an advertisement. The game's own Ad Placement API tag 
 what the registration changes is who answers — AdMob's demand rather than AdSense's, which is the only
 arrangement Google's H5 guide calls policy compliant for a game embedded in an app you own. The ad unit ids
 travel the other way, from `meta[name=puzzle-ads]` in the page onto that tag as `data-admob-rewarded-slot`,
-and only when the page can see it is in the app. There is one unit, the rewarded one: nothing in this game
+and only when the page can see it is in the app. The debug build adds ` debug` to the agent string
+(`PuzzleApp/1 debug`), which is what lets the page's developer settings open: seven taps on the build line do
+nothing in the release build. There is one unit, the rewarded one: nothing in this game
 shows an advertisement of its own accord, so there is no interstitial slot.
 
 **`APPLICATION_ID` is the real one now** — `ca-app-pub-1570944160084395~8956379298`, in `strings.xml` — and it

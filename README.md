@@ -906,10 +906,13 @@ links.
   press-and-hold check, and what clearing the board does. The layer lets taps through, so the board is playable
   under it. Shown once (`coached`), never in a race or on the daily board, closed by winning, losing or
   leaving the board, and Settings → Help → "Show the tutorial again" brings it back on the next board.
-- **The developer switch has a way back.** Seven taps on the build line reveal the Developer group
-  (Default / Test / Mock / Live, and the last advertisement's report) on that device only, stored as
-  `adsdev`; nobody else ever sees it. "Hide developer settings" (`#aaDevHide`) forgets the flag and
-  reloads, which used to need the browser's storage cleared.
+- **The developer switch exists only where a developer is.** Seven taps on the build line reveal the
+  Developer group (Default / Test / Mock / Live, and the last advertisement's report), stored as `adsdev`
+  on that device, but only on a page served from localhost or inside the app's debug build, which says
+  `debug` on its agent string (`shell.debug`, `devAllowed()`). On the site and in the release build the
+  taps do nothing and a flag left over from before is ignored: a switch anybody could find was handing
+  out free lifelines (Test) and mock advertisements that the server pays gold for (Mock). "Hide
+  developer settings" (`#aaDevHide`) forgets the flag and reloads.
 - **No interstitials.** Nothing in the game shows an advertisement of its own accord: not between
   boards, not after a clear, not on a timer. The only advertisements are the rewarded ones a player
   chooses (a heart, a hint, a check, gold); the ads layer knows one AdMob unit, the rewarded one, and
