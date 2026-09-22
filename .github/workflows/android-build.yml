@@ -123,7 +123,11 @@ jobs:
             echo "store password opens the keystore: yes"
             grep -i "keystore type\|entries" "$RUNNER_TEMP/list.txt" | head -3
             if grep -qi "^$KEY_ALIAS," "$RUNNER_TEMP/list.txt"; then echo "alias found in the keystore: yes"; else echo "alias found in the keystore: NO"; echo "aliases present (names only):"; grep -i "PrivateKeyEntry" "$RUNNER_TEMP/list.txt" | cut -d, -f1; fi
-            if keytool -keypasswd -keystore "$KS" -storepass "$KS_PASS" -alias "$KEY_ALIAS" -keypass "$KEY_PASS" -new "$KEY_PASS" > /dev/null 2>&1; then echo "key password opens the key: yes"; else echo "key password opens the key: NO"; fi
+            # -certreq needs the private key, so it is a real test of the key password on a JKS store. On a PKCS12
+            # store keytool ignores a different -keypass (it warns and uses the store password), so there the one
+            # thing that matters is the "same as the store password" line above: bundletool uses both.
+            if keytool -certreq -alias "$KEY_ALIAS" -keystore "$KS" -storepass "$KS_PASS" -keypass "$KEY_PASS" -file "$RUNNER_TEMP/req.csr" > /dev/null 2>&1; then echo "key password opens the key (JKS) / key readable (PKCS12): yes"; else echo "key password opens the key: NO"; fi
+            rm -f "$RUNNER_TEMP/req.csr"
           else
             echo "store password opens the keystore: NO"
             sed -n 1,3p "$RUNNER_TEMP/list.txt" | sed 's/'"$KS_PASS"'/***/g'
