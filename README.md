@@ -651,12 +651,26 @@ links.
   mask's own — cell `(c, r)` has its centre at `(c + 0.5) / k` in the path's
   100-unit box, cropped to the bounding box `mask.x`/`mask.y`.
   So the brain a player comes home to gets
-  finer and busier as they get better. Every board cleared lights another tenth
-  of it, **from the bottom up**, and the tenth lights the lot in green — the same
-  ten that makes a milestone. Under it: `Level <n>`, the difficulty in its own
-  colour, and one line saying how many boards are left to light it. Redrawn only
-  when the tier or the lit count changes (`brainKey`), and the fade-in wave is
-  skipped under `prefers-reduced-motion`.
+  finer and busier as they get better. **The brain carries a rank** (`RANKS`,
+  `arrowsShot`, `rankOf`), and the rank is earned in arrows: every arrow shot off a
+  board the player cleared, on the tour or on the daily, summed from the `lv:` and
+  `daily:` records the tour already syncs (`arrows` on each; a record from before
+  boards remembered their arrows counts as a typical board of its tier,
+  `ARROWS_GUESS`). So a phone and a tablet agree on it, a fresh device gets it back
+  with the account, and clearing the same board twice does not count it twice.
+  Fourteen steps: Newbie 0, Normal 40, Learner 120, Thinker 250, Solver 450,
+  Skilled 700, Sharp 1,000, Expert 1,400, Master 1,900, Genius 2,500, Grandmaster
+  3,300, Legend 4,200, Immortal 5,200, **GOAT 6,236** — about a hundred boards at
+  the difficulty the game deals by then. The brain fills with the arrows of the
+  rank in hand, **from the bottom up**, and GOAT lights the lot in green. Under it:
+  the rank name, a pill with the arrow count, one line saying how many arrows are
+  left to the next rank, and small under that `Rank n of 14 · Level n · Difficulty`
+  (`#aaBrainSub`): the rank is the headline and it is not the level — a level says
+  where a player is on the tour, a rank says what they have done. The result card
+  carries a line too (`.aa-card-rank`): `+N arrows · Rank · M to Next`, or `New
+  rank: …` when the board moved it; a race has none. The share text names the rank.
+  Redrawn only when the tier or the lit count changes (`brainKey`), and the fade-in
+  wave is skipped under `prefers-reduced-motion`.
 - **Every mode gets the same board**: what the game offers on a board does not
   depend on which mode dealt it. Advertisements used to be switched off outright
   in a challenge (`adCanOffer` returned false for `state.daily.race`), which
@@ -906,6 +920,10 @@ links.
   press-and-hold check, and what clearing the board does. The layer lets taps through, so the board is playable
   under it. Shown once (`coached`), never in a race or on the daily board, closed by winning, losing or
   leaving the board, and Settings → Help → "Show the tutorial again" brings it back on the next board.
+- **The brain has a rank** (`RANKS`, `arrowsShot`, `rankOf`, `#aaBrainSub`, `.aa-card-rank`): Newbie to
+  GOAT at 6,236 arrows, fourteen steps, counted from the arrows on the cleared boards the tour syncs, so it
+  is the account's and not the device's, and it is separate from the level — see "The brain on the home
+  screen" above.
 - **The build line is hidden where players are.** "Build N" under the credit shows only on localhost or
   in the debug app (`el.build.hidden = !devAllowed()`), the same places the seven taps work; a player's
   Settings ends at the credit line.

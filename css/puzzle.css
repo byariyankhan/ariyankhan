@@ -120,7 +120,14 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-brain-diff--hard{ color:var(--hard); background:color-mix(in srgb, var(--hard) 12%, transparent); }
 .aa-brain-diff--expert{ color:var(--expert); background:color-mix(in srgb, var(--expert) 14%, transparent); }
 .aa-brain-diff--master{ color:var(--master); background:color-mix(in srgb, var(--master) 12%, transparent); }
+.aa-brain-diff--arrows{ color:var(--accent2); background:color-mix(in srgb, var(--accent2) 12%, transparent); font-variant-numeric:tabular-nums; }
+.aa-brain-diff--arrows.is-top{ color:var(--good); background:color-mix(in srgb, var(--good) 12%, transparent); }
 .aa-brain-note{ margin:0; font-size:13px; color:var(--muted); text-align:center; font-weight:800; }
+.aa-brain-sub{ margin:0; font-size:10px; letter-spacing:1px; text-transform:uppercase; color:var(--muted); text-align:center; font-weight:800; opacity:.75; }
+.aa-card-rank{ margin:8px 0 0; font-size:13px; font-weight:800; color:var(--muted); text-align:center; font-variant-numeric:tabular-nums; }
+.aa-card-rank b{ color:var(--accent2); font-weight:900; }
+.aa-card-rank.is-up{ font-size:16px; color:var(--ink); animation:aapop .45s ease-out; }
+@media(prefers-reduced-motion:reduce){ .aa-card-rank.is-up{ animation:none; } }
 
 /* lobby world map: every country faint, tour countries outlined, cleared ones filled and numbered */
 /* the map fills the panel's width, and the panel takes the height it needs rather than stretching to swallow
