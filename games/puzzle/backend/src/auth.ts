@@ -12,7 +12,7 @@ import { config } from './config.js';
 import { give, idem } from './gold.js';
 import { log } from './log.js';
 
-export interface User { id: number; name: string; provider: string; pic: string; gold: number; }
+export interface User { id: number; name: string; provider: string; pic: string; gold: number; reminder: boolean; }
 export interface GoogleClaims { sub: string; name: string; pic: string; }
 
 export const hashToken = (token: string): string => createHash('sha256').update(token).digest('hex');
@@ -102,7 +102,7 @@ export async function upsertUser(c: PoolClient, provider: string, claims: Google
     created = true;
     await give(c, id, config.game.signupGold, 'signup', idem.signup(id));
   }
-  const row = await query<User>(c, 'SELECT id, name, provider, pic, gold FROM users WHERE id = $1', [id]);
+  const row = await query<User>(c, 'SELECT id, name, provider, pic, gold, reminder FROM users WHERE id = $1', [id]);
   return { user: row.rows[0]!, created };
 }
 
@@ -119,12 +119,12 @@ export async function userForToken(token: string | null): Promise<User | null> {
   if (!token || token.length < 20 || token.length > 256) return null;
   const h = hashToken(token);
   const r = await query<User & { expired: boolean }>(pool,
-    `SELECT u.id, u.name, u.provider, u.pic, u.gold, s.expires_at <= now() AS expired
+    `SELECT u.id, u.name, u.provider, u.pic, u.gold, u.reminder, s.expires_at <= now() AS expired
        FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1`, [h]);
   const row = r.rows[0];
   if (!row) return null;
   if (row.expired) { await query(pool, 'DELETE FROM sessions WHERE token_hash = $1', [h]).catch(() => {}); return null; }
-  return { id: row.id, name: row.name, provider: row.provider, pic: row.pic, gold: row.gold };
+  return { id: row.id, name: row.name, provider: row.provider, pic: row.pic, gold: row.gold, reminder: row.reminder };
 }
 
 export const endSession = (token: string | null) =>

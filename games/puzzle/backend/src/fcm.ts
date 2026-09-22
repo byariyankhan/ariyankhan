@@ -77,7 +77,9 @@ export function messageFor(token: string, note: Note, ttlSeconds: number): Recor
       token,
       data: { kind: note.kind, title: note.title, body: note.body, url: note.url, tag: note.tag },
       android: {
-        priority: 'high',
+        // An invitation is about a room that will be gone in minutes and is worth waking the phone for; the
+        // league and the evening nudge can wait for the phone's next natural moment.
+        priority: note.kind === 'invited' ? 'high' : 'normal',
         ttl: `${Math.max(0, Math.floor(ttlSeconds))}s`,
         // The same rule as the web's tag: invitations replace invitations, so five are one and not five.
         collapse_key: note.tag,

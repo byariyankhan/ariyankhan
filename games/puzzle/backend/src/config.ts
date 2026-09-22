@@ -91,8 +91,11 @@ export const config = {
     idleMinutes: num('PUZZLE_IDLE_MINUTES', 10),
     // How an invitation is kept from becoming a nuisance. There is no friend list to opt into -- the people
     // who can ask you are the people you have played -- so the limit is on the asking itself: one ask of the
-    // same person per cooldown, and a few a day. Somebody who has not answered three in a day has answered.
-    inviteCooldownSeconds: num('PUZZLE_INVITE_COOLDOWN_SECONDS', 600),
+    // same person per cooldown, and a few a day. Somebody who has not answered three in a day has answered;
+    // somebody who takes one has answered the other way, and the count starts over (players.inviteAnswered).
+    // The cooldown is short on purpose: it catches a double tap and a room opened by mistake, not a change
+    // of mind, and the client offers the link instead of a wait.
+    inviteCooldownSeconds: num('PUZZLE_INVITE_COOLDOWN_SECONDS', 120),
     invitesPerDay: num('PUZZLE_INVITES_PER_DAY', 3),
     // The board list the server picks from, so no client can choose an easy country.
     boardsFile: str('PUZZLE_BOARDS_FILE', '/srv/puzzle/site/games/data/puzzle.json'),
@@ -133,6 +136,15 @@ export const config = {
   // browser's are.
   fcm: {
     serviceAccount: str('PUZZLE_FCM_SERVICE_ACCOUNT'),
+  },
+
+  // ── The evening nudge ──
+  // Once a day at this hour, local to the device, to anyone with notifications on who has not played in
+  // quietHours. defaultTz is for a device that does not say where it is.
+  reminder: {
+    hour: num('PUZZLE_REMINDER_HOUR', 19),
+    quietHours: num('PUZZLE_REMINDER_QUIET_HOURS', 4),
+    defaultTz: str('PUZZLE_REMINDER_TZ', 'Asia/Dhaka'),
   },
 
   // How often the housekeeping loop runs. The PHP service swept on every request, which is what made a busy

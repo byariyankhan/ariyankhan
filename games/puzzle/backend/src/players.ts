@@ -141,6 +141,17 @@ export async function inviteAllowed(from: number, to: number): Promise<InviteVer
 }
 
 /**
+ * That player took one. An accepted invitation is the opposite of pestering, so everybody at the table the
+ * player just sat down at may ask them again from a clean slate: the cooldown and the day's count go.
+ */
+export async function inviteAnswered(froms: number[], to: number): Promise<void> {
+  if (!froms.length) return;
+  const day = new Date().toISOString().slice(0, 10);
+  const keys = froms.flatMap(from => [k('invite', from, to), k('invites', from, to, day)]);
+  await soft(async () => { await redis.del(...keys); }, undefined);
+}
+
+/**
  * May this player send that player an invitation?
  *
  * Only if they have shared a table before. An invitation is a notification on somebody else's screen, so the

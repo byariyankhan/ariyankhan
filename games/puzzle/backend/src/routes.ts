@@ -5,7 +5,7 @@
 // a request that changes gold should be something the client can retry and the server can answer once.
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { API_PREFIX, config } from './config.js';
-import { pool, tx } from './db.js';
+import { pool, query, tx } from './db.js';
 import * as R from './rooms.js';
 import { adClaim, balance } from './gold.js';
 import { deleteUser, endSession, googleVerify, providers, startSession, upsertUser, cleanName } from './auth.js';
@@ -13,7 +13,7 @@ import { publish, publishToUser } from './events.js';
 import { boardPace, cleanLevels, cleanState, mergeLevels, mergeState, readAll } from './progress.js';
 import * as L from './league.js';
 import { liveProgress, online, roomPresence } from './presence.js';
-import { havePlayedTogether, isRacing, recentPlayers, inviteAllowed } from './players.js';
+import { havePlayedTogether, isRacing, recentPlayers, inviteAllowed, inviteAnswered } from './players.js';
 import * as push from './push.js';
 import { body, caller, clearSessionCookie, limited, noStore, setSessionCookie, shapeUser, type Caller } from './httpkit.js';
 import { log } from './log.js';
@@ -160,6 +160,9 @@ const H = {
     const merged = await tx(async c => {
       await mergeLevels(c, userId, levels);
       if (state) await mergeState(c, userId, state);
+      // A board posted is a player playing: the evening nudge leaves alone anyone seen in the last few hours.
+      // Written at most once in ten minutes, so a busy session is not a write per level.
+      await query(c, `UPDATE users SET last_played_at = now() WHERE id = $1 AND last_played_at < now() - interval '10 minutes'`, [userId]);
       return readAll(c, userId);
     });
     await noStore(res).send(merged);
@@ -240,8 +243,18 @@ const H = {
     if (!/^[A-Za-z0-9_:\-]{20,4096}$/.test(token)) { await noStore(res).code(400).send({ error: 'bad_token' }); return; }
     // The same word the browser is given by a deploy with no keys: the switch then says so instead of failing.
     if (!push.appEnabled) { await noStore(res).code(503).send({ error: 'push_off' }); return; }
-    await push.saveToken(pool, me.user.id, token, String(req.headers['user-agent'] ?? ''));
+    await push.saveToken(pool, me.user.id, token, String(req.headers['user-agent'] ?? ''), push.cleanTz(body(req).tz));
     await noStore(res).send({ ok: true, on: true });
+  },
+
+  // The evening nudge is the one notification a player may decline while keeping the rest. Per account,
+  // because it is the account that is asked to come and play, on whichever device is nearest.
+  async pushReminder(req: Req, res: Res, me: Caller) {
+    if (!me.user) { await noStore(res).code(401).send({ error: 'signed_out' }); return; }
+    if (!(await limited('push_write', req, res, me.user.id))) return;
+    const on = body(req).on !== false;
+    await push.setReminder(pool, me.user.id, on);
+    await noStore(res).send({ ok: true, reminder: on });
   },
 
   async pushTokenDrop(req: Req, res: Res, me: Caller) {
@@ -266,7 +279,7 @@ const H = {
     if (!/^https:\/\/[^\s]+$/i.test(endpoint) || endpoint.length > 1000 || !p256dh || !auth) {
       await noStore(res).code(400).send({ error: 'bad_subscription' }); return;
     }
-    await push.saveSubscription(pool, me.user.id, { endpoint, keys: { p256dh, auth } }, String(req.headers['user-agent'] ?? ''));
+    await push.saveSubscription(pool, me.user.id, { endpoint, keys: { p256dh, auth } }, String(req.headers['user-agent'] ?? ''), push.cleanTz(b.tz));
     await noStore(res).send({ ok: true, on: true });
   },
 
@@ -361,7 +374,13 @@ const H = {
       await noStore(res).code(status).send({ error: out.error, ...(out.gold !== undefined ? { gold: out.gold } : {}) });
       return;
     }
-    if (!out.already) await publish(out.code, 'player_joined_room', { name: me.user.name });
+    if (!out.already) {
+      await publish(out.code, 'player_joined_room', { name: me.user.name });
+      // Taking a seat answers every invitation to it: whoever at this table asked this player may ask again
+      // from a clean slate, because an invitation that was taken was not a nuisance.
+      const seats = await R.room(pool, out.code);
+      void inviteAnswered(seats.map(p => p.user_id).filter(id => id !== me.user!.id), me.user.id);
+    }
     if (out.started) await R.announceStart(out.code);
     await replyMatch(res, out.code, me);
   },
@@ -433,6 +452,8 @@ const H = {
     const seats = await R.room(pool, code);
     if (!seats.some(p => p.user_id === me.user!.id)) { await noStore(res).code(403).send({ error: 'not_yours' }); return; }
     if (m.state !== 'playing') { await replyMatch(res, code, me); return; }
+    // A race finished is a player playing, the same as a board posted: the evening nudge leaves them alone.
+    await query(pool, `UPDATE users SET last_played_at = now() WHERE id = $1 AND last_played_at < now() - interval '10 minutes'`, [me.user.id]);
 
     const b = body(req);
     const settled = await tx(async c => {
@@ -474,6 +495,7 @@ export function registerRoutes(app: FastifyInstance): void {
   app.post(`${v1}/push/unsubscribe`, withCaller(H.pushUnsubscribe));
   app.post(`${v1}/push/token`, withCaller(H.pushToken));
   app.post(`${v1}/push/token/drop`, withCaller(H.pushTokenDrop));
+  app.post(`${v1}/push/reminder`, withCaller(H.pushReminder));
 
   app.get(`${v1}/lobby`, withCaller(H.lobby));
   app.get(`${v1}/players/recent`, withCaller(H.recent));

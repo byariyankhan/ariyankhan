@@ -149,7 +149,7 @@
     worldMap: $('#aaWorldMap'), worldCap: $('#aaWorldCap'), worldScroll: $('#aaWorldScroll'),
     brainArt: $('#aaBrainArt'), brainLv: $('#aaBrainLv'), brainDiff: $('#aaBrainDiff'), brainNote: $('#aaBrainNote'),
     deck: $('#aaDeck'), deckTrack: $('#aaDeckTrack'), deckDots: $('#aaDeckDots'),
-    notifyCap: $('#aaNotifyCap'), notifyGroup: $('#aaNotifyGroup'), btnNotify: $('#aaNotify'), notifyNote: $('#aaNotifyNote'),
+    notifyCap: $('#aaNotifyCap'), notifyGroup: $('#aaNotifyGroup'), btnNotify: $('#aaNotify'), notifyNote: $('#aaNotifyNote'), remindRow: $('#aaRemindRow'), btnRemind: $('#aaRemind'),
     statBoards: $('#aaStatBoards'), statCountries: $('#aaStatCountries'), statStreak: $('#aaStatStreak'),
   };
   if (!el.board) return;
@@ -2612,6 +2612,8 @@
   // pushOff). The page posts that token to the same account a browser's subscription goes to, and the player
   // sees one switch that means the same thing in both places.
   const appPush = () => shell.on && !!shell.bridge();
+  // Where this device is, so the evening nudge comes at seven here and not at seven somewhere else.
+  const TZ = (() => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch { return ''; } })();
   const pushApi = (path, body) =>
     fetch(`${API_V1}/push/${path}`, {
       method: body ? 'POST' : 'GET', credentials: 'include', cache: 'no-store',
@@ -2642,6 +2644,10 @@
     if (!show) return;
     el.btnNotify.setAttribute('aria-checked', String(push.on));
     el.btnNotify.disabled = push.busy;
+    // The evening nudge has a switch of its own, shown only once notifications are on at all: it is the one
+    // thing a player may decline while keeping the invitations and the league they turned the first on for.
+    if (el.remindRow) el.remindRow.hidden = !push.on;
+    if (el.btnRemind) { el.btnRemind.setAttribute('aria-checked', String(auth.user?.reminder !== false)); el.btnRemind.disabled = !!push.remindBusy; }
     // The one state a switch cannot get itself out of: the browser, or the phone, has been told no, and only
     // its own settings can change that. Saying so is the difference between a broken switch and a closed door.
     // Notification is the browser's global and a WebView need not have it, so in the app the app is asked.
@@ -2692,7 +2698,7 @@
     push.on = !!s.on && !!s.token;
     push.blocked = push.on && s.enabled === false;
     if (push.on && s.token !== push.posted) {
-      try { await pushApi('token', { token: s.token }); push.posted = s.token; }
+      try { await pushApi('token', { token: s.token, tz: TZ }); push.posted = s.token; }
       catch (err) { if (err.code === 'push_off') push.app = false; }
     }
     renderNotify();
@@ -2726,7 +2732,7 @@
           return;
         }
         push.granted = true;
-        await pushApi('token', { token: r.token });
+        await pushApi('token', { token: r.token, tz: TZ });
         push.on = true; push.blocked = false; push.posted = r.token;
         toast('Notifications on. Only an invite, and the league.', 'good');
       }
@@ -2773,7 +2779,7 @@
         if (permission !== 'granted') { push.on = false; renderNotify(); toast(permission === 'denied' ? 'Your browser is blocking notifications for this site.' : 'Notifications stay off.', 'hint'); return; }
         const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlB64ToBytes(push.key) });
         const json = sub.toJSON();
-        await pushApi('subscribe', { endpoint: json.endpoint, keys: json.keys });
+        await pushApi('subscribe', { endpoint: json.endpoint, keys: json.keys, tz: TZ });
         push.on = true;
         toast('Notifications on. Only an invite, and the league.', 'good');
       }
@@ -2788,6 +2794,22 @@
     }
   }
   el.btnNotify?.addEventListener('click', notifyToggle);
+
+  async function remindToggle() {
+    if (!auth.user || push.remindBusy) return;
+    const on = auth.user.reminder === false;
+    push.remindBusy = true; renderNotify();
+    try {
+      const d = await pushApi('reminder', { on });
+      auth.user.reminder = d.reminder !== false;
+      toast(auth.user.reminder ? 'A nudge at 7 pm, once a day, in your own time.' : 'No daily nudge. Invites and the league still come.', 'hint');
+    } catch (err) {
+      toast(`Could not change that (${typeof err.code === 'string' ? err.code : 'failed'}).`, 'bad');
+    } finally {
+      push.remindBusy = false; renderNotify();
+    }
+  }
+  el.btnRemind?.addEventListener('click', remindToggle);
 
   /** Give up this device's subscription, quietly. Used when the account leaves the browser. */
   async function notifyDrop() {
@@ -3061,6 +3083,20 @@
       // than going back to "Invite", because an invitation that has just gone is not one to send again.
       const minutes = Math.max(1, Math.ceil((Number(err.retryAfter) || 0) / 60));
       if (btn && (err.code === 'too_soon' || err.code === 'enough_today')) { btn.disabled = true; btn.textContent = 'Asked'; }
+      // A limit is not a wall. The ask cannot go again for a while -- a double tap, a room opened by mistake,
+      // three in a day -- but the link works whenever it is tapped, so it is offered here, where the refusal
+      // is, instead of a wait. Taking any invitation of yours starts their count over.
+      if (!quiet && (err.code === 'too_soon' || err.code === 'enough_today')) {
+        const yes = await ask({
+          title: err.code === 'too_soon' ? `${name} was just asked` : `${name} has been asked three times today`,
+          body: (err.code === 'too_soon' ? `You can ask again in ${minutes} min. ` : 'That is the limit for one day, until they take one. ')
+            + 'Or send them the link now: it opens the room whenever they tap it.',
+          ok: 'Share the link',
+          cancel: 'Not now',
+        });
+        if (yes) await sendInvite(m);
+        return false;
+      }
       if (!quiet) toast(err.code === 'not_played_together' ? 'You can only invite people you have played with.'
         : err.code === 'in_a_match' ? `${name} is on a board right now. Try again when they are done.`
         : err.code === 'too_soon' ? `${name} was asked a few minutes ago. Try again in ${minutes} min.`

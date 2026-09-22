@@ -5,7 +5,9 @@
 // account that is signed in on it, disposable — and the words a notification arrives with.
 import { createVerify, generateKeyPairSync } from 'node:crypto';
 import { pool, query } from '../backend/src/db.js';
-import { appEnabled, dropSubscription, dropToken, hasSubscription, invitedNote, leagueNote, saveSubscription, saveToken } from '../backend/src/push.js';
+import { appEnabled, cleanTz, dailyNote, dropSubscription, dropToken, hasSubscription, invitedNote, leagueNote, saveSubscription, saveToken, setReminder } from '../backend/src/push.js';
+import { isDue, localClock, reminderSweep, targets } from '../backend/src/reminder.js';
+import { k, redis } from '../backend/src/redis.js';
 import { assertion, enabled as fcmEnabled, messageFor, parseAccount } from '../backend/src/fcm.js';
 import { eq, finish, ok, player, reset, section } from './helpers.js';
 
@@ -166,6 +168,50 @@ section('Reaching Firebase with no Firebase library');
   eq(m.message.android.priority, 'high', 'at high priority, because a room waits minutes');
   eq(m.message.android.ttl, '3600s', "and for as long as the browser's copy would");
   eq(m.message.android.collapse_key, m.message.data.tag, 'collapsing on the tag, so five invitations are one');
+}
+
+section('Seven in the evening, wherever the phone is');
+{
+  eq(cleanTz('Asia/Dhaka'), 'Asia/Dhaka', 'a zone a device reports is kept');
+  eq(cleanTz('Europe/London'), 'Europe/London', 'any zone Intl knows');
+  eq(cleanTz('Mars/Olympus'), 'Asia/Dhaka', 'one it does not know falls back to Dhaka');
+  eq(cleanTz(''), 'Asia/Dhaka', 'and so does a device that says nothing');
+  eq(cleanTz("Asia/Dhaka'; DROP TABLE users"), 'Asia/Dhaka', 'and one that is not even the shape of a zone');
+
+  const at = new Date('2026-09-22T13:00:30Z');   // 19:00 in Dhaka, 14:00 in London
+  eq(localClock(at, 'Asia/Dhaka'), { date: '2026-09-22', hour: 19, minute: 0 }, 'the clock is read in the zone');
+  eq(localClock(at, 'Europe/London')?.hour, 14, 'and a different zone reads differently');
+  eq(localClock(at, 'Nowhere/Atall'), null, 'an unknown zone has no clock');
+  ok(isDue({ date: '2026-09-22', hour: 19, minute: 0 }), 'seven on the dot is due');
+  ok(isDue({ date: '2026-09-22', hour: 19, minute: 9 }), 'and so is nine minutes past, for a service that was restarting at seven');
+  ok(!isDue({ date: '2026-09-22', hour: 19, minute: 10 }), 'ten past is not: the evening is missed, not sent late');
+  ok(!isDue({ date: '2026-09-22', hour: 7, minute: 0 }), 'and seven in the morning is a different seven');
+
+  const n = dailyNote('Ariyan');
+  eq(n.kind, 'daily', 'the nudge is its own kind, so the app can give it its own channel');
+  ok(n.title.startsWith('Hey Ariyan,') && /train your brain/.test(n.title), 'and it says who it is talking to');
+  eq(n.url, '/puzzle/', 'and lands on the game');
+  eq(dailyNote('   ').title.startsWith('Hey there,'), true, 'a blank name still reads as a sentence');
+
+  // Who is told: an account with a device in the zone, the nudge on, and no board in the last few hours.
+  const a = await player('nudge-a'), b = await player('nudge-b'), c = await player('nudge-c'), d = await player('nudge-d');
+  await saveToken(pool, a.id, fcmToken('a'), 'app', 'Asia/Dhaka');
+  await saveSubscription(pool, b.id, sub(21), 'Chrome', 'Asia/Dhaka');
+  await saveToken(pool, c.id, fcmToken('c'), 'app', 'Asia/Dhaka');
+  await saveToken(pool, d.id, fcmToken('d'), 'app', 'Europe/London');
+  await query(pool, `UPDATE users SET last_played_at = now() - interval '1 day' WHERE id = ANY($1)`, [[a.id, b.id, d.id]]);
+  await setReminder(pool, b.id, false);
+  const who = (await targets('Asia/Dhaka')).map(u => u.id).sort();
+  eq(who, [a.id], 'a phone in Dhaka that has not played today is told; the browser that said no is not, nor the phone that played an hour ago, nor London');
+  eq((await targets('Europe/London')).map(u => u.id), [d.id], 'London is told at its own seven');
+
+  await redis.del(k('reminder', 'Asia/Dhaka', '2026-09-22'), k('reminder', 'Europe/London', '2026-09-22'), k('reminded', a.id), k('reminded', d.id));
+  const first = await reminderSweep(at);
+  eq(first.map(z => z.zone), ['Asia/Dhaka'], 'at 13:00Z it is seven in Dhaka and the sweep goes there, and only there');
+  eq(first[0]?.told, 0, 'nobody is actually reached on a box with no keys, and the sweep says so rather than guessing');
+  eq(await reminderSweep(new Date('2026-09-22T13:04:00Z')), [], 'four minutes later the same evening is not sent again');
+  eq(await reminderSweep(new Date('2026-09-22T18:00:30Z')).then(z => z.map(x => x.zone)), ['Europe/London'], 'and London gets its own at its own seven');
+  await redis.del(k('reminder', 'Asia/Dhaka', '2026-09-22'), k('reminder', 'Europe/London', '2026-09-22'), k('reminded', a.id), k('reminded', d.id));
 }
 
 await finish();
