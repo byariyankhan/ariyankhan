@@ -17,7 +17,7 @@ BE="$HERE/../backend"
 if [ -f "$BE/.env.dev" ] && [ -z "${PUZZLE_PG_HOST:-}" ]; then set -a; . "$BE/.env.dev"; set +a; fi
 
 SUITES=("${@}")
-if [ ${#SUITES[@]} -eq 0 ]; then SUITES=(economy progress league push api ws); fi
+if [ ${#SUITES[@]} -eq 0 ]; then SUITES=(economy live progress league push api ws); fi
 
 fail=0
 for s in "${SUITES[@]}"; do
