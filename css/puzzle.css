@@ -20,6 +20,14 @@
   --hard:#2F6BD8; --expert:#D9782A; --master:#C7342F; --heart:#E8565A; --good:#1F8A70; --bad:#C7342F;
   --outline:rgba(23,66,58,.08); --card:#FFFFFF; --shadow:0 10px 30px rgba(20,60,50,.12);
 }
+:root[data-theme="brain"]{
+  /* the brain's own colours: the rose of the arrows that light it up on the home card, on a warm blush paper,
+     with a deep plum for ink where the others use brown or black -- the slogan's colour, not the pencil's */
+  --bg:#FBF1EC; --bg2:#F6E3DC; --panel:#FFF8F5; --line:#5A2431; --line-soft:rgba(90,36,49,.35);
+  --ink:#3B1F2B; --muted:#9A6F7B; --accent:#F26B4E; --accent2:#DB3A5E; --accent-ink:#fff;
+  --hard:#B23A8A; --expert:#F26B4E; --master:#C7342F; --heart:#E8565A; --good:#3AA66B; --bad:#C7342F;
+  --outline:rgba(90,36,49,.08); --card:#FFFFFF; --shadow:0 10px 30px rgba(120,40,60,.12);
+}
 *{ box-sizing:border-box; }
 html{ background:var(--bg); }
 body.aa-body{ margin:0; background:var(--bg); color:var(--ink); font-family:'Nunito','Segoe UI',system-ui,sans-serif; font-weight:700; overflow-x:hidden; -webkit-tap-highlight-color:transparent; }
@@ -688,6 +696,7 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-theme[data-theme="paper"]{ background:#5B3F26; }
 .aa-theme[data-theme="night"]{ background:#141416; }
 .aa-theme[data-theme="mint"]{ background:#17423A; }
+.aa-theme[data-theme="brain"]{ background:#DB3A5E; }
 .aa-theme.is-active{ border-color:var(--accent); box-shadow:0 0 0 2px var(--card); }
 .aa-about{ border-top:1px solid var(--bg2); padding:12px 0; }
 .aa-about-summary{ cursor:pointer; list-style:none; font-weight:900; font-size:15px; }

@@ -2,12 +2,12 @@
    Scope is the whole origin (it has to be, to control the game page), but the fetch
    handler only ever answers for the game's own files; every other request on the
    site is left to the network exactly as if no worker were installed. */
-const VERSION = 'ptw-cache-v103';
+const VERSION = 'ptw-cache-v104';
 const GAME_FILES = new Set([
   '/piece-the-world.html', '/css/style.css', '/css/piece-the-world.css',
   '/js/piece-the-world.js', '/js/site-nav.js', '/js/site-footer.js',
   '/games/piece-the-world.webmanifest', '/images/ariyan-khan-profile.webp',
-  '/puzzle', '/puzzle/', '/css/puzzle.css', '/js/puzzle.js', '/puzzle/app.webmanifest', '/images/puzzle-brain-mark.svg',
+  '/puzzle', '/puzzle/', '/css/puzzle.css', '/js/puzzle.js', '/puzzle/app.webmanifest', '/images/puzzle-brain-mark.svg', '/images/puzzle-brain-mark-rose.svg',
   // the game's own icon and its coin: installed from the home screen, with no network, the game still has a
   // face and its gold still has a face
   '/puzzle/icons/puzzle-96.png', '/puzzle/icons/puzzle-180.png',

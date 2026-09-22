@@ -59,7 +59,7 @@ export function cleanLevels(raw: unknown, known?: (id: string) => boolean): Leve
       quiz: !!r.quiz,
       ms: msRaw > 0 && msRaw <= 86_400_000 ? msRaw : null,          // over a day on one board is not a time
       stars: int(r.stars, 0, 3, 0),
-      tier: int(r.tier, 0, 3, 0),
+      tier: int(r.tier, 0, 4, 0),          // five tiers, Master is 4
       arrows: int(r.arrows, 0, 10_000, 0),
     };
     n++;
