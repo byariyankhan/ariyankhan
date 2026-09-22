@@ -155,7 +155,6 @@ public final class MainActivity extends ComponentActivity {
         super.onResume();
         // Let the page run again before anything is asked of it.
         web.onResume();
-        web.resumeTimers();
         // A theme picked in Settings changes the page's theme-color without a navigation, so the bars would
         // keep the old contrast until something asked again. Leaving the app and coming back asks again.
         //
@@ -167,20 +166,21 @@ public final class MainActivity extends ComponentActivity {
     /**
      * Put the page to sleep while the app is not the thing on screen.
      *
-     * <p>A WebView left alone carries on: animations keep drawing, timers keep firing, and — the reason this
-     * matters now — a video keeps playing. An advertisement is a video. Without this, a player who takes a
-     * call or goes to another app halfway through a rewarded advertisement leaves it talking out of a phone
-     * they are no longer looking at, which is the kind of thing people uninstall an app over and Play takes
-     * complaints about.
+     * <p>A WebView left alone carries on: animations keep drawing and, the reason this matters, a video keeps
+     * playing. Without this, a player who takes a call halfway through a rewarded advertisement leaves it
+     * talking out of a phone they are no longer looking at.
      *
-     * <p>onPause stops this WebView's own work; pauseTimers stops the JavaScript clock, which is process-wide
-     * and would be rude if this app had a second WebView. It has one.
+     * <p><b>onPause only.</b> pauseTimers was here for one build and had to go, because it is not this
+     * WebView's clock it stops — it is every WebView in the process, and the advertisement the SDK shows is
+     * drawn in a WebView of its own, in an activity of its own, which by definition comes to the front at the
+     * exact moment this one is told to pause. So the app would pause the very advertisement it had just
+     * asked for: the countdown stopped, the close button never arrived, and the player was left holding a
+     * screen that could not be got rid of. onPause is per-WebView and does the job that was wanted.
      */
     @Override
     protected void onPause() {
         // Before super, so nothing is still drawing or sounding by the time the activity is told it is gone.
         web.onPause();
-        web.pauseTimers();
         super.onPause();
     }
 
