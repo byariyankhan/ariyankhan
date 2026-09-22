@@ -1839,6 +1839,7 @@
       syncTour({});   // the daily board lives in the state blob, which every push carries
     } else {
       const lid = state.level.id;
+      interCount();   // a clear on the tour: the fourth of them earns an interstitial on the way to the next board
       countBoard(lid, { c: 1, h: state.hintsUsed, l: state.livesMax - state.lives, ms: t });
       store.set('lv:' + lid, rec); forgetNums(); pushOne(lid, rec); showBrainNext = true;
     }
@@ -1955,7 +1956,7 @@
     if (inv) { invitePlayer(inv.dataset.invite, inv.dataset.name, inv); return; }
     const act = e.target.closest('[data-act]')?.dataset.act; if (!act) return;
     if (act === 'adheart') { adOffer('heart'); return; }
-    if (act === 'next') { const j = nextOpen(state.idx); if (j < 0) goToLevels(); else startLevel(j); }
+    if (act === 'next') { const j = nextOpen(state.idx); interShow().finally(() => { if (j < 0) goToLevels(); else startLevel(j); }); }
     else if (act === 'again' || act === 'retry') { if (state.daily?.race) state.daily.moves = (state.moves | 0) + 1; startLevel(state.idx, false, state.daily, state.tier); }
     else if (act === 'shuffle') startLevel(state.idx, true, state.daily);
     else if (act === 'skip') { const id = DATA.levels[state.idx + 1]?.id; store.set(skipKey(state.idx + 1), true); if (id && !isLocalOnly(id)) syncTour({ [id]: { cleared: false, skipped: true } }); startLevel(nextOpen(state.idx)); }
@@ -2293,7 +2294,60 @@
   // reporting, and it holds one attempt, the last.
   function adNote(name, how, why, ms) {
     ads.last = { name, how, why, ms, at: Date.now() };
+    if (name !== INTER_NAME && how !== 'unavailable') inter.rewardAt = Date.now();   // a rewarded one was on, or about to be
     renderDevLast();
+  }
+
+  // ── Interstitials ──
+  // A full-screen advertisement between boards, at the one moment that is a break anyway: the tap on Next
+  // after a clear. Every fourth clear, and only then. Never in a challenge or on the daily board. Never
+  // within three minutes of the last one, nor within two minutes of a rewarded advertisement -- the player
+  // has just watched one on purpose, and an uninvited second is the aggressive version of this -- and never
+  // in the first minute of a session. A break that finds nothing waits two minutes before asking again, so a
+  // network with nothing to serve does not turn every Next into a pause. Like the rewarded ones it exists
+  // only when the ads layer is on and giving real advertisements; in free mode there is nothing here.
+  const INTER_NAME = 'next-board';
+  const INTER_EVERY = 4, INTER_GAP_MS = 3 * 60_000, INTER_AFTER_REWARD_MS = 2 * 60_000, INTER_WARMUP_MS = 60_000, INTER_RETRY_MS = 2 * 60_000;
+  const inter = { clears: store.get('interClears', 0) | 0, lastAt: 0, rewardAt: 0, retryAt: 0, since: Date.now() };
+  function interCount() { inter.clears++; store.set('interClears', inter.clears); }
+  function interDue() {
+    const now = Date.now();
+    return ads.on() && ads.isAd() && !ads.showing && !state.daily && inter.clears >= INTER_EVERY
+      && now - inter.since > INTER_WARMUP_MS && now - inter.lastAt > INTER_GAP_MS
+      && now - inter.rewardAt > INTER_AFTER_REWARD_MS && now >= inter.retryAt;
+  }
+  /** Show one if one is due; resolves either way, so the next board never waits on an advertisement that is not coming. */
+  async function interShow() {
+    if (!interDue()) return false;
+    ads.showing = true;
+    const wasMusic = music.on; if (wasMusic) musicStop();
+    let how = 'unavailable';
+    try { how = ads.mode === 'test' ? await adTestShow(INTER_NAME, 'Test advertisement', 'Between boards.') : await adH5Next(INTER_NAME); }
+    finally { ads.showing = false; }
+    if (how === 'unavailable') { inter.retryAt = Date.now() + INTER_RETRY_MS; return false; }
+    inter.lastAt = Date.now(); inter.clears = 0; store.set('interClears', 0);
+    return true;
+  }
+  // The library's own interstitial break: `next` is its name for "between one part of the game and the next".
+  // beforeAd says one is on the screen; afterAd that it has gone; adBreakDone fires for every break, with the
+  // one word that says why nothing showed when nothing did.
+  function adH5Next(name) {
+    return new Promise(resolve => {
+      if (typeof window.adBreak !== 'function') { adNote(name, 'unavailable', 'no library', 0); resolve('unavailable'); return; }
+      const asked = performance.now();
+      let settled = false, shown = false, guard = 0;
+      const done = (how, why = '') => { if (settled) return; settled = true; clearTimeout(guard); adNote(name, how, why, Math.round(performance.now() - asked)); resolve(how); };
+      guard = setTimeout(() => { if (!shown) done('unavailable', 'nothing answered'); }, 8000);
+      try {
+        adNote(name, 'asked', '', 0);
+        window.adBreak({
+          type: 'next', name,
+          beforeAd() { shown = true; clearTimeout(guard); guard = setTimeout(() => done('shown', 'never ended'), 120000); },
+          afterAd() { done('shown'); },
+          adBreakDone(info) { done(shown ? 'shown' : 'unavailable', (info && info.breakStatus) || 'no reason given'); },
+        });
+      } catch { done('unavailable', 'the call threw'); }
+    });
   }
 
   // Asking the network takes a moment, and a moment of nothing at all reads as a button that did not work.
@@ -4496,8 +4550,9 @@
   $$('.aa-sheet').forEach(sh => sh.addEventListener('click', e => { if (e.target === sh) closeSheets(); }));
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSheets(); });
   // Themes
-  const THEMES = ['paper', 'brain', 'night', 'mint'];
-  function applyTheme(t) { document.documentElement.dataset.theme = t; store.set('theme', t); $('meta[name="theme-color"]')?.setAttribute('content', t === 'night' ? '#0E0E10' : t === 'mint' ? '#E6F2EC' : t === 'brain' ? '#FBF1EC' : '#F4EDE0'); $('.aa-splash-logo img')?.setAttribute('src', t === 'brain' ? '/images/puzzle-brain-mark-rose.svg?v=1' : '/images/puzzle-brain-mark.svg?v=2'); renderThemes(); }
+  const THEMES = ['paper', 'night', 'mint'];
+  // The splash mark is the rose one everywhere but Night, where the dark one is inverted to white by the stylesheet.
+  function applyTheme(t) { document.documentElement.dataset.theme = t; store.set('theme', t); $('meta[name="theme-color"]')?.setAttribute('content', t === 'night' ? '#0E0E10' : t === 'mint' ? '#E6F2EC' : '#F4EDE0'); $('.aa-splash-logo img')?.setAttribute('src', t === 'night' ? '/images/puzzle-brain-mark.svg?v=2' : '/images/puzzle-brain-mark-rose.svg?v=1'); renderThemes(); }
   // ── The build line, and the developer switch behind it ────────────────────────────────────────────
   //
   // The version is not hardcoded: it is the one the page asked for, read back off the script tag, so it can

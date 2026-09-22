@@ -1,0 +1,27 @@
+# The game's own engine and its advertising rules, tested against the code that ships: tests/*.test.mjs lift
+# the pieces out of js/puzzle.js by their own markers, so what runs is the exact code the page loads. No
+# database, no browser, no secrets: a minute of Node. Its own workflow, so a change to the client does not
+# build and publish the API's image.
+name: Puzzle client
+
+on:
+  push:
+    branches: [main]
+    paths: ['js/puzzle.js', 'tests/puzzle*.test.mjs', '.github/workflows/puzzle-client.yml']
+  pull_request:
+    paths: ['js/puzzle.js', 'tests/puzzle*.test.mjs', '.github/workflows/puzzle-client.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  engine:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Engine and interstitial rules
+        run: node --test tests/puzzle.test.mjs tests/puzzle-ads.test.mjs
