@@ -497,8 +497,21 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-lane--peek{ animation:aa-glow .6s ease-in-out infinite alternate; }
 .aa-piece.is-blocker .aa-track{ stroke:var(--bad) !important; stroke-width:.26; }
 .aa-piece.is-blocker .aa-head{ fill:var(--bad) !important; stroke:var(--bad) !important; }
-.aa-piece.is-hint .aa-track{ stroke:var(--accent) !important; stroke-width:.28; animation:aa-glow .5s ease-in-out infinite alternate; }
-.aa-piece.is-hint .aa-head{ fill:var(--accent) !important; stroke:var(--accent) !important; }
+.aa-piece.is-hint .aa-track, .aa-piece.is-coach .aa-track{ stroke:var(--accent) !important; stroke-width:.28; animation:aa-glow .5s ease-in-out infinite alternate; }
+.aa-piece.is-hint .aa-head, .aa-piece.is-coach .aa-head{ fill:var(--accent) !important; stroke:var(--accent) !important; }
+/* ── The tutorial ──
+   A layer that lets taps through (the first step is a tap on the board), a spotlight cut out of a dark scrim
+   by one enormous box-shadow, and a card pinned to the bottom. Nothing of it exists until the first board. */
+.aa-coach{ position:fixed; inset:0; z-index:110; pointer-events:none; }
+.aa-coach-spot{ position:absolute; left:0; top:0; width:0; height:0; border-radius:16px; box-shadow:0 0 0 9999px rgba(40,25,20,.5); transition:left .28s ease, top .28s ease, width .28s ease, height .28s ease; }
+.aa-coach-spot.is-none{ box-shadow:0 0 0 9999px rgba(40,25,20,.5); width:0; height:0; left:50%; top:-40px; }
+.aa-coach-card{ position:absolute; left:16px; right:16px; bottom:calc(16px + env(safe-area-inset-bottom, 0px)); max-width:440px; margin:0 auto; background:var(--card); color:var(--ink); border-radius:20px; padding:16px 18px 14px; box-shadow:var(--shadow); pointer-events:auto; }
+.aa-coach-step{ margin:0 0 4px; font-size:11px; font-weight:800; letter-spacing:1px; text-transform:uppercase; color:var(--accent); }
+.aa-coach-card h3{ margin:0 0 6px; font-size:20px; font-weight:900; line-height:1.1; }
+.aa-coach-card p{ margin:0; font-size:15px; line-height:1.4; color:var(--muted); }
+.aa-coach-actions{ display:flex; justify-content:space-between; align-items:center; gap:10px; margin-top:12px; }
+.aa-coach-actions .aa-btn{ padding:11px 20px; }
+@media(prefers-reduced-motion:reduce){ .aa-coach-spot{ transition:none; } .aa-piece.is-coach .aa-track{ animation:none; } }
 .aa-piece.is-shake .aa-track, .aa-piece.is-shake .aa-head{ animation:aa-shake .3s; }
 @keyframes aa-shake{ 0%,100%{ opacity:1; } 30%,70%{ opacity:.25; } }
 @keyframes aa-glow{ from{ opacity:.5; } to{ opacity:1; } }

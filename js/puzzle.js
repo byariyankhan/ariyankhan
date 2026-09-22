@@ -153,6 +153,7 @@
     select: $('#aaSelect'), tagline: $('#aaTagline'), homeRow: $('#aaHomeRow'), homeNow: $('#aaHomeNow'), homeSheet: $('#aaHomeSheet'), homeBack: $('#aaHomeBack'), homeSearch: $('#aaHomeSearch'), homeList: $('#aaHomeList'), purse: $('#aaPurse'), purseNo: $('#aaPurseNo'), goldAd: $('#aaGoldAd'), hudDiff: $('#aaHudDiff'), play: $('#aaPlay'), path: $('#aaPath'), btnVibe: $('#aaVibe'), btnGuides: $('#aaGuides'), btnMusic: $('#aaMusic'),
     sheet: $('#aaSheet'), friends: $('#aaFriends'), signInSheet: $('#aaSignInSheet'), googleBtn: $('#aaGoogleBtn'), signInNote: $('#aaSignInNote'), ranks: $('#aaRanks'), league: $('#aaLeague'), leagueEnds: $('#aaLeagueEnds'), leagueSheet: $('#aaLeagueSheet'), leagueBody: $('#aaLeagueBody'), leagueInfo: $('#aaLeagueInfo'), matchSheet: $('#aaMatchSheet'), matchBody: $('#aaMatchBody'), matchTitle: $('#aaMatchTitle'), accountGroup: $('#aaAccountGroup'), accountCap: $('#aaAccountCap'), accountRow: $('#aaAccountRow'), accountName: $('#aaAccountName'), accountWho: $('#aaAccountWho'), accountGold: $('#aaAccountGold'), accountFace: $('#aaAccountFace'), sessionGroup: $('#aaSessionGroup'), sessionCap: $('#aaSessionCap'), signOutBtn: $('#aaSignOut'), deleteAccBtn: $('#aaDeleteAcc'), settingsBtns: $$('#aaSettings, #aaSettingsG'), themeBtn: $('#aaTheme'), themes: $('#aaThemes'), build: $('#aaBuild'), devCap: $('#aaDevCap'), devGroup: $('#aaDevGroup'), devAds: $('#aaDevAds'), devAdsNote: $('#aaDevAdsNote'), devLast: $('#aaDevLast'), devTools: $('#aaDevTools'),
     game: $('#aaGame'), boardWrap: $('#aaBoardWrap'), board: $('#aaBoard'), toast: $('#aaToast'), confetti: $('#aaConfetti'),
+    coach: $('#aaCoach'), coachSpot: $('#aaCoachSpot'), coachStep: $('#aaCoachStep'), coachTitle: $('#aaCoachTitle'), coachBody: $('#aaCoachBody'), coachNext: $('#aaCoachNext'), coachSkip: $('#aaCoachSkip'), coachAgain: $('#aaCoachAgain'), hudLives: $('#aaHudLives'),
     hudLevel: $('#aaHudLevel'), hudMode: $('#aaHudMode'), hudTime: $('#aaHudTime'), hudLeft: $('#aaHudLeft'), hudLives: $('#aaHudLives'), hudLivesWrap: $('#aaHudLivesWrap'), hudPct: $('#aaHudPct'), boardBar: $('#aaBoardBar'),
     btnHint: $('#aaHint'), btnCheck: $('#aaCheck'), hintVal: $('#aaHintVal'), checkVal: $('#aaCheckVal'), btnLevels: $('#aaBackToLevels'), btnSound: $('#aaSound'),
     overlay: $('#aaOverlay'), card: $('#aaCard'),
@@ -604,6 +605,61 @@
     if (first) { TAUGHT[k] = 1; store.set('taught', TAUGHT); }
     return first || learning();
   }
+  // ── The tutorial ──
+  // Five things, one at a time, on the first board somebody opens: a free arrow to tap (and the step waits for
+  // the tap), what a blocked arrow costs, the lamp, the press-and-hold check, and what clearing the board
+  // does. A spotlight on each, a card under it, Skip on every step. Shown once (`coached`), and again from
+  // Settings for anyone who wants it back; a race or the daily board never shows it.
+  const COACH_STEPS = [
+    { title: 'Tap a free arrow', body: 'The glowing arrow has a clear path ahead of it. Tap it and it flies off the board.', target: () => coach.piece?.el, wait: 'shot' },
+    { title: 'Blocked arrows cost a heart', body: 'If another arrow is in the way, the tap fails and you lose a heart. The arrow turns red and goes by itself once its path clears. Four hearts per board.', target: () => el.hudLives },
+    { title: 'Stuck? Use a hint', body: 'The lamp lights up an arrow that can go right now. Three per board.', target: () => el.btnHint },
+    { title: 'Check a path first', body: 'Press and hold any arrow: green means it can go, red means it is blocked. Four checks per board.', target: () => el.btnCheck },
+    { title: 'Clear the board', body: 'Shoot every arrow and the shape reveals itself. Out of hearts? Try again, or watch a short ad for one more.', target: () => null, last: true },
+  ];
+  const coach = { on: false, step: -1, piece: null };
+  function coachStart() {
+    if (!el.coach || coach.on || store.get('coached', false)) return false;
+    coach.on = true; coachShow(0);
+    return true;
+  }
+  function coachShow(n) {
+    const s = COACH_STEPS[n]; if (!s) { coachEnd(true); return; }
+    coach.step = n;
+    if (coach.piece) { coach.piece.el?.classList.remove('is-coach'); coach.piece = null; }
+    if (s.wait === 'shot') { coach.piece = state.pieces.find(q => !q.gone && !blockerOf(q)) || null; if (!coach.piece) { coachShow(n + 1); return; } coach.piece.el.classList.add('is-coach'); }
+    el.coachStep.textContent = `Step ${n + 1} of ${COACH_STEPS.length}`;
+    el.coachTitle.textContent = s.title; el.coachBody.textContent = s.body;
+    el.coachNext.hidden = s.wait === 'shot';
+    el.coachNext.textContent = s.last ? "Let's play" : 'Next';
+    el.coachSkip.hidden = !!s.last;
+    el.coach.hidden = false;
+    coachPlace();
+  }
+  function coachPlace() {
+    if (!coach.on || el.coach.hidden) return;
+    const t = COACH_STEPS[coach.step]?.target?.();
+    const r = t?.getBoundingClientRect?.();
+    if (!r || !r.width) { el.coachSpot.classList.add('is-none'); return; }
+    el.coachSpot.classList.remove('is-none');
+    const pad = t === el.hudLives || t === el.btnHint || t === el.btnCheck ? 8 : 14;
+    el.coachSpot.style.left = `${r.left - pad}px`; el.coachSpot.style.top = `${r.top - pad}px`;
+    el.coachSpot.style.width = `${r.width + pad * 2}px`; el.coachSpot.style.height = `${r.height + pad * 2}px`;
+  }
+  function coachShot() { if (coach.on && COACH_STEPS[coach.step]?.wait === 'shot') setTimeout(() => { if (coach.on && coach.step === 0) coachShow(1); }, 350); }
+  function coachEnd(done = false) {
+    if (!coach.on) return;
+    coach.on = false; coach.step = -1;
+    if (coach.piece) { coach.piece.el?.classList.remove('is-coach'); coach.piece = null; }
+    if (el.coach) el.coach.hidden = true;
+    store.set('coached', true);   // skipped or finished, it is not shown again unless asked for
+    if (done) toast('You know everything you need. Enjoy the tour.', 'good');
+  }
+  el.coachNext?.addEventListener('click', () => coachShow(coach.step + 1));
+  el.coachSkip?.addEventListener('click', () => coachEnd(false));
+  el.coachAgain?.addEventListener('click', () => { store.set('coached', false); closeSheets(); toast('The tutorial will show on your next board.', 'hint'); });
+  window.addEventListener('resize', coachPlace);
+  window.addEventListener('scroll', coachPlace, true);
   function teach(k, msg, kind = 'hint', ms = 2800) {
     if (!sayOnce(k)) return false;
     toast(msg, kind, ms);
@@ -1473,7 +1529,8 @@
     // are already on the HUD above it, and a country whose name is the answer has no business being written
     // across the board that asks the question. The one line still said here is the only one that is not a
     // reading of the screen: what to do, once, to somebody who has never played.
-    if (i === 0 && !cleared(0) && !daily) teach('tap', 'Tap an arrow to shoot it off the board. If another arrow is in its way, you lose a heart.');
+    if (!daily && coachStart()) { /* the tutorial says it all, one thing at a time */ }
+    else if (i === 0 && !cleared(0) && !daily) teach('tap', 'Tap an arrow to shoot it off the board. If another arrow is in its way, you lose a heart.');
   }
 
   function renderHud() {
@@ -1635,6 +1692,7 @@
   }
   function shoot(p, auto = false) {
     p.gone = true; state.left--; state.moves++;
+    if (!auto) coachShot();
     if (state.armed.has(p)) disarm(p);
     for (const [y, x] of p.cells) state.occ[y][x] = -1;
     if (state.armed.size) setTimeout(releaseArmed, auto ? 90 : 160);   // armed arrows whose lane just opened go by themselves
@@ -1803,6 +1861,7 @@
   function showCard() { cardShownAt = performance.now(); el.overlay.hidden = false; }
 
   function winLevel() {
+    coachEnd();
     stopTimer(); state.finished = true; state.busy = true;
     music.spike = 0; musicRace(0); heartbeatStop();   // it is done: whatever was leaning on the player stops leaning
     state.outlineEl?.style.setProperty('fill-opacity', '0.9');
@@ -1923,6 +1982,7 @@
   }
 
   function failLevel(reason) {
+    coachEnd();
     if (state.finished) return;
     stopTimer(); state.finished = true; state.busy = true; state.fails++;
     music.spike = 0; musicRace(0); heartbeatStop();
@@ -1994,6 +2054,7 @@
     renderHud();
   }
   function goToLevels() {
+    coachEnd();
     stopTimer(); stopMatchPoll(); stopProgressPoll(); stopResultWatch(); musicStop();
     live.leaveFeed();   // back in the lobby: nothing to watch, but the socket is how invitations arrive
     clearRun();
