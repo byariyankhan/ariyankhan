@@ -67,6 +67,85 @@ export function cleanLevels(raw: unknown, known?: (id: string) => boolean): Leve
   return out;
 }
 
+/** What one device has counted on one board: starts, clears, hearts run out, and what the clears cost. */
+export interface LevelStat { plays: number; clears: number; fails: number; hints: number; hearts: number; ms: number }
+export type Stats = Record<string, LevelStat>;
+const MAX_STAT = 1_000_000;
+
+/** A device's own id, made once on the phone: letters and digits, short. */
+export function cleanDevice(raw: unknown): string {
+  const d = String(raw ?? '').trim();
+  return /^[A-Za-z0-9_-]{4,40}$/.test(d) ? d : '';
+}
+
+/** The counts a device sent, bounded; a board with nothing counted is dropped. */
+export function cleanStats(raw: unknown, known?: (id: string) => boolean): Stats {
+  const out: Stats = {};
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return out;
+  let n = 0;
+  for (const [id, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (n >= MAX_LEVELS_PER_PUSH) break;
+    if (!id || id.length > MAX_LEVEL_ID) continue;
+    if (known && !known(id)) continue;
+    if (!v || typeof v !== 'object' || Array.isArray(v)) continue;
+    const r = v as Record<string, unknown>;
+    const s: LevelStat = {
+      plays: int(r.p ?? r.plays, 0, MAX_STAT, 0), clears: int(r.c ?? r.clears, 0, MAX_STAT, 0),
+      fails: int(r.f ?? r.fails, 0, MAX_STAT, 0), hints: int(r.h ?? r.hints, 0, MAX_STAT, 0),
+      hearts: int(r.l ?? r.hearts, 0, MAX_STAT, 0), ms: int(r.ms, 0, 1_000_000_000_000, 0),
+    };
+    if (!s.plays && !s.clears && !s.fails) continue;
+    out[id] = s;
+    n++;
+  }
+  return out;
+}
+
+/**
+ * A device's totals, merged: every count only grows, so the row keeps the larger of what it has and what
+ * arrived, and a batch posted twice changes nothing the second time.
+ */
+export async function mergeStats(c: Sql, userId: number, device: string, stats: Stats): Promise<number> {
+  const ids = Object.keys(stats);
+  if (!ids.length || !device) return 0;
+  const r = await query<{ moved: boolean }>(c, `
+    INSERT INTO level_stats (user_id, device, level_id, plays, clears, fails, hints, hearts, ms)
+    SELECT $1, $2, u.level_id, u.plays, u.clears, u.fails, u.hints, u.hearts, u.ms
+      FROM unnest($3::text[], $4::int[], $5::int[], $6::int[], $7::int[], $8::int[], $9::bigint[])
+        AS u(level_id, plays, clears, fails, hints, hearts, ms)
+    ON CONFLICT (user_id, device, level_id) DO UPDATE SET
+      plays = GREATEST(level_stats.plays, EXCLUDED.plays), clears = GREATEST(level_stats.clears, EXCLUDED.clears),
+      fails = GREATEST(level_stats.fails, EXCLUDED.fails), hints = GREATEST(level_stats.hints, EXCLUDED.hints),
+      hearts = GREATEST(level_stats.hearts, EXCLUDED.hearts), ms = GREATEST(level_stats.ms, EXCLUDED.ms),
+      updated_at = now()
+    WHERE (level_stats.plays, level_stats.clears, level_stats.fails, level_stats.hints, level_stats.hearts, level_stats.ms)
+       IS DISTINCT FROM
+          (GREATEST(level_stats.plays, EXCLUDED.plays), GREATEST(level_stats.clears, EXCLUDED.clears),
+           GREATEST(level_stats.fails, EXCLUDED.fails), GREATEST(level_stats.hints, EXCLUDED.hints),
+           GREATEST(level_stats.hearts, EXCLUDED.hearts), GREATEST(level_stats.ms, EXCLUDED.ms))
+    RETURNING true AS moved`,
+    [userId, device, ids,
+      ids.map(i => stats[i]!.plays), ids.map(i => stats[i]!.clears), ids.map(i => stats[i]!.fails),
+      ids.map(i => stats[i]!.hints), ids.map(i => stats[i]!.hearts), ids.map(i => stats[i]!.ms)]);
+  return r.rowCount ?? 0;
+}
+
+/** One row of the level_difficulty view. */
+export interface Difficulty {
+  level_id: string; players: number; plays: number; clears: number; fails: number;
+  fail_rate: number | null; hints_per_clear: number | null; hearts_per_clear: number | null; seconds_per_clear: number | null;
+}
+export async function difficulty(c: Sql, minPlayers = 1): Promise<Difficulty[]> {
+  const r = await query<Record<string, string | null>>(c, `
+    SELECT * FROM level_difficulty WHERE players >= $1
+     ORDER BY fail_rate DESC NULLS LAST, seconds_per_clear DESC NULLS LAST, level_id`, [minPlayers]);
+  const num = (v: string | null | undefined) => (v == null ? null : Number(v));
+  return r.rows.map(x => ({
+    level_id: String(x.level_id), players: Number(x.players), plays: Number(x.plays), clears: Number(x.clears), fails: Number(x.fails),
+    fail_rate: num(x.fail_rate), hints_per_clear: num(x.hints_per_clear), hearts_per_clear: num(x.hearts_per_clear), seconds_per_clear: num(x.seconds_per_clear),
+  }));
+}
+
 /** The small settings blob, capped so one account cannot become a place to keep things. */
 export function cleanState(raw: unknown): PlayerState | null {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;

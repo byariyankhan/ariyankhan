@@ -183,8 +183,12 @@ section('The tour syncs over the wire, and only for the signed in');
   eq(out.status, 401, 'a stranger cannot read a tour');
 
   const p = await mint('apiProgress', 1_000);
-  const push = await call('/progress', { token: p.token, body: { levels: { bd: { cleared: true, stars: 3, ms: 41_000 } }, state: { home: 'bd' } } });
+  const push = await call('/progress', { token: p.token, body: { levels: { bd: { cleared: true, stars: 3, ms: 41_000 } }, state: { home: 'bd' }, device: 'apitestdev1', stats: { bd: { p: 3, c: 1, f: 2, h: 1, l: 2, ms: 41_000 } } } });
   eq(push.status, 200, 'a push is accepted');
+  eq((await query(pool, `SELECT plays FROM level_stats WHERE user_id = $1 AND device = 'apitestdev1' AND level_id = 'bd'`, [p.id])).rows[0]?.plays, 3, 'and the counts it carried are kept per device');
+  const diff = await call('/boards/difficulty?min=1');
+  eq(diff.status, 200, 'the difficulty table is public');
+  ok((diff.json.boards as { level_id: string }[]).some(b => b.level_id === 'bd'), 'and shows the board, anonymously');
   eq(((push.json.levels as Record<string, { stars: number }>).bd)?.stars, 3, 'and answers with the merged tour');
   eq((push.json.state as { home: string })?.home, 'bd', 'settings included');
 

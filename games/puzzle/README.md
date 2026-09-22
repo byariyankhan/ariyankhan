@@ -99,6 +99,16 @@ One rule lives in the client rather than the server, and only because the server
 country **guessed** from the connection is not the player's answer, so it never travels. Only one chosen in
 Settings does.
 
+### Which boards are hard
+
+Every device counts what each tour board costs it — started, cleared, hearts run out, and the hints, hearts
+and seconds a clear took — on the phone, signed in or not, online or not, and posts the totals with the tour
+sync (`stats` and `device` on `POST /progress`). `level_stats` keeps a row per account and device, so two
+phones add up, and every count only grows, so a repeated post changes nothing. The `level_difficulty` view
+answers the question per board, anonymously: `GET /boards/difficulty` serves it, the `stats` mode of
+puzzle-ops prints it on the VPS, and `games/puzzle/tools/hardest.py` prints it with the countries' names and
+a score (fail rate, plus a tenth of a point per hint and per heart an average clear costs).
+
 ### The league
 
 Every week the gold won at the gold tables is counted and the ten best are paid. Tenth place takes the base
@@ -180,7 +190,8 @@ in the path.
 | POST | `/auth/logout` | end this session |
 | POST | `/auth/delete` | delete the account and everything attached |
 | GET | `/progress` | the whole tour this account has played |
-| POST | `/progress` | push what a device has; the merged whole comes back |
+| POST | `/progress` | push what a device has (`levels`, `state`, and the board counts as `stats` + `device`); the merged whole comes back |
+| GET | `/boards/difficulty` | per board, how often it beats people and what a clear costs; anonymous, `?min=` players |
 | GET | `/league` | this week's table, your place in it, the prizes, and last week's result |
 | GET | `/lobby` | the tables the server seats, and how many are waiting at each |
 | POST | `/matches` | open a room (`stake`, `open_to_all`, `tier`) |

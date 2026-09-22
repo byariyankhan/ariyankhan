@@ -1,7 +1,7 @@
 // A player's tour, and the one property that makes syncing it safe: nothing a device pushes can ever take
 // something away. Two phones, opened in any order, converge on the better of what each has seen.
 import { pool, query } from '../backend/src/db.js';
-import { cleanLevels, cleanState, mergeLevels, mergeState, readAll, readLevels, readState } from '../backend/src/progress.js';
+import { cleanDevice, cleanLevels, cleanState, cleanStats, difficulty, mergeLevels, mergeState, mergeStats, readAll, readLevels, readState } from '../backend/src/progress.js';
 import { deleteUser } from '../backend/src/auth.js';
 import { releasePlayer } from '../backend/src/rooms.js';
 import { eq, finish, ok, player, reset, section } from './helpers.js';
@@ -173,6 +173,40 @@ section('One read hands a device everything it needs');
   const all = await readAll(pool, p.id);
   eq(all.levels.it?.stars, 3, 'the boards');
   eq((all.state as Record<string, unknown>).home, 'bd', 'and the settings, in one answer');
+}
+
+section('What a board costs is counted per device, and only ever grows');
+{
+  eq(cleanDevice('ab12cd34ef'), 'ab12cd34ef', 'a device id is letters and digits');
+  eq(cleanDevice('x'), '', 'too short is nothing');
+  eq(cleanDevice('a b c d e'), '', 'and so is anything with a space in it');
+  const st = cleanStats({ bd: { p: 5, c: 2, f: 3, h: 4, l: 3, ms: 240_000 }, np: { p: 0, c: 0, f: 0 }, junk: 'no', lk: { plays: 2, clears: 1, fails: 1, hints: 0, hearts: 1, ms: 90_000 } });
+  eq(Object.keys(st).sort(), ['bd', 'lk'], 'a board with nothing counted is dropped, and so is junk');
+  eq(st.bd, { plays: 5, clears: 2, fails: 3, hints: 4, hearts: 3, ms: 240_000 }, 'the short keys the client sends are read');
+  eq(st.lk?.plays, 2, 'and the long ones');
+  eq(cleanStats({ bd: { p: -1, c: 99_999_999 } }).bd, undefined, 'a negative count or an absurd one is not a count');
+
+  const p = await player('statsOne');
+  eq(await mergeStats(pool, p.id, 'phone1', st), 2, 'the first post lands both boards');
+  eq(await mergeStats(pool, p.id, 'phone1', st), 0, 'the same totals again change nothing');
+  eq(await mergeStats(pool, p.id, 'phone1', cleanStats({ bd: { p: 6, c: 3, f: 3, h: 4, l: 3, ms: 300_000 } })), 1, 'bigger totals from the same phone replace');
+  eq(await mergeStats(pool, p.id, 'phone1', cleanStats({ bd: { p: 1, c: 1, f: 0, h: 0, l: 0, ms: 1 } })), 0, 'smaller ones -- a phone that was reset -- never take anything away');
+  eq(await mergeStats(pool, p.id, 'phone2', cleanStats({ bd: { p: 4, c: 0, f: 4, h: 0, l: 0, ms: 0 } })), 1, 'a second phone on the same account is a second row');
+
+  const q = await player('statsTwo');
+  await mergeStats(pool, q.id, 'tab', cleanStats({ bd: { p: 2, c: 2, f: 0, h: 0, l: 0, ms: 100_000 }, lk: { p: 3, c: 0, f: 3, h: 0, l: 0, ms: 0 } }));
+  const d = await difficulty(pool, 1);
+  const bd = d.find(x => x.level_id === 'bd')!, lk = d.find(x => x.level_id === 'lk')!;
+  eq([bd.players, bd.plays, bd.clears, bd.fails], [2, 12, 5, 7], 'the view adds every device of every player');
+  eq(bd.fail_rate, 0.583, 'and says how often the board wins');
+  eq(bd.hints_per_clear, 0.8, 'what a clear costs in hints');
+  eq(bd.seconds_per_clear, 80, 'and how long one takes');
+  eq([lk.players, lk.fail_rate, lk.seconds_per_clear], [2, 0.8, 90], 'a board of two players, one of whom never cleared it');
+  eq(d[0]?.level_id, 'lk', 'ordered hardest first');
+  eq((await difficulty(pool, 3)).length, 0, 'and a floor on players keeps small numbers from posing as facts');
+
+  await query(pool, `DELETE FROM users WHERE id = $1`, [q.id]);
+  eq((await difficulty(pool, 1)).find(x => x.level_id === 'lk')?.players ?? 0, 1, 'a deleted account takes its counts with it');
 }
 
 await finish();

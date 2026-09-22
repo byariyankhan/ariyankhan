@@ -97,6 +97,8 @@
 #                  anonymous ones, so a volume nobody recognises can be identified before anyone deletes it.
 #   health         Reads. The four containers, the API, the socket, the backup timer, and that no legacy
 #                  artifact is left anywhere.
+#   stats          Reads. Which boards are hard, from play: the level_difficulty view, hardest thirty and
+#                  easiest ten, plus how much play has been counted. Nothing personal is printed.
 #
 # No secret is ever printed: the PostgreSQL password is read inside the container from its own environment
 # and passed to psql through PGPASSWORD, which never reaches a log line.
@@ -110,7 +112,7 @@ on:
         type: choice
         required: true
         default: inspect
-        options: [inspect, logs, web-look, web-revive, git-access, git-sync, push-keys, fcm-key, backup-verify, cleanup, deploy, deploy-site, push-source, web-safe-fetch, rename-infra, finish-rename, rename-env, rename-paths, rename-nginx, drop-old-backup-dir, drop-old-volumes, drop-orphan-volumes, retire-site-data, web-drop-aa-mount, volumes, health]
+        options: [inspect, logs, web-look, web-revive, git-access, git-sync, push-keys, fcm-key, backup-verify, cleanup, deploy, deploy-site, push-source, web-safe-fetch, rename-infra, finish-rename, rename-env, rename-paths, rename-nginx, drop-old-backup-dir, drop-old-volumes, drop-orphan-volumes, retire-site-data, web-drop-aa-mount, volumes, health, stats]
       confirm:
         description: "Type DELETE for cleanup, DEPLOY for deploy, RENAME for rename-infra. Ignored by the read-only modes."
         required: false
