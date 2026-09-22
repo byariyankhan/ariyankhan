@@ -132,14 +132,8 @@ jobs:
           echo "::notice::Signing check done. Nothing was built."
           exit 0
 
-      - name: Stop here when only checking
-        if: ${{ inputs.check_signing && !inputs.debug_apk }}
-        run: |
-          rm -f "$RUNNER_TEMP/upload.jks"
-          echo "check_signing was on: the bundle is not built. Read the step above."
-          exit 78
-
       - name: Firebase configuration, when it is a secret rather than a file
+        if: ${{ !inputs.check_signing }}
         env:
           GS_B64: ${{ secrets.GOOGLE_SERVICES_JSON_B64 }}
         run: |
@@ -172,7 +166,7 @@ jobs:
           retention-days: 14
 
       - name: Build the bundle
-        if: ${{ !inputs.debug_apk }}
+        if: ${{ !inputs.debug_apk && !inputs.check_signing }}
         working-directory: android
         env:
           PUZZLE_KEYSTORE: ${{ runner.temp }}/upload.jks
@@ -186,7 +180,7 @@ jobs:
       # A bundle that is not signed, or is signed with the wrong key, looks fine until Play refuses it. Say so
       # here instead, where the run is still on screen.
       - name: Check it is signed, carries its splash, and say what with
-        if: ${{ !inputs.debug_apk }}
+        if: ${{ !inputs.debug_apk && !inputs.check_signing }}
         working-directory: android
         run: |
           AAB=app/build/outputs/bundle/release/app-release.aab
@@ -199,7 +193,7 @@ jobs:
           keytool -printcert -jarfile "$AAB" | grep -E 'Owner:|SHA256:' || true
 
       - name: Keep it
-        if: ${{ !inputs.debug_apk }}
+        if: ${{ !inputs.debug_apk && !inputs.check_signing }}
         uses: actions/upload-artifact@v4
         with:
           name: puzzle-${{ github.event.inputs.version_name }}-${{ steps.ver.outputs.code }}
