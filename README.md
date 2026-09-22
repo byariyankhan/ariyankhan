@@ -899,6 +899,13 @@ links.
   in a soft rose tint; nothing under them (`.aa-actions--out`, `.aa-btn--big`, `.aa-btn--soft`,
   `.aa-ad-pill`): the corner arrow is the way back to the tour. A challenge keeps "Give the board up". The
   home buttons carry no subtitle: the icon says it.
+- **The tutorial** (`COACH_STEPS`, `coachStart`, `#aaCoach`): on the first board somebody opens, five
+  things one at a time, each under a spotlight cut out of a dark scrim by one enormous box-shadow, with a card
+  pinned to the bottom and Skip on every step. Step one glows a free arrow (`.is-coach`, the hint's glow) and
+  waits for the tap (`coachShot` from `shoot`); then the hearts and what a blocked arrow costs, the lamp, the
+  press-and-hold check, and what clearing the board does. The layer lets taps through, so the board is playable
+  under it. Shown once (`coached`), never in a race or on the daily board, closed by winning, losing or
+  leaving the board, and Settings → Help → "Show the tutorial again" brings it back on the next board.
 - **No interstitials.** Nothing in the game shows an advertisement of its own accord: not between
   boards, not after a clear, not on a timer. The only advertisements are the rewarded ones a player
   chooses (a heart, a hint, a check, gold); the ads layer knows one AdMob unit, the rewarded one, and

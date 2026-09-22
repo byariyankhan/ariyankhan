@@ -101,7 +101,7 @@
          set these two when the backend moves to a host of its own and the client follows without a change:
          <meta name="puzzle-api" content="https://api.example.com" />
          <meta name="puzzle-ws"  content="wss://api.example.com" /> -->
-    <link rel="stylesheet" href="/css/puzzle.css?v=36" />
+    <link rel="stylesheet" href="/css/puzzle.css?v=37" />
     <link rel="preload" href="/games/data/puzzle.json?v=11" as="fetch" crossorigin="anonymous" />
 
     <!-- SCHEMA -->
@@ -295,6 +295,16 @@
            while the game was hidden, which is every message the purse's advertisement offer on the home
            screen has to give, was written into a hidden subtree and shown to nobody. -->
       <div class="aa-toast" id="aaToast" role="status" aria-live="polite" hidden></div>
+      <!-- The first-board tutorial: a spotlight on one thing at a time, and a card that says what it is. -->
+      <div class="aa-coach" id="aaCoach" hidden>
+        <div class="aa-coach-spot" id="aaCoachSpot"></div>
+        <div class="aa-coach-card" role="dialog" aria-modal="false" aria-labelledby="aaCoachTitle" aria-describedby="aaCoachBody">
+          <p class="aa-coach-step" id="aaCoachStep"></p>
+          <h3 id="aaCoachTitle"></h3>
+          <p id="aaCoachBody"></p>
+          <div class="aa-coach-actions"><button type="button" class="aa-linkbtn" id="aaCoachSkip">Skip</button><button type="button" class="aa-btn aa-btn--primary" id="aaCoachNext">Next</button></div>
+        </div>
+      </div>
     </main>
 
 
@@ -401,6 +411,7 @@
 
         <p class="aa-cap">Help</p>
         <div class="aa-group">
+          <button type="button" class="aa-row aa-row--link" id="aaCoachAgain"><span class="aa-row-ico">🎓</span><span class="aa-row-label">Show the tutorial again<small>On your next board</small></span><span class="aa-row-chev">›</span></button>
           <a class="aa-row aa-row--link" href="/#contact"><span class="aa-row-ico">💬</span><span class="aa-row-label">Feedback</span><span class="aa-row-chev">›</span></a>
         </div>
 
@@ -442,6 +453,6 @@
       </div>
     </div>
 
-    <script src="/js/puzzle.js?v=58"></script>
+    <script src="/js/puzzle.js?v=59"></script>
   </body>
 </html>
