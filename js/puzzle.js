@@ -4646,6 +4646,9 @@
   }
 
   if (el.build) {
+    // The build number is for a developer, and it shows only where one is: localhost or the debug app. Players
+    // see nothing under the credit line, and there is nothing there for anybody to tap seven times.
+    el.build.hidden = !devAllowed();
     el.build.textContent = `Build ${BUILD}${shell.on ? ' · app' : ''}`;
     let taps = 0, tapTimer = null;
     el.build.addEventListener('click', () => {
