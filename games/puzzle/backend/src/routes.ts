@@ -389,7 +389,7 @@ const H = {
     const seats = await R.room(pool, code);
     if (!seats.some(p => p.user_id === me.user!.id)) { await noStore(res).code(403).send({ error: 'not_yours' }); return; }
     if (m.state === 'playing' && body(req).pct !== undefined) {
-      const pct = await tx(c => R.saveProgress(c, code, me.user!.id, Number(body(req).pct)));
+      const pct = await tx(c => R.saveProgress(c, code, me.user!.id, Number(body(req).pct), R.cleanRun(body(req).run)));
       await liveProgress.set(code, me.user.id, pct);
       await publish(code, 'progress_updated', { user_id: me.user.id, name: me.user.name, pct });
     }

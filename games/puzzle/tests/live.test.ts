@@ -156,4 +156,59 @@ section('A room that waited a long time before it began');
   eq((await R.matchRow(pool, made.code))?.state, 'playing', 'the board that has only just begun is left alone');
 }
 
+section('The board travels with the seat');
+{
+  // The other half of resuming. A match found on a second device used to come up as a fresh board: the
+  // server knew the percentage and nothing else. The run is a snapshot the client posts with its progress,
+  // and it is replaced only by a snapshot with at least as many moves -- so a tab left open on a stale board
+  // cannot put back the arrows a phone has since cleared.
+  const a = await player('run-a'), b = await player('run-b');
+  const code = await playing(a, b);
+  const runOf = async (id: number) => (await query<{ run: R.RunState | null }>(pool,
+    `SELECT run FROM match_players WHERE code = $1 AND user_id = $2`, [code, id])).rows[0]!.run;
+
+  const early = { moves: 3, gone: [4, 1, 9], lives: 3, wrong: 1, hintsUsed: 0, hintsMax: 3, checksUsed: 0, checksMax: 4 };
+  await tx(c => R.saveProgress(c, code, a.id, 16, R.cleanRun(early)));
+  eq((await runOf(a.id))?.moves, 3, 'a snapshot posted with progress is kept');
+  eq(JSON.stringify((await runOf(a.id))?.gone), '[1,4,9]', 'with the arrows that have gone, in order');
+
+  const later = { ...early, moves: 7, gone: [1, 4, 9, 12, 20], lives: 2, wrong: 2 };
+  await tx(c => R.saveProgress(c, code, a.id, 30, R.cleanRun(later)));
+  eq((await runOf(a.id))?.moves, 7, 'a snapshot with more moves replaces it');
+  eq((await runOf(a.id))?.lives, 2, 'hearts included');
+
+  // The tab on the desk, still posting the board as it saw it twenty minutes ago.
+  await tx(c => R.saveProgress(c, code, a.id, 16, R.cleanRun(early)));
+  eq((await runOf(a.id))?.moves, 7, 'a snapshot with fewer moves is refused');
+  eq((await runOf(a.id))?.gone.length, 5, 'and puts no arrow back on the board');
+
+  await tx(c => R.saveProgress(c, code, a.id, 30, R.cleanRun(later)));
+  eq((await runOf(a.id))?.moves, 7, 'the same snapshot again is the ordinary case, not a conflict');
+
+  await tx(c => R.saveProgress(c, code, a.id, 31));
+  eq((await runOf(a.id))?.moves, 7, 'progress posted without a snapshot leaves the one held alone');
+
+  // The view hands it back to its owner, and to nobody else.
+  const m = (await R.matchRow(pool, code))!;
+  const mine = await R.matchView(pool, m, a.id);
+  eq(mine.your_run?.moves, 7, 'the owner is handed their run with the match');
+  const theirs = await R.matchView(pool, m, b.id);
+  eq(theirs.your_run, null, 'a seat that has not moved has no run yet');
+  ok(!JSON.stringify(theirs.players).includes('"gone"'), 'and nobody is handed anybody else\u2019s board');
+
+  // Whatever a client sends that is not a board is dropped without touching the seat.
+  eq(R.cleanRun({ moves: 1, gone: 'all of them', lives: 3, wrong: 0, hintsUsed: 0, hintsMax: 3, checksUsed: 0, checksMax: 4 }), null, 'a run whose arrows are not a list is not a run');
+  eq(R.cleanRun({ moves: -1, gone: [], lives: 3, wrong: 0, hintsUsed: 0, hintsMax: 3, checksUsed: 0, checksMax: 4 }), null, 'nor one with a negative counter');
+  eq(R.cleanRun({ moves: 1, gone: [1, 1, 2], lives: 3, wrong: 0, hintsUsed: 0, hintsMax: 3, checksUsed: 0, checksMax: 4 })?.gone.length, 2, 'a repeated arrow is counted once');
+  eq(R.cleanRun({ moves: 1, gone: new Array(5000).fill(1).map((_, i) => i), lives: 3, wrong: 0, hintsUsed: 0, hintsMax: 3, checksUsed: 0, checksMax: 4 }), null, 'and a board of five thousand arrows is not a board');
+  eq(R.cleanRun(null), null, 'nothing is nothing');
+  await tx(c => R.saveProgress(c, code, a.id, 32, R.cleanRun({ junk: true })));
+  eq((await runOf(a.id))?.moves, 7, 'and none of it reaches the seat');
+
+  // A finished seat is closed to all of it.
+  await tx(c => R.submitResult(c, code, a.id, 8_000, true));
+  await tx(c => R.saveProgress(c, code, a.id, 100, R.cleanRun({ ...later, moves: 99 })));
+  eq((await runOf(a.id))?.moves, 7, 'a run handed in is not rewritten afterwards');
+}
+
 await finish();

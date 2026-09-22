@@ -1278,6 +1278,57 @@
     state.lanesEl = svgEl('g', { class: 'aa-lanes' }); svg.appendChild(state.lanesEl);
     updateReveal();
   }
+  // ── The run, as a thing that can be carried to another device ──
+  //
+  // A match resumes across devices, and until this the resumed board was a fresh one: the server knew how far
+  // a player had got as a percentage and nothing else, so switching from the app to a browser drew the same
+  // board with every arrow on it and every heart lit. This is the rest of it -- which arrows have gone, what is
+  // left of the lifelines, and a move counter that only climbs, which is what lets the server tell a device
+  // that is ahead from one that was left behind.
+  function runSnapshot() {
+    return {
+      moves: state.moves | 0,
+      gone: state.pieces.filter(p => p.gone).map(p => p.idx),
+      lives: state.lives, wrong: state.wrong,
+      hintsUsed: state.hintsUsed, hintsMax: state.hintsMax ?? HINTS_PER_LEVEL,
+      checksUsed: state.checksUsed, checksMax: state.checksMax ?? CHECKS_PER_LEVEL,
+    };
+  }
+  /**
+   * Put a snapshot onto the board that is on screen. Arrows are removed without the flight, because they left
+   * on another device some time ago; counters are taken as read. Never a step backwards: an arrow gone here
+   * stays gone, and hearts are the fewer of the two -- so applying the server's copy over a board this device
+   * has moved on can only ever add to it. It is called with the board freshly drawn, and again whenever a
+   * poll brings back a run that is ahead of this one, which is how a tab left open on a desk catches up with
+   * the phone rather than fighting it.
+   */
+  function applyRun(r) {
+    if (!r || !state.pieces.length || state.finished) return false;
+    const gone = new Set(Array.isArray(r.gone) ? r.gone : []);
+    let took = false;
+    for (const p of state.pieces) {
+      if (p.gone || !gone.has(p.idx)) continue;
+      p.gone = true; state.left--; took = true;
+      if (state.armed.has(p)) disarm(p);
+      for (const [y, x] of p.cells) state.occ[y][x] = -1;
+      p.el?.remove();
+    }
+    const n = (v, fb) => (Number.isInteger(v) && v >= 0 ? v : fb);
+    state.lives = Math.min(state.lives, n(r.lives, state.lives));
+    state.wrong = Math.max(state.wrong, n(r.wrong, state.wrong));
+    state.hintsUsed = Math.max(state.hintsUsed, n(r.hintsUsed, state.hintsUsed));
+    state.checksUsed = Math.max(state.checksUsed, n(r.checksUsed, state.checksUsed));
+    state.hintsMax = Math.max(state.hintsMax ?? HINTS_PER_LEVEL, n(r.hintsMax, 0));
+    state.checksMax = Math.max(state.checksMax ?? CHECKS_PER_LEVEL, n(r.checksMax, 0));
+    state.moves = Math.max(state.moves | 0, n(r.moves, 0));
+    updateReveal(); renderHud();
+    if (state.left === 0) { winLevel(); return true; }
+    if (state.lives <= 0) { failLevel('Out of hearts.'); return true; }
+    return took;
+  }
+  /** A run that came back from the server is ahead of this board if it has seen more moves than this board. */
+  const runAhead = r => !!r && Number.isInteger(r.moves) && r.moves > (state.moves | 0);
+
   function updateReveal() {
     const total = state.pieces.length;
     const done = total - state.left;
@@ -1305,14 +1356,16 @@
     const seed = (daily ? daily.seed : (i + 1) * 1000) + state.seedBump;
     const gen = bestBoard(state.maskInfo, state.tier, seed);
     const livesMax = livesFor(state.tier);
-    Object.assign(state, { W: gen.W, H: gen.H, pieces: gen.pieces, occ: gen.occ, land: gen.land, left: gen.pieces.length, hintsMax: hintsFor(state.tier), checksUsed: 0, checksMax: CHECKS_PER_LEVEL, lives: livesMax, livesMax, elapsed: 0, startedAt: 0, raceBase: 0, finished: false, hintsUsed: 0, wrong: 0, busy: false, potGone: false, combo: 0, bestCombo: 0, lastShot: 0, cheerHold: 0, shown: new Set(), armed: new Set(), raceReading: null });
+    Object.assign(state, { W: gen.W, H: gen.H, pieces: gen.pieces, occ: gen.occ, land: gen.land, left: gen.pieces.length, hintsMax: hintsFor(state.tier), checksUsed: 0, checksMax: CHECKS_PER_LEVEL, lives: livesMax, livesMax, elapsed: 0, startedAt: 0, raceBase: 0, finished: false, hintsUsed: 0, wrong: 0, moves: 0, busy: false, potGone: false, combo: 0, bestCombo: 0, lastShot: 0, cheerHold: 0, shown: new Set(), armed: new Set(), raceReading: null });
     el.error.hidden = true; el.loading.hidden = true;
     if (daily) { if (history.replaceState) history.replaceState(null, '', location.pathname + location.search + (daily.hash ?? '#daily')); } else setHash(i);
     scrollToGame();
     const diff = DIFF_OF(state.tier);
     state.diff = diff;
     resetZoom(); renderBoard(); renderHud();
-    if (daily?.race && daily.match) { renderRanks(daily.match.players); syncRaceClock(daily.match); startProgressPoll(); }   // back on a race board is back in the match, on the match's own clock
+    // Back on a race board is back in the match, on the match's own clock -- and on the board as it was left,
+    // wherever it was left: the run the server holds is put back before anybody is told the board is ready.
+    if (daily?.race && daily.match) { applyRun(daily.match.your_run); renderRanks(daily.match.players); syncRaceClock(daily.match); startProgressPoll(); }
     // A board that has just been drawn is announced by nothing. The level, the difficulty and the arrows left
     // are already on the HUD above it, and a country whose name is the answer has no business being written
     // across the board that asks the question. The one line still said here is the only one that is not a
@@ -1450,7 +1503,7 @@
       if (adCanOffer('check')) { adOffer('check'); return; }
       toast(`No ${CHECK_WORD}s left on this level.`, 'bad'); vibe(20); return;
     }
-    state.checksUsed++;
+    state.checksUsed++; state.moves++;
     renderHud(); musicMoved();
     clearPeek();
     const free = !blockerOf(p);
@@ -1478,7 +1531,7 @@
     shoot(p);
   }
   function shoot(p, auto = false) {
-    p.gone = true; state.left--;
+    p.gone = true; state.left--; state.moves++;
     if (state.armed.has(p)) disarm(p);
     for (const [y, x] of p.cells) state.occ[y][x] = -1;
     if (state.armed.size) setTimeout(releaseArmed, auto ? 90 : 160);   // armed arrows whose lane just opened go by themselves
@@ -1512,7 +1565,7 @@
   }
   function blocked(p, blocker) {
     if (state.armed.has(p)) { bounce(p); SFX.block(); musicMoved(); teach('armed', 'Still blocked. It will go by itself once its lane clears.'); return; }
-    state.lives--; state.wrong++; state.combo = 0;
+    state.lives--; state.wrong++; state.moves++; state.combo = 0;
     arm(p); musicWrong();
     SFX.block(); vibe(60);
     bounce(p);
@@ -1537,7 +1590,7 @@
     const p = state.pieces.find(q => !q.gone && !blockerOf(q));
     if (!p) return;
     startTimer();
-    state.hintsUsed++;
+    state.hintsUsed++; state.moves++;
     if (!state.daily?.race) state.elapsed += HINT_PENALTY_MS;   // a race is timed by the match, not by this board
     $$('.aa-piece.is-hint', el.board).forEach(g => g.classList.remove('is-hint'));
     p.el.classList.add('is-hint');
@@ -2167,17 +2220,17 @@
     heart: {
       earn: 'Watch this through and the board carries on where it stopped, with one heart.',
       board: true,
-      grant() { state.lives = 1; state.finished = false; state.busy = false; el.overlay.hidden = true; renderHud(); startTimer(); heartLost(); toast('One heart. Make it count.', 'good'); },
+      grant() { state.lives = 1; state.moves++; state.finished = false; state.busy = false; el.overlay.hidden = true; renderHud(); startTimer(); heartLost(); toast('One heart. Make it count.', 'good'); },
     },
     hint: {
       earn: 'Watch this through for one more hint on this board.',
       board: true,
-      grant(quiet) { state.hintsMax = (state.hintsMax ?? HINTS_PER_LEVEL) + 1; renderHud(); if (!quiet) toast('One more hint.', 'good'); },
+      grant(quiet) { state.hintsMax = (state.hintsMax ?? HINTS_PER_LEVEL) + 1; state.moves++; renderHud(); if (!quiet) toast('One more hint.', 'good'); },
     },
     check: {
       earn: `Watch this through for one more ${CHECK_WORD} on this board.`,
       board: true,
-      grant() { state.checksMax = (state.checksMax ?? CHECKS_PER_LEVEL) + 1; renderHud(); toast(`One more ${CHECK_WORD}.`, 'good'); },
+      grant() { state.checksMax = (state.checksMax ?? CHECKS_PER_LEVEL) + 1; state.moves++; renderHud(); toast(`One more ${CHECK_WORD}.`, 'good'); },
     },
     gold: {
       earn: 'Watch this through and the gold goes to your purse.',
@@ -2778,7 +2831,7 @@
     },
 
     send(o) { if (this.connected) { try { this.ws.send(JSON.stringify(o)); } catch { /* the close handler tidies up */ } } },
-    progress(pct) { this.send({ type: 'progress', pct }); },
+    progress(pct, run) { this.send(run ? { type: 'progress', pct, run } : { type: 'progress', pct }); },
     resync() { this.send({ type: 'resync' }); },
 
     close() {
@@ -3289,13 +3342,21 @@
     };
     // The REST call is what carries the race while there is no socket, and stays on as a slow safety net when
     // there is one: it is also how the ranks come back, which is what the board beside the map is drawn from.
+    // The board goes with the number, but only when it has changed: a snapshot is a few hundred bytes and the
+    // socket sends every second, so an unchanged board is not worth carrying. The first post always carries it.
+    let carried = -1;
+    const runIfChanged = () => { if (state.moves === carried) return undefined; carried = state.moves | 0; return runSnapshot(); };
+    // A run that comes back ahead of this board was made on another device, and this one catches up rather
+    // than fighting it -- which is the whole answer to a tab left open while the phone played on.
+    const takeBack = m => { if (runAhead(m?.your_run)) { applyRun(m.your_run); carried = -1; } };
     const send = async () => {
       try {
-        const d = await matchApi('progress', { code: R.match.code, pct: myPct() });
+        const d = await matchApi('progress', { code: R.match.code, pct: myPct(), run: runIfChanged() });
         renderRanks(d.match.players);
         syncRaceClock(d.match);     // the match's own age, in case this device slept through part of it
         notePot(d.match);
-      } catch { /* the next tick will try again */ }
+        takeBack(d.match);
+      } catch { carried = -1; /* the next tick will try again, and carry the board again */ }
     };
     const tune = () => {
       if (!state.progressPoll) return;
@@ -3306,11 +3367,11 @@
     live.watch(R.match.code, ev => {
       // Somebody moved, finished, or the match ended. The state that comes with a start or a finish is the
       // whole room; a bare progress event only needs the ranks redrawn, and the socket sends one per tap.
-      if (ev.type === 'state' && ev.match) { renderRanks(ev.match.players); syncRaceClock(ev.match); notePot(ev.match); return; }
+      if (ev.type === 'state' && ev.match) { renderRanks(ev.match.players); syncRaceClock(ev.match); notePot(ev.match); takeBack(ev.match); return; }
       if (ev.type === 'progress_updated' || ev.type === 'player_finished' || ev.type === 'match_finished') live.resync();
     });
     // While the socket is up, our own progress goes over it — no request per tap, no waiting for a reply.
-    state.progressPush = setInterval(() => { if (live.connected) live.progress(myPct()); }, 1000);
+    state.progressPush = setInterval(() => { if (live.connected) live.progress(myPct(), runIfChanged()); }, 1000);
     send();
     state.progressPoll = setInterval(send, pollEvery());
   }
@@ -3463,7 +3524,9 @@
     if (!m || m.code === resumedCode) return false;
     if (state.pieces.length && !state.finished) return false;   // busy on another board: leave them on it
     resumedCode = m.code;
-    return enterMatch(m);
+    const entered = enterMatch(m);
+    if (entered) splashSkip?.();   // the board is more urgent than the line about focus
+    return entered;
   }
 
   // Someone opened an invitation link. Signing in comes first, because the stake leaves a real purse.
@@ -4228,13 +4291,20 @@
     'Play a board before bed instead of the feed. Wind down, then sleep well.',
     'Look before you tap. Patience clears more boards than speed.',
   ];
+  // The launch splash holds the screen for a couple of seconds with a line about focus. A match the account is
+  // in the middle of is more urgent than the line, so finding one cuts the splash short: this is the handle.
+  let splashSkip = null;
   function showSplash(then) {
     if (!el.splash) { then?.(); return; }
+    // On a first open the welcome comes before this, and the account can have been asked and a match found
+    // while the welcome was being read. A board already on the screen is not covered with a line about focus.
+    if (resumedCode && !el.game.hidden) { then?.(); return; }
     const n = store.get('launches', 0); store.set('launches', n + 1);
     el.splashQuote.textContent = QUOTES[n % QUOTES.length];
     el.splash.hidden = false;
     let done = false;
-    const finish = () => { if (done) return; done = true; el.splash.classList.add('is-out'); setTimeout(() => { el.splash.hidden = true; el.splash.classList.remove('is-out'); then?.(); }, 240); };
+    const finish = () => { if (done) return; done = true; splashSkip = null; el.splash.classList.add('is-out'); setTimeout(() => { el.splash.hidden = true; el.splash.classList.remove('is-out'); then?.(); }, 240); };
+    splashSkip = finish;
     el.splash.addEventListener('click', finish, { once: true });
     setTimeout(finish, 2400);
   }
@@ -4254,12 +4324,16 @@
 
   renderSound();
   el.loading.hidden = false;
+  // The account is asked about now, in parallel with the level data and the splash, rather than only once the
+  // data has landed. It used to be the other way round, and a match waiting to be resumed paid for it twice:
+  // the whole splash, and then a round trip that could have been made during it.
+  const authEarly = authLoad();
   loadData().then(() => {
     el.loading.hidden = true;
     renderSelect();
     // the purse and the account row from the first paint, not only once Play with Friends has been tapped, and
     // a time from last time that never got through goes now
-    authLoad().then(() => {
+    authEarly.then(() => {
       renderPurse(); renderAccountRow(); syncTour(); void notifyInit();
       // Not when a link brought us here: that link names the room, and it wins over anything remembered.
       if (!matchHash()) resumeLive();
