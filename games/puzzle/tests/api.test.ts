@@ -340,36 +340,6 @@ section('The people you have played with, and inviting them without a link');
   eq(sent.status, 200, 'the host may ask somebody they have played to come and sit down');
   eq(sent.json.ok, true, 'and is told it went');
 
-  // And may not ask them again straight away. There is no friend list here, only the people you have played,
-  // and an invitation that can be sent every second is a way to pester somebody who has already said no by
-  // not answering. Once per cooldown, and a few a day.
-  const again = await call(`/matches/${next}/invite`, { token: host.token, body: { user_id: mate.id } });
-  eq(again.status, 429, 'asking the same person again straight away is refused');
-  eq(again.json.error, 'too_soon', 'because they were only just asked');
-  ok(typeof again.json.retry_after === 'number' && (again.json.retry_after as number) > 0, 'and the host is told how long to wait');
-  // The cooldown is Redis state; the test winds it forward by removing it, the way ten minutes would.
-  const pairKey = k('invite', host.id, mate.id);
-  for (let n = 2; n <= config.game.invitesPerDay; n++) {
-    await redis.del(pairKey);
-    eq((await call(`/matches/${next}/invite`, { token: host.token, body: { user_id: mate.id } })).status, 200, `ask ${n} of the day goes through once the cooldown has passed`);
-  }
-  await redis.del(pairKey);
-  const capped = await call(`/matches/${next}/invite`, { token: host.token, body: { user_id: mate.id } });
-  eq(capped.status, 429, `ask ${config.game.invitesPerDay + 1} in the same day does not`);
-  eq(capped.json.error, 'enough_today', 'because that is enough for one day');
-  // Somebody else is a different pair, with a cooldown and a day of their own.
-  const other = await mint('inviteOther');
-  const theirs = await call('/matches', { token: other.token, body: { stake: config.game.stakes[0], open_to_all: false } });
-  const theirCode = (theirs.json.match as { code: string }).code;
-  await call(`/matches/${theirCode}/join`, { token: mate.token, body: {} });
-  await call(`/matches/${theirCode}/start`, { token: other.token, body: {} });
-  await call(`/matches/${theirCode}/result`, { token: other.token, body: { ms: 3_000, cleared: true } });
-  await call(`/matches/${theirCode}/result`, { token: mate.token, body: { ms: 4_000, cleared: true } });
-  const otherRoom = await call('/matches', { token: other.token, body: { stake: config.game.stakes[0], open_to_all: false } });
-  const fresh = await call(`/matches/${(otherRoom.json.match as { code: string }).code}/invite`, { token: other.token, body: { user_id: mate.id } });
-  eq(fresh.status, 200, 'the limit is on the pair, not on the person being asked');
-  // The rest of this section asks mate a few more times for reasons of its own; the day is wound back for it.
-  await redis.del(pairKey, k('invites', host.id, mate.id, new Date().toISOString().slice(0, 10)));
   eq(sent.json.delivered, false, 'honestly, including that nobody was there to hear it');
 
   // Not while they are racing: a challenge landing on a board somebody is being timed on is a notification
@@ -555,9 +525,9 @@ section('A phone registers for notifications the way a browser does, and is told
   eq((await call('/push/reminder', { body: { on: false } })).status, 401, 'but not by a stranger');
 }
 
-section('An invitation that is taken starts the count over');
+section('Mute: the one answer to being asked too often');
 {
-  const host = await mint('resetHost'), mate = await mint('resetMate');
+  const host = await mint('muteHost'), mate = await mint('muteMate');
   // Having played together is the right to ask at all.
   const first = await call('/matches', { token: host.token, body: { stake: config.game.stakes[0], open_to_all: false } });
   const firstCode = (first.json.match as { code: string }).code;
@@ -568,22 +538,30 @@ section('An invitation that is taken starts the count over');
 
   const room = await call('/matches', { token: host.token, body: { stake: config.game.stakes[0], open_to_all: false } });
   const code = (room.json.match as { code: string }).code;
-  const day = new Date().toISOString().slice(0, 10);
-  const pair = k('invite', host.id, mate.id), count = k('invites', host.id, mate.id, day);
-  for (let i = 0; i < config.game.invitesPerDay; i++) {
-    eq((await call(`/matches/${code}/invite`, { token: host.token, body: { user_id: mate.id } })).status, 200, `ask ${i + 1} goes`);
-    await redis.del(pair);   // the cooldown, wound forward
-  }
-  eq((await call(`/matches/${code}/invite`, { token: host.token, body: { user_id: mate.id } })).json.error, 'enough_today', 'and the next is the day\'s limit');
-  eq(Number(await redis.get(count)), config.game.invitesPerDay, 'the day remembers every ask');
+  // Asking twice in a row is simply asking twice: there is no cooldown and no cap any more.
+  eq((await call(`/matches/${code}/invite`, { token: host.token, body: { user_id: mate.id } })).status, 200, 'the first ask goes');
+  const twice = await call(`/matches/${code}/invite`, { token: host.token, body: { user_id: mate.id } });
+  eq([twice.status, twice.json.reach], [200, 'none'], 'and so does the second, straight away -- reaching nobody, because mate is not online');
+  await online.seen(mate.id);
+  eq((await call(`/matches/${code}/invite`, { token: host.token, body: { user_id: mate.id } })).json.reach, 'live', 'with the game open it lands on the screen');
+  await online.gone(mate.id);
+  await query(pool, `INSERT INTO push_tokens (user_id, token) VALUES ($1, $2)`, [mate.id, 'fcm:' + 'm'.repeat(40)]);
+  eq((await call(`/matches/${code}/invite`, { token: host.token, body: { user_id: mate.id } })).json.reach, 'push', 'with the game closed and a phone registered, the phone is told');
 
-  eq((await call(`/matches/${code}/join`, { token: mate.token, body: {} })).status, 200, 'then the invitation is taken');
-  await new Promise(r => setTimeout(r, 150));   // the reset is fired after the reply, not before it
-  eq(await redis.get(count), null, 'and the day\'s count is gone');
-  eq(await redis.get(pair), null, 'and so is the cooldown');
-  await call(`/matches/${code}/leave`, { token: mate.token, body: {} });
-  eq((await call(`/matches/${code}/invite`, { token: host.token, body: { user_id: mate.id } })).status, 200, 'so the host may ask again from a clean slate');
-  await redis.del(pair, count);
+  // Mate has had enough.
+  eq((await call('/players/mute', { token: mate.token, body: { user_id: host.id } })).status, 200, 'mate mutes host');
+  eq(((await call('/players/muted', { token: mate.token })).json.muted as { id: number }[]).map(x => x.id), [host.id], 'and the list says so');
+  const muted = await call(`/matches/${code}/invite`, { token: host.token, body: { user_id: mate.id } });
+  eq([muted.status, muted.json.reach], [200, 'none'], 'the next ask goes nowhere, and host is told only that mate is not reachable');
+  eq(((await call('/players/recent', { token: mate.token })).json.players as { id: number }[]).some(x => x.id === host.id), false, 'host is off mate\'s list');
+  eq(((await call('/players/recent', { token: host.token })).json.players as { id: number }[]).some(x => x.id === mate.id), true, 'but mate is still on host\'s: host is never told');
+  eq((await call('/players/mute', { token: mate.token, body: { user_id: mate.id } })).status, 400, 'nobody can mute themselves');
+  eq((await call('/players/mute', { body: { user_id: host.id } })).status, 401, 'nor a stranger anybody');
+
+  // And the way back.
+  eq(((await call('/players/unmute', { token: mate.token, body: { user_id: host.id } })).json.muted as unknown[]).length, 0, 'unmuting empties the list');
+  eq((await call(`/matches/${code}/invite`, { token: host.token, body: { user_id: mate.id } })).json.reach, 'push', 'and the phone is told again');
+  await query(pool, `DELETE FROM push_tokens WHERE user_id = $1`, [mate.id]);
 }
 
 await finish();

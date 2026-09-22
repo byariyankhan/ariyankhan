@@ -17,8 +17,6 @@
 import type { Sql } from './db.js';
 import { query } from './db.js';
 import { online } from './presence.js';
-import { config } from './config.js';
-import { k, redis, soft } from './redis.js';
 
 export interface RecentPlayer {
   id: number;
@@ -53,6 +51,7 @@ export async function recentPlayers(sql: Sql, userId: number, limit = 24): Promi
       JOIN match_players p ON p.code = mine.code AND p.user_id <> $1
       JOIN matches m       ON m.code = mine.code
       JOIN users u         ON u.id = p.user_id
+     WHERE p.user_id NOT IN (SELECT muted_id FROM mutes WHERE user_id = $1)
      GROUP BY u.id, u.name, u.pic
      ORDER BY last_at DESC
      LIMIT $2`,
@@ -105,50 +104,29 @@ export async function isRacing(sql: Sql, userId: number): Promise<boolean> {
 export type InviteVerdict = { ok: true } | { ok: false; why: 'too_soon' | 'enough_today'; retryAfter: number };
 
 /** Seconds until the day's count starts over, which is midnight UTC: a plain answer to "when can I ask again". */
-function secondsToTomorrow(now = new Date()): number {
-  const next = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1);
-  return Math.max(1, Math.ceil((next - now.getTime()) / 1000));
-}
+// ── Muting ──
+//
+// The one answer a player gives about somebody: their invitations are not wanted. Nothing is counted and
+// nothing is rate-limited beyond the ordinary request limit, because a limit on asking was in the way of
+// people who wanted to be asked; this is in the way of exactly one person, chosen by the one being asked.
 
-/**
- * May this player ask that player again, right now?
- *
- * Having played together is the right to ask at all; this is how often. There is no friend list here and no
- * way to be taken off somebody's list, so the only thing between a player and being pestered is a rule on
- * the asking: one ask of the same person per cooldown, and a few a day. Somebody who has not answered three
- * in a day has answered.
- *
- * The count lives in Redis, keyed on the pair and the day, because it is a courtesy and not a ledger: if
- * Redis is gone the courtesy is gone with it and the invitation goes through, which is the degradation this
- * service promises everywhere -- the game slows and forgets, it does not stop. Asking consumes the cooldown
- * and a place in the day only when the answer is yes.
- */
-export async function inviteAllowed(from: number, to: number): Promise<InviteVerdict> {
-  return soft<InviteVerdict>(async () => {
-    const day = k('invites', from, to, new Date().toISOString().slice(0, 10));
-    const pair = k('invite', from, to);
-    const sofar = Number(await redis.get(day)) || 0;
-    if (sofar >= config.game.invitesPerDay) return { ok: false, why: 'enough_today', retryAfter: secondsToTomorrow() };
-    const set = await redis.set(pair, '1', 'EX', Math.max(1, config.game.inviteCooldownSeconds), 'NX');
-    if (set === null) {
-      const ttl = await redis.ttl(pair);
-      return { ok: false, why: 'too_soon', retryAfter: Math.max(1, ttl) };
-    }
-    const n = await redis.incr(day);
-    if (n === 1) await redis.expire(day, 86_400 + 3_600);   // a day, and a little, so a count never outlives its day by less than it started with
-    return { ok: true };
-  }, { ok: true });
+export async function mute(sql: Sql, userId: number, mutedId: number): Promise<void> {
+  if (userId === mutedId) return;
+  await query(sql, `INSERT INTO mutes (user_id, muted_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, [userId, mutedId]);
 }
-
-/**
- * That player took one. An accepted invitation is the opposite of pestering, so everybody at the table the
- * player just sat down at may ask them again from a clean slate: the cooldown and the day's count go.
- */
-export async function inviteAnswered(froms: number[], to: number): Promise<void> {
-  if (!froms.length) return;
-  const day = new Date().toISOString().slice(0, 10);
-  const keys = froms.flatMap(from => [k('invite', from, to), k('invites', from, to, day)]);
-  await soft(async () => { await redis.del(...keys); }, undefined);
+export async function unmute(sql: Sql, userId: number, mutedId: number): Promise<void> {
+  await query(sql, `DELETE FROM mutes WHERE user_id = $1 AND muted_id = $2`, [userId, mutedId]);
+}
+/** Has `to` muted `from`? Read before an invitation goes anywhere. */
+export async function isMuted(sql: Sql, to: number, from: number): Promise<boolean> {
+  const r = await query(sql, `SELECT 1 FROM mutes WHERE user_id = $1 AND muted_id = $2`, [to, from]);
+  return (r.rowCount ?? 0) > 0;
+}
+export async function mutedList(sql: Sql, userId: number): Promise<{ id: number; name: string; pic: string }[]> {
+  const r = await query<{ id: number; name: string; pic: string | null }>(sql, `
+    SELECT u.id, u.name, u.pic FROM mutes m JOIN users u ON u.id = m.muted_id
+     WHERE m.user_id = $1 ORDER BY m.created_at DESC LIMIT 200`, [userId]);
+  return r.rows.map(x => ({ id: x.id, name: x.name, pic: x.pic ?? '' }));
 }
 
 /**

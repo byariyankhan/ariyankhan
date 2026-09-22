@@ -151,10 +151,11 @@ notifications on who has not been on a board in the last few hours (`PUZZLE_REMI
 day per zone and once per player, remembered in Redis; with Redis gone the evening is skipped rather than
 repeated. `POST /push/reminder {on}` is the switch, and `/auth/me` reports it.
 
-An invitation is limited on the asking — one per short cooldown (`PUZZLE_INVITE_COOLDOWN_SECONDS`, two
-minutes, for a double tap or a room opened by mistake) and three a day (`PUZZLE_INVITES_PER_DAY`) — and the
-day's count starts over the moment the invited player takes a seat at a table the asker is at. The client
-answers a refusal by offering the room's link, which works whenever it is tapped.
+An invitation is not limited on the asking. The answer to being asked too often is **mute**
+(`POST /players/mute`, `/players/unmute`, `GET /players/muted`): a muted player's invitations reach nobody,
+on any device, and they leave the muter's list of people to ask; the sender is told only what they would be
+told about somebody who is not online. The invite reply says where it went — `reach` is `live` (on their
+screen), `push` (their phone or browser will ring) or `none` (send the link).
 
 ## Public URLs
 
@@ -195,6 +196,10 @@ in the path.
 | POST | `/push/token` | a phone's Firebase registration token, for this account |
 | POST | `/push/token/drop` | let it go |
 | POST | `/push/reminder` | whether this account wants the evening nudge |
+| GET | `/players/recent` | the people you have played with, and whether they are here |
+| GET | `/players/muted` | whose invitations you have muted |
+| POST | `/players/mute` | mute somebody (`user_id`); they are never told |
+| POST | `/players/unmute` | the way back |
 
 ### WebSocket
 

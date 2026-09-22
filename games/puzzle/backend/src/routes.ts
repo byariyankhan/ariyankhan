@@ -13,7 +13,7 @@ import { publish, publishToUser } from './events.js';
 import { boardPace, cleanLevels, cleanState, mergeLevels, mergeState, readAll } from './progress.js';
 import * as L from './league.js';
 import { liveProgress, online, roomPresence } from './presence.js';
-import { havePlayedTogether, isRacing, recentPlayers, inviteAllowed, inviteAnswered } from './players.js';
+import { havePlayedTogether, isMuted, isRacing, mute, mutedList, recentPlayers, unmute } from './players.js';
 import * as push from './push.js';
 import { body, caller, clearSessionCookie, limited, noStore, setSessionCookie, shapeUser, type Caller } from './httpkit.js';
 import { log } from './log.js';
@@ -310,21 +310,49 @@ const H = {
     // And not while they are racing. A challenge landing on a board somebody is being timed on is the one
     // notification this game must never send; it can be sent again in a minute, when their board is over.
     if (await isRacing(pool, to)) { await noStore(res).code(409).send({ error: 'in_a_match' }); return; }
-    // And not again and again. Once per cooldown, a few a day; the refusal says which, and how long.
-    const may = await inviteAllowed(me.user.id, to);
-    if (!may.ok) { await noStore(res).code(429).send({ error: may.why, retry_after: may.retryAfter }); return; }
+    // Muted: the invitation goes nowhere, and the sender is told what they would be told about somebody who
+    // is not online. Whether they were muted is the muter's business and not the sender's.
+    if (await isMuted(pool, to, me.user.id)) { await noStore(res).send({ ok: true, delivered: false, reach: 'none' }); return; }
 
     await publishToUser(to, 'invited', {
       code: m.code, stake: m.stake, from: me.user.name, from_id: me.user.id, pic: me.user.pic ?? '',
     });
-    // Whether they are reachable right now decides what the sender is told, not whether the invitation was
-    // sent: a socket that opens a second later still gets nothing, and saying so is kinder than a silent wait.
+    // What the sender is told is where the invitation went: onto a screen that has the game open, to a phone
+    // or a browser that will ring, or nowhere -- in which case the link is the way. A socket that opens a
+    // second later still gets nothing, and saying so is kinder than a silent wait.
     const here = await online.is(to);
-    // And if they are not here, their phone is told — the one thing in this game worth interrupting somebody
-    // for, because the room it is about will be gone in a few minutes. Somebody with the game open in front of
-    // them already has the invitation on their screen and does not need it twice.
-    if (!here) void push.sendToUser(to, push.invitedNote(me.user.name, m.stake, m.code));
-    await noStore(res).send({ ok: true, delivered: here });
+    // Somebody with the game open in front of them already has the invitation on their screen and does not
+    // need it twice; anybody else has their phone told, because the room will be gone in a few minutes.
+    let reach: 'live' | 'push' | 'none' = 'live';
+    if (!here) {
+      reach = (await push.hasSubscription(pool, to)) ? 'push' : 'none';
+      if (reach === 'push') void push.sendToUser(to, push.invitedNote(me.user.name, m.stake, m.code));
+    }
+    await noStore(res).send({ ok: true, delivered: here, reach });
+  },
+
+  // Muting somebody: their invitations stop reaching this account, and they leave its list of people to
+  // ask. The muted person is never told. Undone from the list in Settings.
+  async mute(req: Req, res: Res, me: Caller) {
+    if (!me.user) { await noStore(res).code(401).send({ error: 'signed_out' }); return; }
+    if (!(await limited('match_invite', req, res, me.user.id))) return;
+    const who = Number(body(req).user_id ?? 0);
+    if (!Number.isInteger(who) || who <= 0 || who === me.user.id) { await noStore(res).code(400).send({ error: 'bad_player' }); return; }
+    await mute(pool, me.user.id, who);
+    await noStore(res).send({ ok: true, muted: await mutedList(pool, me.user.id) });
+  },
+  async unmute(req: Req, res: Res, me: Caller) {
+    if (!me.user) { await noStore(res).code(401).send({ error: 'signed_out' }); return; }
+    if (!(await limited('match_invite', req, res, me.user.id))) return;
+    const who = Number(body(req).user_id ?? 0);
+    if (!Number.isInteger(who) || who <= 0) { await noStore(res).code(400).send({ error: 'bad_player' }); return; }
+    await unmute(pool, me.user.id, who);
+    await noStore(res).send({ ok: true, muted: await mutedList(pool, me.user.id) });
+  },
+  async muted(req: Req, res: Res, me: Caller) {
+    if (!me.user) { await noStore(res).code(401).send({ error: 'signed_out' }); return; }
+    if (!(await limited('players_read', req, res, me.user.id))) return;
+    await noStore(res).send({ muted: await mutedList(pool, me.user.id) });
   },
 
   async create(req: Req, res: Res, me: Caller) {
@@ -374,13 +402,7 @@ const H = {
       await noStore(res).code(status).send({ error: out.error, ...(out.gold !== undefined ? { gold: out.gold } : {}) });
       return;
     }
-    if (!out.already) {
-      await publish(out.code, 'player_joined_room', { name: me.user.name });
-      // Taking a seat answers every invitation to it: whoever at this table asked this player may ask again
-      // from a clean slate, because an invitation that was taken was not a nuisance.
-      const seats = await R.room(pool, out.code);
-      void inviteAnswered(seats.map(p => p.user_id).filter(id => id !== me.user!.id), me.user.id);
-    }
+    if (!out.already) await publish(out.code, 'player_joined_room', { name: me.user.name });
     if (out.started) await R.announceStart(out.code);
     await replyMatch(res, out.code, me);
   },
@@ -499,6 +521,9 @@ export function registerRoutes(app: FastifyInstance): void {
 
   app.get(`${v1}/lobby`, withCaller(H.lobby));
   app.get(`${v1}/players/recent`, withCaller(H.recent));
+  app.get(`${v1}/players/muted`, withCaller(H.muted));
+  app.post(`${v1}/players/mute`, withCaller(H.mute));
+  app.post(`${v1}/players/unmute`, withCaller(H.unmute));
   app.post(`${v1}/matches/:code/invite`, withCaller(H.invite));
   app.post(`${v1}/matches`, withCaller(H.create));
   app.get(`${v1}/matches/:code`, withCaller(H.get));
