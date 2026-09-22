@@ -61,6 +61,15 @@ Three things hold it together:
 Finishing a run frees the account immediately, before the match even settles; so does leaving a room that has
 not started.
 
+**The board travels with the seat.** The client posts a small snapshot of its run with its progress — the
+indices of the arrows that have gone, hearts, hints and checks used and allowed, wrong taps, and a move
+counter — into `match_players.run`, and `/auth/me` and the match view hand it back as `your_run`. A device
+resuming the match puts it onto the freshly drawn board before anyone is told the board is ready. The server
+replaces it only with a snapshot of at least as many moves, so a tab left open on a stale board cannot put
+back what the phone has since cleared; and a device whose poll brings back a run ahead of its own board
+applies it rather than fighting it, which is how that tab catches up. The server derives nothing from it —
+`pct` and `ms` still decide the race — and `cleanRun` drops anything that is not a small, well-formed board.
+
 ### The gold ledger
 
 Every movement of gold is a row in `gold_ledger` with a unique `idem_key`, written in the same transaction as

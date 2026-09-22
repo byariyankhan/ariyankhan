@@ -1,0 +1,14 @@
+-- The board as a player left it, so the next device can pick it up where the last one put it down.
+--
+-- A match resumes across devices now, but the resumed board was a fresh one: the server knew how far a
+-- player had got as a percentage and nothing else. Which arrows had gone, how many hearts were left, which
+-- hints had been spent -- all of that lived in the device that was playing, so switching from the app to a
+-- browser, or back, drew the same board with every arrow on it and every heart lit. The percentage in the
+-- other players' line-up said 46%; the board said 0%.
+--
+-- This column is the run itself, as a small JSON snapshot the client posts with its progress: the indices of
+-- the arrows that have gone, the hearts, the hints and checks used and allowed, the wrong taps, and a move
+-- counter. It is only ever replaced by a snapshot with at least as many moves, so a tab left open on a stale
+-- board cannot overwrite what a phone has done since. Nothing is derived from it on the server: the seat's
+-- pct and ms still decide the race, and this is handed straight back to whichever device asks.
+ALTER TABLE match_players ADD COLUMN IF NOT EXISTS run JSONB NULL;

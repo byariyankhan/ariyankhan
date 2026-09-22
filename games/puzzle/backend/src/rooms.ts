@@ -27,6 +27,46 @@ export interface MatchRow {
 export interface SeatRow {
   seat_id: number; code: string; user_id: number; tier: number; pct: number;
   ms: number | null; gave_up: boolean; finished_at: Date | null; joined_at: Date; name: string; pic: string;
+  run: RunState | null;
+}
+
+/**
+ * The board as a player left it: which arrows have gone, what is left of the lifelines, and a move counter
+ * that only ever climbs. It is the client's own snapshot, held here so the next device can pick the board up
+ * where this one put it down; the server derives nothing from it and never looks inside except to validate.
+ */
+export interface RunState {
+  moves: number; gone: number[]; lives: number; wrong: number;
+  hintsUsed: number; hintsMax: number; checksUsed: number; checksMax: number;
+}
+
+const RUN_INTS = ['moves', 'lives', 'wrong', 'hintsUsed', 'hintsMax', 'checksUsed', 'checksMax'] as const;
+
+/**
+ * A run snapshot the client sent, or null if it is not one. Shape and bounds only: a board has at most a few
+ * hundred arrows, the counters are small, and a snapshot is a few hundred bytes. Anything outside that is not
+ * a board, whatever it claims to be, and is dropped without touching the seat.
+ */
+export function cleanRun(raw: unknown): RunState | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const r = raw as Record<string, unknown>;
+  const ints: Record<string, number> = {};
+  for (const k of RUN_INTS) {
+    const v = r[k];
+    if (typeof v !== 'number' || !Number.isInteger(v) || v < 0 || v > 100_000) return null;
+    ints[k] = v;
+  }
+  if (!Array.isArray(r.gone) || r.gone.length > 2_000) return null;
+  const gone = new Set<number>();
+  for (const g of r.gone) {
+    if (typeof g !== 'number' || !Number.isInteger(g) || g < 0 || g > 10_000) return null;
+    gone.add(g);
+  }
+  return {
+    moves: ints.moves!, lives: ints.lives!, wrong: ints.wrong!,
+    hintsUsed: ints.hintsUsed!, hintsMax: ints.hintsMax!, checksUsed: ints.checksUsed!, checksMax: ints.checksMax!,
+    gone: [...gone].sort((a, b) => a - b),
+  };
 }
 export interface PlayerView {
   name: string; pic: string; pct: number; ms: number | null; gave_up: boolean; race_ms: number | null;
@@ -40,6 +80,8 @@ export interface MatchView {
   /** what the table pays for second and third, both 0 at a table too small for places */
   prizes: { second: number; third: number };
   fills_in: number | null; board?: string; tier?: number; seed?: number; your_ms?: number | null;
+  /** the board as this player last left it, for a device that was not the one playing; absent until they move */
+  your_run?: RunState | null;
   // How long the match has been running, as this server counts it. The client starts its own clock from this
   // rather than from a timestamp, because a device with a wrong clock would then show a wrong race.
   age_ms?: number;
@@ -275,6 +317,7 @@ export async function matchView(sql: PoolClient | typeof pool, m: MatchRow, meId
     view.tier = m.tier;
     view.seed = m.seed;
     view.your_ms = players.find(p => p.you)?.ms ?? null;
+    view.your_run = seats.find(p => p.user_id === meId)?.run ?? null;
     // The race began when the match did, for everyone in it at once. The clock on the board is counted from
     // here, so the time a player watches is the time they are ranked on — waiting, thinking and all.
     if (started) view.age_ms = Math.max(0, Date.now() - started);
@@ -537,12 +580,20 @@ export async function submitResult(c: PoolClient, code: string, userId: number, 
  * present as one clearing arrows. The write used to be refused outright when the percentage had not grown,
  * which threw that away — a player thinking looked exactly like a player who had closed the tab.
  */
-export async function saveProgress(c: PoolClient, code: string, userId: number, pct: number): Promise<number> {
+export async function saveProgress(c: PoolClient, code: string, userId: number, pct: number, run: RunState | null = null): Promise<number> {
   const clamped = Math.max(0, Math.min(100, Math.round(pct)));
+  // The run is replaced only by a snapshot with at least as many moves as the one held. Two devices can be
+  // signed in to the same account, and the one that was left behind keeps posting the board as it last saw
+  // it; without this, a tab forgotten on a desk would put every arrow back that the phone had since cleared.
+  // At least as many, not more: the same snapshot posted twice is the ordinary case, not a conflict.
   const upd = await query<{ pct: number }>(c,
-    `UPDATE match_players SET pct = GREATEST(pct, $3), last_seen_at = now()
+    `UPDATE match_players
+        SET pct = GREATEST(pct, $3), last_seen_at = now(),
+            run = CASE WHEN $4::jsonb IS NULL THEN run
+                       WHEN run IS NULL OR COALESCE((run->>'moves')::int, 0) <= ($4::jsonb->>'moves')::int THEN $4::jsonb
+                       ELSE run END
       WHERE code = $1 AND user_id = $2 AND ms IS NULL RETURNING pct`,
-    [code, userId, clamped]);
+    [code, userId, clamped, run ? JSON.stringify(run) : null]);
   return upd.rows[0]?.pct ?? clamped;
 }
 

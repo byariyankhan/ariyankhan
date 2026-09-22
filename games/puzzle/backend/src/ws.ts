@@ -108,7 +108,7 @@ export function attachWebSocket(app: FastifyInstance): void {
       ws.on('pong', () => { c.alive = true; void online.seen(user.id); });
 
       ws.on('message', async raw => {
-        let msg: { type?: string; code?: string; pct?: number };
+        let msg: { type?: string; code?: string; pct?: number; run?: unknown };
         try { msg = JSON.parse(String(raw)) as typeof msg; } catch { return; }
         const code = String(msg.code ?? '').trim().toUpperCase();
 
@@ -143,7 +143,7 @@ export function attachWebSocket(app: FastifyInstance): void {
             if (!m || m.state !== 'playing') return;
             const seats = await R.room(pool, target);
             if (!seats.some(p => p.user_id === user.id)) return;
-            const pct = await tx(t => R.saveProgress(t, target, user.id, Number(msg.pct)));
+            const pct = await tx(t => R.saveProgress(t, target, user.id, Number(msg.pct), R.cleanRun(msg.run)));
             await liveProgress.set(target, user.id, pct);
             await publish(target, 'progress_updated', { user_id: user.id, name: user.name, pct });
             return;
