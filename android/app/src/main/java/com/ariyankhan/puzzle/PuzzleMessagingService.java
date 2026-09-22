@@ -32,9 +32,9 @@ import java.util.Map;
  * was in a pocket. (A "notification" message would be drawn by the library itself while the game is closed
  * and handed to us only while it is open: two different notifications for one invitation.)
  *
- * <p>Two channels, so that Android's own settings can silence one kind and keep the other: invitations, which
- * matter now because the room they are about waits minutes, and the league, which has paid out and can wait
- * until morning. The tag does the job it does on the web — five invitations are one line, not five — because
+ * <p>Three channels, so that Android's own settings can silence one kind and keep the others: invitations,
+ * which matter now because the room they are about waits minutes; the league, which has paid out and can
+ * wait until morning; and the evening nudge, which the game's own Settings can also turn off. The tag does the job it does on the web — five invitations are one line, not five — because
  * {@code notify(tag, id)} replaces rather than stacks.
  *
  * <p>Nothing here talks to our server. The token this phone is addressed by is fetched by MainActivity's
@@ -50,6 +50,7 @@ public final class PuzzleMessagingService extends FirebaseMessagingService {
 
     static final String CHANNEL_INVITES = "invites";
     static final String CHANNEL_LEAGUE = "league";
+    static final String CHANNEL_REMINDERS = "reminders";
 
     static SharedPreferences prefs(Context c) {
         return c.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
@@ -76,9 +77,14 @@ public final class PuzzleMessagingService extends FirebaseMessagingService {
         if (!canPost(this)) return;
         ensureChannels(this);
 
-        boolean invite = !"league".equals(data.get("kind"));
+        // Three kinds, three channels, so the phone's own settings can silence one and keep the others:
+        // an invitation, the league paying out, and the evening nudge.
+        String kind = data.get("kind");
+        boolean league = "league".equals(kind), daily = "daily".equals(kind);
+        boolean invite = !league && !daily;
+        String channel = invite ? CHANNEL_INVITES : league ? CHANNEL_LEAGUE : CHANNEL_REMINDERS;
         String tag = data.get("tag");
-        if (tag == null || tag.isEmpty()) tag = invite ? "puzzle-invite" : "puzzle-league";
+        if (tag == null || tag.isEmpty()) tag = invite ? "puzzle-invite" : league ? "puzzle-league" : "puzzle-daily";
         String body = data.get("body");
         if (body == null) body = "";
 
@@ -90,7 +96,7 @@ public final class PuzzleMessagingService extends FirebaseMessagingService {
         PendingIntent tap = PendingIntent.getActivity(this, tag.hashCode(), open,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
-        NotificationCompat.Builder n = new NotificationCompat.Builder(this, invite ? CHANNEL_INVITES : CHANNEL_LEAGUE)
+        NotificationCompat.Builder n = new NotificationCompat.Builder(this, channel)
                 .setSmallIcon(R.drawable.ic_stat_puzzle)
                 .setColor(ContextCompat.getColor(this, R.color.ink))
                 .setContentTitle(title)
@@ -101,7 +107,8 @@ public final class PuzzleMessagingService extends FirebaseMessagingService {
                 // Below Android 8 there are no channels, and this is what decides whether it makes a sound.
                 .setPriority(invite ? NotificationCompat.PRIORITY_HIGH : NotificationCompat.PRIORITY_DEFAULT)
                 .setDefaults(NotificationCompat.DEFAULT_ALL)
-                .setCategory(invite ? NotificationCompat.CATEGORY_SOCIAL : NotificationCompat.CATEGORY_STATUS);
+                .setCategory(invite ? NotificationCompat.CATEGORY_SOCIAL
+                        : daily ? NotificationCompat.CATEGORY_REMINDER : NotificationCompat.CATEGORY_STATUS);
         try {
             NotificationManagerCompat.from(this).notify(tag, 1, n.build());
         } catch (SecurityException takenAwayMeanwhile) {
@@ -138,7 +145,11 @@ public final class PuzzleMessagingService extends FirebaseMessagingService {
         NotificationChannel league = new NotificationChannel(CHANNEL_LEAGUE,
                 c.getString(R.string.notify_league), NotificationManager.IMPORTANCE_DEFAULT);
         league.setDescription(c.getString(R.string.notify_league_about));
+        NotificationChannel reminders = new NotificationChannel(CHANNEL_REMINDERS,
+                c.getString(R.string.notify_reminders), NotificationManager.IMPORTANCE_DEFAULT);
+        reminders.setDescription(c.getString(R.string.notify_reminders_about));
         nm.createNotificationChannel(invites);
         nm.createNotificationChannel(league);
+        nm.createNotificationChannel(reminders);
     }
 }

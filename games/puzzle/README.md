@@ -145,6 +145,17 @@ every device the account has, on both; either channel left unconfigured is simpl
 them. No Firebase SDK is involved on the server: `fcm.ts` signs a JWT with the account's key and posts to
 FCM's HTTP v1 endpoint.
 
+There is one more, and it is the only one a player may decline on its own: **a nudge at seven in the
+evening** (`PUZZLE_REMINDER_HOUR`), local to the device — each registers the zone it is in — to anyone with
+notifications on who has not been on a board in the last few hours (`PUZZLE_REMINDER_QUIET_HOURS`). Once a
+day per zone and once per player, remembered in Redis; with Redis gone the evening is skipped rather than
+repeated. `POST /push/reminder {on}` is the switch, and `/auth/me` reports it.
+
+An invitation is limited on the asking — one per short cooldown (`PUZZLE_INVITE_COOLDOWN_SECONDS`, two
+minutes, for a double tap or a room opened by mistake) and three a day (`PUZZLE_INVITES_PER_DAY`) — and the
+day's count starts over the moment the invited player takes a seat at a table the asker is at. The client
+answers a refusal by offering the room's link, which works whenever it is tapped.
+
 ## Public URLs
 
 ```
@@ -183,6 +194,7 @@ in the path.
 | POST | `/push/unsubscribe` | let it go |
 | POST | `/push/token` | a phone's Firebase registration token, for this account |
 | POST | `/push/token/drop` | let it go |
+| POST | `/push/reminder` | whether this account wants the evening nudge |
 
 ### WebSocket
 

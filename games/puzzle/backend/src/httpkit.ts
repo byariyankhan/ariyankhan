@@ -77,4 +77,4 @@ export const body = (req: FastifyRequest): Record<string, unknown> =>
   (req.body && typeof req.body === 'object' ? req.body : {}) as Record<string, unknown>;
 
 export const shapeUser = (u: User | null) =>
-  u ? { id: u.id, name: u.name, provider: u.provider, pic: u.pic ?? '', gold: u.gold ?? 0 } : null;
+  u ? { id: u.id, name: u.name, provider: u.provider, pic: u.pic ?? '', gold: u.gold ?? 0, reminder: u.reminder !== false } : null;

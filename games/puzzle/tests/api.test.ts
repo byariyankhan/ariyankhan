@@ -545,6 +545,45 @@ section('A phone registers for notifications the way a browser does, and is told
   const drop = await call('/push/token/drop', { token: p.token, body: { token: 'x'.repeat(40) } });
   eq(drop.status, 200, 'dropping a token never needs the service account');
   eq(drop.json.on, false, 'and answers with whether anything is still listening');
+
+  // The evening nudge is per account and the one notification a player may decline on its own.
+  eq(((await call('/auth/me', { token: p.token })).json.user as { reminder: boolean }).reminder, true, 'the nudge is on to begin with');
+  const nudgeOff = await call('/push/reminder', { token: p.token, body: { on: false } });
+  eq([nudgeOff.status, nudgeOff.json.reminder], [200, false], 'and can be turned off');
+  eq(((await call('/auth/me', { token: p.token })).json.user as { reminder: boolean }).reminder, false, 'which /auth/me then says');
+  eq((await call('/push/reminder', { token: p.token, body: { on: true } })).json.reminder, true, 'and back on');
+  eq((await call('/push/reminder', { body: { on: false } })).status, 401, 'but not by a stranger');
+}
+
+section('An invitation that is taken starts the count over');
+{
+  const host = await mint('resetHost'), mate = await mint('resetMate');
+  // Having played together is the right to ask at all.
+  const first = await call('/matches', { token: host.token, body: { stake: config.game.stakes[0], open_to_all: false } });
+  const firstCode = (first.json.match as { code: string }).code;
+  await call(`/matches/${firstCode}/join`, { token: mate.token, body: {} });
+  await call(`/matches/${firstCode}/start`, { token: host.token, body: {} });
+  await call(`/matches/${firstCode}/result`, { token: host.token, body: { ms: 3_000, cleared: true } });
+  await call(`/matches/${firstCode}/result`, { token: mate.token, body: { ms: 4_000, cleared: true } });
+
+  const room = await call('/matches', { token: host.token, body: { stake: config.game.stakes[0], open_to_all: false } });
+  const code = (room.json.match as { code: string }).code;
+  const day = new Date().toISOString().slice(0, 10);
+  const pair = k('invite', host.id, mate.id), count = k('invites', host.id, mate.id, day);
+  for (let i = 0; i < config.game.invitesPerDay; i++) {
+    eq((await call(`/matches/${code}/invite`, { token: host.token, body: { user_id: mate.id } })).status, 200, `ask ${i + 1} goes`);
+    await redis.del(pair);   // the cooldown, wound forward
+  }
+  eq((await call(`/matches/${code}/invite`, { token: host.token, body: { user_id: mate.id } })).json.error, 'enough_today', 'and the next is the day\'s limit');
+  eq(Number(await redis.get(count)), config.game.invitesPerDay, 'the day remembers every ask');
+
+  eq((await call(`/matches/${code}/join`, { token: mate.token, body: {} })).status, 200, 'then the invitation is taken');
+  await new Promise(r => setTimeout(r, 150));   // the reset is fired after the reply, not before it
+  eq(await redis.get(count), null, 'and the day\'s count is gone');
+  eq(await redis.get(pair), null, 'and so is the cooldown');
+  await call(`/matches/${code}/leave`, { token: mate.token, body: {} });
+  eq((await call(`/matches/${code}/invite`, { token: host.token, body: { user_id: mate.id } })).status, 200, 'so the host may ask again from a clean slate');
+  await redis.del(pair, count);
 }
 
 await finish();

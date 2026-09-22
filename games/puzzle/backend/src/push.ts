@@ -24,7 +24,7 @@ export interface PushSub { endpoint: string; keys: { p256dh: string; auth: strin
 
 /** What a notification says. `url` is where tapping it lands, relative to the site. */
 export interface PushNote {
-  kind: 'invited' | 'league';
+  kind: 'invited' | 'league' | 'daily';
   title: string;
   body: string;
   url: string;
@@ -53,14 +53,30 @@ export const appEnabled = fcm.enabled;
 
 // ── Phones ──
 
+/**
+ * A time zone as a device reported it, or the default for one that reported nothing Intl recognises. Kept
+ * because seven in the evening is a local fact (reminder.ts), and checked because it is used in a query and
+ * handed back to Intl.
+ */
+export function cleanTz(raw: unknown): string {
+  const tz = String(raw ?? '').trim();
+  if (!tz || tz.length > 64 || !/^[A-Za-z0-9_+\-/]+$/.test(tz)) return config.reminder.defaultTz;
+  try { new Intl.DateTimeFormat('en', { timeZone: tz }); return tz; } catch { return config.reminder.defaultTz; }
+}
+
+/** Whether this account wants the evening nudge. Invitations and the league are not affected by it. */
+export async function setReminder(sql: Sql, userId: number, on: boolean): Promise<void> {
+  await query(sql, `UPDATE users SET reminder = $2 WHERE id = $1`, [userId, on]);
+}
+
 /** Remember where to reach this phone. One row per token; a token that changes hands follows the sign-in. */
-export async function saveToken(sql: Sql, userId: number, token: string, agent: string): Promise<void> {
+export async function saveToken(sql: Sql, userId: number, token: string, agent: string, tz = config.reminder.defaultTz): Promise<void> {
   await query(sql, `
-    INSERT INTO push_tokens (user_id, token, agent)
-         VALUES ($1, $2, $3)
+    INSERT INTO push_tokens (user_id, token, agent, tz)
+         VALUES ($1, $2, $3, $4)
     ON CONFLICT (token) DO UPDATE
-            SET user_id = EXCLUDED.user_id, agent = EXCLUDED.agent, seen_at = now(), fails = 0`,
-    [userId, token, agent.slice(0, 200)]);
+            SET user_id = EXCLUDED.user_id, agent = EXCLUDED.agent, tz = EXCLUDED.tz, seen_at = now(), fails = 0`,
+    [userId, token, agent.slice(0, 200), tz]);
 }
 
 /** The player turning notifications off on this phone. Only their own token is theirs to drop. */
@@ -74,14 +90,14 @@ export async function dropToken(sql: Sql, userId: number, token: string): Promis
  * Keyed by endpoint, so the same browser subscribing again updates its row rather than adding another, and a
  * browser that changes hands moves to whoever is signed in on it now.
  */
-export async function saveSubscription(sql: Sql, userId: number, sub: PushSub, agent: string): Promise<void> {
+export async function saveSubscription(sql: Sql, userId: number, sub: PushSub, agent: string, tz = config.reminder.defaultTz): Promise<void> {
   await query(sql, `
-    INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth, agent)
-         VALUES ($1, $2, $3, $4, $5)
+    INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth, agent, tz)
+         VALUES ($1, $2, $3, $4, $5, $6)
     ON CONFLICT (endpoint) DO UPDATE
             SET user_id = EXCLUDED.user_id, p256dh = EXCLUDED.p256dh, auth = EXCLUDED.auth,
-                agent = EXCLUDED.agent, seen_at = now(), fails = 0`,
-    [userId, sub.endpoint, sub.keys.p256dh, sub.keys.auth, agent.slice(0, 200)]);
+                agent = EXCLUDED.agent, tz = EXCLUDED.tz, seen_at = now(), fails = 0`,
+    [userId, sub.endpoint, sub.keys.p256dh, sub.keys.auth, agent.slice(0, 200), tz]);
 }
 
 /** The player turning notifications off on this browser, or the browser telling us it has dropped them. */
@@ -191,4 +207,13 @@ export const leagueNote = (rank: number, gold: number): PushNote => ({
   body: `${gold.toLocaleString('en-US')} gold is in your purse.`,
   url: '/puzzle/#league',
   tag: 'league',
+});
+
+/** Seven in the evening, and the player has not been on a board today. Named, because it is addressed to them. */
+export const dailyNote = (name: string): PushNote => ({
+  kind: 'daily',
+  title: `Hey ${name.trim() || 'there'}, it\u2019s time to train your brain`,
+  body: 'A fresh board is waiting. A few minutes keeps the streak alive.',
+  url: '/puzzle/',
+  tag: 'daily',
 });

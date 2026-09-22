@@ -41,4 +41,6 @@
     <string name="notify_invites_about">Somebody asking you to a match. The room waits minutes, not hours.</string>
     <string name="notify_league">League</string>
     <string name="notify_league_about">Where you finished, when the week\'s league pays out.</string>
+    <string name="notify_reminders">Daily reminder</string>
+    <string name="notify_reminders_about">A nudge at seven in the evening to play a board. Also a switch in the game\'s Settings.</string>
 </resources>
