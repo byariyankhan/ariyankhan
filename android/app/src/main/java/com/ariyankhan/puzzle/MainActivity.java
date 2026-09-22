@@ -45,7 +45,9 @@ import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.net.URISyntaxException;
 import java.util.Collections;
+import java.util.Locale;
 
 /**
  * The game, in a window this app owns.
@@ -134,12 +136,35 @@ public final class MainActivity extends ComponentActivity {
     @Override
     protected void onResume() {
         super.onResume();
+        // Let the page run again before anything is asked of it.
+        web.onResume();
+        web.resumeTimers();
         // A theme picked in Settings changes the page's theme-color without a navigation, so the bars would
         // keep the old contrast until something asked again. Leaving the app and coming back asks again.
         //
         // Not on the first resume, though: that one runs while the page is still on its way, and asking a
         // WebView with nothing in it what colour it is gets an empty answer.
         if (web.getUrl() != null) readThemeColour();
+    }
+
+    /**
+     * Put the page to sleep while the app is not the thing on screen.
+     *
+     * <p>A WebView left alone carries on: animations keep drawing, timers keep firing, and — the reason this
+     * matters now — a video keeps playing. An advertisement is a video. Without this, a player who takes a
+     * call or goes to another app halfway through a rewarded advertisement leaves it talking out of a phone
+     * they are no longer looking at, which is the kind of thing people uninstall an app over and Play takes
+     * complaints about.
+     *
+     * <p>onPause stops this WebView's own work; pauseTimers stops the JavaScript clock, which is process-wide
+     * and would be rude if this app had a second WebView. It has one.
+     */
+    @Override
+    protected void onPause() {
+        // Before super, so nothing is still drawing or sounding by the time the activity is told it is gone.
+        web.onPause();
+        web.pauseTimers();
+        super.onPause();
     }
 
     /**
@@ -253,16 +278,103 @@ public final class MainActivity extends ComponentActivity {
      * policy is a page, a YouTube link is an app, a mailto: is a mail client — is Android's business, and
      * handing it over is also what keeps Google's sign-in out of a WebView it refuses to run in.
      */
+    /**
+     * Whether this WebView is the thing that should answer a URL, judged by its scheme alone.
+     *
+     * <p>http and https are the web. about, data and blob are the page talking to itself. javascript: is the
+     * page running its own code, and file: is refused by the settings above rather than here. Everything
+     * else — intent:, market:, tel:, sms:, mailto:, whatever an advertiser has registered — belongs to some
+     * other app, and this one hands it over.
+     */
+    private static boolean renderable(Uri u) {
+        String scheme = u.getScheme();
+        if (scheme == null) return true;   // relative to a page we are already showing
+        switch (scheme.toLowerCase(Locale.ROOT)) {
+            case "http":
+            case "https":
+            case "about":
+            case "data":
+            case "blob":
+            case "javascript":
+            case "file":
+                return true;
+            default:
+                return false;
+        }
+    }
+
     private boolean ours(Uri u) {
         return "https".equalsIgnoreCase(u.getScheme())
                 && getString(R.string.host).equalsIgnoreCase(u.getHost());
     }
 
+    /**
+     * Hand a link that is not ours to whatever on the phone wants it.
+     *
+     * <p>Most are https and go to the browser. Advertisements are the exception that made this function grow:
+     * a great many creatives link out with an {@code intent:} URI — the scheme Chrome defined for "open this
+     * in the app if it is installed, and this web page if it is not" — and ACTION_VIEW on one of those is
+     * handled by nothing at all. The click did nothing, silently, which for a paid advertisement is the worst
+     * of both: the impression was served and the advertiser got no visit.
+     *
+     * <p>Parsing an intent: URI that came from somebody else's iframe needs care, because the URI can name
+     * any component it likes and this app would be the one starting it. So three things are taken away from
+     * whatever comes back before it is started: the explicit component, the selector, and any granted URI
+     * permissions. What is left can only be resolved the ordinary way, by an intent filter that asked to be
+     * BROWSABLE — the same bar a link in the browser has to clear.
+     */
     private void openOutside(Uri u) {
+        if ("intent".equalsIgnoreCase(u.getScheme())) { openIntentUri(u); return; }
         try {
             startActivity(new Intent(Intent.ACTION_VIEW, u).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
         } catch (ActivityNotFoundException nothingHandlesIt) {
             // A phone with no browser and no mail client is not a state worth a dialog about.
+        }
+    }
+
+    private void openIntentUri(Uri u) {
+        Intent wanted;
+        try {
+            wanted = Intent.parseUri(u.toString(), Intent.URI_INTENT_SCHEME);
+        } catch (URISyntaxException notAnIntent) {
+            return;
+        }
+        // The fallback the creative itself named, read before the intent is stripped of its extras' meaning.
+        String fallback = wanted.getStringExtra("browser_fallback_url");
+
+        wanted.setComponent(null);
+        wanted.setSelector(null);
+        wanted.addCategory(Intent.CATEGORY_BROWSABLE);
+        wanted.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        try {
+            startActivity(wanted);
+            return;
+        } catch (ActivityNotFoundException | SecurityException appIsNotInstalled) {
+            // Fall through: the point of the fallback is that this is expected, not exceptional.
+        }
+
+        if (fallback != null && !fallback.isEmpty()) {
+            Uri page = Uri.parse(fallback);
+            // A fallback is a web page. Anything else — another intent: URI, a file — is not followed.
+            if ("http".equalsIgnoreCase(page.getScheme()) || "https".equalsIgnoreCase(page.getScheme())) {
+                try {
+                    startActivity(new Intent(Intent.ACTION_VIEW, page).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+                    return;
+                } catch (ActivityNotFoundException noBrowser) {
+                    return;
+                }
+            }
+            return;
+        }
+
+        // No fallback, but the URI named a package: the store page for it is the honest last answer.
+        String pkg = wanted.getPackage();
+        if (pkg == null || pkg.isEmpty()) return;
+        try {
+            startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=" + pkg))
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+        } catch (ActivityNotFoundException noStore) {
+            // A phone with no Play Store. Nothing more to try.
         }
     }
 
@@ -471,8 +583,23 @@ public final class MainActivity extends ComponentActivity {
 
         @Override
         public boolean shouldOverrideUrlLoading(@NonNull WebView v, @NonNull WebResourceRequest r) {
-            // Sub-frames are left alone. An advertisement is an iframe on somebody else's origin, and a
-            // policy that sent every foreign frame to the browser would send the ads there too.
+            // A scheme this WebView cannot draw is nobody's navigation — it is a request for something else
+            // on the phone, and that is as true inside an advertisement's iframe as it is in the main frame.
+            // intent:, market:, tel:, mailto: are how a creative links out to the thing it is selling. Left
+            // to the WebView they load nothing at all and the click is lost, which is the one outcome that
+            // costs the advertiser and us both.
+            //
+            // With one condition: somebody has to have touched the screen. A navigation to another app is
+            // started by script as easily as by a finger, and a creative that fires one on load would put
+            // the Play Store in front of a player who tapped nothing. hasGesture is the same test Chrome
+            // applies before it follows one of these, and a request without one is dropped rather than
+            // handed on — dropped quietly, because the page did not ask the player anything to begin with.
+            if (!renderable(r.getUrl())) {
+                if (r.hasGesture()) openOutside(r.getUrl());
+                return true;
+            }
+            // Everything else in a sub-frame is left alone. An advertisement is an iframe on somebody else's
+            // origin, and a policy that sent every foreign frame to the browser would send the ads there too.
             if (!r.isForMainFrame()) return false;
             if (ours(r.getUrl())) return false;
             openOutside(r.getUrl());

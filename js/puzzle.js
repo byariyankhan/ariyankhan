@@ -2093,14 +2093,17 @@
   const AD_REWARD = {
     heart: {
       earn: 'Watch this through and the board carries on where it stopped, with one heart.',
+      board: true,
       grant() { state.lives = 1; state.finished = false; state.busy = false; el.overlay.hidden = true; renderHud(); startTimer(); heartLost(); toast('One heart. Make it count.', 'good'); },
     },
     hint: {
       earn: 'Watch this through for one more hint on this board.',
+      board: true,
       grant(quiet) { state.hintsMax = (state.hintsMax ?? HINTS_PER_LEVEL) + 1; renderHud(); if (!quiet) toast('One more hint.', 'good'); },
     },
     check: {
       earn: `Watch this through for one more ${CHECK_WORD} on this board.`,
+      board: true,
       grant() { state.checksMax = (state.checksMax ?? CHECKS_PER_LEVEL) + 1; renderHud(); toast(`One more ${CHECK_WORD}.`, 'good'); },
     },
     gold: {
@@ -2168,6 +2171,15 @@
     const R = AD_REWARD[kind];
     if (!R || ads.showing) return;
     if (R.needsAccount && !auth.user) { openSignIn('Sign in first, so the gold has a purse to go into.'); return; }
+    // A heart, a hint and a check are each for THIS board, and this board can be gone by the time the
+    // advertisement ends: given up from the card behind it, left for the list, or replaced by the next one.
+    // The pieces array is built fresh for every board and emptied when a run is cleared away, so holding on
+    // to it is holding on to the board itself -- cheaper and more honest than a counter to keep in step.
+    //
+    // The heart is the one that would do damage. Its grant sets lives, clears finished, hides the overlay and
+    // starts the clock: run against a board the player has already walked away from, it revives somebody
+    // else's board under them. The other two would quietly add an allowance to a board nobody asked for.
+    const board = R.board ? state.pieces : null;
 
     if (ads.isAd()) {
       // A match does not pause for this, and a player about to spend half a minute on an advertisement is owed
@@ -2189,6 +2201,10 @@
         // The network's panel is still tearing itself down as this resolves, and a 2.5-second hint glow
         // behind it is a hint the player never sees. A breath first, then the reward.
         await new Promise(r => setTimeout(r, 400));
+        if (board && (state.pieces !== board || el.game.hidden)) {
+          toast('That board is over, so there was nothing to add it to.', 'hint', 3200);
+          return false;
+        }
         await R.grant(quiet);
       } finally { ads.showing = false; }
       return true;
