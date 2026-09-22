@@ -2,12 +2,12 @@
    Scope is the whole origin (it has to be, to control the game page), but the fetch
    handler only ever answers for the game's own files; every other request on the
    site is left to the network exactly as if no worker were installed. */
-const VERSION = 'ptw-cache-v104';
+const VERSION = 'ptw-cache-v105';
 const GAME_FILES = new Set([
   '/piece-the-world.html', '/css/style.css', '/css/piece-the-world.css',
   '/js/piece-the-world.js', '/js/site-nav.js', '/js/site-footer.js',
   '/games/piece-the-world.webmanifest', '/images/ariyan-khan-profile.webp',
-  '/puzzle', '/puzzle/', '/css/puzzle.css', '/js/puzzle.js', '/puzzle/app.webmanifest', '/images/puzzle-brain-mark.svg', '/images/puzzle-brain-mark-rose.svg',
+  '/puzzle', '/puzzle/', '/css/puzzle.css', '/js/puzzle.js', '/puzzle/app.webmanifest', '/images/puzzle-brain-mark.svg', '/images/puzzle-brain-mark-rose.svg', '/images/puzzle-brain-mark-white.svg',
   // the game's own icon and its coin: installed from the home screen, with no network, the game still has a
   // face and its gold still has a face
   '/puzzle/icons/puzzle-96.png', '/puzzle/icons/puzzle-180.png',
@@ -29,7 +29,7 @@ const isLevelData = p => p.startsWith('/games/data/') && p.endsWith('.json');
    404 cannot fail the install and leave the site with no worker at all. Everything else still arrives the way
    it always did, on first use. The query strings the page stamps on the CSS and the JS are not known here and
    do not need to be: the fallback below matches with ignoreSearch. */
-const CORE = ['/puzzle/', '/css/puzzle.css', '/js/puzzle.js', '/images/puzzle-brain-mark.svg'];
+const CORE = ['/puzzle/', '/css/puzzle.css', '/js/puzzle.js', '/images/puzzle-brain-mark-rose.svg', '/images/puzzle-brain-mark-white.svg'];
 self.addEventListener('install', event => {
   self.skipWaiting();
   event.waitUntil(caches.open(VERSION).then(cache =>

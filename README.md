@@ -884,12 +884,24 @@ links.
   looked at — each of those pulls as well as pushes, which is how the other device's
   clears arrive without a restart. The server keeps `tier` up to 4 (Master was being
   clamped to 3).
-- **Home clarity, and the Brain theme.** The two big buttons carry a line each —
-  "Solo tour · 197 countries · works offline", "Online · challenge a friend for gold"
-  (`.aa-play-sub`) — so nobody has to guess which is which. A fourth theme, `brain`,
-  is the slogan's own colour: rose `#DB3A5E` for the primary, coral `#F26B4E` for
-  hints and the lamp, plum ink on blush paper, with a rose brain mark on the splash
-  (`images/puzzle-brain-mark-rose.svg`). Paper stays the default until it is chosen.
+- **Home clarity, and the brain's colour.** The two home buttons are drawn as designed: an icon
+  (wifi-off for the solo tour, wifi for friends) | a thin divider | the label with a short line under it
+  ("Solo · works offline", "Online · for gold") | a chevron; the first one is a rose-to-coral gradient with a
+  faint white brain of arrows riding its right edge (`.aa-play::after`,
+  `images/puzzle-brain-mark-white.svg`). Paper stays the default theme and keeps its cream and brown, but
+  its purple is gone: `--accent2` is the brain's rose `#DB3A5E` (the arrows that light the brain up on the
+  home card, the slogan's colour), the Hard tier is magenta rather than purple, the primary buttons wear
+  the same rose-to-coral gradient, a faint rose brain sits behind the home screen in every theme, and the
+  splash mark is the rose one (`images/puzzle-brain-mark-rose.svg`) everywhere but Night. There is no
+  separate Brain theme: the brain is in Paper.
+- **Interstitials, guarded** (`interShow`, `adH5Next`, `tests/puzzle-ads.test.mjs`): a full-screen
+  advertisement on the tap on Next after every fourth tour clear (`INTER_EVERY`), never in a challenge or
+  on the daily board, never within three minutes of the last one (`INTER_GAP_MS`), never within two
+  minutes of a rewarded advertisement the player chose (`INTER_AFTER_REWARD_MS`, stamped by `adNote`),
+  never in the first minute of a session, and a break that found nothing waits two minutes before asking
+  again. Only when the ads layer is on and giving real advertisements (`ads.on() && ads.isAd()`); the
+  H5 break is `type: 'next'`, and in the app it needs the AdMob interstitial unit in
+  `data-admob-interstitial`. The count is kept in `interClears` across sessions.
 - **Pre-publish audit fixes** (September 2026): a tap on the world map looks the
   board up by id when tapped, and a clear is saved under `state.level.id`, because
   choosing a home country reorders the tour under both; "Auto" home rebuilds the
