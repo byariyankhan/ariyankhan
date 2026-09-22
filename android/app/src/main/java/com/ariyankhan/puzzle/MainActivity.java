@@ -39,6 +39,7 @@ import androidx.webkit.WebViewCompat;
 import androidx.webkit.WebViewFeature;
 
 import com.google.android.gms.ads.MobileAds;
+import com.google.android.gms.ads.h5.H5AdsWebViewClient;
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption;
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential;
 
@@ -69,6 +70,10 @@ public final class MainActivity extends ComponentActivity {
     private View offline;
     private ImageView splash;
     private boolean splashGone;
+    /** True while the WebView is showing a page this app sent it to on purpose, rather than the game. */
+    private boolean away;
+    /** The advertising library's WebViewClient. Ours is the delegate behind it. One per WebView, always. */
+    private H5AdsWebViewClient h5;
 
     /** The view a fullscreen video hands us, and the callback that takes it back. Null when none is up. */
     private View fullscreen;
@@ -124,7 +129,19 @@ public final class MainActivity extends ComponentActivity {
             }
         };
         getOnBackPressedDispatcher().addCallback(this, back);
-        web.setWebViewClient(new Client(back));
+        // The advertising library's own WebViewClient goes on the outside, and ours is the delegate it hands
+        // everything else to.
+        //
+        // This is not decoration. Google's example for an H5 game inside an app does two things, and until
+        // now this app did one: it registered the WebView with the SDK but never installed
+        // H5AdsWebViewClient, which is what actually intercepts the ad requests the page makes and turns
+        // them into ads. Registration alone says "this WebView belongs to this app"; this is the part that
+        // carries the advertisement.
+        //
+        // The order is the documented one — set it as the client, then give it the delegate, then register.
+        h5 = new H5AdsWebViewClient(this, web);
+        web.setWebViewClient(h5);
+        h5.setDelegateWebViewClient(new Client(back));
         web.setWebChromeClient(new Chrome());
 
         installBridge(web);
@@ -228,6 +245,8 @@ public final class MainActivity extends ComponentActivity {
 
     @Override
     protected void onDestroy() {
+        // Any advertisement the library is still holding goes before the WebView it was drawn in does.
+        if (isFinishing() && h5 != null) h5.clearAdObjects();
         // Music and the match socket should stop with the app, not carry on in a detached renderer.
         if (isFinishing()) web.destroy();
         super.onDestroy();
@@ -477,6 +496,7 @@ public final class MainActivity extends ComponentActivity {
                     if (!isMainFrame) return;
                     String cmd = message.getData();
                     if ("signIn".equals(cmd)) signIn(reply);
+                    else if ("adTest".equals(cmd)) adSelfTest(reply);
                     else if ("hello".equals(cmd)) answer(reply, ok("signIn", true));
                 });
     }
@@ -536,6 +556,27 @@ public final class MainActivity extends ComponentActivity {
         } catch (RuntimeException notOne) {
             return null;
         }
+    }
+
+    /**
+     * Load Google's own page for checking that this WebView is joined to the Mobile Ads SDK.
+     *
+     * <p>It is the only way, from a phone, to tell two quite different problems apart. Green bars mean
+     * {@link MobileAds#registerWebView} worked and the page really is talking to the SDK, so anything still
+     * missing is on the account side — an approval not yet granted, an app not yet reviewed — and no amount
+     * of changing this code will help. Red means the fault is here, and waiting will never fix it.
+     *
+     * <p>It is reached only from the developer group in Settings, which takes seven taps to reveal, and the
+     * page is loaded rather than opened in a browser on purpose: a browser tab is not this WebView, and this
+     * WebView is the thing being asked about. Back returns to the game, because the game is still in the
+     * WebView's history behind it.
+     */
+    private void adSelfTest(JavaScriptReplyProxy reply) {
+        answer(reply, ok("opened", true));
+        new Handler(Looper.getMainLooper()).post(() -> {
+            away = true;
+            web.loadUrl("https://google.github.io/webview-ads/test/#api-for-ads-tests");
+        });
     }
 
     private static JSONObject ok(String key, Object value) {
@@ -630,6 +671,12 @@ public final class MainActivity extends ComponentActivity {
          */
         @Override
         public void onPageFinished(@NonNull WebView v, @NonNull String url) {
+            // A page we asked for ourselves is not an outage, whatever is on it. The check below looks for
+            // something only the game has, so without this the developer's own diagnostic page would be
+            // covered by "you are offline" — which is both wrong and the exact opposite of a diagnostic.
+            Uri here = Uri.parse(url == null ? "" : url);
+            if (away && ours(here)) away = false;
+            if (away) { hideSplash(); offline.setVisibility(View.GONE); return; }
             v.evaluateJavascript("!!document.getElementById('aaPlay')", value -> {
                 boolean isTheGame = "true".equals(value);
                 hideSplash();
