@@ -163,7 +163,7 @@
     loading: $('#aaLoading'), error: $('#aaError'),
     gate: $('#aaGate'), accept: $('#aaAccept'), splash: $('#aaSplash'), splashQuote: $('#aaSplashQuote'),
     worldMap: $('#aaWorldMap'), worldCap: $('#aaWorldCap'), worldScroll: $('#aaWorldScroll'),
-    brainArt: $('#aaBrainArt'), brainLv: $('#aaBrainLv'), brainDiff: $('#aaBrainDiff'), brainNote: $('#aaBrainNote'),
+    brainArt: $('#aaBrainArt'), brainLv: $('#aaBrainLv'), brainDiff: $('#aaBrainDiff'), brainNote: $('#aaBrainNote'), brainSub: $('#aaBrainSub'),
     deck: $('#aaDeck'), deckTrack: $('#aaDeckTrack'), deckDots: $('#aaDeckDots'),
     notifyCap: $('#aaNotifyCap'), notifyGroup: $('#aaNotifyGroup'), btnNotify: $('#aaNotify'), notifyNote: $('#aaNotifyNote'), remindRow: $('#aaRemindRow'), btnRemind: $('#aaRemind'), mutedCap: $('#aaMutedCap'), mutedGroup: $('#aaMutedGroup'),
     statBoards: $('#aaStatBoards'), statCountries: $('#aaStatCountries'), statStreak: $('#aaStatStreak'),
@@ -789,7 +789,33 @@
   //
   // What fills it is what they have done: every board cleared lights another tenth of it, from the bottom up,
   // and the tenth board lights the lot. Ten is not a number picked for this — it is the game's own milestone.
-  const BRAIN_STEP = 10;
+  // ── Rank ──
+  // The brain on the home screen carries a rank, and the rank is earned in arrows: every arrow shot off a board
+  // the player cleared, on the tour or on the daily, counted from the records the tour already syncs. So a
+  // phone and a tablet agree on it, a fresh device gets it back with the account, and clearing the same board
+  // twice does not count it twice. It is not the level. A level says where a player is on the tour; a rank says
+  // what they have done, and it is theirs to keep. Fourteen steps, from two Easy boards to GOAT at 6,236 arrows
+  // -- about a hundred boards at the difficulty the game deals by then.
+  const RANKS = [['Newbie', 0], ['Normal', 40], ['Learner', 120], ['Thinker', 250], ['Solver', 450], ['Skilled', 700], ['Sharp', 1000],
+    ['Expert', 1400], ['Master', 1900], ['Genius', 2500], ['Grandmaster', 3300], ['Legend', 4200], ['Immortal', 5200], ['GOAT', 6236]];
+  const ARROWS_GUESS = [22, 40, 55, 80, 100];   // a record saved before boards remembered their arrows counts the tier's typical board
+  const fmtN = n => Number(n || 0).toLocaleString('en-US');
+  const recArrows = r => (r && typeof r === 'object' && (r.arrows || ARROWS_GUESS[clampTier(r.tier || 0)])) || 0;
+  function arrowsShot() {
+    let n = 0;
+    try {
+      for (const k of Object.keys(localStorage)) {
+        if (!k.startsWith(STORE + 'lv:') && !k.startsWith(STORE + 'daily:')) continue;
+        n += recArrows(store.get(k.slice(STORE.length)));
+      }
+    } catch { /* storage can be unreadable in a private window */ }
+    return n;
+  }
+  function rankOf(n) {
+    let i = 0; while (i + 1 < RANKS.length && n >= RANKS[i + 1][1]) i++;
+    const top = i + 1 >= RANKS.length;
+    return { i, name: RANKS[i][0], lo: RANKS[i][1], hi: top ? null : RANKS[i + 1][1], next: top ? null : RANKS[i + 1][0], top };
+  }
   const emblemCache = new Map();
   function emblemFor(tier) {
     const em = FOCUS?.emblem; if (!em?.d || !em.k?.length) return null;
@@ -807,18 +833,21 @@
     const svg = el.brainArt; if (!svg || !DATA) return;
     const tier = TIER_OF(), em = emblemFor(tier);
     const done = DATA.levels.filter((_, i) => cleared(i)).length;
-    const step = done % BRAIN_STEP, full = done > 0 && step === 0;
-    if (el.brainLv) el.brainLv.textContent = `Level ${done + 1}`;
-    // the pill takes the difficulty's own colour, the same four the HUD uses
-    if (el.brainDiff) { const d = DIFF_OF(tier); el.brainDiff.textContent = d; el.brainDiff.className = 'aa-brain-diff aa-brain-diff--' + d.toLowerCase(); }
-    const togo = BRAIN_STEP - step;
+    const n = arrowsShot(), rk = rankOf(n), full = rk.top;
+    // the brain fills with the arrows of the rank in hand, from the bottom up, and GOAT lights the lot in green
+    const frac = full ? 1 : (n - rk.lo) / (rk.hi - rk.lo);
+    if (el.brainLv) el.brainLv.textContent = rk.name;
+    if (el.brainDiff) { el.brainDiff.textContent = `${fmtN(n)} arrow${n === 1 ? '' : 's'}`; el.brainDiff.className = 'aa-brain-diff aa-brain-diff--arrows' + (full ? ' is-top' : ''); }
+    const togo = full ? 0 : rk.hi - n;
     if (el.brainNote) el.brainNote.textContent = !em ? ''
-      : done === 0 ? 'Clear a board to light your first arrows.'
-      : full ? `A whole brain — ${done} boards cleared.`
-      : `${togo} more board${togo === 1 ? ' lights' : 's light'} it up.`;
+      : n === 0 ? 'Clear a board to shoot your first arrows.'
+      : full ? `${fmtN(n)} arrows. The whole brain is yours.`
+      : `${fmtN(togo)} more arrow${togo === 1 ? '' : 's'} to ${rk.next}.`;
+    // the level and the difficulty are still here, small: the rank is the headline, and it is not the level
+    if (el.brainSub) el.brainSub.textContent = `Rank ${rk.i + 1} of ${RANKS.length} · Level ${done + 1} · ${DIFF_OF(tier)}`;
     if (!em) { svg.hidden = true; return; }
     svg.hidden = false;
-    const lit = full ? em.pieces.length : Math.round(em.pieces.length * step / BRAIN_STEP);
+    const lit = full ? em.pieces.length : Math.min(em.pieces.length - 1, Math.round(em.pieces.length * frac));
     const key = `${tier}:${lit}:${full ? 1 : 0}`;
     if (key === brainKey) return;
     brainKey = key;
@@ -1886,6 +1915,7 @@
     // every cleared board carries it: the name is on the card either way, and a row saved today should not
     // read as poorer than one saved last week.
     const rec = { t: isBest ? t : prev.t, stars: Math.max(s, prev?.stars || 0), quiz: true, tier: state.tier, arrows: state.pieces.length, at: Date.now() };
+    const arrowsWas = R ? 0 : arrowsShot();   // the rank before this board is saved, so the card can say if it moved
     // The streak on the home screen is a streak of days this player played. It used to be the daily board's own
     // streak, which is a board most people never open, so somebody who had cleared a hundred boards — several of
     // them that morning — was told their streak was zero. Any cleared board keeps it alive; a day missed ends it.
@@ -1941,12 +1971,23 @@
     // else added underneath only when the server has enough players to make it true.
     const focus = focusOf(t, state.pieces.length, state.livesMax - state.lives, state.hintsUsed);
     const band = focusBand(focus);
+    // The rank line: what this board added and where that leaves the player. A new rank is the card's news; a
+    // board cleared again adds nothing and says so by saying only the rank. A race is not the tour and has none.
+    let rankLine = '';
+    if (!R) {
+      const now = arrowsShot(), rk = rankOf(now), gain = now - arrowsWas;
+      const toNext = rk.top ? '' : ` · ${fmtN(rk.hi - now)} to ${rk.next}`;
+      rankLine = rk.i > rankOf(arrowsWas).i ? `<p class="aa-card-rank is-up">New rank: <b>${rk.name}</b> · ${fmtN(now)} arrows</p>`
+        : gain > 0 ? `<p class="aa-card-rank">+${fmtN(gain)} arrows · <b>${rk.name}</b>${toNext}</p>`
+        : `<p class="aa-card-rank"><b>${rk.name}</b> · ${fmtN(now)} arrows${toNext}</p>`;
+    }
     el.card.innerHTML = `
       <p class="aa-card-kicker">${milestone ? `Milestone · level ${n} · ` : ''}You cleared</p>
       <h3>${escapeHtml(L.name)}</h3>
       ${facts ? `<p class="aa-facts">${facts}</p>` : ''}
       <p class="aa-stars" aria-label="${s} of 3 stars">${'★'.repeat(s)}${'☆'.repeat(3 - s)}</p>
       <div class="aa-stats"><span><b>${fmtTime(t, true)}</b>time</span><span><b>${state.livesMax - state.lives}</b>hearts lost</span><span><b>${state.hintsUsed}</b>hints</span><span><b>x${state.bestCombo}</b>best combo</span></div>
+      ${rankLine}
       <div class="aa-focus" id="aaFocus" role="img" aria-label="Focus ${focus} out of 100 — ${band.name}">
         <p class="aa-focus-cap">Your focus level<b class="aa-focus-num">0</b></p>
         <div class="aa-focus-bar">
@@ -2070,7 +2111,7 @@
     const n = DATA.levels.length, done = DATA.levels.filter((_, i) => cleared(i)).length;
     const D = state.disc, rec = state.daily ? store.get(`daily:${state.daily.key}`) : cleared(state.idx);
     const what = D ? `${D.country.name}'s ${KIND_WORD[D.kind]}, the ${state.level.name}` : state.level.name;
-    const text = `Puzzle – Train Your Brain: I cleared ${what} (${state.daily ? 'daily board ' + state.daily.key : 'level ' + levelNo(state.idx)}) in ${fmtTime(rec?.t ?? state.elapsed, true)} ${'★'.repeat(rec?.stars || stars())} and ${done}/${n} boards so far.\nYour turn: https://ariyankhan.com/puzzle/${state.daily ? '#daily' : '#b-' + state.level.id}`;
+    const text = `Puzzle – Train Your Brain: I cleared ${what} (${state.daily ? 'daily board ' + state.daily.key : 'level ' + levelNo(state.idx)}) in ${fmtTime(rec?.t ?? state.elapsed, true)} ${'★'.repeat(rec?.stars || stars())} and ${done}/${n} boards so far. Rank: ${rankOf(arrowsShot()).name} (${fmtN(arrowsShot())} arrows).\nYour turn: https://ariyankhan.com/puzzle/${state.daily ? '#daily' : '#b-' + state.level.id}`;
     const flash = $('.aa-flash', el.card);
     try {
       if (shell.on && shell.bridge() && (await shell.ask('share ' + text, 8000)).ok) return;   // the phone's own share sheet

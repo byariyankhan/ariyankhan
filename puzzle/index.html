@@ -101,7 +101,7 @@
          set these two when the backend moves to a host of its own and the client follows without a change:
          <meta name="puzzle-api" content="https://api.example.com" />
          <meta name="puzzle-ws"  content="wss://api.example.com" /> -->
-    <link rel="stylesheet" href="/css/puzzle.css?v=37" />
+    <link rel="stylesheet" href="/css/puzzle.css?v=38" />
     <link rel="preload" href="/games/data/puzzle.json?v=11" as="fetch" crossorigin="anonymous" />
 
     <!-- SCHEMA -->
@@ -236,13 +236,14 @@
           <div class="aa-deck-view">
             <div class="aa-deck-track" id="aaDeckTrack">
               <!-- The brain: a board of this game drawn at the player's own difficulty, lit from the bottom by
-                   the boards they have cleared (renderBrain). -->
+                   the arrows they have shot off cleared boards, rank by rank up to GOAT (renderBrain, RANKS). -->
               <div class="aa-slide" id="aaSlideBrain" role="group" aria-roledescription="slide" aria-label="Your brain">
                 <section class="aa-panel aa-brainbox" aria-labelledby="aaBrainLv">
-                  <svg class="aa-brain-art" id="aaBrainArt" viewBox="0 0 10 10" role="img" aria-label="Your brain, filling with the boards you clear"></svg>
+                  <svg class="aa-brain-art" id="aaBrainArt" viewBox="0 0 10 10" role="img" aria-label="Your brain, filling with the arrows you shoot"></svg>
                   <div class="aa-brain-meta">
-                    <p class="aa-brain-line"><b class="aa-brain-lv" id="aaBrainLv">Level 1</b><span class="aa-brain-diff" id="aaBrainDiff">Easy</span></p>
+                    <p class="aa-brain-line"><b class="aa-brain-lv" id="aaBrainLv">Newbie</b><span class="aa-brain-diff aa-brain-diff--arrows" id="aaBrainDiff">0 arrows</span></p>
                     <p class="aa-brain-note" id="aaBrainNote"></p>
+                    <p class="aa-brain-sub" id="aaBrainSub"></p>
                   </div>
                 </section>
               </div>
@@ -454,6 +455,6 @@
       </div>
     </div>
 
-    <script src="/js/puzzle.js?v=62"></script>
+    <script src="/js/puzzle.js?v=63"></script>
   </body>
 </html>
