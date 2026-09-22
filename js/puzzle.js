@@ -2106,7 +2106,14 @@
     gold: {
       earn: 'Watch this through and the gold goes to your purse.',
       needsAccount: true,
-      async grant() { await adClaimGold(); },
+      async grant() {
+        // The stand-in panel asks nothing of any network, and the reward has to hold to the same rule. It did
+        // not: the gold was claimed from the server for an advertisement that was never requested, never
+        // shown and never paid for by anybody — real gold, on an account that can stake it against other
+        // people. What the test mode owes is the shape of the thing, and the toast is that.
+        if (ads.mode === 'test') { toast('Test advertisement watched. The real one adds gold here.', 'good', 3200); return; }
+        await adClaimGold();
+      },
     },
   };
 
@@ -2173,10 +2180,17 @@
           : 'No advertisement was available, so nothing was added. Try again in a moment.', 'hint', 3200);
         return;
       }
-      // The network's panel is still tearing itself down as this resolves, and a 2.5-second hint glow behind it
-      // is a hint the player never sees. A breath first, then the reward.
-      await new Promise(r => setTimeout(r, 400));
-      await R.grant(quiet);
+      // adShow gave the lock back when its panel came down, and the reward has not been handed over yet —
+      // for gold that means a request still in flight. Take it back for the rest, or a second tap starts a
+      // second advertisement while the first is still being paid for, and the day's gold goes twice as fast
+      // as the player watched for it.
+      ads.showing = true;
+      try {
+        // The network's panel is still tearing itself down as this resolves, and a 2.5-second hint glow
+        // behind it is a hint the player never sees. A breath first, then the reward.
+        await new Promise(r => setTimeout(r, 400));
+        await R.grant(quiet);
+      } finally { ads.showing = false; }
       return true;
     }
 
