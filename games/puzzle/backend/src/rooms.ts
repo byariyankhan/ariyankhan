@@ -19,6 +19,8 @@ import { publish } from './events.js';
 
 export interface MatchRow {
   code: string; host_id: number | null; stake: number; board: string; tier: number; seed: number;
+  /** every board of the match, comma-separated, first one also in `board`; empty on a match from before 016 */
+  boards: string;
   state: 'open' | 'playing' | 'done' | 'void'; winner_id: number | null; open_to_all: boolean;
   stakes_in: number; fills_at: Date | null; created_at: Date; started_at: Date | null; settled_at: Date | null;
   // paid_at and winner_name survive the winner deleting their account; winner_id does not
@@ -38,6 +40,8 @@ export interface SeatRow {
 export interface RunState {
   moves: number; gone: number[]; lives: number; wrong: number;
   hintsUsed: number; hintsMax: number; checksUsed: number; checksMax: number;
+  /** which board of the match this run is on, from 0; absent on a one-board match */
+  bi?: number;
 }
 
 const RUN_INTS = ['moves', 'lives', 'wrong', 'hintsUsed', 'hintsMax', 'checksUsed', 'checksMax'] as const;
@@ -62,10 +66,13 @@ export function cleanRun(raw: unknown): RunState | null {
     if (typeof g !== 'number' || !Number.isInteger(g) || g < 0 || g > 10_000) return null;
     gone.add(g);
   }
+  const bi = r.bi === undefined ? undefined : (typeof r.bi === 'number' && Number.isInteger(r.bi) && r.bi >= 0 && r.bi < 20 ? r.bi : null);
+  if (bi === null) return null;
   return {
     moves: ints.moves!, lives: ints.lives!, wrong: ints.wrong!,
     hintsUsed: ints.hintsUsed!, hintsMax: ints.hintsMax!, checksUsed: ints.checksUsed!, checksMax: ints.checksMax!,
     gone: [...gone].sort((a, b) => a - b),
+    ...(bi !== undefined ? { bi } : {}),
   };
 }
 export interface PlayerView {
@@ -80,6 +87,8 @@ export interface MatchView {
   /** what the table pays for second and third, both 0 at a table too small for places */
   prizes: { second: number; third: number };
   fills_in: number | null; board?: string; tier?: number; seed?: number; your_ms?: number | null;
+  /** how many boards the match plays: known to everybody; which boards, only to the seated once it starts */
+  boards_n: number; boards?: string[];
   /** the board as this player last left it, for a device that was not the one playing; absent until they move */
   your_run?: RunState | null;
   // How long the match has been running, as this server counts it. The client starts its own clock from this
@@ -181,6 +190,22 @@ export async function pickBoard(): Promise<string | null> {
   }
   return boardIds.length ? boardIds[randomInt(0, boardIds.length)]! : null;
 }
+/** `n` different boards, for a match that plays them in a row. Fewer only if the tour itself has fewer. */
+export async function pickBoards(n: number): Promise<string[]> {
+  const first = await pickBoard();
+  if (first === null) return [];
+  const out = [first];
+  const ids = boardIds ?? [];
+  let guard = 0;
+  while (out.length < Math.min(n, ids.length) && guard++ < 200) {
+    const b = ids[randomInt(0, ids.length)]!;
+    if (!out.includes(b)) out.push(b);
+  }
+  return out;
+}
+/** The boards of a match, in order: the list if there is one, the single board otherwise. */
+export const boardsOf = (m: { board: string; boards: string }): string[] =>
+  m.boards ? m.boards.split(',').filter(Boolean) : [m.board];
 export const _resetBoardCache = () => { boardIds = null; };
 
 async function freeCode(c: PoolClient): Promise<string> {
@@ -309,11 +334,13 @@ export async function matchView(sql: PoolClient | typeof pool, m: MatchRow, meId
     you: mine ? (isHost ? 'host' : 'guest') : '',
     can_start: isHost && m.state === 'open' && players.length > 1 && !m.open_to_all,
     open_to_all: m.open_to_all,
+    boards_n: boardsOf(m).length,
     // seconds until it begins on its own; null in an invite-only room, or before the second player arrives
     fills_in: m.fills_at === null || m.state !== 'open' ? null : Math.max(0, Math.round((m.fills_at.getTime() - Date.now()) / 1000)),
   };
   if (mine && m.state !== 'open') {
     view.board = m.board;
+    view.boards = boardsOf(m);
     view.tier = m.tier;
     view.seed = m.seed;
     view.your_ms = players.find(p => p.you)?.ms ?? null;
@@ -601,13 +628,15 @@ export async function saveProgress(c: PoolClient, code: string, userId: number, 
 
 export type CreateResult =
   | { ok: true; code: string; joined?: string }
-  | { ok: false; error: 'bad_stake' | 'not_enough_gold' | 'no_boards'; gold?: number }
+  | { ok: false; error: 'bad_stake' | 'bad_length' | 'not_enough_gold' | 'no_boards'; gold?: number }
   | { ok: false; error: 'in_match'; code: string };
 
-export async function createMatch(me: { id: number }, stake: number, openToAll: boolean, tier: number): Promise<CreateResult> {
+export async function createMatch(me: { id: number }, stake: number, openToAll: boolean, tier: number, length = 1): Promise<CreateResult> {
   if (!config.game.stakes.includes(stake)) return { ok: false, error: 'bad_stake' };
-  const board = await pickBoard();
-  if (board === null) return { ok: false, error: 'no_boards' };
+  if (!config.game.lengths.includes(length)) return { ok: false, error: 'bad_length' };
+  const boards = await pickBoards(length);
+  const board = boards[0];
+  if (board === undefined) return { ok: false, error: 'no_boards' };
 
   return tx<CreateResult>(async c => {
     // A player is in one match at a time. Two were possible before, and the way it happened was not exotic:
@@ -631,9 +660,9 @@ export async function createMatch(me: { id: number }, stake: number, openToAll: 
     }
     const code = await freeCode(c);
     await query(c,
-      `INSERT INTO matches (code, host_id, stake, board, tier, seed, state, open_to_all)
-       VALUES ($1, $2, $3, $4, 2, $5, 'open', $6)`,
-      [code, me.id, stake, board, randomInt(100_000, 1_000_000), openToAll]);
+      `INSERT INTO matches (code, host_id, stake, board, boards, tier, seed, state, open_to_all)
+       VALUES ($1, $2, $3, $4, $5, 2, $6, 'open', $7)`,
+      [code, me.id, stake, board, boards.join(','), randomInt(100_000, 1_000_000), openToAll]);
     const m = (await matchRowLocked(c, code))!;
     const seated = await sit(c, m, me.id, tier);
     if (seated === 'not_enough_gold') {
@@ -787,7 +816,7 @@ export async function sweep(): Promise<SweepReport> {
 export async function announceStart(code: string): Promise<void> {
   const m = await matchRow(pool, code);
   if (!m) return;
-  await publish(code, 'match_started', { board: m.board, tier: m.tier, seed: m.seed, started_at: m.started_at?.getTime() ?? null });
+  await publish(code, 'match_started', { board: m.board, boards: boardsOf(m), tier: m.tier, seed: m.seed, started_at: m.started_at?.getTime() ?? null });
 }
 
 let sweepTimer: NodeJS.Timeout | null = null;

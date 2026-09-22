@@ -782,7 +782,7 @@ links.
   across on Easy to Hard (46 tall / 38 wide for elongated shapes) and up to 36/40
   on Expert/Master (`MAX_DIM_OF`, `MAX_TALL_OF`, `MAX_WIDE_OF`; `TARGETS` 110/240/400/540/680
   cells), so phones show ~12 px cells; strokes are 0.2 of a cell with 0.5-cell
-  arrowheads; snakes run up to 7-15 cells (`MAXLEN_OF`). Every tap has feedback:
+  arrowheads; snakes run up to 7-16 cells (`MAXLEN_OF`). Every tap has feedback:
   pressing thickens the arrow; a blocked arrow lunges forward, hits and comes
   back (`bounce()`, WAAPI) with a thud; a shot arrow lights up with a three-colour
   gradient of three success-green shades that streams along it (`#aaGrad`: a 5-cell
@@ -832,9 +832,29 @@ links.
   landmark, the text often names two). 59 shapes for 197 countries, 55 KB.
   In the game a discovery level is `{ id: 'd:<id>', name, kind, hex, d, k,
   country, disc: true }` and sits in the one tour list right after its country
-  (`tourFor`: 197 countries → 394 levels; more kinds of board later mean more
-  levels), so it unlocks, seeds, saves (`lv:d:<id>`) and deep-links (`#b-<id>`)
+  (`tourFor`: 197 countries → 394 levels, plus a scene board after every
+  fourth country), so it unlocks, seeds, saves (`lv:d:<id>`) and deep-links (`#b-<id>`)
   exactly like a country.
+- **Scene boards** (`games/build-scene-boards.mjs` → `games/data/scene-boards.json`,
+  fetched once per session with `SCENE_VERSION`): twelve geometric shapes — The
+  Tower, Twin Towers, The Arena, The Cross, The Diamond, The Ziggurat, The Hive,
+  The Frame, The Bridge, The Comb, The Gate, The Spiral — rasterised at five sizes
+  (`TARGETS` 160/330/540/950/1250 cells) like the focus boards, and drawn like the
+  reference pages: a tall shape filled edge to edge with long winding arrows. In the
+  game one is `{ id: 's:<id>', name, d, k, scene: true }`; `tourFor` puts one after
+  every fourth country (`SCENE_EVERY`), in order, and it is played **one tier
+  harder** than the player's form (`clampTier(TIER_OF() + 1)`), so a Hard player
+  meets The Tower at Expert (~140 arrows) and an Expert player Twin Towers at Master
+  (~160). The result card has no fact box and no YouTube line, as on focus boards,
+  and the HUD reads `Level N · The Tower`.
+- **Hard and Master are harder** than they were: snakes run to 14 and 16 cells
+  (`MAXLEN_OF`), nearly every arrow points far (`FAR_OF` 0.85/0.95), runs are
+  straighter and longer (`RAIL_OF`), and the country outline is rasterised on a
+  finer grid (`KSCALE_OF` 1.18 on Hard, 1.5 on Master, applied only to countries and
+  discovery boards; scene and focus boards are sized for their tiers already), so
+  a Master country holds ~120 long arrows instead of ~90, and the tightening pass
+  runs more flips (`TIGHTEN_OF` 380/420). A board still generates in about two
+  seconds on a phone-sized Chromium.
 - **Focus boards** (`games/build-focus-boards.mjs` → `games/data/focus-boards.json`,
   26 boards, 18 KB) are the boards the game opens on: a brain, a lightbulb, a
   key, a cog, a puzzle piece, a labyrinth, a knight — the game's own language
@@ -1052,6 +1072,18 @@ links.
   match the corner arrow says "Leave the challenge", asks first, and reports the
   board as given up, so the stake stays in the pot and nobody waits a day for a
   player who walked away.
+  **A challenge is a run of boards**, so a game takes five to ten minutes rather
+  than one or two: the dashboard's "How long" row offers one, three or five boards
+  (`LENGTHS` from `/lobby`, the pick kept in `matchLen`), the room card and the
+  invite sheet say the shape ("3 boards in a row"), and the server deals the
+  boards when the seats fill. In the engine `raceFor(m, boards, bi, …)` builds
+  `state.daily` for board `bi` with its own seed (`seed + bi*7919`); the HUD reads
+  "Board 2 of 3"; clearing a board that is not the last shows "Board 2 of 3
+  cleared!" and moves on with hearts back, while `elapsedBase` carries the
+  clock across boards; the progress poll reports `(bi + fraction)/n`; the run
+  snapshot carries `bi`, so a device resuming lands on the right board and a
+  stale tab jumps forward when the phone is a board ahead (`takeBack`,
+  `runAhead`).
   Winning pays off properly and immediately: the win card, the `SFX.win` fanfare,
   gold raining over the card, the purse badge popping and counting up from the old
   balance (`goldRain`, `countTo`), with the canvas lifted above the sheet for the
@@ -1109,8 +1141,8 @@ links.
   when that closes a cycle, also one arrow on its new run, and keep the flip when
   a simulated nearest-free player then sees fewer free arrows (mean over the game
   plus 0.3 × free at the start). Acyclicity is re-checked (Kahn), so boards stay
-  solvable. Master snakes are capped at 10 cells (`MAXLEN_OF`) to pack ~90
-  arrows. Measured on Master: free at any moment 5.0 → 4.1, free at start 11 → 10.
+  solvable. (Measured on the earlier Master boards, with 10-cell snakes and ~90
+  arrows: free at any moment 5.0 → 4.1, free at start 11 → 10.)
 - **Armed arrows and lane preview** (as in the reference apps): a blocked tap
   costs a heart once and leaves the arrow *armed* (it just turns red);
   after every shot `releaseArmed()` fires any armed arrow whose lane is now clear

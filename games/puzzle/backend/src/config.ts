@@ -79,6 +79,8 @@ export const config = {
     // The tables a player can sit at. Five of them, three orders of magnitude apart at the top, so a new
     // account and one that has been winning for a month both have somewhere to play.
     stakes: str('PUZZLE_STAKES', '500,1000,10000,1000000,10000000').split(',').map(s => Number(s.trim())).filter(n => n > 0),
+    // How long a match may be, in boards. The client offers exactly these.
+    lengths: str('PUZZLE_MATCH_LENGTHS', '1,3,5').split(',').map(s => Number(s.trim())).filter(n => n >= 1 && n <= 9),
     seats: num('PUZZLE_MATCH_SEATS', 7),
     fillSeconds: num('PUZZLE_FILL_SECONDS', 63),
     lonelySeconds: num('PUZZLE_LONELY_SECONDS', 120),
