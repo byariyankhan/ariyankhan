@@ -106,7 +106,7 @@
          set these two when the backend moves to a host of its own and the client follows without a change:
          <meta name="puzzle-api" content="https://api.example.com" />
          <meta name="puzzle-ws"  content="wss://api.example.com" /> -->
-    <link rel="stylesheet" href="/css/puzzle.css?v=29" />
+    <link rel="stylesheet" href="/css/puzzle.css?v=30" />
     <link rel="preload" href="/games/data/puzzle.json?v=11" as="fetch" crossorigin="anonymous" />
 
     <!-- SCHEMA -->
@@ -355,6 +355,16 @@
       </div>
     </div>
 
+    <!-- ── HOME COUNTRY PAGE ── opened from Settings, and Back returns there -->
+    <div class="aa-sheet aa-sheet--page" id="aaHomeSheet" hidden>
+      <div class="aa-sheet-panel" role="dialog" aria-label="Home country">
+        <div class="aa-sheet-head"><button type="button" class="aa-icon" id="aaHomeBack" aria-label="Back to Settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H6M11 6l-6 6 6 6"/></svg></button><h2>Home country</h2></div>
+        <p class="aa-sheet-note">Your tour starts here and spreads out from it.</p>
+        <input type="search" class="aa-search" id="aaHomeSearch" placeholder="Search a country" autocomplete="off" aria-label="Search a country">
+        <div class="aa-group" id="aaHomeList"></div>
+      </div>
+    </div>
+
     <!-- ── SETTINGS PAGE ── -->
     <div class="aa-sheet aa-sheet--page" id="aaSheet" hidden>
       <div class="aa-sheet-panel" role="dialog" aria-label="Settings">
@@ -368,7 +378,9 @@
 
         <p class="aa-cap">Game</p>
         <div class="aa-group">
-          <label class="aa-row aa-row--select" for="aaHome"><span class="aa-row-ico">🏠</span><span class="aa-row-label">Home country<small>Your tour starts here and spreads out</small></span><select class="aa-select" id="aaHome" aria-label="Home country"></select></label>
+          <!-- A page of its own rather than a <select>: the WebView draws a native list the size of the screen,
+               with no way back but the system gesture, and a search box is the only sane way through 197 names. -->
+          <button type="button" class="aa-row aa-row--link" id="aaHomeRow"><span class="aa-row-ico">🏠</span><span class="aa-row-label">Home country<small id="aaHomeNow">Your tour starts here and spreads out</small></span><span class="aa-row-go" aria-hidden="true">›</span></button>
           <div class="aa-row"><span class="aa-row-ico">▦</span><span class="aa-row-label">Guideline<small>Dots on the board to aim along</small></span><button type="button" class="aa-switch" id="aaGuides" role="switch" aria-checked="false" aria-label="Guideline dots on the board"></button></div>
         </div>
 
@@ -435,6 +447,6 @@
       </div>
     </div>
 
-    <script src="/js/puzzle.js?v=50"></script>
+    <script src="/js/puzzle.js?v=51"></script>
   </body>
 </html>

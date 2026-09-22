@@ -138,7 +138,7 @@
   const PALETTE = ['#FFED54', '#5CD6FF', '#8CFF7A', '#FF9AD5', '#C79BFF', '#FFB347', '#6EE7B7', '#FDBA74', '#F97373', '#38BDF8'];
 
   const el = {
-    select: $('#aaSelect'), tagline: $('#aaTagline'), homeSel: $('#aaHome'), purse: $('#aaPurse'), purseNo: $('#aaPurseNo'), goldAd: $('#aaGoldAd'), hudDiff: $('#aaHudDiff'), play: $('#aaPlay'), path: $('#aaPath'), btnVibe: $('#aaVibe'), btnGuides: $('#aaGuides'), btnMusic: $('#aaMusic'),
+    select: $('#aaSelect'), tagline: $('#aaTagline'), homeRow: $('#aaHomeRow'), homeNow: $('#aaHomeNow'), homeSheet: $('#aaHomeSheet'), homeBack: $('#aaHomeBack'), homeSearch: $('#aaHomeSearch'), homeList: $('#aaHomeList'), purse: $('#aaPurse'), purseNo: $('#aaPurseNo'), goldAd: $('#aaGoldAd'), hudDiff: $('#aaHudDiff'), play: $('#aaPlay'), path: $('#aaPath'), btnVibe: $('#aaVibe'), btnGuides: $('#aaGuides'), btnMusic: $('#aaMusic'),
     sheet: $('#aaSheet'), friends: $('#aaFriends'), signInSheet: $('#aaSignInSheet'), googleBtn: $('#aaGoogleBtn'), signInNote: $('#aaSignInNote'), ranks: $('#aaRanks'), league: $('#aaLeague'), leagueEnds: $('#aaLeagueEnds'), leagueSheet: $('#aaLeagueSheet'), leagueBody: $('#aaLeagueBody'), leagueInfo: $('#aaLeagueInfo'), matchSheet: $('#aaMatchSheet'), matchBody: $('#aaMatchBody'), matchTitle: $('#aaMatchTitle'), accountGroup: $('#aaAccountGroup'), accountCap: $('#aaAccountCap'), accountRow: $('#aaAccountRow'), accountName: $('#aaAccountName'), accountWho: $('#aaAccountWho'), accountGold: $('#aaAccountGold'), accountFace: $('#aaAccountFace'), sessionGroup: $('#aaSessionGroup'), sessionCap: $('#aaSessionCap'), signOutBtn: $('#aaSignOut'), deleteAccBtn: $('#aaDeleteAcc'), settingsBtns: $$('#aaSettings, #aaSettingsG'), themeBtn: $('#aaTheme'), themes: $('#aaThemes'), build: $('#aaBuild'), devCap: $('#aaDevCap'), devGroup: $('#aaDevGroup'), devAds: $('#aaDevAds'), devAdsNote: $('#aaDevAdsNote'), devLast: $('#aaDevLast'), devTools: $('#aaDevTools'),
     game: $('#aaGame'), boardWrap: $('#aaBoardWrap'), board: $('#aaBoard'), toast: $('#aaToast'), confetti: $('#aaConfetti'),
     hudLevel: $('#aaHudLevel'), hudMode: $('#aaHudMode'), hudTime: $('#aaHudTime'), hudLeft: $('#aaHudLeft'), hudLives: $('#aaHudLives'), hudLivesWrap: $('#aaHudLivesWrap'), hudPct: $('#aaHudPct'), boardBar: $('#aaBoardBar'),
@@ -4040,22 +4040,55 @@
   }
 
   // Settings → Home country: a list of every country (canonical order), plus Auto
+  // The home country is picked on a page of its own -- Settings → Home country → a list with a search box and
+  // a Back button -- rather than in a <select>. The WebView drew that as a native list the height of the
+  // screen with no way out but the system gesture, and nobody scrolls 197 names when they can type three letters.
+  const HOME_AUTO = 'auto';
+  const homeValue = () => { const h = store.get('home', null); return h == null ? HOME_AUTO : h; };
+  const homeChoices = () => [
+    { v: HOME_AUTO, name: 'Auto (where you are)' },
+    { v: '', name: 'World order (no home)' },
+    ...DATA.canon.slice().sort((a, b) => a.name.localeCompare(b.name)).map(L => ({ v: L.a2, name: L.name })),
+  ];
   function renderHome() {
-    const sel = el.homeSel; if (!sel || !DATA) return;
-    if (!sel.options.length) {
-      sel.appendChild(new Option('Auto (where you are)', 'auto'));
-      sel.appendChild(new Option('World order (no home)', ''));
-      for (const L of DATA.canon.slice().sort((a, b) => a.name.localeCompare(b.name))) sel.appendChild(new Option(L.name, L.a2));
-    }
-    const home = store.get('home', null); sel.value = home == null ? 'auto' : home;
-    if (sel.value !== (home == null ? 'auto' : home)) sel.value = '';
+    if (!DATA) return;
+    const cur = homeValue();
+    const now = homeChoices().find(c => c.v === cur);
+    if (el.homeNow) el.homeNow.textContent = cur === HOME_AUTO ? `Auto · ${DATA.levels[0]?.name || 'where you are'}` : now ? now.name : 'Your tour starts here and spreads out';
+    if (el.homeSheet && !el.homeSheet.hidden) renderHomeList();
   }
-  el.homeSel?.addEventListener('change', async () => {
-    const v = el.homeSel.value;
+  function renderHomeList() {
+    if (!el.homeList || !DATA) return;
+    const q = (el.homeSearch?.value || '').trim().toLowerCase(), cur = homeValue();
+    const rows = homeChoices().filter(c => !q || c.name.toLowerCase().includes(q));
+    el.homeList.innerHTML = rows.length
+      ? rows.map(c => `<button type="button" class="aa-row aa-row--link aa-row--pick${c.v === cur ? ' is-on' : ''}" data-home="${escapeHtml(c.v)}" role="radio" aria-checked="${c.v === cur}"><span class="aa-row-label">${escapeHtml(c.name)}</span><span class="aa-radio" aria-hidden="true"></span></button>`).join('')
+      : '<p class="aa-home-none">No country by that name.</p>';
+  }
+  function openHomePage() {
+    if (!el.homeSheet) return;
+    if (el.homeSearch) el.homeSearch.value = '';
+    renderHomeList();
+    openSheet(el.homeSheet);           // over Settings, which stays where it was for Back
+    // The chosen row is brought into view, not the search box: a keyboard that opens by itself covers the list.
+    $('.aa-row--pick.is-on', el.homeList)?.scrollIntoView({ block: 'center' });
+  }
+  const closeHomePage = () => { if (el.homeSheet) el.homeSheet.hidden = true; };
+  el.homeRow?.addEventListener('click', openHomePage);
+  el.homeBack?.addEventListener('click', closeHomePage);
+  el.homeSearch?.addEventListener('input', renderHomeList);
+  el.homeList?.addEventListener('click', async e => {
+    const btn = e.target.closest('[data-home]'); if (!btn) return;
+    const v = btn.dataset.home;
+    await chooseHome(v);
+    closeHomePage();
+  });
+  async function chooseHome(v) {
     if (v === 'auto') { try { localStorage.removeItem(STORE + 'home'); localStorage.removeItem(STORE + 'homeAuto'); } catch { /* ignore */ } const c = await homeCountry(DATA); DATA.levels = orderFor(DATA, c); maskCache.clear(); renderSelect(); }
     else setHome(v);
+    renderHome();
     toast(v === 'auto' ? 'Tour order follows where you are.' : v ? `Your tour now starts from ${DATA.levels[0].name}.` : 'Tour in world order.', 'hint');
-  });
+  }
   // ── Board zoom: pinch with two fingers, drag to pan while zoomed, or the − ⤢ + buttons ──
   // On a Master board of 180 arrows a cell is ~9 px on a phone: zooming is how a tap lands on the arrow meant.
   const zoom = { s: 1, x: 0, y: 0, MIN: 1, MAX: 4, ptrs: new Map(), pinch: null, pan: null };
@@ -4296,7 +4329,7 @@
   el.play.addEventListener('click', () => startLevel(+el.play.dataset.level || 0));
   // Sheets
   const openSheet = sh => { sh.hidden = false; document.body.style.overflow = 'hidden'; };
-  const closeSheets = () => { stopResultWatch(); el.sheet.hidden = true; if (el.signInSheet) el.signInSheet.hidden = true; if (el.matchSheet) el.matchSheet.hidden = true; if (el.leagueSheet) el.leagueSheet.hidden = true; document.body.style.overflow = ''; };
+  const closeSheets = () => { stopResultWatch(); el.sheet.hidden = true; if (el.homeSheet) el.homeSheet.hidden = true; if (el.signInSheet) el.signInSheet.hidden = true; if (el.matchSheet) el.matchSheet.hidden = true; if (el.leagueSheet) el.leagueSheet.hidden = true; document.body.style.overflow = ''; };
   el.settingsBtns.forEach(b => b.addEventListener('click', () => {
     openSheet(el.sheet);
     renderAccountRow();                                   // with what the page already knows, at once
