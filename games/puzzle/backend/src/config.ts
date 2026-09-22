@@ -83,6 +83,12 @@ export const config = {
     fillSeconds: num('PUZZLE_FILL_SECONDS', 63),
     lonelySeconds: num('PUZZLE_LONELY_SECONDS', 120),
     matchHours: num('PUZZLE_MATCH_HOURS', 24),
+    // How long a board that has begun may go unheard from before the room is cleared. The client posts its
+    // progress on a timer while a race is on screen, so this is not "how long a board may take" -- somebody
+    // can stare at one arrow for an hour and still be heard from every few seconds. It is how long after the
+    // last sign of life a seat is treated as empty, and the account freed to play again. Twenty-four hours
+    // was the only answer before, which is the rest of the day to a player who shut a tab by mistake.
+    idleMinutes: num('PUZZLE_IDLE_MINUTES', 10),
     // The board list the server picks from, so no client can choose an easy country.
     boardsFile: str('PUZZLE_BOARDS_FILE', '/srv/puzzle/site/games/data/puzzle.json'),
   },

@@ -101,11 +101,13 @@ section('A result sent twice is still one pot');
 
 section('A room that fills itself cannot be started by hand');
 {
-  const made = await call('/matches', { token: a.token, body: { stake: config.game.stakes[1], open_to_all: true, tier: 2 } });
+  // Its own host: an account is in one match at a time, and the one above is still going.
+  const host = await mint('apiFill');
+  const made = await call('/matches', { token: host.token, body: { stake: config.game.stakes[1], open_to_all: true, tier: 2 } });
   const code = (made.json.match as { code: string }).code;
   const c = await mint('apiCarl');
   await call(`/matches/${code}/join`, { token: c.token, body: { tier: 2 } });
-  const r = await call(`/matches/${code}/start`, { token: a.token, body: {} });
+  const r = await call(`/matches/${code}/start`, { token: host.token, body: {} });
   eq(r.status, 409, 'the host is refused');
   eq(r.json.error, 'clock_starts_it', 'because the clock owns the start');
 }
@@ -138,10 +140,11 @@ section('Losing Redis degrades the game; it does not stop it');
   await redis.flushall();                                 // as if the cache had been restarted from nothing
   const me = await call('/auth/me', { token: a.token });
   eq(me.status, 200, 'signing in still works with an empty Redis');
-  const made = await call('/matches', { token: a.token, body: { stake: 500, open_to_all: false, tier: 2 } });
+  const host = await mint('apiRedis');
+  const made = await call('/matches', { token: host.token, body: { stake: 500, open_to_all: false, tier: 2 } });
   eq(made.status, 200, 'and a room still opens');
   const code = (made.json.match as { code: string }).code;
-  const got = await call(`/matches/${code}`, { token: a.token });
+  const got = await call(`/matches/${code}`, { token: host.token });
   eq((got.json.match as { code: string }).code, code, 'and reading it back still works');
   // And the things that must never have been in Redis are still in PostgreSQL.
   const still = await query<{ n: number }>(pool, 'SELECT COUNT(*)::int AS n FROM users WHERE id = $1', [a.id]);
@@ -150,17 +153,18 @@ section('Losing Redis degrades the game; it does not stop it');
 
 section('Gold is never for the client to claim');
 {
-  const made = await call('/matches', { token: a.token, body: { stake: 500, open_to_all: false, tier: 2 } });
+  const host = await mint('apiGoldHost'), racer = await mint('apiGoldRacer');
+  const made = await call('/matches', { token: host.token, body: { stake: 500, open_to_all: false, tier: 2 } });
   const code = (made.json.match as { code: string }).code;
-  await call(`/matches/${code}/join`, { token: b.token, body: { tier: 2 } });
-  await call(`/matches/${code}/start`, { token: a.token, body: {} });
-  const before = (await call('/auth/me', { token: b.token })).json.user as { gold: number };
+  await call(`/matches/${code}/join`, { token: racer.token, body: { tier: 2 } });
+  await call(`/matches/${code}/start`, { token: host.token, body: {} });
+  const before = (await call('/auth/me', { token: racer.token })).json.user as { gold: number };
   // a client claiming an impossible time, and one claiming somebody else's room
-  await call(`/matches/${code}/result`, { token: b.token, body: { ms: -5_000_000, cleared: true } });
+  await call(`/matches/${code}/result`, { token: racer.token, body: { ms: -5_000_000, cleared: true } });
   const outsider = await mint('apiOut');
   const stolen = await call(`/matches/${code}/result`, { token: outsider.token, body: { ms: 1, cleared: true } });
   eq(stolen.status, 403, 'a player with no seat cannot report a result');
-  const after = (await call('/auth/me', { token: b.token })).json.user as { gold: number };
+  const after = (await call('/auth/me', { token: racer.token })).json.user as { gold: number };
   ok(after.gold <= before.gold + 1000, 'and no claim invented gold');
 }
 
@@ -267,7 +271,11 @@ section('The league is readable signed out, and knows you when you are in');
 
   // win a pot, and the table has to know about it
   const rival = await mint('leaguer-rival');
-  const made = await call('/matches', { token: me.token, body: { stake: config.game.stakes[0], open_to_all: false } });
+  // A table of its own, bigger than anything else this suite plays, so first place is first on the merits
+  // rather than on nobody else having won yet -- which was true only by accident of the order of the sections
+  // above, and stopped being true the moment each of them got a host of its own.
+  const LEAGUE_STAKE = config.game.stakes[2] ?? config.game.stakes[0]!;
+  const made = await call('/matches', { token: me.token, body: { stake: LEAGUE_STAKE, open_to_all: false } });
   const code = (made.json.match as { code: string }).code;
   await call(`/matches/${code}/join`, { token: rival.token, body: {} });
   await call(`/matches/${code}/start`, { token: me.token, body: {} });
@@ -275,14 +283,14 @@ section('The league is readable signed out, and knows you when you are in');
 
   const after = await call('/league', { token: me.token });
   const place = after.json.me as { rank: number | null; earning: number };
-  eq(place.rank, 1, 'the winner is first in a league nobody else has won in');
-  eq(place.earning, config.game.stakes[0], 'having won the other seat\u2019s stake');
+  eq(place.rank, 1, 'the biggest winner of the week is first');
+  eq(place.earning, LEAGUE_STAKE, 'having won the other seat\u2019s stake');
   const top = after.json.top as { name: string; you: boolean }[];
   ok(top.some(r => r.you), 'and the row is marked as theirs');
   const loser = await call('/league', { token: rival.token });
   const lost = loser.json.me as { rank: number | null; earning: number };
   ok(typeof lost.rank === 'number' && lost.rank > 1, 'the player who lost their stake is still in the table, below the winner');
-  eq(lost.earning, -(config.game.stakes[0] ?? 0), 'with the stake they lost standing as their week so far');
+  eq(lost.earning, -LEAGUE_STAKE, 'with the stake they lost standing as their week so far');
 }
 
 section('The people you have played with, and inviting them without a link');
@@ -448,6 +456,44 @@ section('How a cleared board went, against everybody else who cleared it');
   await call('/progress', { token: me.token, body: { levels: { 'pace-board': { cleared: true, ms: 1, stars: 3, tier: 1, arrows: 40 } } } });
   eq((await call('/boards/pace?level_id=pace-board&tier=1&ms=20000', { token: me.token })).json.n, 20,
      'their own row is left out of the count');
+}
+
+section('One match at a time, and a device that knows nothing can still find it');
+{
+  // The fault this is here for: the same account signed in on a phone and in a browser, a challenge started
+  // in one of them, and nothing in the other that could see it. The code used to live only in whichever
+  // client had opened the room.
+  const one = await mint('liveOne'), two = await mint('liveTwo');
+
+  const made = await call('/matches', { token: one.token, body: { stake: 500, open_to_all: false, tier: 2 } });
+  const code = (made.json.match as { code: string }).code;
+
+  const mine = await call('/auth/me', { token: one.token });
+  eq((mine.json.match as { code: string } | null)?.code, code, 'a fresh sign-in is told which match the account is in');
+  eq((mine.json.match as { state: string }).state, 'open', 'and what state it is in');
+
+  const second = await call('/matches', { token: one.token, body: { stake: 500, open_to_all: false, tier: 2 } });
+  eq(second.status, 409, 'a second match is refused');
+  eq(second.json.error, 'in_match', 'for the honest reason');
+  eq(second.json.match_code, code, 'and the refusal carries the room already held, so the client has a way back to it');
+
+  // Somebody else's invitation is refused the same way while a match is live.
+  const host = await mint('liveHost');
+  const theirs = await call('/matches', { token: host.token, body: { stake: 500, open_to_all: false, tier: 2 } });
+  const theirCode = (theirs.json.match as { code: string }).code;
+  const barged = await call(`/matches/${theirCode}/join`, { token: one.token, body: { tier: 2 } });
+  eq(barged.status, 409, 'and so is an invitation');
+  eq(barged.json.match_code, code, 'naming the same room');
+
+  // Leaving hands the seat and the stake back, and the account is free again.
+  await call(`/matches/${code}/leave`, { token: one.token, body: {} });
+  eq((await call('/auth/me', { token: one.token })).json.match, null, 'leaving clears it');
+  const now = await call('/matches', { token: one.token, body: { stake: 500, open_to_all: false, tier: 2 } });
+  eq(now.status, 200, 'and the next match opens straight away');
+
+  // A player signed out has no match to be told about, and nothing to leak.
+  eq((await call('/auth/me')).json.match, null, 'a signed-out visitor is told nothing');
+  void two;
 }
 
 await finish();

@@ -2317,7 +2317,7 @@
   // Only for playing with other people: the single-player game never asks. The server keeps the provider's
   // opaque user id and the display name, nothing else, and the account can be deleted from the dashboard.
   // Signed out, the button opens the sign-in sheet; signed in, it opens the dashboard.
-  const auth = { user: null, providers: {}, ready: false };
+  const auth = { user: null, providers: {}, match: null, ready: false };
   // me is a read; everything else changes something and is posted. The paths are the versioned ones, so a
   // later backend can add a v2 without this client noticing.
   const AUTH_PATH = { me: '/auth/me', google: '/auth/google', name: '/auth/name', logout: '/auth/logout', delete: '/auth/delete' };
@@ -2328,8 +2328,14 @@
   }
   async function authLoad(force) {
     if (auth.ready && !force) return auth;
-    try { const d = await authApi('me'); auth.user = d.user || null; auth.providers = d.providers || {}; }
-    catch { auth.user = null; auth.providers = {}; }
+    try {
+      const d = await authApi('me');
+      auth.user = d.user || null; auth.providers = d.providers || {};
+      // The match this account is still in, if there is one. It comes from the server rather than from this
+      // device's memory, which is the whole point: a challenge started in a browser tab is a challenge the
+      // phone has to be able to find, and before this the code lived only in whichever client opened it.
+      auth.match = d.match || null;
+    } catch { auth.user = null; auth.providers = {}; auth.match = null; }
     auth.ready = true;
     // Signed in means reachable: the socket is what marks this player as about and what carries an invitation
     // to them wherever they are in the game.
@@ -2419,7 +2425,8 @@
       renderAccountRow();
       if (auth.user) syncTour();   // a new phone gets the tour back here; a player who played signed out gives theirs up
       if (auth.user) {
-        if (state.pendingCode) { const c = state.pendingCode; state.pendingCode = null; openMatchLink(c); } else openStakes();
+        if (state.pendingCode) { const c = state.pendingCode; state.pendingCode = null; openMatchLink(c); }
+        else { await authLoad(true); if (!resumeLive()) openStakes(); }
         toast(fresh ? `Welcome, ${auth.user.name}. ${Number(auth.user.gold || 0).toLocaleString('en-US')} gold to start you off.` : `Signed in as ${auth.user.name}`, 'good', fresh ? 5000 : 2800);
         if (typeof gtag === 'function') gtag('event', 'login', { method: 'google', game: 'puzzle' });
       }
@@ -2709,7 +2716,7 @@
   const matchApi = (a, body, query = '') => {
     const { url, method } = matchUrl(a, body, query);
     return fetch(url, { method, credentials: 'include', cache: 'no-store', headers: method === 'POST' ? { 'Content-Type': 'application/json' } : {}, body: method === 'POST' ? JSON.stringify(body || {}) : undefined })
-      .then(async r => { const d = await r.json().catch(() => ({})); if (!r.ok) throw Object.assign(new Error(d.error || `HTTP ${r.status}`), { code: d.error, gold: d.gold }); return d; });
+      .then(async r => { const d = await r.json().catch(() => ({})); if (!r.ok) throw Object.assign(new Error(d.error || `HTTP ${r.status}`), { code: d.error, gold: d.gold, matchCode: d.match_code }); return d; });
   };
   // ── The live socket ──
   //
@@ -3394,7 +3401,8 @@
       } catch (err) {
         btn.disabled = false;
         if (typeof err.gold === 'number') setGold(err.gold);
-        if (err.code === 'not_enough_gold' && ads.on() && auth.user) adOffer('gold', 'Not enough gold for that table. Watch a short advertisement through and some is added to your purse.');
+        if (err.code === 'in_match' && err.matchCode) { toast('You are already in a match. Here it is.', 'hint', 4000); openMatchLink(err.matchCode); }
+        else if (err.code === 'not_enough_gold' && ads.on() && auth.user) adOffer('gold', 'Not enough gold for that table. Watch a short advertisement through and some is added to your purse.');
         else toast(goldError(err), 'bad');
       }
       return;
@@ -3409,7 +3417,8 @@
       catch (err) {
         btn.disabled = false;
         if (typeof err.gold === 'number') setGold(err.gold);
-        if (err.code === 'not_enough_gold' && ads.on() && auth.user) adOffer('gold', 'Not enough gold for that table. Watch a short advertisement through and some is added to your purse.');
+        if (err.code === 'in_match' && err.matchCode) { toast('You are already in a match. Here it is.', 'hint', 4000); openMatchLink(err.matchCode); }
+        else if (err.code === 'not_enough_gold' && ads.on() && auth.user) adOffer('gold', 'Not enough gold for that table. Watch a short advertisement through and some is added to your purse.');
         else toast(goldError(err), 'bad');
       }
     }
@@ -3422,6 +3431,40 @@
     const code = matchHash();
     if (code && code !== state.daily?.match?.code) openMatchLink(code);
   });
+
+  /**
+   * Put a match on screen wherever it belongs, given what it is: a board to play, a room to wait in, or a
+   * result to read. Used by an invitation link, by a refusal that names the room already held, and by a
+   * device finding a match the account started somewhere else.
+   */
+  function enterMatch(m) {
+    if (!m || !m.you) return false;
+    if (state.daily?.race && state.daily.match?.code === m.code) return true;   // already on it
+    if (m.state === 'playing') { if (m.your_ms == null && m.board) playMatch(m); else showMatchState(m); return true; }
+    if (m.state === 'open') { showRoom(m); return true; }
+    if (m.state === 'done') { showMatchState(m); return true; }
+    return false;
+  }
+
+  /**
+   * The match this account is still in, opened on a device that knew nothing about it.
+   *
+   * <p>This is the fix for the fault itself. The same account can be signed in on a phone and in a browser,
+   * and the code of a room used to live only in the client that opened it: start a challenge in a tab, close
+   * the tab, pick up the phone, and the phone had no idea there was a board with the account's gold on it.
+   *
+   * <p>It is deliberately only called on the way in — on load, and on signing in. A player halfway through a
+   * board of their own is not dragged off it, and asking the server again from a Settings screen must never
+   * move anybody anywhere.
+   */
+  let resumedCode = '';
+  function resumeLive() {
+    const m = auth.match;
+    if (!m || m.code === resumedCode) return false;
+    if (state.pieces.length && !state.finished) return false;   // busy on another board: leave them on it
+    resumedCode = m.code;
+    return enterMatch(m);
+  }
 
   // Someone opened an invitation link. Signing in comes first, because the stake leaves a real purse.
   async function openMatchLink(code) {
@@ -4216,7 +4259,12 @@
     renderSelect();
     // the purse and the account row from the first paint, not only once Play with Friends has been tapped, and
     // a time from last time that never got through goes now
-    authLoad().then(() => { renderPurse(); renderAccountRow(); syncTour(); void notifyInit(); return flushResult(false); }).catch(() => {});
+    authLoad().then(() => {
+      renderPurse(); renderAccountRow(); syncTour(); void notifyInit();
+      // Not when a link brought us here: that link names the room, and it wins over anything remembered.
+      if (!matchHash()) resumeLive();
+      return flushResult(false);
+    }).catch(() => {});
     // the league chip, and the clock that keeps its countdown honest
     loadLeague().then(startLeagueTick).catch(() => {});
     const m = /^#level-(\d+)$/.exec(location.hash), mb = /^#b-([\w:]+)$/.exec(location.hash), mm = matchHash();

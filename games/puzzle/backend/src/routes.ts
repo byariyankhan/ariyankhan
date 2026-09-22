@@ -47,7 +47,12 @@ async function replyMatch(
 const H = {
   async me(req: Req, res: Res, me: Caller) {
     if (!(await limited('auth_read', req, res, me.user?.id ?? null))) return;
-    await noStore(res).send({ user: shapeUser(me.user), providers: { google: providers().google } });
+    // The match this account is still in, if any, in the same shape the room screen is drawn from. This is
+    // how a phone finds the challenge a browser tab started: the account is one account, and until now the
+    // only copy of the code lived in whichever client had opened it.
+    const live = me.user ? await R.liveMatchOf(pool, me.user.id) : null;
+    const match = live ? await R.matchView(pool, live, me.user!.id) : null;
+    await noStore(res).send({ user: shapeUser(me.user), providers: { google: providers().google }, match });
   },
 
   async google(req: Req, res: Res, me: Caller) {
@@ -287,6 +292,9 @@ const H = {
     const b = body(req);
     const made = await R.createMatch(me.user, Number(b.stake ?? 0), Boolean(b.open_to_all), Number(b.tier ?? 2));
     if (!made.ok) {
+      // Already in one: 409, and the code, because the only useful answer to "you are already in a match" is
+      // the way back to it. The client turns this into a tap rather than a dead end.
+      if (made.error === 'in_match') { await noStore(res).code(409).send({ error: 'in_match', match_code: made.code }); return; }
       const status = made.error === 'no_boards' ? 503 : 400;
       await noStore(res).code(status).send({ error: made.error, ...(made.gold !== undefined ? { gold: made.gold } : {}) });
       return;
@@ -320,6 +328,7 @@ const H = {
     const code = codeOf(req);
     const out = await tx(c => R.joinRoomTx(c, me.user!.id, code, Number(body(req).tier ?? 2)));
     if (!out.ok) {
+      if (out.error === 'in_match') { await noStore(res).code(409).send({ error: 'in_match', match_code: out.code }); return; }
       const status = out.error === 'no_match' ? 404 : out.error === 'not_enough_gold' ? 400 : 409;
       await noStore(res).code(status).send({ error: out.error, ...(out.gold !== undefined ? { gold: out.gold } : {}) });
       return;

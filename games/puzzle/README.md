@@ -35,6 +35,32 @@ movement of gold ever made. If Redis is wiped, nothing here is lost.
 counters, and the pub/sub channel the WebSocket layer fans out through. Everything has a TTL. If it is flushed
 mid-match the game keeps running — there is a test for exactly that.
 
+### One match at a time
+
+An account is in one live match at a time, and can always find out which. The rule exists because the same
+account is often signed in twice — a phone and a browser — and a challenge started in one of them used to be
+invisible to the other: the room's code lived in whichever client had opened it, so closing a tab lost the
+room while the seat, and the stake in it, stayed exactly where they were. From there the account could open a
+second match, and its result went to whichever board it happened to be looking at.
+
+Three things hold it together:
+
+- **`/auth/me` carries the live match**, in the same shape the room screen is drawn from. A device that has
+  never heard of the room finds it the moment it signs in, and goes there: straight onto the board if it is
+  being played, into the waiting room if it has not started.
+- **Opening or accepting a second match is refused** with `409 in_match`, and the refusal names the room
+  already held — `{"error":"in_match","match_code":"ABC123"}` — because the only useful answer to "you are
+  already in a match" is the way back to it.
+- **A board nobody is on is cleared.** The client posts its progress on a timer while a race is on screen,
+  whether or not the number has moved, and that stamps `match_players.last_seen_at`. When every unfinished
+  seat in a playing match has been quiet for `PUZZLE_IDLE_MINUTES` (10), the sweeper closes it: settled if
+  somebody actually finished, so their win stands, and voided with every stake handed back if nobody did —
+  taking gold for a board that was never a contest is a fine for closing a tab, not a rule. The old
+  twenty-four hour sweep is still there behind it as a backstop.
+
+Finishing a run frees the account immediately, before the match even settles; so does leaving a room that has
+not started.
+
 ### The gold ledger
 
 Every movement of gold is a row in `gold_ledger` with a unique `idem_key`, written in the same transaction as

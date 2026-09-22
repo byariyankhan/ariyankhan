@@ -99,9 +99,11 @@ section('A player joining reaches the room over the socket');
 
 section('The countdown is the server\'s, and it ticks');
 {
-  const fill = await api('/matches', a.token, { stake: config.game.stakes[1], open_to_all: true, tier: 2 }) as { match: { code: string } };
+  // Its own host: an account is in one match at a time, and the room above is still open.
+  const filler = await mint('wsFill');
+  const fill = await api('/matches', filler.token, { stake: config.game.stakes[1], open_to_all: true, tier: 2 }) as { match: { code: string } };
   const fillCode = fill.match.code;
-  const sc = open(a.token); await sc.ready; await sc.waitFor('hello');
+  const sc = open(filler.token); await sc.ready; await sc.waitFor('hello');
   sc.send({ type: 'watch', code: fillCode });
   await sc.waitFor('state');
   const c2 = await mint('wsCarl');

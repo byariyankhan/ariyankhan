@@ -153,6 +153,29 @@ async function freeCode(c: PoolClient): Promise<string> {
 
 // ── Reading a room ──
 
+/**
+ * The match this account is still sitting in, if any.
+ *
+ * <p>One row, because a player is allowed one live match at a time — that rule is enforced where rooms are
+ * made and joined, and this is what both of them ask. It is also what a second device asks on sign-in: an
+ * account signed in on a phone and in a browser is one account, and a challenge started in one of them is a
+ * challenge the other has to be able to find. Without this the browser holds the only copy of the code, and
+ * closing the tab loses the room while the seat, and the stake in it, stay where they are.
+ *
+ * <p>A seat counts as live while `ms IS NULL` — the run has not been handed in — and the match is still open
+ * or being played. Playing comes before waiting, because a board with a clock running is the more urgent of
+ * the two, and the newest of those before the rest.
+ */
+export async function liveMatchOf(sql: PoolClient | typeof pool, userId: number): Promise<MatchRow | null> {
+  const r = await query<MatchRow>(sql,
+    `SELECT m.* FROM matches m
+       JOIN match_players p ON p.code = m.code
+      WHERE p.user_id = $1 AND p.ms IS NULL AND m.state IN ('open', 'playing')
+      ORDER BY (m.state = 'playing') DESC, m.created_at DESC
+      LIMIT 1`, [userId]);
+  return r.rows[0] ?? null;
+}
+
 export async function matchRow(sql: PoolClient | typeof pool, code: string): Promise<MatchRow | null> {
   const r = await query<MatchRow>(sql, 'SELECT * FROM matches WHERE code = $1', [code.trim().toUpperCase()]);
   return r.rows[0] ?? null;
@@ -308,7 +331,12 @@ export async function startRoom(c: PoolClient, code: string): Promise<boolean> {
   const upd = await query(c,
     `UPDATE matches SET state = 'playing', started_at = now(), tier = $2 WHERE code = $1 AND state = 'open'`,
     [code, roomTier(seats)]);
-  return upd.rowCount === 1;
+  if (upd.rowCount !== 1) return false;
+  // Everybody's clock starts here. An invitation can sit open for a day before a friend accepts it, and the
+  // seat that has been waiting all that time was last heard from when it sat down — without this the sweeper
+  // would look at a board one second old and see a room nobody had visited since yesterday.
+  await query(c, 'UPDATE match_players SET last_seen_at = now() WHERE code = $1', [code]);
+  return true;
 }
 
 /**
@@ -501,11 +529,19 @@ export async function submitResult(c: PoolClient, code: string, userId: number, 
     [code, userId, value, value > 0 ? 100 : 0, value > 0 ? false : gaveUp]);
 }
 
-/** How far along a player is. Never goes backwards, and never moves a player who has already finished. */
+/**
+ * How far along a player is. Never goes backwards, and never moves a player who has already finished.
+ *
+ * <p>It also stamps the seat as seen, which is the whole of the heartbeat: the client posts this on a timer
+ * while a race is on screen whether or not the number has moved, so a player staring at a hard board is as
+ * present as one clearing arrows. The write used to be refused outright when the percentage had not grown,
+ * which threw that away — a player thinking looked exactly like a player who had closed the tab.
+ */
 export async function saveProgress(c: PoolClient, code: string, userId: number, pct: number): Promise<number> {
   const clamped = Math.max(0, Math.min(100, Math.round(pct)));
   const upd = await query<{ pct: number }>(c,
-    `UPDATE match_players SET pct = $3 WHERE code = $1 AND user_id = $2 AND ms IS NULL AND pct < $3 RETURNING pct`,
+    `UPDATE match_players SET pct = GREATEST(pct, $3), last_seen_at = now()
+      WHERE code = $1 AND user_id = $2 AND ms IS NULL RETURNING pct`,
     [code, userId, clamped]);
   return upd.rows[0]?.pct ?? clamped;
 }
@@ -514,7 +550,8 @@ export async function saveProgress(c: PoolClient, code: string, userId: number, 
 
 export type CreateResult =
   | { ok: true; code: string; joined?: string }
-  | { ok: false; error: 'bad_stake' | 'not_enough_gold' | 'no_boards'; gold?: number };
+  | { ok: false; error: 'bad_stake' | 'not_enough_gold' | 'no_boards'; gold?: number }
+  | { ok: false; error: 'in_match'; code: string };
 
 export async function createMatch(me: { id: number }, stake: number, openToAll: boolean, tier: number): Promise<CreateResult> {
   if (!config.game.stakes.includes(stake)) return { ok: false, error: 'bad_stake' };
@@ -522,6 +559,15 @@ export async function createMatch(me: { id: number }, stake: number, openToAll: 
   if (board === null) return { ok: false, error: 'no_boards' };
 
   return tx<CreateResult>(async c => {
+    // A player is in one match at a time. Two were possible before, and the way it happened was not exotic:
+    // a challenge started in a browser tab, the tab closed, the app opened, a new challenge started there.
+    // The account then held two seats and two stakes, its result went to whichever board it happened to be
+    // looking at, and the other room sat with a player who was never coming back. Refusing here is the half
+    // of the fix that stops it; telling the client which room it already has is the half that makes the
+    // refusal useful, because the answer to "you are already in a match" is a way back to it.
+    const live = await liveMatchOf(c, me.id);
+    if (live) return { ok: false, error: 'in_match', code: live.code };
+
     // with open_to_all on, walk into the room already waiting at this stake rather than opening a second one
     if (openToAll) {
       const waiting = await openRoom(c, stake, me.id);
@@ -553,7 +599,8 @@ export async function createMatch(me: { id: number }, stake: number, openToAll: 
 
 export type JoinResult =
   | { ok: true; code: string; already: boolean; started: boolean }
-  | { ok: false; error: 'no_match' | 'taken' | 'room_full' | 'not_enough_gold'; gold?: number };
+  | { ok: false; error: 'no_match' | 'taken' | 'room_full' | 'not_enough_gold'; gold?: number }
+  | { ok: false; error: 'in_match'; code: string };
 
 /** Sit down in a room. Used by a friend opening an invitation link and by a player asking for any free seat. */
 export async function joinRoomTx(c: PoolClient, userId: number, code: string, tier: number): Promise<JoinResult> {
@@ -561,8 +608,12 @@ export async function joinRoomTx(c: PoolClient, userId: number, code: string, ti
   if (!m) return { ok: false, error: 'no_match' };
   if (m.state !== 'open') return { ok: false, error: 'taken' };
   const seats = await room(c, m.code);
+  // Already in this one: that is not a second match, it is a link opened twice or a device catching up.
   if (seats.some(p => p.user_id === userId)) return { ok: true, code: m.code, already: true, started: false };
   if (seats.length >= config.game.seats) return { ok: false, error: 'room_full' };
+  // In a different one, though, and an invitation cannot be accepted until that is finished or left.
+  const live = await liveMatchOf(c, userId);
+  if (live) return { ok: false, error: 'in_match', code: live.code };
 
   const seated = await sit(c, m, userId, tier);
   if (seated === 'not_enough_gold') {
@@ -623,6 +674,41 @@ export async function sweep(): Promise<SweepReport> {
       return true;
     });
     if (voided) { out.voided.push(r.code); await publish(r.code, 'room_closed', { reason: 'expired' }); }
+  }
+
+  // a board nobody has been heard from on is cleared, so the seat -- and the account in it -- is free again
+  const idle = await query<{ code: string }>(pool,
+    `SELECT m.code FROM matches m
+      WHERE m.state = 'playing'
+        AND m.started_at IS NOT NULL
+        AND m.started_at < now() - ($1 || ' minutes')::interval
+        AND NOT EXISTS (
+              SELECT 1 FROM match_players p
+               WHERE p.code = m.code AND p.ms IS NULL
+                 AND p.last_seen_at > now() - ($1 || ' minutes')::interval)
+      LIMIT 50`, [String(config.game.idleMinutes)]);
+  for (const r of idle.rows) {
+    const how = await tx(async c => {
+      const m = await matchRowLocked(c, r.code);
+      if (!m || m.state !== 'playing') return null;
+      const seats = await room(c, r.code);
+      // Somebody played it: the board was a real race, and whoever finished has earned what they finished
+      // for. The rest are counted as losses, which is what they would have been had they stayed.
+      if (seats.some(p => p.finished_at !== null)) {
+        await query(c, `UPDATE match_players SET ms = -1, finished_at = now() WHERE code = $1 AND ms IS NULL`, [r.code]);
+        await settleMatch(c, r.code);
+        return 'settled' as const;
+      }
+      // Nobody played it at all. Taking the stakes off people for a board that was never a contest is not a
+      // rule, it is a fine for closing a tab, so the room is voided and every stake goes back where it came
+      // from -- the same way an invitation nobody accepted is handed back.
+      const upd = await query(c, `UPDATE matches SET state = 'void', settled_at = now() WHERE code = $1 AND state = 'playing'`, [r.code]);
+      if (upd.rowCount !== 1) return null;
+      for (const p of seats) await give(c, p.user_id, m.stake, 'expire_refund', idem.expireRefund(r.code, p.user_id), r.code);
+      return 'voided' as const;
+    });
+    if (how === 'settled') { out.settled.push(r.code); await publish(r.code, 'match_finished', { reason: 'idle' }); }
+    if (how === 'voided') { out.voided.push(r.code); await publish(r.code, 'room_closed', { reason: 'idle' }); }
   }
 
   // a match where someone never finished is settled a day later, with the missing run counted as a loss
