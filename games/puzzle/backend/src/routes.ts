@@ -217,6 +217,7 @@ const H = {
       waiting: await R.lobbyCounts(),
       gold: me.user ? await balance(pool, me.user.id) : null,
       stakes: config.game.stakes,
+      lengths: config.game.lengths,
     });
   },
 
@@ -369,7 +370,8 @@ const H = {
     if (!me.user) { await noStore(res).code(401).send({ error: 'signed_out' }); return; }
     if (!(await limited('match_create', req, res, me.user.id))) return;
     const b = body(req);
-    const made = await R.createMatch(me.user, Number(b.stake ?? 0), Boolean(b.open_to_all), Number(b.tier ?? 2));
+    // How long: the client sends what it offered, and the server checks it against its own list.
+    const made = await R.createMatch(me.user, Number(b.stake ?? 0), Boolean(b.open_to_all), Number(b.tier ?? 2), b.boards === undefined ? 1 : Number(b.boards));
     if (!made.ok) {
       // Already in one: 409, and the code, because the only useful answer to "you are already in a match" is
       // the way back to it. The client turns this into a tap rather than a dead end.

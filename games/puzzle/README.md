@@ -70,6 +70,13 @@ back what the phone has since cleared; and a device whose poll brings back a run
 applies it rather than fighting it, which is how that tab catches up. The server derives nothing from it —
 `pct` and `ms` still decide the race — and `cleanRun` drops anything that is not a small, well-formed board.
 
+**A match is a run of boards.** A room is opened for one, three or five boards (`PUZZLE_MATCH_LENGTHS`,
+default `1,3,5`; `/lobby` lists them and `POST /matches` takes `boards`), and the server picks that many
+countries when the seats fill, so both players see the same boards in the same order. `pct` counts across
+the whole run — board two of three starts at a third — and the snapshot carries the board index (`bi`), so
+a device resuming the match lands on the right board. Clearing the last board finishes the run; running out
+of hearts on any board ends it there.
+
 ### The gold ledger
 
 Every movement of gold is a row in `gold_ledger` with a unique `idem_key`, written in the same transaction as
@@ -194,7 +201,7 @@ in the path.
 | GET | `/boards/difficulty` | per board, how often it beats people and what a clear costs; anonymous, `?min=` players |
 | GET | `/league` | this week's table, your place in it, the prizes, and last week's result |
 | GET | `/lobby` | the tables the server seats, and how many are waiting at each |
-| POST | `/matches` | open a room (`stake`, `open_to_all`, `tier`) |
+| POST | `/matches` | open a room (`stake`, `open_to_all`, `tier`, `boards`) |
 | GET | `/matches/:code` | the room as you may see it |
 | POST | `/matches/:code/join` | take a seat |
 | POST | `/matches/:code/start` | host starts an invite-only room |

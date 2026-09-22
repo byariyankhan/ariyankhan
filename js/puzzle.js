@@ -18,6 +18,7 @@
   const MAP_VERSION = '3';
   const DISCB_VERSION = '4';  // games/data/discover-boards.json: the board shaped like each country's animal, bird or landmark
   const FOCUS_VERSION = '4';  // games/data/focus-boards.json: the brain, the lightbulb, the key — the boards the game opens on
+  const SCENE_VERSION = '1';  // games/data/scene-boards.json: the tower, the arena, the cross — the big boards every few countries
   const STORE = 'aa:v1:';
 
   // ── Where the backend lives ──
@@ -121,18 +122,21 @@
   };
   const formNow = () => ({ ...FORM0, ...(store.get('form', null) || {}) });
   const TIER_OF = () => clampTier(formNow().tier);
-  const MAXLEN_OF = [7, 9, 11, 12, 10];  // longest body per tier: long snakes, as on the reference boards; Master a little shorter so it packs more arrows
+  const MAXLEN_OF = [7, 9, 11, 14, 16];  // longest body per tier: long snakes, as on the reference boards -- and on Hard and Master, the long winding ones that fill a page
+  // Hard and Master boards are drawn on a finer grid than the level data asks for: more cells, so more arrows
+  // on the same outline. The scale is the same for everybody, so a match is still the same board for both.
+  const KSCALE_OF = [1, 1, 1, 1.18, 1.5];
   // How narrow the play is per tier (see generate()): narrow = prefer the end whose run holds more pieces (blocked
   // longer), far = prefer the end with a gap right ahead (the arrow it frees when it goes is that far away), rail =
   // straighter, longer snakes, holes/lane = share and length of the lanes carved out first.
-  const NARROW_OF = [0.5, 0.75, 0.9, 0.97, 1];
-  const FAR_OF = [0.2, 0.4, 0.6, 0.8, 0.9];
-  const RAIL_OF = [0.1, 0.15, 0.2, 0.25, 0.3];     // share of pieces that run long and straight across the board
-  const HOLE_OF = [0.1, 0.15, 0.2, 0.22, 0.25];    // share of inland cells carved out as lanes: the cleared arrow frees one far away, across the lane
+  const NARROW_OF = [0.5, 0.75, 0.9, 1, 1];
+  const FAR_OF = [0.2, 0.4, 0.6, 0.85, 0.95];
+  const RAIL_OF = [0.1, 0.15, 0.2, 0.32, 0.42];    // share of pieces that run long and straight across the board
+  const HOLE_OF = [0.1, 0.15, 0.2, 0.18, 0.15];    // share of inland cells carved out as lanes: fewer on the top tiers, so the board is packed
   const LANE_OF = [1, 2, 3, 3, 4];                 // longest lane (empty cells between an arrow and its blocker)
   // Tightening iterations per tier (see generate stage 3): a local search that turns arrows to face a blocker so a
   // simulated player has fewer free arrows to pick from at any moment. Hard and up.
-  const TIGHTEN_OF = [0, 0, 250, 300, 300];
+  const TIGHTEN_OF = [0, 0, 250, 380, 420];
   const GEN_OPTS = tier => ({ narrow: NARROW_OF[tier], far: FAR_OF[tier], rail: RAIL_OF[tier], holes: HOLE_OF[tier], lane: LANE_OF[tier], tighten: TIGHTEN_OF[tier] });
   const DIRS = { r: [0, 1], l: [0, -1], d: [1, 0], u: [-1, 0] };
   const PALETTE = ['#FFED54', '#5CD6FF', '#8CFF7A', '#FF9AD5', '#C79BFF', '#FFB347', '#6EE7B7', '#FDBA74', '#F97373', '#38BDF8'];
@@ -590,7 +594,7 @@
   // ── Data ──
   async function loadData() {
     if (DATA) return DATA;
-    const [r] = await Promise.all([fetch(`/games/data/puzzle.json?v=${DATA_VERSION}`, { cache: 'force-cache' }), loadDiscBoards(), loadFocusBoards()]);
+    const [r] = await Promise.all([fetch(`/games/data/puzzle.json?v=${DATA_VERSION}`, { cache: 'force-cache' }), loadDiscBoards(), loadFocusBoards(), loadSceneBoards()]);
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     const d = await r.json(); d.canon = d.levels.slice();
     migrateProgress(d);
@@ -607,7 +611,8 @@
   // The tour: every country in the player's order, each followed by its discovery board, one numbered list.
   // More kinds of board later simply mean more levels.
   function tourFor(d, home) {
-    const tour = orderFor(d, home).flatMap(C => [C, discLevelFor(C)].filter(Boolean));
+    let nth = 0;
+    const tour = orderFor(d, home).flatMap((C, k) => [C, discLevelFor(C), (k + 1) % SCENE_EVERY === 0 ? sceneLevelFor(nth++) : null].filter(Boolean));
     // discovery clears were briefly kept under dv:<id> before the boards became levels of their own
     for (const L of tour) if (L.disc && !store.get('lv:' + L.id)) { const v = store.get('dv:' + L.country.id); if (v) store.set('lv:' + L.id, v); }
     // The focus boards go in at the frontier — in front of the first board the player has not cleared. For a new
@@ -986,6 +991,25 @@
     });
   }
   const isLocalOnly = id => String(id).startsWith('f:');   // a focus board: cleared here, kept here
+  // ── Scene boards ──
+  // Big, plain shapes that exist to be full of arrows -- a tower, a pair of towers, an arena, a cross -- the
+  // size a long game is (games/build-scene-boards.mjs draws them). One sits in the tour after every fourth
+  // country, one tier harder than the player's own, and is cleared and synced under its own id like any board.
+  let SCENES = null, scenePromise = null;
+  function loadSceneBoards() {
+    if (SCENES) return Promise.resolve(SCENES);
+    if (!scenePromise) scenePromise = fetch(`/games/data/scene-boards.json?v=${SCENE_VERSION}`, { cache: 'force-cache' }).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }).then(d => { SCENES = d; return d; }).catch(() => null);
+    return scenePromise;
+  }
+  const sceneCache = new Map();
+  const SCENE_EVERY = 4;
+  function sceneLevelFor(n) {
+    const list = Array.isArray(SCENES?.boards) ? SCENES.boards : [];
+    if (!list.length) return null;
+    const b = list[n % list.length];
+    if (!sceneCache.has(b.id)) sceneCache.set(b.id, { id: 's:' + b.id, name: b.name, d: b.d, k: b.k, scene: true });
+    return sceneCache.get(b.id);
+  }
 
   // the next board to play after i: the first open one further down the list (cleared boards are skipped, so Next
   // never lands on a replay), else the first open one anywhere, else nothing (-1)
@@ -995,8 +1019,12 @@
     for (let j = 0; j <= i && j < DATA.levels.length; j++) if (open(j)) return j;
     return -1;
   }
-  const hudLabel = () => state.daily ? (state.daily.race ? 'Challenge' : 'Daily') : `Level ${levelNo(state.idx)}`;
-  const maskFor = (L, tier) => { const key = L.id + ':' + tier; if (!maskCache.has(key)) maskCache.set(key, rasterise(L.d, L.k[tier])); return maskCache.get(key); };
+  const hudLabel = () => {
+    if (state.daily?.race) { const R = state.daily; return R.boards && R.boards.length > 1 ? `Board ${(R.bi | 0) + 1} of ${R.boards.length}` : 'Challenge'; }
+    if (state.daily) return 'Daily';
+    return `Level ${levelNo(state.idx)}${state.level?.scene ? ' · ' + state.level.name : ''}`;
+  };
+  const maskFor = (L, tier) => { const key = L.id + ':' + tier; if (!maskCache.has(key)) maskCache.set(key, rasterise(L.d, L.k[tier] * ((L.scene || L.focus) ? 1 : KSCALE_OF[tier]))); return maskCache.get(key); };   // scene and focus boards were sized for their tiers already
 
   // ── Puzzle generation ──
   // Two stages, like a maze that is drawn first and signposted after.
@@ -1323,6 +1351,7 @@
       lives: state.lives, wrong: state.wrong,
       hintsUsed: state.hintsUsed, hintsMax: state.hintsMax ?? HINTS_PER_LEVEL,
       checksUsed: state.checksUsed, checksMax: state.checksMax ?? CHECKS_PER_LEVEL,
+      ...(state.daily?.race && state.daily.boards ? { bi: state.daily.bi | 0 } : {}),
     };
   }
   /**
@@ -1335,6 +1364,7 @@
    */
   function applyRun(r) {
     if (!r || !state.pieces.length || state.finished) return false;
+    if (state.daily?.boards && Number.isInteger(r.bi) && r.bi !== (state.daily.bi | 0)) return false;   // another board's run
     const gone = new Set(Array.isArray(r.gone) ? r.gone : []);
     let took = false;
     for (const p of state.pieces) {
@@ -1358,7 +1388,7 @@
     return took;
   }
   /** A run that came back from the server is ahead of this board if it has seen more moves than this board. */
-  const runAhead = r => !!r && Number.isInteger(r.moves) && r.moves > (state.moves | 0);
+  const runAhead = r => !!r && Number.isInteger(r.moves) && (r.moves > (state.moves | 0) || (Number.isInteger(r.bi) && r.bi > (state.daily?.bi | 0)));
 
   function updateReveal() {
     const total = state.pieces.length;
@@ -1378,7 +1408,8 @@
     if (daily?.race) state.seedBump = 0;   // a race is that exact board: a stray reshuffle must not change it
     else if (bumpSeed) state.seedBump++; else if (state.idx !== i || !!daily !== !!state.daily) { state.seedBump = 0; state.fails = 0; }
     state.daily = daily; state.level = DATA.levels[i]; state.disc = state.level.disc ? state.level : null;
-    state.idx = i; state.tier = daily ? daily.tier : keepTier >= 0 ? keepTier : TIER_OF();
+    // A scene board is one tier harder than the player's own: it is the long game, and the tier is the pace.
+    state.idx = i; state.tier = daily ? daily.tier : keepTier >= 0 ? keepTier : state.level.scene ? clampTier(TIER_OF() + 1) : TIER_OF();
     if (!daily) countBoard(state.level.id, { p: 1 });   // a tour board started; a race or a daily is not the tour's
     state.busy = true; el.select.hidden = true; el.game.hidden = false; el.overlay.hidden = true; el.board.innerHTML = '';
     el.hudLevel.textContent = hudLabel(); el.hudLeft.textContent = 'Drawing the board…';
@@ -1389,6 +1420,7 @@
     const gen = bestBoard(state.maskInfo, state.tier, seed);
     const livesMax = livesFor(state.tier);
     Object.assign(state, { W: gen.W, H: gen.H, pieces: gen.pieces, occ: gen.occ, land: gen.land, left: gen.pieces.length, hintsMax: hintsFor(state.tier), checksUsed: 0, checksMax: CHECKS_PER_LEVEL, lives: livesMax, livesMax, elapsed: 0, startedAt: 0, raceBase: 0, finished: false, hintsUsed: 0, wrong: 0, moves: 0, busy: false, potGone: false, combo: 0, bestCombo: 0, lastShot: 0, cheerHold: 0, shown: new Set(), armed: new Set(), raceReading: null });
+    if (daily?.race) state.moves = daily.moves | 0;   // a later board of the same match carries the count on, so the server's monotonic guard still holds
     el.error.hidden = true; el.loading.hidden = true;
     if (daily) { if (history.replaceState) history.replaceState(null, '', location.pathname + location.search + (daily.hash ?? '#daily')); } else setHash(i);
     scrollToGame();
@@ -1397,7 +1429,7 @@
     resetZoom(); renderBoard(); renderHud();
     // Back on a race board is back in the match, on the match's own clock -- and on the board as it was left,
     // wherever it was left: the run the server holds is put back before anybody is told the board is ready.
-    if (daily?.race && daily.match) { applyRun(daily.match.your_run); renderRanks(daily.match.players); syncRaceClock(daily.match); startProgressPoll(); }
+    if (daily?.race && daily.match) { applyRun(daily.run || daily.match.your_run); renderRanks(daily.match.players); syncRaceClock(daily.match); startProgressPoll(); }
     // A board that has just been drawn is announced by nothing. The level, the difficulty and the arrows left
     // are already on the HUD above it, and a country whose name is the answer has no business being written
     // across the board that asks the question. The one line still said here is the only one that is not a
@@ -1779,9 +1811,19 @@
       // sheet a second later. Two different times on two screens in a row is how a race stops making sense.
       state.raceReading = { code: R.match?.code, stars: s, lost: state.livesMax - state.lives, hints: state.hintsUsed,
         combo: state.bestCombo, focus: focusOf(t, state.pieces.length, state.livesMax - state.lives, state.hintsUsed) };
+      // A match is a run of boards: this one cleared, the next comes up on its own, hearts and hints back,
+      // the clock still running. Only the last board ends the race.
+      const nb = (R.bi | 0) + 1;
+      if (R.boards && nb < R.boards.length) {
+        el.card.innerHTML = `<h3>Board ${nb} of ${R.boards.length} cleared!</h3><p class="aa-card-lead">The next one is coming up…</p>`;
+        showCard();
+        const next = raceFor(R.match, R.boards, nb, (state.moves | 0) + 1, null, (R.elapsedBase || 0) + t);
+        const j = matchBoardIndex(next.board);
+        if (j >= 0) { setTimeout(() => startLevel(j, false, next, R.tier), 1100); return; }
+      }
       el.card.innerHTML = '<h3>Board cleared!</h3><p class="aa-card-lead">Sending your time…</p>';
       showCard();
-      finishMatch(true, t);
+      finishMatch(true, (R.elapsedBase || 0) + t);
       return;
     }
     // The streak is still counted and still reset by a loss — it is a record of this device's play and throwing
@@ -1791,7 +1833,7 @@
     // What the card has to say about the board, where there is anything to say. A country has its capital,
     // its size and its region; a discovery board has what the find is to that country; a focus board is a brain
     // or a lightbulb and has nothing of the kind, so it is given nothing and the line is left out altogether.
-    const facts = D ? escapeHtml(D.rel.charAt(0).toUpperCase() + D.rel.slice(1)) : L.focus ? '' : [L.cap ? `Capital: <b>${L.cap}</b>` : '', L.pop ? `Population: <b>${fmtPop(L.pop)}</b>` : '', L.sub ? `Region: <b>${L.sub}</b>` : ''].filter(Boolean).join(' · ');
+    const facts = D ? escapeHtml(D.rel.charAt(0).toUpperCase() + D.rel.slice(1)) : (L.focus || L.scene) ? '' : [L.cap ? `Capital: <b>${L.cap}</b>` : '', L.pop ? `Population: <b>${fmtPop(L.pop)}</b>` : '', L.sub ? `Region: <b>${L.sub}</b>` : ''].filter(Boolean).join(' · ');
     const nj = nextOpen(i), last = nj < 0;
     // The reading. It is shown, not described: a bar under a caption, with the comparison against everybody
     // else added underneath only when the server has enough players to make it true.
@@ -1817,7 +1859,7 @@
         <button type="button" class="aa-btn" data-act="share">${ICON_SHARE}Share</button>
       </div>
       <p class="aa-flash" hidden></p>
-      ${L.focus ? '' : `<p class="aa-yt">Curious about ${escapeHtml(C.name)}? I make geography, history and economy videos: <a href="https://www.youtube.com/@ariyankhan" target="_blank" rel="noopener">youtube.com/@ariyankhan</a></p>`}`;
+      ${(L.focus || L.scene) ? '' : `<p class="aa-yt">Curious about ${escapeHtml(C.name)}? I make geography, history and economy videos: <a href="https://www.youtube.com/@ariyankhan" target="_blank" rel="noopener">youtube.com/@ariyankhan</a></p>`}`;
     showCard();
     $('[data-act]', el.card)?.focus({ preventScroll: true });
     runFocusBar(focus);
@@ -1874,7 +1916,7 @@
     const act = e.target.closest('[data-act]')?.dataset.act; if (!act) return;
     if (act === 'adheart') { adOffer('heart'); return; }
     if (act === 'next') { const j = nextOpen(state.idx); if (j < 0) goToLevels(); else startLevel(j); }
-    else if (act === 'again' || act === 'retry') startLevel(state.idx, false, state.daily, state.tier);
+    else if (act === 'again' || act === 'retry') { if (state.daily?.race) state.daily.moves = (state.moves | 0) + 1; startLevel(state.idx, false, state.daily, state.tier); }
     else if (act === 'shuffle') startLevel(state.idx, true, state.daily);
     else if (act === 'skip') { const id = DATA.levels[state.idx + 1]?.id; store.set(skipKey(state.idx + 1), true); if (id && !isLocalOnly(id)) syncTour({ [id]: { cleared: false, skipped: true } }); startLevel(nextOpen(state.idx)); }
     // Out of hearts is not the end of a challenge — giving up is, and it cannot be taken back: the loss goes
@@ -3168,6 +3210,9 @@
     el.matchTitle.textContent = 'Dashboard';
     el.matchBody.innerHTML = `
       ${meStrip()}
+      <p class="aa-cap">How long</p>
+      <div class="aa-opts" id="aaLenOpts">${lengthsHtml()}</div>
+      <p class="aa-cap">Table</p>
       <div class="aa-stakes">${stakesHtml(gold, waiting)}</div>
       <label class="aa-fill"><input type="checkbox" id="aaFillOnline"${fill ? ' checked' : ''}><span>Fill from online</span></label>
       <p class="aa-cap" id="aaRecentCap" hidden>Played with lately</p>
@@ -3203,6 +3248,13 @@
   // Five tables in one row, small enough to take in at a glance. How many are sitting at each one rides in the
   // corner as a badge rather than as a line of type: the number is the news, the word "waiting" is not.
   const stakeLive = n => n ? `<span class="aa-stake-live" title="${n} waiting">${n}</span>` : '';
+  // How long a match is, in boards. The list is the server's (the lobby sends it), so a length added there
+  // reaches the player on their next look at the dashboard. Three is the default: a match should take a while.
+  let LENGTHS = [1, 3, 5];
+  const matchLen = () => { const n = Number(store.get('matchLen', 3)); return LENGTHS.includes(n) ? n : LENGTHS[Math.min(1, LENGTHS.length - 1)]; };
+  const lengthsHtml = () => LENGTHS.map(n => `<button type="button" class="aa-dev-opt${n === matchLen() ? ' is-active' : ''}" data-len="${n}" aria-pressed="${n === matchLen()}">${n} board${n === 1 ? '' : 's'}</button>`).join('');
+  /** One line that says how long a room's match is, for the room card and the invitation. */
+  const shapeLine = m => { const n = Number(m?.boards_n) || (Array.isArray(m?.boards) ? m.boards.length : 1); return n === 1 ? 'One board' : `${n} boards in a row`; };
   const stakesHtml = (gold, waiting) => STAKES.map(v =>
     `<button type="button" class="aa-stake" data-stake="${v}"${gold < v ? ' disabled' : ''} aria-label="Play for ${gfmt(v)} gold"><span class="aa-stake-in"><img class="aa-coin aa-stake-coin" src="/images/puzzle-coin.png" alt="" width="128" height="128" decoding="async"><span class="aa-stake-amt">${gtiny(v)}</span></span>${stakeLive(waiting[v])}</button>`).join('');
 
@@ -3214,6 +3266,7 @@
       const d = await matchApi('lobby');
       state.lobbyWaiting = d.waiting || {};
       if (typeof d.gold === 'number') setGold(d.gold);
+      if (Array.isArray(d.lengths) && d.lengths.length) LENGTHS = d.lengths.filter(n => Number.isInteger(n) && n > 0);
       const served = Array.isArray(d.stakes) ? d.stakes.filter(n => Number.isFinite(n) && n > 0) : [];
       const row = $('.aa-stakes', el.matchBody);
       if (served.length && String(served) !== String(STAKES)) {
@@ -3265,6 +3318,7 @@
     el.card.innerHTML = `
       <p class="aa-card-kicker">Gold match · ${gpurse(m.stake)} <button type="button" class="aa-info" data-act="minfo" aria-expanded="${state.roomInfo ? 'true' : 'false'}" aria-controls="aaRoomInfo" aria-label="How the pot is paid">${INFO_ICON}</button></p>
       <h3>${m.count} of ${m.seats} joined</h3>
+      <p class="aa-shape">${shapeLine(m)}</p>
       <div class="aa-ranks aa-ranks--card">${faces(m.players)}</div>
       <p class="aa-wait">${roomWait(m, host)}</p>
       <p class="aa-sheet-note aa-info-text" id="aaRoomInfo"${state.roomInfo ? '' : ' hidden'}>${splitLine(m)}</p>
@@ -3382,7 +3436,8 @@
         <span class="aa-vs-who"><b>${escapeHtml(m.host)}</b> challenges you.</span>
       </div>
       <p class="aa-purse"><span>Stake</span><span class="aa-gold" title="${gfmt(m.stake)} gold">${COIN}${gpurse(m.stake)}</span></p>
-      <p class="aa-sheet-note">Everyone puts in ${gpurse(m.stake)} gold and plays the very same board. ${splitLine(m)}${short ? ` <b>You have only ${gpurse(gold)}.</b>` : ''}</p>
+      <p class="aa-shape">${shapeLine(m)}</p>
+      <p class="aa-sheet-note">Everyone puts in ${gpurse(m.stake)} gold and plays the very same boards. ${splitLine(m)}${short ? ` <b>You have only ${gpurse(gold)}.</b>` : ''}</p>
       <div class="aa-actions">
         <button type="button" class="aa-btn aa-btn--primary" data-mact="join"${short ? ' disabled' : ''}>Confirm game</button>
         <button type="button" class="aa-btn" data-mact="close">Not now</button>
@@ -3548,7 +3603,9 @@
     stopProgressPoll();
     const R = state.daily;
     if (!R?.match) return;
-    const myPct = () => (state.pieces.length ? Math.round(((state.pieces.length - state.left) / state.pieces.length) * 100) : 0);
+    // Progress is over the whole match: board two of three half done is 50%, not 50% of a third.
+    const boardFrac = () => (state.pieces.length ? (state.pieces.length - state.left) / state.pieces.length : 0);
+    const myPct = () => { const n = R.boards?.length || 1; return Math.round((((R.bi | 0) + boardFrac()) / n) * 100); };
     const notePot = m => {
       if (m?.winner && !state.potGone && !state.finished) {   // the pot is gone; the places behind it are not
         state.potGone = true;
@@ -3563,7 +3620,16 @@
     const runIfChanged = () => { if (state.moves === carried) return undefined; carried = state.moves | 0; return runSnapshot(); };
     // A run that comes back ahead of this board was made on another device, and this one catches up rather
     // than fighting it -- which is the whole answer to a tab left open while the phone played on.
-    const takeBack = m => { if (runAhead(m?.your_run)) { applyRun(m.your_run); carried = -1; } };
+    const takeBack = m => {
+      const r = m?.your_run; if (!runAhead(r)) return;
+      // Ahead on a later board: this device goes there, and puts the run onto it once it is drawn.
+      if (R.boards && Number.isInteger(r.bi) && r.bi > (R.bi | 0)) {
+        const bi = Math.min(r.bi, R.boards.length - 1), next = raceFor(R.match, R.boards, bi, r.moves | 0, r, R.elapsedBase || 0);
+        const j = matchBoardIndex(next.board);
+        if (j >= 0) { startLevel(j, false, next, R.tier); return; }
+      }
+      applyRun(r); carried = -1;
+    };
     const send = async () => {
       try {
         const d = await matchApi('progress', { code: R.match.code, pct: myPct(), run: runIfChanged() });
@@ -3597,17 +3663,31 @@
   }
 
   const matchBoardIndex = board => DATA.levels.findIndex(L => L.id === board);
+  /**
+   * The race, as startLevel plays it: which board of the match, from what move count. A match is a run of
+   * boards now, each with its own seed off the match's; `moves` carries on from board to board so the
+   * server's guard -- a snapshot only ever replaces one with fewer moves -- still holds across them, and
+   * `run` is a snapshot to put back onto the board once it is drawn.
+   */
+  function raceFor(m, boards, bi, moves = 0, run = null, elapsedBase = 0) {
+    return { key: 'match', race: true, match: m, boards, bi, board: boards[bi], tier: m.tier,
+      seed: (Number(m.seed) | 0) + bi * 7919, hash: '#m=' + m.code, moves, run, elapsedBase };
+  }
+  const boardsOfMatch = m => (Array.isArray(m.boards) && m.boards.length ? m.boards : [m.board]);
   function playMatch(m) {
     // Never deal this board again over a run that is already on screen. A poll that arrives late, a link
     // opened twice, the back button — any of them used to restart the board under the player, which looked
     // like the game had pressed Try again for them. Getting back onto a board is a tap, and only a tap.
     if (state.daily?.race && state.daily.match?.code === m.code) return;
-    const i = matchBoardIndex(m.board);
+    const boards = boardsOfMatch(m);
+    // The board this account is on, wherever it last played: a run posted from another device says which.
+    const bi = Math.max(0, Math.min(boards.length - 1, Number(m.your_run?.bi) | 0));
+    const i = matchBoardIndex(boards[bi]);
     if (i < 0) { toast('That board is not in this version of the game.', 'bad'); return; }
     closeSheets();
     state.pendingMatch = null;
     stopMatchPoll();
-    startLevel(i, false, { key: 'match', race: true, match: m, board: m.board, tier: m.tier, seed: m.seed, hash: '#m=' + m.code })
+    startLevel(i, false, raceFor(m, boards, bi, Number(m.your_run?.moves) | 0, m.your_run || null), m.tier)
       .then(() => { SFX.go(); vibe([0, 30, 60, 70]); });   // startLevel puts the line-up and the poll back
     if (typeof gtag === 'function') gtag('event', 'match_play', { game: 'puzzle', stake: m.stake });
   }
@@ -3636,6 +3716,14 @@
     store.set('fillOnline', e.target.checked);
   });
   el.matchBody?.addEventListener('click', async e => {
+    // How long: a tap marks the choice and it is kept for next time.
+    const len = e.target.closest('[data-len]')?.dataset.len;
+    if (len !== undefined) {
+      store.set('matchLen', Number(len));
+      const box = $('#aaLenOpts', el.matchBody); if (box) box.innerHTML = lengthsHtml();
+      vibe(8);
+      return;
+    }
     const inv = e.target.closest('[data-invite]');
     if (inv) {
       const id = Number(inv.dataset.invite), name = inv.dataset.name;
@@ -3658,7 +3746,7 @@
     if (stake) {
       const btn = e.target.closest('[data-stake]'); btn.disabled = true;
       try {
-        const d = await matchApi('create', { stake: +stake, tier: TIER_OF(), open_to_all: fillOn() });
+        const d = await matchApi('create', { stake: +stake, tier: TIER_OF(), open_to_all: fillOn(), boards: matchLen() });
         setGold(d.gold);
         showRoom(d.match);
         // People were picked on the dashboard before the table was: now there is a room to point them at.

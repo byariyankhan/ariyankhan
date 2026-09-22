@@ -234,6 +234,9 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 @media(max-width:340px){ .aa-stake-coin{ width:20px; height:20px; } .aa-stake-amt{ font-size:12px; } }
 /* one switch: does this room take players from online, or only the ones you send the link to */
 .aa-fill{ display:flex; align-items:center; gap:9px; margin:12px 2px 2px; font-size:14px; font-weight:800; color:var(--muted); cursor:pointer; }
+.aa-opts{ display:flex; gap:6px; margin:2px 0 10px; }
+.aa-opts .aa-dev-opt{ font-size:13px; padding:9px 4px; }
+.aa-shape{ margin:-6px 0 10px; font-size:13px; font-weight:800; color:var(--muted); text-align:center; }
 .aa-fill input{ appearance:none; width:42px; height:24px; border-radius:999px; background:var(--line-soft); position:relative; cursor:pointer; transition:background .15s; flex:0 0 auto; margin:0; }
 .aa-fill input::after{ content:""; position:absolute; top:3px; left:3px; width:18px; height:18px; border-radius:50%; background:var(--card); box-shadow:0 1px 3px rgba(0,0,0,.25); transition:transform .15s; }
 .aa-fill input:checked{ background:var(--good); }

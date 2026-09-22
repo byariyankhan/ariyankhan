@@ -211,4 +211,32 @@ section('The board travels with the seat');
   eq((await runOf(a.id))?.moves, 7, 'a run handed in is not rewritten afterwards');
 }
 
+section('A match is a run of boards');
+{
+  const a = await player('twist-a'), b = await player('twist-b');
+  const made = await R.createMatch(a, S, false, 2, 3) as { ok: true; code: string };
+  const open = await R.matchView(pool, (await R.matchRow(pool, made.code))!, a.id);
+  eq(open.boards_n, 3, 'the room says how long it is before it starts');
+  eq(open.boards, undefined, 'but not which boards, until it does');
+  await tx(c => R.joinRoomTx(c, b.id, made.code, 2));
+  await tx(c => R.startRoom(c, made.code));
+  const m = (await R.matchRow(pool, made.code))!;
+  const v = await R.matchView(pool, m, b.id);
+  eq(v.boards?.length, 3, 'three boards once it starts');
+  eq(new Set(v.boards).size, 3, 'all different');
+  eq(v.board, v.boards?.[0], 'and board is the first of them, for a client from before there was a list');
+
+  const plain = await R.createMatch(await player('twist-c'), S, false, 2) as { ok: true; code: string };
+  eq((await R.matchView(pool, (await R.matchRow(pool, plain.code))!, null)).boards_n, 1, 'a match asked for with no length is one board, as before');
+  eq((await R.createMatch(await player('twist-d'), S, false, 2, 4)).ok, false, 'a length the server does not offer is refused');
+
+  // The run carries which board it is on; the guard on it is the same.
+  const run = R.cleanRun({ moves: 9, gone: [1, 2], lives: 3, wrong: 1, hintsUsed: 0, hintsMax: 3, checksUsed: 0, checksMax: 4, bi: 1 });
+  eq(run?.bi, 1, 'the board index rides with the run');
+  eq(R.cleanRun({ moves: 1, gone: [], lives: 3, wrong: 0, hintsUsed: 0, hintsMax: 3, checksUsed: 0, checksMax: 4 })?.bi, undefined, 'a one-board run has no index');
+  eq(R.cleanRun({ moves: 1, gone: [], lives: 3, wrong: 0, hintsUsed: 0, hintsMax: 3, checksUsed: 0, checksMax: 4, bi: 40 }), null, 'an index off the end is not a run');
+  await tx(c => R.saveProgress(c, made.code, b.id, 40, run));
+  eq((await R.matchView(pool, (await R.matchRow(pool, made.code))!, b.id)).your_run?.bi, 1, 'and comes back to the seat that posted it');
+}
+
 await finish();

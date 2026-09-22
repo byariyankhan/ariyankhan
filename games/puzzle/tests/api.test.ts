@@ -529,6 +529,17 @@ section('A phone registers for notifications the way a browser does, and is told
   eq((await call('/push/reminder', { body: { on: false } })).status, 401, 'but not by a stranger');
 }
 
+section('A room says how long it is');
+{
+  const host = await mint('shapeHost');
+  eq((await call('/lobby')).json.lengths, [1, 3, 5], 'the lobby says which lengths are offered');
+  const room = await call('/matches', { token: host.token, body: { stake: config.game.stakes[0], open_to_all: false, boards: 3 } });
+  eq([room.status, (room.json.match as { boards_n: number }).boards_n], [200, 3], 'a three-board match opens and the room says so');
+  await call(`/matches/${(room.json.match as { code: string }).code}/leave`, { token: host.token, body: {} });
+  const bad = await call('/matches', { token: host.token, body: { stake: config.game.stakes[0], open_to_all: false, boards: 2 } });
+  eq([bad.status, bad.json.error], [400, 'bad_length'], 'a length not on the list is refused');
+}
+
 section('Mute: the one answer to being asked too often');
 {
   const host = await mint('muteHost'), mate = await mint('muteMate');
