@@ -653,8 +653,6 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-actions .aa-btn--soft{ background:color-mix(in srgb, var(--accent2) 12%, var(--card)); color:var(--accent2); box-shadow:none; }
 .aa-ad-pill{ position:absolute; right:14px; top:50%; transform:translateY(-50%); background:rgba(255,255,255,.88); color:var(--accent); font-size:11px; font-weight:900; letter-spacing:.6px; padding:3px 9px; border-radius:999px; }
 .aa-card .aa-btn:focus:not(:focus-visible){ outline:none; }   /* the first action is focused for the keyboard's sake; a tap draws no ring */
-.aa-card-links{ display:flex; flex-wrap:wrap; justify-content:center; align-items:center; gap:4px 10px; margin:12px 0 0; }
-.aa-card-links .aa-linkbtn{ display:inline; width:auto; margin:0; padding:4px 2px; font-size:13px; white-space:nowrap; }
 /* The one that does the damage. Tinted rather than solid, because --bad is a light red in the dark themes and
    white on that cannot be read; the outline is what makes it look like a decision. */
 .aa-actions .aa-btn--danger{ background:color-mix(in srgb, var(--bad) 14%, transparent); color:var(--bad);

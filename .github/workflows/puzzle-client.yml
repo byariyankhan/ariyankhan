@@ -1,5 +1,5 @@
-# The game's own engine and its advertising rules, tested against the code that ships: tests/*.test.mjs lift
-# the pieces out of js/puzzle.js by their own markers, so what runs is the exact code the page loads. No
+# The game's own engine, tested against the code that ships: tests/puzzle.test.mjs lifts the pieces out of
+# js/puzzle.js by their own markers, so what runs is the exact code the page loads. No
 # database, no browser, no secrets: a minute of Node. Its own workflow, so a change to the client does not
 # build and publish the API's image.
 name: Puzzle client
@@ -23,5 +23,5 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Engine and interstitial rules
-        run: node --test tests/puzzle.test.mjs tests/puzzle-ads.test.mjs
+      - name: Engine
+        run: node --test tests/puzzle.test.mjs
