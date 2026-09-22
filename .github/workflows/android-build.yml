@@ -39,6 +39,11 @@ on:
         type: boolean
         required: false
         default: false
+      check_signing:
+        description: 'Only check the four signing secrets against each other and print what is wrong (sizes, hashes, yes/no answers -- never a secret), then stop'
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: read
@@ -93,7 +98,46 @@ jobs:
           printf '%s' "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/upload.jks"
           test -s "$RUNNER_TEMP/upload.jks" || { echo "::error::the secret did not decode to a keystore"; exit 1; }
 
+      # A signing failure says "keystore password was incorrect" whether the password is wrong, has a stray
+      # newline, or the keystore bytes are not the ones on the laptop; the build log cannot tell which. This
+      # step can, and prints nothing that is secret: lengths, a hash to compare with `sha256sum` at home,
+      # the keystore type, and yes/no for each password against the file.
+      - name: Check the signing secrets against each other
+        if: ${{ inputs.check_signing && !inputs.debug_apk }}
+        env:
+          KEYSTORE_B64: ${{ secrets.PUZZLE_KEYSTORE_B64 }}
+          KS_PASS: ${{ secrets.PUZZLE_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.PUZZLE_KEY_ALIAS }}
+          KEY_PASS: ${{ secrets.PUZZLE_KEY_PASSWORD }}
+        run: |
+          set +e
+          KS="$RUNNER_TEMP/upload.jks"
+          echo "keystore file: $(stat -c %s "$KS") bytes, sha256 $(sha256sum "$KS" | cut -c1-64)"
+          echo "  compare with, on the laptop:  sha256sum puzzle-upload.jks"
+          echo "base64 secret: ${#KEYSTORE_B64} characters; newlines inside: $(printf '%s' "$KEYSTORE_B64" | tr -cd '\n' | wc -c); ends with whitespace: $([[ "$KEYSTORE_B64" =~ [[:space:]]$ ]] && echo yes || echo no)"
+          echo "store password: ${#KS_PASS} characters; ends with whitespace/newline: $([[ "$KS_PASS" =~ [[:space:]]$ ]] && echo YES || echo no); starts with whitespace: $([[ "$KS_PASS" =~ ^[[:space:]] ]] && echo YES || echo no)"
+          echo "key password:   ${#KEY_PASS} characters; ends with whitespace/newline: $([[ "$KEY_PASS" =~ [[:space:]]$ ]] && echo YES || echo no); same as the store password: $([ "$KEY_PASS" = "$KS_PASS" ] && echo yes || echo no)"
+          echo "key alias:      ${#KEY_ALIAS} characters; ends with whitespace/newline: $([[ "$KEY_ALIAS" =~ [[:space:]]$ ]] && echo YES || echo no)"
+          echo "file starts with: $(head -c 4 "$KS" | od -An -tx1 | tr -d ' ')  (feedfeed = JKS, 3082 = PKCS12)"
+          if keytool -list -keystore "$KS" -storepass "$KS_PASS" > "$RUNNER_TEMP/list.txt" 2>&1; then
+            echo "store password opens the keystore: yes"
+            grep -i "keystore type\|entries" "$RUNNER_TEMP/list.txt" | head -3
+            if grep -qi "^$KEY_ALIAS," "$RUNNER_TEMP/list.txt"; then echo "alias found in the keystore: yes"; else echo "alias found in the keystore: NO"; echo "aliases present (names only):"; grep -i "PrivateKeyEntry" "$RUNNER_TEMP/list.txt" | cut -d, -f1; fi
+            # -certreq needs the private key, so it is a real test of the key password on a JKS store. On a PKCS12
+            # store keytool ignores a different -keypass (it warns and uses the store password), so there the one
+            # thing that matters is the "same as the store password" line above: bundletool uses both.
+            if keytool -certreq -alias "$KEY_ALIAS" -keystore "$KS" -storepass "$KS_PASS" -keypass "$KEY_PASS" -file "$RUNNER_TEMP/req.csr" > /dev/null 2>&1; then echo "key password opens the key (JKS) / key readable (PKCS12): yes"; else echo "key password opens the key: NO"; fi
+            rm -f "$RUNNER_TEMP/req.csr"
+          else
+            echo "store password opens the keystore: NO"
+            sed -n 1,3p "$RUNNER_TEMP/list.txt" | sed 's/'"$KS_PASS"'/***/g'
+          fi
+          rm -f "$RUNNER_TEMP/list.txt" "$KS"
+          echo "::notice::Signing check done. Nothing was built."
+          exit 0
+
       - name: Firebase configuration, when it is a secret rather than a file
+        if: ${{ !inputs.check_signing }}
         env:
           GS_B64: ${{ secrets.GOOGLE_SERVICES_JSON_B64 }}
         run: |
@@ -126,7 +170,7 @@ jobs:
           retention-days: 14
 
       - name: Build the bundle
-        if: ${{ !inputs.debug_apk }}
+        if: ${{ !inputs.debug_apk && !inputs.check_signing }}
         working-directory: android
         env:
           PUZZLE_KEYSTORE: ${{ runner.temp }}/upload.jks
@@ -140,7 +184,7 @@ jobs:
       # A bundle that is not signed, or is signed with the wrong key, looks fine until Play refuses it. Say so
       # here instead, where the run is still on screen.
       - name: Check it is signed, carries its splash, and say what with
-        if: ${{ !inputs.debug_apk }}
+        if: ${{ !inputs.debug_apk && !inputs.check_signing }}
         working-directory: android
         run: |
           AAB=app/build/outputs/bundle/release/app-release.aab
@@ -153,7 +197,7 @@ jobs:
           keytool -printcert -jarfile "$AAB" | grep -E 'Owner:|SHA256:' || true
 
       - name: Keep it
-        if: ${{ !inputs.debug_apk }}
+        if: ${{ !inputs.debug_apk && !inputs.check_signing }}
         uses: actions/upload-artifact@v4
         with:
           name: puzzle-${{ github.event.inputs.version_name }}-${{ steps.ver.outputs.code }}
