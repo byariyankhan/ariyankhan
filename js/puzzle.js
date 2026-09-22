@@ -194,6 +194,37 @@
   // progress is keyed by country id (not by level number: the tour order is the player's own, home country first)
   const progressKey = i => 'lv:' + DATA.levels[i].id;
   const skipKey = i => 'skip:' + DATA.levels[i].id;
+
+  // ── What each board costs, counted here ──
+  // The tour's record of a board is its best run. It cannot say how many tries that took, how many hearts
+  // went, or which boards are started and never cleared -- which is the whole of what "hard" means, and the
+  // one thing a level designer needs to know. So every board played counts, on this device, signed in or not,
+  // online or not: started, cleared, hearts run out, and what a clear cost in hints, hearts and time. The
+  // counts ride along with the tour sync whenever there is one, per device, and only ever grow.
+  const DEVICE = (() => {
+    let d = store.get('device', '');
+    if (!d) { d = Math.random().toString(36).slice(2, 10) + Date.now().toString(36); store.set('device', d); }
+    return d;
+  })();
+  const statKey = id => 'st:' + id;
+  function countBoard(id, add) {
+    if (!id) return;
+    const s = store.get(statKey(id), { p: 0, c: 0, f: 0, h: 0, l: 0, ms: 0 });
+    for (const [k, v] of Object.entries(add)) s[k] = (s[k] || 0) + v;
+    store.set(statKey(id), s);
+  }
+  /** Every board this device has counted, for the sync. Focus boards stay here, like their records do. */
+  function localStats() {
+    const out = {};
+    try {
+      for (const k of Object.keys(localStorage)) {
+        if (!k.startsWith(STORE + 'st:')) continue;
+        const id = k.slice(STORE.length + 3); if (isLocalOnly(id)) continue;
+        const s = store.get('st:' + id); if (s && (s.p || s.c || s.f)) out[id] = s;
+      }
+    } catch { /* storage can be unreadable in a private window */ }
+    return out;
+  }
   const cleared = i => store.get(progressKey(i));
   const unlocked = i => i === 0 || !!cleared(i - 1) || !!store.get(skipKey(i));
   const dayKeyOf = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -1348,6 +1379,7 @@
     else if (bumpSeed) state.seedBump++; else if (state.idx !== i || !!daily !== !!state.daily) { state.seedBump = 0; state.fails = 0; }
     state.daily = daily; state.level = DATA.levels[i]; state.disc = state.level.disc ? state.level : null;
     state.idx = i; state.tier = daily ? daily.tier : keepTier >= 0 ? keepTier : TIER_OF();
+    if (!daily) countBoard(state.level.id, { p: 1 });   // a tour board started; a race or a daily is not the tour's
     state.busy = true; el.select.hidden = true; el.game.hidden = false; el.overlay.hidden = true; el.board.innerHTML = '';
     el.hudLevel.textContent = hudLabel(); el.hudLeft.textContent = 'Drawing the board…';
     el.btnLevels.setAttribute('aria-label', daily?.race ? 'Leave the challenge' : 'Back to home');
@@ -1734,7 +1766,10 @@
       const ds = store.get('dailyStreak', { count: 0, last: '' });
       if (ds.last !== state.daily.key) store.set('dailyStreak', { count: ds.last === dayKeyBack(1) ? ds.count + 1 : 1, last: state.daily.key });
       syncTour({});   // the daily board lives in the state blob, which every push carries
-    } else { store.set(progressKey(i), rec); forgetNums(); pushOne(DATA.levels[i].id, rec); showBrainNext = true; }
+    } else {
+      countBoard(DATA.levels[i].id, { c: 1, h: state.hintsUsed, l: state.livesMax - state.lives, ms: t });
+      store.set(progressKey(i), rec); forgetNums(); pushOne(DATA.levels[i].id, rec); showBrainNext = true;
+    }
     if (R) {
       // How the run went is the player's either way, so the reading goes with them onto the result sheet: the
       // stars, what the board cost, and the focus bar, exactly as a tour board draws them. It is kept here
@@ -1810,6 +1845,7 @@
     stopTimer(); state.finished = true; state.busy = true; state.fails++;
     music.spike = 0; musicRace(0); heartbeatStop();
     store.set('streak', 0);
+    if (!state.daily) countBoard(state.level.id, { f: 1 });
     SFX.lose(); renderHud();
     const learn = learnFrom(false);
     const canSkip = !state.daily && state.fails >= 2 && state.idx < DATA.levels.length - 1;
@@ -2577,6 +2613,7 @@
     if (!auth.user) return Promise.resolve(false);
     if (syncing) return syncing;
     const body = levels ? { levels, state: localState() } : { levels: localTour(), state: localState() };
+    body.stats = localStats(); body.device = DEVICE;
     syncing = progressApi(body)
       .then(d => adoptTour(d))
       .catch(() => false)

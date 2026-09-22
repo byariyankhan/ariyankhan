@@ -10,7 +10,7 @@ import * as R from './rooms.js';
 import { adClaim, balance } from './gold.js';
 import { deleteUser, endSession, googleVerify, providers, startSession, upsertUser, cleanName } from './auth.js';
 import { publish, publishToUser } from './events.js';
-import { boardPace, cleanLevels, cleanState, mergeLevels, mergeState, readAll } from './progress.js';
+import { boardPace, cleanDevice, cleanLevels, cleanState, cleanStats, difficulty, mergeLevels, mergeStats, mergeState, readAll } from './progress.js';
 import * as L from './league.js';
 import { liveProgress, online, roomPresence } from './presence.js';
 import { havePlayedTogether, isMuted, isRacing, mute, mutedList, recentPlayers, unmute } from './players.js';
@@ -150,16 +150,26 @@ const H = {
 
   // Push what this device has, get back the merged whole. One call rather than a read and a write, because a
   // device that has just been handed the truth should adopt it in the same breath as it offers its own.
+  // Which boards are hard, from play. Public and anonymous: counts and averages per board, never a person.
+  async difficulty(req: Req, res: Res, _me: Caller) {
+    if (!(await limited('progress_read', req, res, null))) return;
+    const min = Math.max(1, Math.min(1000, Number((req.query as Record<string, unknown>).min ?? 3) || 3));
+    await res.header('Cache-Control', 'public, max-age=300').send({ boards: await difficulty(pool, min) });
+  },
+
   async progressPush(req: Req, res: Res, me: Caller) {
     if (!me.user) { await noStore(res).code(401).send({ error: 'signed_out' }); return; }
     if (!(await limited('progress_write', req, res, me.user.id))) return;
     const b = body(req);
     const levels = cleanLevels(b.levels);
     const state = cleanState(b.state);
+    // What the boards cost this device, if it counted: per device, so two phones on one account add up.
+    const stats = cleanStats(b.stats), device = cleanDevice(b.device);
     const userId = me.user.id;
     const merged = await tx(async c => {
       await mergeLevels(c, userId, levels);
       if (state) await mergeState(c, userId, state);
+      if (device && Object.keys(stats).length) await mergeStats(c, userId, device, stats);
       // A board posted is a player playing: the evening nudge leaves alone anyone seen in the last few hours.
       // Written at most once in ten minutes, so a busy session is not a write per level.
       await query(c, `UPDATE users SET last_played_at = now() WHERE id = $1 AND last_played_at < now() - interval '10 minutes'`, [userId]);
@@ -505,6 +515,7 @@ export function registerRoutes(app: FastifyInstance): void {
 
   app.get(`${v1}/progress`, withCaller(H.progressRead));
   app.post(`${v1}/progress`, withCaller(H.progressPush));
+  app.get(`${v1}/boards/difficulty`, withCaller(H.difficulty));
 
   app.get(`${v1}/boards/pace`, withCaller(H.pace));
 

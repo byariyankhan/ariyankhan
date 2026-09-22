@@ -2375,6 +2375,25 @@ PATCH
   note "the service account is in $ENVF on this host and nowhere else; it has not been printed"
 }
 
+mode_stats() {
+  echo "Puzzle — stats  ($(date -u))"
+  say "1. how much play has been counted"
+  T=$(psqlc "SELECT count(DISTINCT user_id) || ' players, ' || count(DISTINCT device) || ' devices, ' || count(DISTINCT level_id) || ' boards, ' || coalesce(sum(plays),0) || ' starts, ' || coalesce(sum(clears),0) || ' clears, ' || coalesce(sum(fails),0) || ' hearts run out' FROM level_stats" 2>/dev/null) || { bad "could not read level_stats (has the migration run?)"; return; }
+  note "$T"
+  say "2. the hardest thirty boards, by how often they beat somebody (three players or more)"
+  docker exec "$PG" sh -c 'PGPASSWORD="$POSTGRES_PASSWORD" exec psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "
+    SELECT level_id AS board, players, plays AS starts, clears, fails, fail_rate, hints_per_clear AS hints, hearts_per_clear AS hearts, seconds_per_clear AS seconds
+      FROM level_difficulty WHERE players >= 3
+     ORDER BY fail_rate DESC NULLS LAST, seconds_per_clear DESC NULLS LAST LIMIT 30"' 2>&1 | sed 's/^/      /'
+  say "3. the ten that beat nobody"
+  docker exec "$PG" sh -c 'PGPASSWORD="$POSTGRES_PASSWORD" exec psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "
+    SELECT level_id AS board, players, plays AS starts, clears, fail_rate, seconds_per_clear AS seconds
+      FROM level_difficulty WHERE players >= 3 AND clears > 0
+     ORDER BY fail_rate ASC NULLS LAST, seconds_per_clear ASC NULLS LAST LIMIT 10"' 2>&1 | sed 's/^/      /'
+  ok "read only; nothing changed"
+  note "for names, charts and the full list: games/puzzle/tools/hardest.py, or GET /api/puzzle/v1/boards/difficulty"
+}
+
 case "$MODE" in
   inspect)       mode_inspect ;;
   logs)          mode_logs ;;
@@ -2391,6 +2410,7 @@ case "$MODE" in
   deploy)        mode_deploy ;;
   deploy-site)   mode_deploy_site ;;
   health)        mode_health ;;
+  stats)         mode_stats ;;
   rename-infra)  mode_rename_infra ;;
   rename-env)    mode_rename_env ;;
   rename-paths)  mode_rename_paths ;;
