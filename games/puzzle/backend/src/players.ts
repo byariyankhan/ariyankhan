@@ -17,6 +17,8 @@
 import type { Sql } from './db.js';
 import { query } from './db.js';
 import { online } from './presence.js';
+import { config } from './config.js';
+import { k, redis, soft } from './redis.js';
 
 export interface RecentPlayer {
   id: number;
@@ -98,6 +100,44 @@ export async function isRacing(sql: Sql, userId: number): Promise<boolean> {
          AND m.started_at > now() - ($2 || ' minutes')::interval
     ) AS ok`, [userId, String(AT_A_TABLE_MINUTES)]);
   return !!r.rows[0]?.ok;
+}
+
+export type InviteVerdict = { ok: true } | { ok: false; why: 'too_soon' | 'enough_today'; retryAfter: number };
+
+/** Seconds until the day's count starts over, which is midnight UTC: a plain answer to "when can I ask again". */
+function secondsToTomorrow(now = new Date()): number {
+  const next = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1);
+  return Math.max(1, Math.ceil((next - now.getTime()) / 1000));
+}
+
+/**
+ * May this player ask that player again, right now?
+ *
+ * Having played together is the right to ask at all; this is how often. There is no friend list here and no
+ * way to be taken off somebody's list, so the only thing between a player and being pestered is a rule on
+ * the asking: one ask of the same person per cooldown, and a few a day. Somebody who has not answered three
+ * in a day has answered.
+ *
+ * The count lives in Redis, keyed on the pair and the day, because it is a courtesy and not a ledger: if
+ * Redis is gone the courtesy is gone with it and the invitation goes through, which is the degradation this
+ * service promises everywhere -- the game slows and forgets, it does not stop. Asking consumes the cooldown
+ * and a place in the day only when the answer is yes.
+ */
+export async function inviteAllowed(from: number, to: number): Promise<InviteVerdict> {
+  return soft<InviteVerdict>(async () => {
+    const day = k('invites', from, to, new Date().toISOString().slice(0, 10));
+    const pair = k('invite', from, to);
+    const sofar = Number(await redis.get(day)) || 0;
+    if (sofar >= config.game.invitesPerDay) return { ok: false, why: 'enough_today', retryAfter: secondsToTomorrow() };
+    const set = await redis.set(pair, '1', 'EX', Math.max(1, config.game.inviteCooldownSeconds), 'NX');
+    if (set === null) {
+      const ttl = await redis.ttl(pair);
+      return { ok: false, why: 'too_soon', retryAfter: Math.max(1, ttl) };
+    }
+    const n = await redis.incr(day);
+    if (n === 1) await redis.expire(day, 86_400 + 3_600);   // a day, and a little, so a count never outlives its day by less than it started with
+    return { ok: true };
+  }, { ok: true });
 }
 
 /**

@@ -1851,6 +1851,7 @@
       });
     }
     else if (act === 'resend') { const b = e.target.closest('[data-act]'); b.disabled = true; flushResult(true).then(ok => { if (!ok) b.disabled = false; }); }
+    else if (act === 'minfo') toggleRoomInfo();
     else if (act === 'minvite') showInvitePanel(state.pendingMatch);
     else if (act === 'mshare') sendInvite(state.pendingMatch);
     else if (act === 'mroom') renderRoom(state.pendingMatch);
@@ -2769,7 +2770,7 @@
   const matchApi = (a, body, query = '') => {
     const { url, method } = matchUrl(a, body, query);
     return fetch(url, { method, credentials: 'include', cache: 'no-store', headers: method === 'POST' ? { 'Content-Type': 'application/json' } : {}, body: method === 'POST' ? JSON.stringify(body || {}) : undefined })
-      .then(async r => { const d = await r.json().catch(() => ({})); if (!r.ok) throw Object.assign(new Error(d.error || `HTTP ${r.status}`), { code: d.error, gold: d.gold, matchCode: d.match_code }); return d; });
+      .then(async r => { const d = await r.json().catch(() => ({})); if (!r.ok) throw Object.assign(new Error(d.error || `HTTP ${r.status}`), { code: d.error, gold: d.gold, matchCode: d.match_code, retryAfter: d.retry_after }); return d; });
   };
   // ── The live socket ──
   //
@@ -2969,11 +2970,17 @@
       return !!d.delivered;
     } catch (err) {
       if (btn) { btn.disabled = false; btn.textContent = 'Invite'; }
+      // Asked too recently, or enough for one day: said as what it is, and the button reads "Asked" rather
+      // than going back to "Invite", because an invitation that has just gone is not one to send again.
+      const minutes = Math.max(1, Math.ceil((Number(err.retryAfter) || 0) / 60));
+      if (btn && (err.code === 'too_soon' || err.code === 'enough_today')) { btn.disabled = true; btn.textContent = 'Asked'; }
       if (!quiet) toast(err.code === 'not_played_together' ? 'You can only invite people you have played with.'
         : err.code === 'in_a_match' ? `${name} is on a board right now. Try again when they are done.`
+        : err.code === 'too_soon' ? `${name} was asked a few minutes ago. Try again in ${minutes} min.`
+        : err.code === 'enough_today' ? `${name} has been asked enough for one day.`
         : err.code === 'taken' ? 'That room has already started.'
         : err.code === 'already_in' ? `${name} is already in this room.`
-        : 'Could not send that invitation.', 'bad');
+        : 'Could not send that invitation.', err.code === 'too_soon' || err.code === 'enough_today' ? 'hint' : 'bad', 4200);
       return false;
     }
   }
@@ -3084,6 +3091,7 @@
   const faces = players => (players || []).map(p => `<span class="aa-rank${p.you ? ' is-you' : ''}${faceClass(p)}" title="${escapeHtml(p.name)}">${faceInner(p)}</span>`).join('');
   function showRoom(m) {
     state.pendingMatch = m;
+    state.roomInfo = false;           // a new room starts with the note folded away, as every room does
     closeSheets();
     clearRun();                       // the waiting room shows this match's nothing, not the last one's ending
     el.select.hidden = true; el.game.hidden = false; el.board.innerHTML = '';
@@ -3097,15 +3105,25 @@
     startRoomPoll(m.code);
     tickFill(m.fills_in);   // after the poll: starting it clears any tick already running, this one included
   }
+  const INFO_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M12 11v5.2"/><path d="M12 7.6v.2"/></svg>';
+  function toggleRoomInfo() {
+    state.roomInfo = !state.roomInfo;
+    const text = $('#aaRoomInfo', el.card), btn = $('.aa-info', el.card);
+    if (text) text.hidden = !state.roomInfo;
+    if (btn) btn.setAttribute('aria-expanded', String(!!state.roomInfo));
+  }
   function renderRoom(m) {
     const host = m.you === 'host';
     state.pendingMatch = m;
+    // What the table pays is one tap away rather than on the card: a paragraph that is read once and then sits
+    // in the way of every glance at who has joined. The (i) opens it and closes it, and it stays as it was
+    // left across the polls that redraw this card.
     el.card.innerHTML = `
-      <p class="aa-card-kicker">Gold match · ${gpurse(m.stake)}</p>
+      <p class="aa-card-kicker">Gold match · ${gpurse(m.stake)} <button type="button" class="aa-info" data-act="minfo" aria-expanded="${state.roomInfo ? 'true' : 'false'}" aria-controls="aaRoomInfo" aria-label="How the pot is paid">${INFO_ICON}</button></p>
       <h3>${m.count} of ${m.seats} joined</h3>
       <div class="aa-ranks aa-ranks--card">${faces(m.players)}</div>
       <p class="aa-wait">${roomWait(m, host)}</p>
-      <p class="aa-sheet-note">${splitLine(m)}</p>
+      <p class="aa-sheet-note aa-info-text" id="aaRoomInfo"${state.roomInfo ? '' : ' hidden'}>${splitLine(m)}</p>
       <div class="aa-actions">
         <button type="button" class="aa-btn${host && !m.open_to_all ? '' : ' aa-btn--primary'}" data-act="minvite">Invite</button>
         ${host && !m.open_to_all ? `<button type="button" class="aa-btn aa-btn--primary" data-act="mstart"${m.count > 1 ? '' : ' disabled'}>Start</button>` : ''}
