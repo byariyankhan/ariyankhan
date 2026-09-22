@@ -1938,17 +1938,14 @@
       <h3>${reason}</h3>
       <p class="aa-card-lead">${state.left} of ${state.pieces.length} arrows were still on the board.</p>
       ${state.daily?.race && sayOnce('race-retry') ? '<p class="aa-adapt">Try again puts you back on the same board with your hearts back. Nothing is lost until somebody else clears it.</p>' : ''}
-      <div class="aa-actions aa-actions--stack">
-        <button type="button" class="aa-btn aa-btn--primary" data-act="retry">${ICON_AGAIN}Try again</button>
-        ${state.daily?.race ? `<button type="button" class="aa-btn" data-act="giveup">${ICON_FLAG}Give the board up</button>` : `<button type="button" class="aa-btn" data-act="shuffle">${ICON_SHUFFLE}${eased ? 'Easier layout' : 'New layout'}</button>`}
-        ${canSkip ? `<button type="button" class="aa-btn" data-act="skip">${ICON_SKIP}Skip level</button>` : ''}
-        ${adCanOffer('heart')
-          ? `<button type="button" class="aa-btn aa-btn--ad" data-act="adheart">${ads.isAd() ? ICON_AD + 'Watch an ad' : 'Free heart'}</button>`
-          : `<button type="button" class="aa-btn" data-act="levels">${ICON_MAP}World Tour</button>`}
+      <div class="aa-actions aa-actions--stack aa-actions--out">
+        ${adCanOffer('heart') ? `<button type="button" class="aa-btn aa-btn--ad aa-btn--big" data-act="adheart">${ICON_AD}Get a free life${ads.isAd() ? '<span class="aa-ad-pill">AD</span>' : ''}</button>` : ''}
+        <button type="button" class="aa-btn aa-btn--soft aa-btn--big" data-act="retry">${ICON_AGAIN}Try again</button>
+        ${state.daily?.race ? `<button type="button" class="aa-btn aa-btn--big" data-act="giveup">${ICON_FLAG}Give the board up</button>` : ''}
       </div>
-      ${adCanOffer('heart') ? '<p class="aa-card-out"><button type="button" class="aa-linkbtn" data-act="levels">Back to the World Tour</button></p>' : ''}`;
+      <p class="aa-card-links">${state.daily?.race ? '' : `<button type="button" class="aa-linkbtn" data-act="shuffle">${eased ? 'Easier layout' : 'New layout'}</button>${canSkip ? '<button type="button" class="aa-linkbtn" data-act="skip">Skip level</button>' : ''}`}<button type="button" class="aa-linkbtn" data-act="levels">Back to the World Tour</button></p>`;
     showCard();
-    $('[data-act]', el.card)?.focus({ preventScroll: true });
+    $('[data-act]', el.card)?.focus({ preventScroll: true, focusVisible: false });   // for the keyboard's sake, without a ring drawn on a tap
   }
   el.card.addEventListener('click', e => {
     if (performance.now() - cardShownAt < CARD_DEAF_MS) return;   // the click that opened this card is not a press on it
