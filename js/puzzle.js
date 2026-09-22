@@ -2686,8 +2686,13 @@
     if (d.ok && d.idToken) { await onGoogleCredential({ credential: d.idToken }); return; }
     // Cancelling is an answer, not a fault, and it gets no scolding.
     if (d.error === 'cancelled') return;
+    if (d.detail) console.warn('Google sign-in through the app: ' + d.detail);
+    // "No credentials available" is Google's answer both to a phone with no Google account and to a build
+    // whose signing certificate is not an OAuth client in the Cloud project yet. A phone that does have an
+    // account is in the second case, so the note carries the fingerprint the Cloud form asks for.
+    const cert = d.cert ? ` If this phone does have one, this build is not registered with Google yet — signing certificate SHA-1 ${d.cert}.` : '';
     signInNote(
-      d.error === 'no_account' ? 'No Google account on this phone yet. Add one in Android settings, then try again.'
+      d.error === 'no_account' ? 'No Google account on this phone yet. Add one in Android settings, then try again.' + cert
       : d.error === 'unavailable' ? 'This phone cannot sign in with Google — it has no Play services.'
       : 'That sign-in did not go through. Please try again.');
   }

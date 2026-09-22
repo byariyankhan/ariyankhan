@@ -601,15 +601,56 @@ public final class MainActivity extends ComponentActivity {
                         }
 
                         @Override public void onError(GetCredentialException e) {
-                            answer(reply, fail(
-                                    e instanceof GetCredentialCancellationException ? "cancelled"
-                                            : e instanceof NoCredentialException ? "no_account"
-                                            : "failed"));
+                            String code = e instanceof GetCredentialCancellationException ? "cancelled"
+                                    : e instanceof NoCredentialException ? "no_account"
+                                    : "failed";
+                            JSONObject out = fail(code);
+                            try {
+                                // What Credential Manager actually said, for the page's console; and the
+                                // certificate this build is signed with. "No credentials available" is what
+                                // Google answers both when the phone has no Google account and when this
+                                // package-and-certificate pair is not an OAuth client in the Cloud project,
+                                // and only the fingerprint tells those two apart.
+                                String msg = e.getType() + ": " + e.getMessage();
+                                out.put("detail", msg.length() > 200 ? msg.substring(0, 200) : msg);
+                                String cert = "cancelled".equals(code) ? null : signerSha1();
+                                if (cert != null) out.put("cert", cert);
+                            } catch (JSONException impossible) {
+                                // literal keys, string values
+                            }
+                            answer(reply, out);
                         }
                     });
         } catch (RuntimeException noPlayServices) {
             // A phone without Play services cannot do this at all, and saying so beats hanging.
             answer(reply, fail("unavailable"));
+        }
+    }
+
+    /**
+     * The SHA-1 of the certificate this build is signed with, written the way Google Cloud's OAuth client
+     * form wants it. Null when it cannot be read, which is not something the page has to handle.
+     */
+    @SuppressWarnings("deprecation")
+    private String signerSha1() {
+        try {
+            android.content.pm.Signature[] sigs;
+            if (Build.VERSION.SDK_INT >= 28) {
+                android.content.pm.PackageInfo pi = getPackageManager().getPackageInfo(getPackageName(), PackageManager.GET_SIGNING_CERTIFICATES);
+                sigs = pi.signingInfo == null ? null : pi.signingInfo.getApkContentsSigners();
+            } else {
+                sigs = getPackageManager().getPackageInfo(getPackageName(), PackageManager.GET_SIGNATURES).signatures;
+            }
+            if (sigs == null || sigs.length == 0) return null;
+            byte[] d = java.security.MessageDigest.getInstance("SHA-1").digest(sigs[0].toByteArray());
+            StringBuilder sb = new StringBuilder();
+            for (byte b : d) {
+                if (sb.length() > 0) sb.append(':');
+                sb.append(String.format("%02X", b));
+            }
+            return sb.toString();
+        } catch (Exception cannot) {
+            return null;
         }
     }
 

@@ -108,7 +108,20 @@ whatever is asking. One is needed per package-and-fingerprint pair:
 | `com.ariyankhan.puzzle.debug` | whichever debug keystore built the test APK |
 
 Miss one and sign-in fails for builds signed that way and only those, which is a confusing thing to debug: the
-symptom is a credential error, not a rejection from our server.
+symptom is a credential error, not a rejection from our server. Credential Manager answers
+`NoCredentialException: No credentials available` — the very thing it says when the phone has no Google
+account — so the app's failure reply carries `detail` (what Credential Manager said, logged to the page's
+console) and `cert` (the SHA-1 of the certificate the running build is signed with), and the sign-in note
+prints that fingerprint after "No Google account on this phone yet". A phone that does have an account and
+still sees that note is a build whose fingerprint is not registered: copy the SHA-1 from the note, or from
+Play Console → Test and release → Setup → App signing, and add an Android OAuth client for it.
+
+**Two traps.** The clients go in the Cloud project that owns the *web* client ID (`arrow-atlas-508819`,
+project number 83384024830 — the prefix of the client ID in `strings.xml`), not in the Firebase project that
+owns `google-services.json` (`puzzle-e3f5d`, 634738912422): a fingerprint added in the Firebase console lands
+in the wrong project and changes nothing. And the build Play installs is signed with the **Play App Signing
+key**, not the upload key that signed the bundle, so the upload key's fingerprint alone does not cover what a
+tester's phone runs. Nothing needs rebuilding after a client is added; Google applies it within minutes.
 
 ## Digital Asset Links — what it is still for
 
