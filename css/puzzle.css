@@ -559,6 +559,12 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-card{ width:min(100%,440px); background:var(--card); border-radius:24px; padding:24px 20px; text-align:center; box-shadow:var(--shadow); max-height:100%; overflow:auto; }
 .aa-card h3{ font-size:28px; font-weight:900; margin:0 0 6px; line-height:1.05; color:var(--ink); }
 .aa-card-kicker{ font-size:12px; font-weight:900; letter-spacing:1.5px; text-transform:uppercase; color:var(--accent); margin:0 0 4px; }
+/* The (i) beside a room's kicker. What the table pays used to be a paragraph on the card, read once and then
+   in the way of every glance at who has joined; it is behind this now, one tap away, and a tap away again. */
+.aa-info{ display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; margin-left:2px; vertical-align:middle; border:none; border-radius:50%; background:transparent; color:var(--accent); cursor:pointer; padding:0; letter-spacing:0; transition:background .15s; }
+.aa-info svg{ width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+.aa-info[aria-expanded="true"]{ background:color-mix(in srgb, var(--accent) 16%, transparent); }
+.aa-info-text{ margin-top:-2px; }
 .aa-card-lead{ font-size:15px; color:var(--muted); margin:0 0 14px; }
 .aa-stars{ font-size:34px; color:var(--accent); letter-spacing:6px; margin:0 0 10px; }
 .aa-stats{ display:grid; grid-template-columns:repeat(4,1fr); gap:6px; margin:0 0 12px; }

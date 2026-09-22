@@ -13,7 +13,7 @@ import { publish, publishToUser } from './events.js';
 import { boardPace, cleanLevels, cleanState, mergeLevels, mergeState, readAll } from './progress.js';
 import * as L from './league.js';
 import { liveProgress, online, roomPresence } from './presence.js';
-import { havePlayedTogether, isRacing, recentPlayers } from './players.js';
+import { havePlayedTogether, isRacing, recentPlayers, inviteAllowed } from './players.js';
 import * as push from './push.js';
 import { body, caller, clearSessionCookie, limited, noStore, setSessionCookie, shapeUser, type Caller } from './httpkit.js';
 import { log } from './log.js';
@@ -272,6 +272,9 @@ const H = {
     // And not while they are racing. A challenge landing on a board somebody is being timed on is the one
     // notification this game must never send; it can be sent again in a minute, when their board is over.
     if (await isRacing(pool, to)) { await noStore(res).code(409).send({ error: 'in_a_match' }); return; }
+    // And not again and again. Once per cooldown, a few a day; the refusal says which, and how long.
+    const may = await inviteAllowed(me.user.id, to);
+    if (!may.ok) { await noStore(res).code(429).send({ error: may.why, retry_after: may.retryAfter }); return; }
 
     await publishToUser(to, 'invited', {
       code: m.code, stake: m.stake, from: me.user.name, from_id: me.user.id, pic: me.user.pic ?? '',
