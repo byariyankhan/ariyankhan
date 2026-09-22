@@ -896,17 +896,12 @@ links.
   separate Brain theme: the brain is in Paper.
 - **The out-of-hearts card, as drawn:** "Get a free life" first and biggest, orange with the play icon
   and an AD pill on the right when it is a real advertisement (no pill in free mode); "Try again" under it
-  in a soft rose tint; "New layout" / "Easier layout", "Skip level" and "Back to the World Tour" as links
-  under that (`.aa-actions--out`, `.aa-btn--big`, `.aa-btn--soft`, `.aa-ad-pill`, `.aa-card-links`). The
+  in a soft rose tint; nothing under them (`.aa-actions--out`, `.aa-btn--big`, `.aa-btn--soft`,
+  `.aa-ad-pill`): the corner arrow is the way back to the tour. A challenge keeps "Give the board up". The
   home buttons carry no subtitle: the icon says it.
-- **Interstitials, guarded** (`interShow`, `adH5Next`, `tests/puzzle-ads.test.mjs`): a full-screen
-  advertisement on the tap on Next after every fourth tour clear (`INTER_EVERY`), never in a challenge or
-  on the daily board, never within three minutes of the last one (`INTER_GAP_MS`), never within two
-  minutes of a rewarded advertisement the player chose (`INTER_AFTER_REWARD_MS`, stamped by `adNote`),
-  never in the first minute of a session, and a break that found nothing waits two minutes before asking
-  again. Only when the ads layer is on and giving real advertisements (`ads.on() && ads.isAd()`); the
-  H5 break is `type: 'next'`, and in the app it needs the AdMob interstitial unit in
-  `data-admob-interstitial`. The count is kept in `interClears` across sessions.
+- **No interstitials.** Nothing in the game shows an advertisement of its own accord: not between
+  boards, not after a clear, not on a timer. The only advertisements are the rewarded ones a player
+  chooses (a heart, a hint, a check, gold), and `data-admob-interstitial` is empty on purpose.
 - **Pre-publish audit fixes** (September 2026): a tap on the world map looks the
   board up by id when tapped, and a clear is saved under `state.level.id`, because
   choosing a home country reorders the tour under both; "Auto" home rebuilds the
