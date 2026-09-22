@@ -130,7 +130,8 @@ jobs:
             rm -f "$RUNNER_TEMP/req.csr"
           else
             echo "store password opens the keystore: NO"
-            sed -n 1,3p "$RUNNER_TEMP/list.txt" | sed 's/'"$KS_PASS"'/***/g'
+            # only keytool's own reason, matched against a short list, so nothing typed by a person is echoed
+            grep -o 'keystore password was incorrect\|Keystore was tampered with, or password was incorrect\|Invalid keystore format\|Integrity check failed' "$RUNNER_TEMP/list.txt" | head -1 || echo "(keytool gave a reason outside the known list)"
           fi
           rm -f "$RUNNER_TEMP/list.txt" "$KS"
           echo "::notice::Signing check done. Nothing was built."
