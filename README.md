@@ -901,7 +901,12 @@ links.
   home buttons carry no subtitle: the icon says it.
 - **No interstitials.** Nothing in the game shows an advertisement of its own accord: not between
   boards, not after a clear, not on a timer. The only advertisements are the rewarded ones a player
-  chooses (a heart, a hint, a check, gold), and `data-admob-interstitial` is empty on purpose.
+  chooses (a heart, a hint, a check, gold); the ads layer knows one AdMob unit, the rewarded one, and
+  has no interstitial slot.
+- **Advertisements are on in the app** (`data-give="ad"`: a real rewarded advertisement, granted only on
+  `adViewed`) **and free lifelines stay on the site** (`data-give-web="free"`) until H5 Games Ads approves
+  the domain — a button that asks a network that has not approved the site yet would give nothing. The
+  day approval lands, drop `data-give-web` and the site is strict too.
 - **Pre-publish audit fixes** (September 2026): a tap on the world map looks the
   board up by id when tapped, and a clear is saved under `state.level.id`, because
   choosing a home country reorders the tour under both; "Auto" home rebuilds the

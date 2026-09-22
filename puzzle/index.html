@@ -33,12 +33,15 @@
          start, and nobody noticed that it had taken the publisher id with it. Without this attribute the
          switch above flips and nothing happens at all — no tag built, no break requested, no error — which is
          the worst way for a thing to be broken. -->
-    <!-- data-admob-*: the AdMob ad unit ids, used only when the game is running inside the Android app.
-         The same AdSense tag asks for the same breaks either way; these decide who answers. Empty until the
-         AdMob account has them, and then they are just pasted in — nothing else changes.
-         They look like ca-app-pub-0000000000000000/0000000000 (a slash, where the app id has a tilde). -->
-    <meta name="puzzle-ads" content="h5" data-give="free" data-client="ca-pub-1570944160084395"
-          data-admob-rewarded="ca-app-pub-1570944160084395/3154222428" data-admob-interstitial="" />
+    <!-- data-admob-rewarded: the AdMob rewarded ad unit, used only when the game is running inside the Android
+         app. The same AdSense tag asks for the same break either way; this decides who answers. It looks like
+         ca-app-pub-0000000000000000/0000000000 (a slash, where the app id has a tilde). It is the only unit:
+         nothing in this game shows an advertisement of its own accord, so there is no interstitial unit.
+         data-give="ad" is the app: real rewarded advertisements, granted only on adViewed.
+         data-give-web="free" is the browser, until H5 Games Ads approves the site: a free lifeline that never
+         calls itself an advertisement. The day approval lands, drop data-give-web and the site is strict too. -->
+    <meta name="puzzle-ads" content="h5" data-give="ad" data-give-web="free" data-client="ca-pub-1570944160084395"
+          data-admob-rewarded="ca-app-pub-1570944160084395/3154222428" />
     <!-- Google Analytics is loaded by the game (analyticsOn in js/puzzle.js): only once the Terms and Privacy
          gate below has been accepted, and never inside the Android app. -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
@@ -439,6 +442,6 @@
       </div>
     </div>
 
-    <script src="/js/puzzle.js?v=57"></script>
+    <script src="/js/puzzle.js?v=58"></script>
   </body>
 </html>
