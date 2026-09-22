@@ -106,7 +106,7 @@
          set these two when the backend moves to a host of its own and the client follows without a change:
          <meta name="puzzle-api" content="https://api.example.com" />
          <meta name="puzzle-ws"  content="wss://api.example.com" /> -->
-    <link rel="stylesheet" href="/css/puzzle.css?v=27" />
+    <link rel="stylesheet" href="/css/puzzle.css?v=28" />
     <link rel="preload" href="/games/data/puzzle.json?v=11" as="fetch" crossorigin="anonymous" />
 
     <!-- SCHEMA -->
@@ -289,13 +289,17 @@
           <div class="aa-board-track" aria-hidden="true"><div class="aa-board-bar" id="aaBoardBar"></div></div>
           <svg id="aaBoard" class="aa-board" viewBox="0 0 10 10" role="group" aria-label="Puzzle board. Tap an arrow to shoot it off the board."></svg>
           <canvas class="aa-confetti" id="aaConfetti" hidden></canvas>
-          <div class="aa-toast" id="aaToast" role="status" aria-live="polite" hidden></div>
           <div class="aa-zoom" id="aaZoom" role="group" aria-label="Zoom"><button type="button" class="aa-zoom-btn" data-zoom="out" aria-label="Zoom out"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 12h12"/></svg></button><button type="button" class="aa-zoom-btn" data-zoom="fit" aria-label="Fit board to screen"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 4H4v5"/><path d="M15 4h5v5"/><path d="M15 20h5v-5"/><path d="M9 20H4v-5"/></svg></button><button type="button" class="aa-zoom-btn" data-zoom="in" aria-label="Zoom in"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 12h12"/><path d="M12 6v12"/></svg></button></div>
           <div class="aa-overlay" id="aaOverlay" hidden>
             <div class="aa-card" id="aaCard" role="dialog" aria-live="polite"></div>
           </div>
         </div>
       </section>
+      <!-- The toast sits here, outside the game, because that is the only place it can be seen from every
+           screen. It used to live in the board wrapper, which is inside #aaGame — so every message raised
+           while the game was hidden, which is every message the purse's advertisement offer on the home
+           screen has to give, was written into a hidden subtree and shown to nobody. -->
+      <div class="aa-toast" id="aaToast" role="status" aria-live="polite" hidden></div>
     </main>
 
 
