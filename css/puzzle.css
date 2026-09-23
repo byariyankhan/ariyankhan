@@ -42,7 +42,7 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-icon svg{ width:26px; height:26px; fill:none; stroke:currentColor; stroke-width:1.9; stroke-linecap:round; stroke-linejoin:round; }
 .aa-icon:hover{ background:rgba(0,0,0,.06); }
 .aa-icon:active{ transform:scale(.92); }
-.aa-btn{ display:inline-flex; align-items:center; justify-content:center; gap:8px; padding:12px 22px; border-radius:16px; border:none; background:var(--accent); color:var(--accent-ink); cursor:pointer; font-weight:900; font-size:15px; letter-spacing:.2px; white-space:nowrap; box-shadow:0 4px 0 rgba(0,0,0,.12); transition:transform .1s, filter .15s; }
+.aa-btn{ display:inline-flex; align-items:center; justify-content:center; gap:8px; padding:12px 22px; border-radius:16px; border:none; background:linear-gradient(120deg, var(--accent2), color-mix(in srgb, var(--accent2) 62%, var(--accent))); color:#fff; cursor:pointer; font-weight:900; font-size:15px; letter-spacing:.2px; white-space:nowrap; box-shadow:0 4px 0 rgba(0,0,0,.12); transition:transform .1s, filter .15s; }
 .aa-btn:hover{ filter:brightness(1.05); }
 .aa-btn:active{ transform:translateY(2px); box-shadow:0 2px 0 rgba(0,0,0,.12); }
 .aa-btn:disabled{ opacity:.45; cursor:default; }
@@ -207,7 +207,7 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-signin-list{ margin:0 0 14px; padding:0 0 0 18px; color:var(--muted); font-size:14px; line-height:1.7; }
 /* The player's own header: face, name, and the purse right under the name rather than adrift at the far edge. */
 .aa-me{ display:flex; align-items:center; gap:14px; margin:0 0 16px; min-width:0; }
-.aa-me-id{ display:flex; flex-direction:column; align-items:flex-start; gap:6px; min-width:0; overflow:hidden; }
+.aa-me-id{ display:flex; flex-direction:row; align-items:center; flex-wrap:wrap; gap:6px 12px; min-width:0; overflow:hidden; }
 .aa-me-face{ position:relative; overflow:hidden; width:56px; height:56px; border-radius:50%; background:var(--accent); color:#fff; font-size:22px; font-weight:900; display:flex; align-items:center; justify-content:center; flex:0 0 auto; }
 /* A face is the Google picture when there is one, the initial when there is not. Two players whose names start
    with the same letter get different colours, so the line-up over the board is never a row of identical As. */
@@ -227,7 +227,7 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-rank.is-c5, .aa-me-face.is-c5, .aa-row-face.is-c5{ background:#0E7C86; }
 .aa-rank.is-c6, .aa-me-face.is-c6, .aa-row-face.is-c6{ background:#B5651D; }
 .aa-rank.is-c7, .aa-me-face.is-c7, .aa-row-face.is-c7{ background:#8C2F6B; }
-.aa-me-name{ display:block; max-width:100%; font-size:21px; font-weight:900; color:var(--ink); line-height:1.15; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.aa-me-name{ display:block; max-width:100%; min-width:0; flex:0 1 auto; font-size:21px; font-weight:900; color:var(--ink); line-height:1.15; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 /* Who is ahead, over the top left of the board: first place first, and the order changes as they play */
 .aa-ranks{ position:absolute; top:6px; left:6px; z-index:4; display:flex; gap:6px; pointer-events:none; }
 .aa-rank{ position:relative; overflow:visible; width:34px; height:34px; border-radius:50%; background:var(--line-soft); color:var(--card); font-size:15px; font-weight:900; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 6px rgba(0,0,0,.18); transition:transform .25s; }
@@ -247,9 +247,9 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
    like a row of chips you tap, and be taken in at a glance — the tall boxes pushed everything else off the
    screen and still said no more than the coin and the number do here. */
 .aa-stakes{ display:grid; grid-template-columns:repeat(5, 1fr); gap:6px; margin:4px 0 2px; }
-.aa-stake{ position:relative; display:flex; align-items:center; justify-content:center; padding:8px 2px; border:1px solid color-mix(in srgb, var(--accent) 26%, transparent); border-radius:14px; background:linear-gradient(180deg, color-mix(in srgb, var(--card) 92%, #FFE9B0), color-mix(in srgb, var(--card) 74%, var(--bg2))); box-shadow:0 3px 0 color-mix(in srgb, var(--accent) 34%, var(--bg2)), inset 0 1px 0 rgba(255,255,255,.55); cursor:pointer; color:var(--ink); transition:transform .1s, box-shadow .1s; }
+.aa-stake{ position:relative; display:flex; align-items:center; justify-content:center; padding:8px 2px; border:1px solid color-mix(in srgb, var(--accent2) 30%, transparent); border-radius:14px; background:linear-gradient(180deg, color-mix(in srgb, var(--card) 94%, var(--accent2)), color-mix(in srgb, var(--card) 82%, var(--accent2))); box-shadow:0 3px 0 color-mix(in srgb, var(--accent2) 38%, var(--bg2)), inset 0 1px 0 rgba(255,255,255,.55); cursor:pointer; color:var(--ink); transition:transform .1s, box-shadow .1s; }
 .aa-stake:hover:not(:disabled){ filter:brightness(1.03); }
-.aa-stake:active:not(:disabled){ transform:translateY(3px); box-shadow:0 0 0 color-mix(in srgb, var(--accent) 34%, var(--bg2)), inset 0 1px 0 rgba(255,255,255,.55); }
+.aa-stake:active:not(:disabled){ transform:translateY(3px); box-shadow:0 0 0 color-mix(in srgb, var(--accent2) 38%, var(--bg2)), inset 0 1px 0 rgba(255,255,255,.55); }
 .aa-stake:disabled{ opacity:.4; cursor:default; }
 .aa-stake-in{ display:flex; flex-direction:column; align-items:center; gap:3px; min-width:0; }
 .aa-stake-coin{ width:24px; height:24px; }
