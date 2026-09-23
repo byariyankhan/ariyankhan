@@ -2228,6 +2228,7 @@
       <div class="aa-train-rounds">
         ${TRAIN_ROUNDS.map(r => { const c = trainCardState(t, r.id); return `<button type="button" class="aa-train-card ${c.cls}" data-train="${r.id}">${trainIcon(r.id)}<span class="aa-row-label">${c.tag ? `<small class="aa-train-tag">${c.tag}</small>` : ''}<span class="aa-train-name">${r.name}</span><small class="aa-train-run">${runLine(r.id)}</small></span><span class="aa-train-got">${c.chip}</span></button>`; }).join('')}
       </div>
+      ${done ? (() => { const nx = trainNext(trainFreeId()), ad = ads.isAd() && nx !== trainFreeId(); return `<div class="aa-actions aa-actions--stack aa-train-nextrow"><button type="button" class="aa-btn aa-btn--primary${ad ? ' aa-btn--ad' : ''}" data-train="${nx}"${ad ? ' data-train-ad' : ''}>${ad ? `${ICON_AD}Play next<span class="aa-ad-pill">AD</span>` : 'Play next'}</button></div>`; })() : ''}
       <div id="aaTrainGame" hidden></div>`;
     // the marks are paintings: fetched once, and the list drawn again when they arrive
     if (!ART) loadArt().then(() => { const list = $('.aa-train-rounds', el.trainBody); if (list && !list.hidden) renderTrain(); }).catch(() => {});
