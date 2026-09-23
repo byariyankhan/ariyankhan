@@ -940,9 +940,14 @@ links.
 - **Every button is the brain's colour** (`.aa-btn`: the rose-to-coral gradient of Play & Discover, white
   text), the table tiles (`.aa-stake`) carry the same rose in their wash and edge, and the dashboard header
   is one row: the picture, the name, the gold to its right (`.aa-me-id`). "Get a free life" stays orange.
-- **The app asks for notifications on first open** (`notifyFirstAsk`): the phone's own dialog, once
-  (`pushAsked`), after the welcome is accepted; the answer is kept, and the switch in Settings stays.
-  Browsers are never asked unprompted.
+- **The app asks for notifications on first open** (`notifyFirstAsk`): the phone's own dialog the moment
+  the app is up, once (`pushAsked`); the answer is kept, and the switch in Settings stays. Browsers are
+  never asked unprompted. **No card before a system dialog**, in the app or the browser: the switch is the
+  question.
+- **Buttons carry the logo's brain** (`.aa-btn::after`: the white mark, faint, on the right, as Play &
+  Discover does). **The home brain's arrows are always the rose** — GOAT is the whole brain lit, not a
+  green one — and **lit arrows keep moving** (`aabrainflow`: a small step along each arrow's own direction
+  and back, each on its own beat, off under `prefers-reduced-motion`).
 - **The evening nudge needs no account.** Notifications are offered signed out too (`renderNotify` no
   longer waits for `auth.user`); a token or subscription is posted with no user, with the device's own
   nudge answer (`remindOn()`, `reminder` in the post, `store 'remind'`), and the 7 pm sweep reaches those

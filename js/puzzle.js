@@ -862,7 +862,6 @@
     const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
     svg.innerHTML = '';
     svg.setAttribute('viewBox', `-0.6 -0.6 ${em.W + 1.2} ${em.H + 1.2}`);
-    svg.classList.toggle('is-full', full);
     svg.classList.toggle('is-drawing', !still);
     // The outline itself, under the arrows. Thirty arrows cannot draw a brain — a fold is smaller than a cell at
     // this size, and what survives the raster is a lumpy blob. So the silhouette is drawn as a path, at the
@@ -876,7 +875,13 @@
       const hx = head[1] + 0.5, hy = head[0] + 0.5, tipX = hx + dc * 0.32, tipY = hy + dr * 0.32;
       const body = p.cells.slice().reverse().map(([y, x]) => `${x + 0.5} ${y + 0.5}`).join('L');
       const pg = svgEl('g', { class: 'aa-brain-p' + (litSet.has(i) ? ' is-lit' : '') });
-      if (!still) pg.style.transitionDelay = `${Math.min(rank.get(i) ?? 0, 60) * 9}ms`;
+      if (!still) {
+        pg.style.transitionDelay = `${Math.min(rank.get(i) ?? 0, 60) * 9}ms`;
+        // Once lit, an arrow keeps moving: a small step along its own direction and back, each on its own
+        // beat, so the brain reads as alive -- cells firing -- and never as a still drawing.
+        pg.style.setProperty('--dx', `${dc * 0.22}px`); pg.style.setProperty('--dy', `${dr * 0.22}px`);
+        pg.style.animationDelay = `${((i * 137) % 2600)}ms`;
+      }
       pg.appendChild(svgEl('path', { class: 'aa-brain-track', d: `M${body}L${tipX} ${tipY}` }));
       const headG = svgEl('g', { transform: `translate(${tipX} ${tipY}) rotate(${ARROW[p.dir]})` });
       headG.appendChild(svgEl('path', { class: 'aa-brain-head', d: 'M-0.36 -0.3 L0.14 0 L-0.36 0.3 Z' }));
@@ -2972,13 +2977,14 @@
       catch (err) { if (err.code === 'push_off') push.app = false; }
     }
     renderNotify();
-    if (store.get('welcomed')) void notifyFirstAsk();
+    void notifyFirstAsk();
   }
 
   /**
-   * The first time the app is opened, the phone is asked for notifications straight away: its own dialog,
-   * once, and not again -- what the phone answers is its answer, and the switch in Settings stays for
-   * changing it. Only in the app: a browser asked on a first visit is a browser that says no for good.
+   * The first time the app is opened, the phone is asked for notifications straight away -- before anything
+   * else, the way apps do: its own dialog, once, and not again; what the phone answers is its answer, and
+   * the switch in Settings stays for changing it. Only in the app: a browser asked on a first visit is a
+   * browser that says no for good.
    */
   async function notifyFirstAsk() {
     if (!appPush() || store.get('pushAsked')) return;
@@ -3007,14 +3013,7 @@
         push.on = false; push.blocked = false; push.posted = '';
         toast('Notifications off on this phone.', 'hint');
       } else {
-        // The same words before Android's dialog as before the browser's, for the same reason: the system's
-        // dialog names the app and nothing else, and on Android 13 and up two refusals close it for good.
-        if (!push.granted && !(await ask({
-          title: 'Turn on notifications?',
-          body: 'An invite, and the league. Nothing else.\n\nYour phone asks next.',
-          ok: 'Ask me',
-          cancel: 'Not now',
-        }))) return;
+        // Straight to the phone's own dialog: the switch is the question, and a card before it was one too many.
         const r = await shell.ask('pushOn', 120000);
         if (!r?.ok || !r.token) {
           if (r?.error === 'denied') { push.granted = false; toast('Notifications are blocked for Puzzle in your phone\u2019s settings.', 'hint'); }
@@ -3059,13 +3058,7 @@
         // The second reason matters more. That dialog is a single shot: tap Block and web push is off for
         // this origin until the player digs into browser settings to undo it, and nothing in the game can
         // ask again. Anyone who is not sure should be able to say no here, where no costs nothing.
-        if (Notification.permission === 'default' &&
-            !(await ask({
-              title: 'Turn on notifications?',
-              body: 'An invite, and the league. Nothing else.\n\nYour browser asks next.',
-              ok: 'Ask me',
-              cancel: 'Not now',
-            }))) { push.on = false; renderNotify(); return; }
+        // Straight to the browser's own dialog: the switch is the question, and a card before it was one too many.
         const permission = await Notification.requestPermission();
         if (permission !== 'granted') { push.on = false; renderNotify(); toast(permission === 'denied' ? 'Your browser is blocking notifications for this site.' : 'Notifications stay off.', 'hint'); return; }
         const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlB64ToBytes(push.key) });
@@ -4835,7 +4828,7 @@
     shellWired = b;
     shell.ask('hello', 4000);   // so the app holds a way to reach this page
   }
-  if (shell.on) { shellListen(); window.addEventListener('load', shellListen); }
+  if (shell.on) { shellListen(); window.addEventListener('load', shellListen); setTimeout(() => { void notifyFirstAsk(); }, 400); }
   el.btnSound.addEventListener('click', () => { state.muted = !state.muted; store.set('muted', state.muted); renderSound(); if (!state.muted) SFX.shoot(); });
   el.btnVibe?.addEventListener('click', () => { state.vibe = !state.vibe; store.set('vibe', state.vibe); renderToggles(); vibe(20); });
   // Turning music on while standing in the lobby does not start it: it starts on the next board, the same as
@@ -4928,7 +4921,7 @@
   function showGate(then) {
     if (!el.gate) { then?.(); return; }
     el.gate.hidden = false;
-    el.accept.addEventListener('click', () => { store.set('welcomed', Date.now()); analyticsOn(); el.gate.hidden = true; showSplash(then); if (shell.on) setTimeout(() => { void notifyFirstAsk(); }, 1500); }, { once: true });
+    el.accept.addEventListener('click', () => { store.set('welcomed', Date.now()); analyticsOn(); el.gate.hidden = true; showSplash(then); }, { once: true });
     el.accept.focus({ preventScroll: true });
   }
   {
