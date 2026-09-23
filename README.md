@@ -948,6 +948,15 @@ links.
   Discover does). **The home brain's arrows are always the rose** — GOAT is the whole brain lit, not a
   green one — and **lit arrows keep moving** (`aabrainflow`: a small step along each arrow's own direction
   and back, each on its own beat, off under `prefers-reduced-motion`).
+- **A sweep for dead and doubled code** (September 2026): gone from `js/puzzle.js` are three icons nothing
+  drew, `MODES`, `RUSH_SECONDS`, a second copy of `freeAtStart` (the test has its own), four `el.*` entries
+  nothing read, and the `lastRun` record nothing read back; the six fetch wrappers (`authApi`,
+  `progressApi`, `pushApi`, `matchApi`, `playersApi`, `leagueApi`) are one `apiCall`, and the phone's
+  "let the token go" sequence is one `dropAppToken`. `css/puzzle.css` lost 57 rules for classes no markup
+  or script produces (the old about/explore/minis/table/setting blocks, the brain pill, the How long
+  options). A scan of every `${…}` in HTML found names and messages escaped or set as text; the session
+  cookie is HttpOnly + SameSite=Lax and JSON bodies need a CORS preflight, so cross-site posts do not
+  carry it. "Get a free life" is a button like the others now: the brain's colour.
 - **The evening nudge needs no account.** Notifications are offered signed out too (`renderNotify` no
   longer waits for `auth.user`); a token or subscription is posted with no user, with the device's own
   nudge answer (`remindOn()`, `reminder` in the post, `store 'remind'`), and the 7 pm sweep reaches those
