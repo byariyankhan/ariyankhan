@@ -673,7 +673,6 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-actions--stack .aa-btn--primary{ grid-column:1 / -1; }
 /* An offer, not an action: it is the only warm one in the card, so it reads as the extra thing on the row
    rather than as a second way of doing what the primary does. */
-.aa-actions .aa-btn--ad{ background:var(--accent); color:var(--accent-ink); }
 /* the out-of-hearts card, as drawn: the free life first and biggest, Try again under it in a soft tint, and the
    rest as links -- one decision on top, the others a glance below */
 .aa-actions--out{ grid-template-columns:1fr; gap:10px; }
