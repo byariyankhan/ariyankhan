@@ -9,11 +9,12 @@ const data = JSON.parse(fs.readFileSync(path.join(root, 'games/data/puzzle.json'
 const html = fs.readFileSync(path.join(root, 'puzzle/index.html'), 'utf8');
 // Pull the pure pieces of the engine out of the IIFE so the exact production code is tested.
 const grab = re => { const m = js.match(re); if (!m) throw new Error('could not find ' + re); return m[0]; };
-const src = [grab(/const REF = \d+;/), grab(/function parsePath\(d\) \{[\s\S]*?\n  \}\n/), grab(/function insidePath\([\s\S]*?\n  \}\n/), grab(/function rasterise\([\s\S]*?\n  \}\n/), grab(/const DIRS = [^\n]+/), grab(/const PALETTE = [^\n]+/), grab(/const STEP_POINTS = [^\n]+/), grab(/const FAST_SEC_PER_ARROW = [^\n]+/), grab(/const clampTier = [^\n]+/), grab(/const clearPoints = [^\n]+/), grab(/const FORM0 = [^\n]+/), grab(/const nextForm = [\s\S]*?\n  \};\n/), grab(/const MAXLEN_OF = [^\n]+/), grab(/const NARROW_OF = [^\n]+/), grab(/const FAR_OF = [^\n]+/), grab(/const RAIL_OF = [^\n]+/), grab(/const HOLE_OF = [^\n]+/), grab(/const LANE_OF = [^\n]+/), grab(/const TIGHTEN_OF = [^\n]+/), grab(/const GEN_OPTS = [^\n]+/), grab(/function mulberry32[^\n]+/), grab(/function generate\(mask, maxLen, seed[^)]*\) \{[\s\S]*?\n  \}\n/)].join('\n');
-const { generate, rasterise, nextForm, FORM0, MAXLEN_OF, GEN_OPTS, DIRS } = new Function(src + '\nreturn { generate, rasterise, nextForm, FORM0, MAXLEN_OF, GEN_OPTS, DIRS };')();
+const src = [grab(/const REF = \d+;/), grab(/function parsePath\(d\) \{[\s\S]*?\n  \}\n/), grab(/function insidePath\([\s\S]*?\n  \}\n/), grab(/function rasterise\([\s\S]*?\n  \}\n/), grab(/const DIRS = [^\n]+/), grab(/const PALETTE = [^\n]+/), grab(/const STEP_POINTS = [^\n]+/), grab(/const FAST_SEC_PER_ARROW = [^\n]+/), grab(/const clampTier = [^\n]+/), grab(/const clearPoints = [^\n]+/), grab(/const FORM0 = [^\n]+/), grab(/const nextForm = [\s\S]*?\n  \};\n/), grab(/const MAXLEN_OF = [^\n]+/), grab(/const KSCALE_OF = [^\n]+/), grab(/const CELL_CAP_OF = [^\n]+/), grab(/const SIDE_CAP = [^\n]+/), grab(/const NARROW_OF = [^\n]+/), grab(/const FAR_OF = [^\n]+/), grab(/const RAIL_OF = [^\n]+/), grab(/const HOLE_OF = [^\n]+/), grab(/const LANE_OF = [^\n]+/), grab(/const TIGHTEN_OF = [^\n]+/), grab(/const TRAP_OF = [^\n]+/), grab(/const GEN_OPTS = [^\n]+/), grab(/function mulberry32[^\n]+/), grab(/function generate\(mask, maxLen, seed[^)]*\) \{[\s\S]*?\n  \}\n/)].join('\n');
+const { generate, rasterise, nextForm, FORM0, MAXLEN_OF, GEN_OPTS, DIRS, KSCALE_OF, CELL_CAP_OF, SIDE_CAP } = new Function(src + '\nreturn { generate, rasterise, nextForm, FORM0, MAXLEN_OF, GEN_OPTS, DIRS, KSCALE_OF, CELL_CAP_OF, SIDE_CAP };')();
 // a sampling ramp for the board tests (the game itself picks the tier from the player's form, not the level)
 const BASE_TIER = i => i < 5 ? 0 : i < 15 ? 1 : i < 40 ? 2 : i < 80 ? 3 : 4;
-const maskCache = new Map(); const maskFor = (L, t) => { const key = L.id + ':' + t; if (!maskCache.has(key)) maskCache.set(key, rasterise(L.d, L.k[t])); return maskCache.get(key); };
+// the mask the game plays, finer grid of the top tiers included (see maskFor in the engine)
+const maskCache = new Map(); const maskFor = (L, t) => { const key = L.id + ':' + t; if (!maskCache.has(key)) { const k = L.k[t]; let scale = KSCALE_OF[t]; if (scale !== 1) { const base = rasterise(L.d, k); scale = Math.max(1, Math.min(scale, Math.sqrt(CELL_CAP_OF[t] / Math.max(1, base.count)), SIDE_CAP / Math.max(1, base.w, base.h))); } let m = scale === 1 ? rasterise(L.d, k) : rasterise(L.d, k * scale); if (t > 0) { const below = maskFor(L, t - 1); if (below.count > m.count) m = below; } maskCache.set(key, m); } return maskCache.get(key); };
 const TIER_OF = i => BASE_TIER(i);
 let tests = 0;
 const test = (name, fn) => { tests++; try { fn(); console.log('  ✓ ' + name); } catch (e) { console.log('  ✗ ' + name + '\n    ' + e.message); process.exitCode = 1; } };
@@ -35,8 +36,8 @@ test('197 levels with name, capital, outline and 5 tier scales', () => {
   for (const L of data.levels) { assert.ok(L.name && L.cap && L.d.startsWith('M'), L.name); assert.equal(L.k.length, 5); assert.ok(L.k.every(k => k > 0), L.name); assert.ok(L.cont, `${L.name} has no continent`); }
 });
 test('every level id is unique', () => assert.equal(new Set(data.levels.map(l => l.id)).size, data.levels.length));
-test('rasterised tiers grow in cell count and stay within the per-tier caps (32/32/32/40/44, long side 46/46/46/54/58)', () => {
-  const DIM = [32, 32, 32, 40, 44], LONG = [46, 46, 46, 54, 58];
+test('rasterised tiers grow in cell count and stay within the per-tier caps (32/32 on Easy and Normal, long side 46; the finer grid of Hard and up within SIDE_CAP)', () => {
+  const DIM = [32, 32, SIDE_CAP + 2, SIDE_CAP + 2, SIDE_CAP + 2], LONG = [46, 46, SIDE_CAP + 2, SIDE_CAP + 2, SIDE_CAP + 2];   // +2: the scale is trimmed to the cap, the rasteriser rounds
   for (const L of data.levels) {
     for (let t = 0; t < 5; t++) { const m = maskFor(L, t); assert.ok(m.count >= 20, `${L.name} tier ${t} has only ${m.count} cells`); assert.ok(Math.max(m.w, m.h) <= LONG[t] && Math.min(m.w, m.h) <= DIM[t], `${L.name} tier ${t} is ${m.w}x${m.h}`); assert.equal(m.rows.length, m.h); assert.ok(m.rows.every(r => r.length === m.w)); }
     for (let t = 1; t < 5; t++) assert.ok(maskFor(L, t).count >= maskFor(L, t - 1).count, `${L.name} tier ${t} smaller than tier ${t - 1}`);
@@ -62,9 +63,9 @@ test('generation is deterministic for a seed', () => {
 test('100 random seeds on the hardest boards all generate', () => {
   for (let s = 0; s < 100; s++) { const L = data.levels[s % data.levels.length]; assert.ok(solvable(generate(maskFor(L, 4), 4, 5000 + s))); }
 });
-test('boards are dense: Hard tour levels average over 55 arrows, Normal over 35 (long snakes on ~28-cell boards)', () => {
+test('boards are dense: Hard tour levels average over 90 arrows on the finer grid, Normal over 35', () => {
   const avg = tier => { const idx = data.levels.map((_, i) => i).filter(i => BASE_TIER(i) === tier); return idx.reduce((n, i) => n + generate(maskFor(data.levels[i], tier), MAXLEN_OF[tier], (i + 1) * 1000).pieces.length, 0) / idx.length; };
-  assert.ok(avg(1) > 35, `Normal averages ${avg(1)}`); assert.ok(avg(2) > 55, `Hard averages ${avg(2)}`);
+  assert.ok(avg(1) > 35, `Normal averages ${avg(1)}`); assert.ok(avg(2) > 90, `Hard averages ${avg(2)}`);
 });
 test('difficulty follows form, not the level: a flawless fast clear steps up at once, two first-try clears step up, two losses step down, a retry clear resets', () => {
   const flawless = { firstTry: true, heartsLost: 0, hints: 0, secPerArrow: 0.9 }, scrappy = { firstTry: true, heartsLost: 3, hints: 3, secPerArrow: 2.5 }, slow = { firstTry: true, heartsLost: 0, hints: 0, secPerArrow: 2 }, retry = { firstTry: false, heartsLost: 0, hints: 0, secPerArrow: 0.9 };
@@ -138,8 +139,9 @@ test('focus-boards.json: the boards a new player starts on, M/L/Z paths with fiv
   for (let t = 0; t < 5; t++) {
     const b = generate(rasterise(em.d, em.k[t]), MAXLEN_OF[t], 7000 + t * 131, GEN_OPTS(t));
     assert.ok(b.pieces.length >= 25 && b.pieces.length <= 140, `emblem tier ${t}: ${b.pieces.length} arrows`);
-    assert.ok(b.pieces.length >= prev, `emblem tier ${t} is not finer than tier ${t - 1}`);
-    prev = b.pieces.length;
+    const cells = rasterise(em.d, em.k[t]).count;
+    assert.ok(cells >= prev, `emblem tier ${t} is not finer than tier ${t - 1}`);   // finer grid; the arrow count also depends on the tier's snake length
+    prev = cells;
   }
 });
 test('focus boards generate and are solvable at every tier', () => {
