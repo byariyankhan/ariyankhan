@@ -769,6 +769,16 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-train-row .aa-row-ico{ font-size:22px; }
 .aa-train-got{ min-width:48px; text-align:center; padding:6px 10px; border-radius:12px; font-size:13px; font-weight:900; background:color-mix(in srgb, var(--accent2) 12%, transparent); color:var(--accent2); }
 .aa-train-got.is-done{ background:color-mix(in srgb, var(--good) 14%, transparent); color:var(--good); }
+.aa-train-run{ display:flex !important; align-items:center; gap:8px; margin-top:6px; font-size:11px !important; font-weight:800 !important; color:var(--muted); }
+.aa-train-run em{ font-style:normal; white-space:nowrap; }
+.aa-train-goal{ flex:1; max-width:120px; height:5px; border-radius:3px; background:color-mix(in srgb, var(--muted) 18%, transparent); overflow:hidden; }
+.aa-train-goal i{ display:block; height:100%; border-radius:3px; background:linear-gradient(90deg, color-mix(in srgb, var(--accent2) 62%, var(--accent)), var(--accent2)); }
+.aa-train-goal.is-done i{ background:var(--good); }
+/* a round is a game: the whole screen, the lobby gone, the way out in the corner */
+.aa-sheet.is-playing .aa-sheet-panel{ padding-bottom:calc(32px + env(safe-area-inset-bottom, 0px)); }
+.aa-sheet.is-playing .aa-sheet-head h2{ font-size:18px; color:var(--muted); }
+.aa-train-info{ display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; margin-left:6px; border:none; border-radius:50%; background:color-mix(in srgb, var(--accent2) 14%, transparent); color:var(--accent2); font:inherit; font-size:13px; font-weight:900; vertical-align:middle; cursor:pointer; }
+.aa-train-info[aria-expanded="true"]{ background:var(--accent2); color:#fff; }
 .aa-train-hud{ display:flex; justify-content:space-between; align-items:center; gap:12px; font-size:14px; font-weight:900; color:var(--muted); margin:0 0 12px; font-variant-numeric:tabular-nums; }
 .aa-train-hud span:first-child{ color:var(--ink); }
 .aa-train-res{ text-align:center; padding:6px 0 2px; }
