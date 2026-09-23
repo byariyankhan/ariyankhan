@@ -854,7 +854,7 @@ links.
   `discLevelFor`, `nextStep`, `renderDiscoveries`): after a country's outline the tour
   plays a second board shaped like something a traveller finds there: its animal,
   its bird or a landmark. Shapes are Twemoji glyphs (graphics CC-BY 4.0, credited
-  on the page) traced to one silhouette with potrace at 240 px, flattened to
+  in Settings > About, `.aa-row--credit`; nothing sits under the game any more, so no screen scrolls past its end) traced to one silhouette with potrace at 240 px, flattened to
   straight segments (the game's parser reads M/L/Z only), centred in the same
   100-unit box as the country outlines and given one scale per tier by the same
   `rasterise`, so the generator, tiers, hearts and hints are untouched; the

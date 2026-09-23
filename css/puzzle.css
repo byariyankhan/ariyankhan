@@ -164,6 +164,9 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 /* compact secondary actions under the map: daily board and the level list */
 /* the country picker gets a line of its own: squeezed beside the label it wrapped into five lines */
 .aa-row-label small{ display:block; font-size:12px; font-weight:600; color:var(--muted); }
+/* the licence credit, in Settings > About: a line of small print with its two links, not a row to tap */
+.aa-row--credit small{ line-height:1.5; margin-top:2px; }
+.aa-row--credit small a{ color:inherit; text-decoration:underline; text-underline-offset:3px; }
 #aaHomeSheet{ z-index:51; }   /* opened from Settings, so it must paint over it */
 .aa-row-go{ color:var(--muted); font-size:24px; font-weight:900; line-height:1; padding-right:4px; }
 .aa-search{ font:inherit; font-weight:700; font-size:15px; color:var(--ink); background:var(--bg2); border:none; border-radius:14px; padding:12px 14px; width:100%; margin:0 0 12px; box-sizing:border-box; -webkit-appearance:none; appearance:none; }
@@ -627,15 +630,6 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 @media(prefers-reduced-motion:reduce){ .aa-focus.is-done .aa-brain{ animation:none; } }
 .aa-facts b{ color:var(--ink); }
 /* discoveries: four finds per cleared country */
-.aa-seo-credit{ font-size:12px; color:var(--muted); }
-/* The two licence links used to sit in a page full of styled links and were never looked at. Now that the
-   credit is half of what is under the game, default browser blue is the loudest thing on the screen. */
-.aa-seo-credit a{ color:var(--muted); text-decoration:underline; text-underline-offset:3px; }
-.aa-seo-credit a:hover{ color:var(--ink); }
-/* The game's own policies, visible on the page. A reviewer should not have to open a settings sheet to find them. */
-.aa-seo-legal{ margin:10px 0 0; font-size:13px; font-weight:800; color:var(--muted); }
-.aa-seo-legal a{ color:var(--muted); text-decoration:underline; text-underline-offset:3px; }
-.aa-seo-legal a:hover{ color:var(--ink); }
 .aa-adapt{ font-size:13px; font-weight:800; color:var(--muted); margin:-6px 0 14px; }
 .aa-actions{ display:flex; flex-wrap:wrap; justify-content:center; gap:8px; }
 .aa-actions .aa-btn{ background:var(--bg2); color:var(--ink); box-shadow:none; }
@@ -718,10 +712,6 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-dev-opt{ flex:1; padding:10px; border-radius:12px; border:2px solid transparent; background:var(--bg2);
   color:var(--ink); cursor:pointer; font-weight:900; font-size:13px; }
 .aa-dev-opt.is-active{ border-color:var(--accent); }
-/* the About / how-to / FAQ copy sits under the app, visible to readers and crawlers */
-/* Two lines now — a licence credit and the policy links — so it is the foot of the page rather than a
-   section of it, and its bottom padding has to clear the gesture bar in the app. */
-.aa-seo{ max-width:640px; margin:0 auto; padding:24px 16px calc(28px + env(safe-area-inset-bottom, 0px)); border-top:1px solid var(--bg2); }
 .aa-row--danger .aa-row-label{ color:var(--bad); }
 /* legal pages (privacy, terms) in the game's own dress */
 .aa-legal{ max-width:640px; margin:0 auto; padding:calc(18px + env(safe-area-inset-top, 0px)) 16px 48px; font-weight:600; }
@@ -735,7 +725,6 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-legal-back{ display:block; font-size:14px; margin-bottom:18px; text-decoration:none; }
 .aa-legal-date{ font-size:13px; }
 .aa-legal-foot{ margin-top:34px; padding-top:16px; border-top:1px solid var(--bg2); font-size:13px; }
-.aa-seo .aa-btn{ text-decoration:none; }
 
 /* ── About content (reused sections) ── */
 .faq-item{ background:var(--card); border-radius:14px; margin-bottom:8px; overflow:hidden; }

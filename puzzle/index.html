@@ -101,7 +101,7 @@
          set these two when the backend moves to a host of its own and the client follows without a change:
          <meta name="puzzle-api" content="https://api.example.com" />
          <meta name="puzzle-ws"  content="wss://api.example.com" /> -->
-    <link rel="stylesheet" href="/css/puzzle.css?v=65" />
+    <link rel="stylesheet" href="/css/puzzle.css?v=66" />
     <link rel="preload" href="/games/data/puzzle.json?v=11" as="fetch" crossorigin="anonymous" />
 
     <!-- SCHEMA -->
@@ -297,25 +297,11 @@
     </main>
 
 
-    <!-- ── THE FOOT OF THE GAME ──
-         What used to be here was five sections of prose about the game — what it is, how it plays, the tour,
-         the geography, and a FAQ — written for search engines and read by nobody who had already started
-         playing. In the app it was worse than useless: a game you scroll past into an advertisement for
-         itself. It is gone from both, and so is the FAQPage structured data that described it, because
-         markup for answers that are not on the page is markup Google is entitled to distrust.
-
-         These two lines are not decoration. The discovery silhouettes are traced from Twemoji, which is
-         CC-BY 4.0, and attribution is the licence's one condition; the policies are what the store listing
-         and the sign-in both point at. -->
-    <section class="aa-seo" aria-label="Credits and policies">
-      <p class="aa-seo-credit">Country outlines from Natural Earth (public domain). Discovery board shapes are silhouettes traced from <a href="https://github.com/twitter/twemoji" target="_blank" rel="noopener">Twemoji</a> graphics by Twitter and contributors, licensed <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC-BY 4.0</a>.</p>
-      <p class="aa-seo-legal">
-        <a href="/puzzle/privacy.html">Privacy Policy</a> &middot;
-        <a href="/puzzle/terms.html">Terms of Service</a> &middot;
-        <a href="/#contact">Contact</a> &middot;
-        <a href="/privacy-policy.html">Site-wide privacy policy</a>
-      </p>
-    </section>
+    <!-- Nothing sits under the game. The credits and the policies used to be a foot here, so every screen,
+         the board included, scrolled 160 px past its end into two lines of small print -- and in the app, where
+         the board takes every touch for panning and zooming, a player who scrolled down could not drag back up
+         and the game looked frozen. The Twemoji credit (CC-BY 4.0: attribution is its one condition) is in
+         Settings > About with the policies; the policies are also on the gate every new player accepts. -->
 
     <!-- ── SIGN IN (only for playing with other people) ── -->
     <div class="aa-sheet" id="aaTrainSheet" hidden>
@@ -414,6 +400,7 @@
         <div class="aa-group">
           <a class="aa-row aa-row--link" href="/puzzle/privacy.html"><span class="aa-row-ico">🔒</span><span class="aa-row-label">Privacy Policy</span><span class="aa-row-chev">›</span></a>
           <a class="aa-row aa-row--link" href="/puzzle/terms.html"><span class="aa-row-ico">📄</span><span class="aa-row-label">Terms of Service</span><span class="aa-row-chev">›</span></a>
+          <div class="aa-row aa-row--credit"><span class="aa-row-ico">🗺️</span><span class="aa-row-label">Credits<small>Country outlines from Natural Earth (public domain). Discovery board shapes are silhouettes traced from <a href="https://github.com/twitter/twemoji" target="_blank" rel="noopener">Twemoji</a> graphics by Twitter and contributors, licensed <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC-BY 4.0</a>.</small></span></div>
         </div>
 
         <!-- People whose invitations this account has muted, with the way back. Hidden while there are none. -->
