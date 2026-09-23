@@ -127,19 +127,28 @@ written under the row's lock inside the push's transaction):
 
 * `train` — per day, each round's best score; hints used, rounds played and the per-round counts the larger;
 * `daily` — per day, the better run (more stars, then the faster time), the quiz answered if either answered it;
-* `loss` — per device, the larger count;
-* `playStreak`, `dailyStreak` — the later day; on the same day the longer count; two runs that meet (one ends
-  the day before the other's last day) are one run;
+* `loss` — per device, the larger count (at most 256 devices: past that the largest are kept, so a new device
+  still gets in and a browser long cleared makes room);
+* `playStreak`, `dailyStreak` — a streak is a run of `count` days ending on `last`, so two of them are two runs
+  on the calendar: if they overlap or meet they are one run, earlier start to later end; with a gap between
+  them the later run stands. A day after the UTC date plus one is a clock that runs ahead and is refused (and
+  the client never keeps or adopts a streak that ends after its own today);
 * anything else (home, the difficulty ladder) — the last device to say it.
 
 Every one of those is commutative and idempotent, like the boards. It used to be a one-level merge
 (`state || incoming`), which replaced the whole `train` map, the whole `daily` map and the streaks with the
 pushing device's copy and handed that copy straight back, so the phone and the website each saw only their own
-training and their own streak. The account keeps 400 days of daily boards and training (`STATE_KEEP_DAYS`); a
-device sends its last 120 (`STATE_SEND_DAYS`), so a push stays about 30 KB of state however long somebody has
-played. A push may be up to 256 KB (a whole tour of 600 boards with its counts is about 115 KB) and its state
-up to 128 KB; each of the records is cleaned field by field and trimmed to the window, the other settings are
-kept only while small.
+training and their own streak. Nothing is dropped for being old -- the rank adds up the arrows of every daily
+board ever cleared and a round's goal counts every day it was played -- so the account keeps the newest 1000
+days of each (`STATE_KEEP_DAYS`), which is years of play. A device sends its last 120 (`STATE_SEND_DAYS`), so a
+push stays about 30 KB of state however long somebody has played, and 400 after any gap longer than that
+(signed out for months, a stretch of failed pushes), so what it played meanwhile still arrives. The tour sync
+alone may send 256 KB (`PROGRESS_BODY_LIMIT`, on its own route: a whole tour of 600 boards with its counts is
+about 115 KB; every other route keeps 64 KB), its state up to 128 KB; each record is cleaned field by field, the
+other settings are kept only while small. The row is locked `FOR NO KEY UPDATE`, not `FOR UPDATE`: the push's
+own inserts hold KEY SHARE locks on it through their foreign key, and `FOR UPDATE` deadlocked two devices
+pushing at once (the api suite has the six-at-once case). On the device, a setting changed while its push was in
+the air stays; the next push says it.
 
 The client keeps playing out of its own storage and syncs around it: a push that fails costs freshness, not
 progress. That is also why a failure here goes unseen, so it is worth knowing the one that happened: the tier

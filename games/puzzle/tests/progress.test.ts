@@ -1,7 +1,7 @@
 // A player's tour, and the one property that makes syncing it safe: nothing a device pushes can ever take
 // something away. Two phones, opened in any order, converge on the better of what each has seen.
 import { pool, query } from '../backend/src/db.js';
-import { cleanDevice, cleanLevels, cleanState, cleanStats, combineState, difficulty, mergeLevels, mergeState, mergeStats, mergeStreak, nextDay, readAll, readLevels, readState } from '../backend/src/progress.js';
+import { cleanDevice, cleanLevels, cleanState, cleanStats, cleanStreak, combineState, difficulty, mergeLevels, mergeState, mergeStats, mergeStreak, nextDay, readAll, readLevels, readState, STATE_KEEP_DAYS } from '../backend/src/progress.js';
 import { deleteUser } from '../backend/src/auth.js';
 import { releasePlayer } from '../backend/src/rooms.js';
 import { eq, finish, ok, player, reset, section } from './helpers.js';
@@ -198,6 +198,12 @@ section('Streaks from two devices join up');
   eq(mergeStreak(s(1, '2026-09-23'), s(2, '2026-09-22')), s(3, '2026-09-23'), 'in either order');
   eq(mergeStreak(s(3, '2026-09-23'), s(1, '2026-09-23')), s(3, '2026-09-23'), 'the same day: the longer count');
   eq(mergeStreak(s(5, '2026-09-18'), s(1, '2026-09-23')), s(1, '2026-09-23'), 'a gap between them: the later run alone');
+  eq(mergeStreak(s(5, '2026-09-05'), s(6, '2026-09-08')), s(8, '2026-09-08'), 'the 1st to the 5th and the 3rd to the 8th overlap: eight days');
+  eq(mergeStreak(s(6, '2026-09-08'), s(5, '2026-09-05')), s(8, '2026-09-08'), 'in either order');
+  eq(mergeStreak(s(10, '2026-09-08'), s(2, '2026-09-05')), s(10, '2026-09-08'), 'a run inside a longer one adds nothing');
+  eq(mergeStreak(s(3, '2026-03-01'), s(2, '2026-02-26')), s(5, '2026-03-01'), 'across the end of a month');
+  eq(cleanStreak({ count: 3, last: '2099-01-01' }), undefined, 'a day from a clock that runs ahead is not a streak');
+  eq(cleanStreak({ count: 0, last: today }), undefined, 'and neither is a run of no days');
   eq(mergeStreak(mergeStreak(s(2, '2026-09-22'), s(1, '2026-09-23')), s(2, '2026-09-22')), s(3, '2026-09-23'), 'merging again changes nothing');
   const p = await player('progStreak');
   await mergeState(pool, p.id, { playStreak: s(2, back(1)) });
@@ -232,13 +238,25 @@ section('Two devices land on the same account whichever pushes first');
 
 section('What the account keeps is cleaned and kept in bounds');
 {
+  const devs: Record<string, number> = {};
+  for (let i = 0; i < 300; i++) devs['dev' + i] = 1 + i;
+  const lossKept = (combineState({ loss: devs }, { loss: { freshPhone: 5000 } }) as Record<string, any>).loss;
+  eq(Object.keys(lossKept).length, 256, 'the rank remembers a bounded number of devices');
+  eq(lossKept.freshPhone, 5000, 'and a new device still gets in');
+  ok(!('dev0' in lossKept), 'making room by the smallest, a device long gone');
+  same(combineState({ loss: { freshPhone: 5000 } }, { loss: devs }), combineState({ loss: devs }, { loss: { freshPhone: 5000 } }), 'the same devices survive whichever pushed first');
+  const many: Record<string, unknown> = {};
+  for (let i = 0; i < STATE_KEEP_DAYS + 100; i++) { const d = new Date(); d.setUTCDate(d.getUTCDate() - i); many[d.toISOString().slice(0, 10)] = { t: 60_000, stars: 1 }; }
+  const kept = Object.keys((combineState({ daily: many }, {}) as Record<string, any>).daily).sort();
+  eq(kept.length, STATE_KEEP_DAYS, 'the account keeps a bounded number of days');
+  eq(kept[kept.length - 1], today, 'the newest of them');
   const st = cleanState({
-    train: { '1999-01-01': { r: 90 }, 'not-a-day': { r: 90 }, [today]: { r: 250, f: 'x', g: 70, pp: { g: -3, e: 2 } } },
+    train: { '2019-01-01': { r: 90 }, '2099-01-01': { r: 90 }, '2026-02-30': { r: 90 }, 'not-a-day': { r: 90 }, [today]: { r: 250, f: 'x', g: 70, pp: { g: -3, e: 2 } } },
     daily: { [today]: { stars: 3 } },
     playStreak: { count: -1, last: today }, dailyStreak: { count: 2, last: 'yesterday' },
     loss: { 'a b': 5, ok1: 7, neg: -2 },
   }) as Record<string, any>;
-  eq(Object.keys(st.train), [today], 'a day from long ago or no day at all is dropped');
+  eq(Object.keys(st.train).sort(), ['2019-01-01', today], 'an old day is kept (the rank and the goals count every one); a future day, an impossible date or no day at all is dropped');
   eq(st.train[today], { g: 70, pp: { e: 2 } }, 'an impossible score or count is dropped, the rest of the day kept');
   ok(!('daily' in st), 'a daily board with no time is not a run');
   ok(!('playStreak' in st) && !('dailyStreak' in st), 'a streak with a negative count or no date is dropped');

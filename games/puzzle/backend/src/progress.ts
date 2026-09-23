@@ -32,6 +32,8 @@ const MAX_LEVEL_ID = 64;
 // below, so this is only the line past which nothing a real client sends could reach -- a device sends its
 // last STATE_SEND_DAYS days of daily boards and training, a few hundred bytes a day.
 const MAX_STATE_BYTES = 128 * 1024;
+/** What one push to the tour may weigh: a whole tour of 600 boards with its counts is about 115 KB. */
+export const PROGRESS_BODY_LIMIT = 256 * 1024;
 
 const int = (v: unknown, lo: number, hi: number, dflt: number): number => {
   const n = typeof v === 'number' ? Math.round(v) : NaN;
@@ -167,11 +169,15 @@ export async function difficulty(c: Sql, minPlayers = 1): Promise<Difficulty[]> 
 
 /** Days of daily boards and training a client sends with each push; older ones are already on the account. */
 export const STATE_SEND_DAYS = 120;
-/** Days the account keeps. Every goal the game shows (30 and 90 days of a round) fits well inside. */
-export const STATE_KEEP_DAYS = 400;
+/**
+ * Days of each the account keeps, the newest. Not a window of time: the rank adds up the arrows of every daily
+ * board ever cleared and a round's goal counts every day it was played, so nothing is dropped for being old --
+ * only past this many, which is years of play and keeps the blob bounded (about 215 bytes a day of both).
+ */
+export const STATE_KEEP_DAYS = 1000;
 const MAX_OTHER_KEYS = 16;               // settings other than the records of play
 const MAX_OTHER_BYTES = 4 * 1024;        // each
-const MAX_DEVICES = 64;                  // entries in `loss`
+const MAX_DEVICES = 256;                 // entries in `loss`: every browser and every install is a device, for years
 const TRAIN_IDS = ['r', 'f', 'g', 'e'] as const;
 const PLAY_KEYS = new Set(['train', 'daily', 'loss', 'playStreak', 'dailyStreak']);
 
@@ -186,13 +192,18 @@ export function nextDay(day: string): string {
   d.setUTCDate(d.getUTCDate() + 1);
   return dayOf(d);
 }
-/** The range of days worth keeping: nothing older than the window, nothing from a clock that runs days ahead. */
-function dayWindow(now: Date): { from: string; to: string } {
-  const from = new Date(now); from.setUTCDate(from.getUTCDate() - STATE_KEEP_DAYS);
-  const to = new Date(now); to.setUTCDate(to.getUTCDate() + 2);   // time zones: a player east of UTC is a day ahead
-  return { from: dayOf(from), to: dayOf(to) };
+/** The last day a record may carry: the UTC date plus one, since no time zone is more than a day ahead of UTC. */
+function dayWindow(now: Date): { to: string } {
+  const to = new Date(now); to.setUTCDate(to.getUTCDate() + 1);
+  return { to: dayOf(to) };
 }
-const inWindow = (day: string, w: { from: string; to: string }) => DAY.test(day) && day >= w.from && day <= w.to;
+const inWindow = (day: string, w: { to: string }) => DAY.test(day) && dayNum(day) !== null && day <= w.to;
+/** A day as a whole number of days, for arithmetic on dates without a clock or a time zone in it. */
+function dayNum(day: string): number | null {
+  if (!DAY.test(day)) return null;
+  const t = Date.parse(day + 'T00:00:00Z');
+  return Number.isNaN(t) || dayOf(new Date(t)) !== day ? null : Math.round(t / 86_400_000);
+}
 const num = (v: unknown, lo: number, hi: number): number | undefined => {
   const n = typeof v === 'number' ? v : NaN;
   return Number.isFinite(n) && n >= lo && n <= hi ? n : undefined;
@@ -248,11 +259,12 @@ function mergeDailyDay(a: Rec | undefined, b: Rec | undefined): Rec | undefined 
   return { ...win, quiz: !!a.quiz || !!b.quiz };
 }
 
-/** A map of days, cleaned day by day, inside the window. */
-function cleanDays(raw: unknown, clean: (v: unknown) => Rec | undefined, w: { from: string; to: string }): Record<string, Rec> {
+/** A map of days, cleaned day by day: real days, none in the future, the newest STATE_KEEP_DAYS of them. */
+function cleanDays(raw: unknown, clean: (v: unknown) => Rec | undefined, w: { to: string }): Record<string, Rec> {
   const out: Record<string, Rec> = {};
   if (!isObj(raw)) return out;
-  for (const [day, v] of Object.entries(raw)) { if (!inWindow(day, w)) continue; const r = clean(v); if (r) out[day] = r; }
+  const days = Object.keys(raw).filter(d => inWindow(d, w)).sort().slice(-STATE_KEEP_DAYS);
+  for (const day of days) { const r = clean(raw[day]); if (r) out[day] = r; }
   return out;
 }
 function mergeDays(a: Record<string, Rec>, b: Record<string, Rec>, merge: (x: Rec | undefined, y: Rec | undefined) => Rec | undefined): Record<string, Rec> {
@@ -261,36 +273,46 @@ function mergeDays(a: Record<string, Rec>, b: Record<string, Rec>, merge: (x: Re
   return out;
 }
 
-/** What each device took off the rank. */
+/**
+ * What each device took off the rank. Past MAX_DEVICES entries the largest are kept: a new device's count still
+ * gets in, and what makes room is the smallest, a browser long cleared. Chosen by count, then id, so the same
+ * entries survive whichever order the devices pushed in.
+ */
+function topLoss(m: Record<string, number>): Record<string, number> {
+  const ids = Object.keys(m);
+  if (ids.length <= MAX_DEVICES) return m;
+  ids.sort((x, y) => m[y]! - m[x]! || (x < y ? -1 : 1));
+  return Object.fromEntries(ids.slice(0, MAX_DEVICES).map(id => [id, m[id]!]));
+}
 function cleanLoss(raw: unknown): Record<string, number> {
   const out: Record<string, number> = {};
   if (!isObj(raw)) return out;
   for (const [dev, v] of Object.entries(raw)) {
-    if (Object.keys(out).length >= MAX_DEVICES) break;
     if (!/^[A-Za-z0-9_-]{1,64}$/.test(dev)) continue;
     const n = cnt(v); if (n) out[dev] = n;
   }
-  return out;
+  return topLoss(out);
 }
 
 /** A streak: how many days in a row, and the last of them. */
 export interface Streak { count: number; last: string }
-export function cleanStreak(raw: unknown): Streak | undefined {
-  if (!isObj(raw) || typeof raw.last !== 'string' || !DAY.test(raw.last)) return undefined;
-  const count = cnt(raw.count); if (count === undefined) return undefined;
+export function cleanStreak(raw: unknown, now = new Date()): Streak | undefined {
+  if (!isObj(raw) || typeof raw.last !== 'string' || !inWindow(raw.last, dayWindow(now))) return undefined;   // no day ahead of the calendar
+  const count = cnt(raw.count); if (!count) return undefined;
   return { count, last: raw.last };
 }
 /**
- * Two devices' streaks of the same player, as one. The later day wins; on the same day, the longer count. Two
- * runs that meet -- one ending the day before the other's last day -- are one run: the phone played Monday and
- * Tuesday, the website Wednesday, and that is three days in a row, not one. What cannot be told from two
- * numbers (a gap inside the later run) is not guessed at: the later device's own count stands.
+ * Two devices' streaks of the same player, as one. A streak is a run of days, `count` of them ending on `last`,
+ * so two of them are two runs on the calendar: if they overlap or meet, they are one run from the earlier start
+ * to the later end -- the phone played Monday and Tuesday, the website Tuesday to Thursday, and that is four
+ * days in a row. If there is a gap between them, the later run is the streak.
  */
 export function mergeStreak(a: Streak | undefined, b: Streak | undefined): Streak | undefined {
   if (!a) return b; if (!b) return a;
-  if (a.last === b.last) return { count: Math.max(a.count, b.count), last: a.last };
-  const [later, earlier] = a.last > b.last ? [a, b] : [b, a];
-  const count = nextDay(earlier.last) === later.last ? Math.max(later.count, earlier.count + 1) : later.count;
+  const ea = dayNum(a.last)!, eb = dayNum(b.last)!;
+  const [later, le, earlier, ee] = ea >= eb ? [a, ea, b, eb] : [b, eb, a, ea];
+  const ls = le - later.count + 1, es = ee - earlier.count + 1;
+  const count = ee >= ls - 1 ? le - Math.min(ls, es) + 1 : later.count;
   return { count, last: later.last };
 }
 
@@ -313,7 +335,7 @@ export function cleanState(raw: unknown, now = new Date(), capped = true): Playe
     if (k === 'train') { const d = cleanDays(v, cleanTrainDay, w); if (Object.keys(d).length) out.train = d; }
     else if (k === 'daily') { const d = cleanDays(v, cleanDailyDay, w); if (Object.keys(d).length) out.daily = d; }
     else if (k === 'loss') { const l = cleanLoss(v); if (Object.keys(l).length) out.loss = l; }
-    else if (k === 'playStreak' || k === 'dailyStreak') { const st = cleanStreak(v); if (st) out[k] = st; }
+    else if (k === 'playStreak' || k === 'dailyStreak') { const st = cleanStreak(v, now); if (st) out[k] = st; }
     else {
       if (others >= MAX_OTHER_KEYS || !k || k.length > 64 || v === undefined) continue;
       let size = 0; try { size = JSON.stringify(v)?.length ?? 0; } catch { continue; }
@@ -336,11 +358,12 @@ export function combineState(a: PlayerState, b: PlayerState, now = new Date()): 
   if (Object.keys(train).length) out.train = train;
   const daily = mergeDays(cleanDays(A.daily, cleanDailyDay, w), cleanDays(B.daily, cleanDailyDay, w), mergeDailyDay);
   if (Object.keys(daily).length) out.daily = daily;
-  const la = cleanLoss(A.loss), lb = cleanLoss(B.loss), loss: Record<string, number> = { ...la };
-  for (const [dev, n] of Object.entries(lb)) if (n > (loss[dev] ?? 0) && (dev in loss || Object.keys(loss).length < MAX_DEVICES)) loss[dev] = n;
+  const la = cleanLoss(A.loss), lb = cleanLoss(B.loss), all: Record<string, number> = { ...la };
+  for (const [dev, n] of Object.entries(lb)) if (n > (all[dev] ?? 0)) all[dev] = n;
+  const loss = topLoss(all);
   if (Object.keys(loss).length) out.loss = loss;
   for (const k of ['playStreak', 'dailyStreak'] as const) {
-    const st = mergeStreak(cleanStreak(A[k]), cleanStreak(B[k])); if (st) out[k] = st;
+    const st = mergeStreak(cleanStreak(A[k], now), cleanStreak(B[k], now)); if (st) out[k] = st;
   }
   return out;
 }
@@ -463,10 +486,15 @@ export async function mergeLevels(c: Sql, userId: number, levels: Levels): Promi
  * with what the account has (combineState). Read and written under the row's lock, so two of this player's
  * devices pushing at the same moment take turns rather than each writing over the other; the route runs it
  * inside the push's transaction, which is what holds the lock until the write.
+ *
+ * FOR NO KEY UPDATE, not FOR UPDATE: the same push has just inserted progress rows, and each insert's foreign
+ * key holds a KEY SHARE lock on this user's row. FOR UPDATE conflicts with KEY SHARE, so two devices pushing
+ * together would each wait on the other's inserts -- a deadlock. NO KEY UPDATE does not conflict with KEY
+ * SHARE and still makes a second push wait for the first, then read what the first one wrote.
  */
 export async function mergeState(c: Sql, userId: number, state: PlayerState): Promise<void> {
   if (!state || Object.keys(state).length === 0) return;
-  const r = await query<{ state: PlayerState }>(c, `SELECT state FROM users WHERE id = $1 FOR UPDATE`, [userId]);
+  const r = await query<{ state: PlayerState }>(c, `SELECT state FROM users WHERE id = $1 FOR NO KEY UPDATE`, [userId]);
   if (!r.rows[0]) return;
   const merged = combineState(r.rows[0].state ?? {}, state);
   await query(c, `UPDATE users SET state = $2::jsonb WHERE id = $1`, [userId, JSON.stringify(merged)]);

@@ -3589,6 +3589,7 @@
   const progressApi = body => apiCall(`${API_V1}/progress`, body);
 
   const STATE_SEND_DAYS = 120;   // days of daily boards and training each push carries (the server's STATE_SEND_DAYS)
+  const STATE_FULL_DAYS = 400;   // and a push after a long gap: well inside the server's 128 KB
   const STATE_KEYS = ['home', 'form', 'dailyStreak', 'playStreak'];   // what a new device needs before it can show the right tour
 
   /** Everything this device has played, in the shape the server stores. */
@@ -3612,7 +3613,7 @@
     } catch { /* storage can be unreadable in a private window; syncing is optional, playing is not */ }
     return levels;
   }
-  function localState() {
+  function localState(allDays = false) {
     const out = {};
     for (const k of STATE_KEYS) { const v = store.get(k, null); if (v !== null && v !== undefined) out[k] = v; }
     // A home country this device guessed from the connection is not the player's answer, so it stays here.
@@ -3620,8 +3621,10 @@
     if (store.get('homeAuto', false)) delete out.home;
     const loss = lossMap(); if (Object.keys(loss).length) out.loss = loss;
     // the daily boards and the training of the last STATE_SEND_DAYS days: the account keeps the older ones, and a
-    // push that carried every day ever played would grow by a few hundred bytes a day, every five minutes
-    const since = dayKeyBack(STATE_SEND_DAYS);
+    // push that carried every day ever played would grow by a few hundred bytes a day, every five minutes. A push
+    // after a long gap (see syncTour) carries STATE_FULL_DAYS, so what a device played while its pushes were
+    // failing, or while it was signed out, reaches the account even if it is older than that
+    const since = dayKeyBack(allDays ? STATE_FULL_DAYS : STATE_SEND_DAYS);
     const days = prefix => {
       const m = {};
       try {
@@ -3637,17 +3640,22 @@
     const trainDays = days('train:'); if (Object.keys(trainDays).length) out.train = trainDays;
     return out;
   }
-  // Two devices' streaks as one, the rule the server applies too: the later day wins, the longer count on the
-  // same day, and two runs that meet (one ends the day before the other's last) are one run.
-  const okStreak = v => v && typeof v === 'object' && typeof v.last === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v.last) && Number.isFinite(Number(v.count)) && Number(v.count) >= 0;
-  const dayAfter = day => { const [y, m, d] = day.split('-').map(Number); return dayKeyOf(new Date(y, m - 1, d + 1)); };
+  // Two devices' streaks as one, the rule the server applies too (mergeStreak in progress.ts): a streak is a run
+  // of `count` days ending on `last`; two runs that overlap or meet are one run from the earlier start to the
+  // later end, and with a gap between them the later run is the streak. A day after this device's today is a
+  // clock that runs ahead (a phone set to tomorrow to peek at the next daily board), not a day played here: it is
+  // neither kept nor adopted, or its lone day would win the merge and end a long run on every device. The
+  // honest device's next push joins it on the account once the calendar gets there.
+  const dayNo = day => { const [y, m, d] = day.split('-').map(Number); return Math.round(Date.UTC(y, m - 1, d) / 864e5); };
+  const okStreak = v => v && typeof v === 'object' && typeof v.last === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v.last) && v.last <= dayKey()
+    && Number.isFinite(Number(v.count)) && Number(v.count) >= 1;
   function mergeStreak(a, b) {
-    if (!okStreak(a)) return okStreak(b) ? { count: Math.floor(Number(b.count)), last: b.last } : null;
-    if (!okStreak(b)) return { count: Math.floor(Number(a.count)), last: a.last };
-    const ca = Math.floor(Number(a.count)), cb = Math.floor(Number(b.count));
-    if (a.last === b.last) return { count: Math.max(ca, cb), last: a.last };
-    const [later, cl, earlier, ce] = a.last > b.last ? [a, ca, b, cb] : [b, cb, a, ca];
-    return { count: dayAfter(earlier.last) === later.last ? Math.max(cl, ce + 1) : cl, last: later.last };
+    const A = okStreak(a) ? { count: Math.floor(Number(a.count)), last: a.last } : null, B = okStreak(b) ? { count: Math.floor(Number(b.count)), last: b.last } : null;
+    if (!A || !B) return A || B;
+    const ea = dayNo(A.last), eb = dayNo(B.last);
+    const [later, le, earlier, ee] = ea >= eb ? [A, ea, B, eb] : [B, eb, A, ea];
+    const ls = le - later.count + 1, es = ee - earlier.count + 1;
+    return { count: ee >= ls - 1 ? le - Math.min(ls, es) + 1 : later.count, last: later.last };
   }
 
   // The same rule the server applies, applied here too — not for the server's benefit but for the race: a board
@@ -3655,7 +3663,7 @@
   const betterRun = (a, b) => !b ? true : (a.stars || 0) !== (b.stars || 0) ? (a.stars || 0) > (b.stars || 0)
     : typeof a.t === 'number' && typeof b.t === 'number' ? a.t < b.t : typeof a.t === 'number';
 
-  function adoptTour(server) {
+  function adoptTour(server, sent = null) {
     let changed = false;
     for (const [id, r] of Object.entries(server?.levels || {})) {
       if (r.cleared) {
@@ -3669,6 +3677,9 @@
       if (st[k] === undefined) continue;
       // a streak is joined with this device's own rather than replaced by the account's: a board cleared here
       // while the push was in the air must not be taken back by an answer that predates it
+      // a setting changed here while the push was in the air (the ladder moved, a home picked) is newer than the
+      // answer: it stays, and the next push says it
+      if (sent && k !== 'playStreak' && k !== 'dailyStreak' && JSON.stringify(store.get(k, null)) !== JSON.stringify(sent[k] ?? null)) continue;
       const v = k === 'playStreak' || k === 'dailyStreak' ? mergeStreak(store.get(k, null), st[k]) : st[k];
       if (v != null && JSON.stringify(v) !== JSON.stringify(store.get(k, null))) { store.set(k, v); changed = true; }
     }
@@ -3679,12 +3690,13 @@
       for (const [dev, v] of Object.entries(st.loss)) { const n = Number(v) > 0 ? Math.floor(Number(v)) : 0; if (n > (Number(mine[dev]) || 0)) { mine[dev] = n; grew = true; } }
       if (grew) { store.set('loss', mine); changed = true; }
     }
-    for (const [day, rec] of Object.entries(st.daily || {})) if (!store.get('daily:' + day)) { store.set('daily:' + day, rec); changed = true; }
+    // a daily board: the better run of the two, as the account keeps it
+    for (const [day, rec] of Object.entries(st.daily || {})) if (rec && typeof rec === 'object' && typeof rec.t === 'number' && betterRun(rec, store.get('daily:' + day))) { store.set('daily:' + day, rec); changed = true; }
     // training days merge by the better score per round: a round played on two devices keeps the best of both
     for (const [day, rec] of Object.entries(st.train || {})) {
       if (!rec || typeof rec !== 'object') continue;
       const mine = trainDay(day); let grew = false;
-      for (const r of TRAIN_ROUNDS) { const v = Number(rec[r.id]); if (Number.isFinite(v) && v > (Number(mine[r.id]) || -1)) { mine[r.id] = clamp100(v); grew = true; } }
+      for (const r of TRAIN_ROUNDS) { const v = Number(rec[r.id]), have = typeof mine[r.id] === 'number' ? mine[r.id] : -1; if (typeof rec[r.id] === 'number' && Number.isFinite(v) && clamp100(v) > have) { mine[r.id] = clamp100(v); grew = true; } }
       // hints used and rounds played: the larger, so a second device gets no second free round or hint
       for (const k of ['h', 'p']) { const v = Math.floor(Number(rec[k])); if (v > 0 && v > (mine[k] | 0)) { mine[k] = v; grew = true; } }
       if (rec.pp && typeof rec.pp === 'object') for (const r of TRAIN_ROUNDS) { const v = Math.floor(Number(rec.pp[r.id])); if (v > 0 && v > ((mine.pp && mine.pp[r.id]) | 0)) { mine.pp = mine.pp || {}; mine.pp[r.id] = v; grew = true; } }
@@ -3706,10 +3718,14 @@
     if (syncing) return syncing;
     // A push that could not be made -- the phone was offline when the board was cleared -- is owed, and the
     // next chance (the network back, the app back on screen) pushes the whole tour rather than that one board.
-    const body = levels && !syncOwed ? { levels, state: localState() } : { levels: localTour(), state: localState() };
+    // the long history whenever the account may be missing some of it: the first push since the sync was mended,
+    // and any push after a gap longer than the usual window (signed out for months, a stretch of failed pushes)
+    const okAt = Number(store.get('stateOkAt', 0)) || 0, full = Date.now() - okAt > (STATE_SEND_DAYS - 14) * 864e5;
+    const body = levels && !syncOwed ? { levels, state: localState(full) } : { levels: localTour(), state: localState(full) };
     body.stats = localStats(); body.device = DEVICE;
+    const sent = Object.fromEntries(STATE_KEYS.map(k => [k, store.get(k, null)]));
     syncing = progressApi(body)
-      .then(d => { syncedAt = Date.now(); syncOwed = false; return adoptTour(d); })
+      .then(d => { syncedAt = Date.now(); syncOwed = false; store.set('stateOkAt', Date.now()); return adoptTour(d, sent); })
       .catch(() => { syncOwed = true; return false; })
       .finally(() => { syncing = null; });
     return syncing;

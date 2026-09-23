@@ -262,6 +262,20 @@ section('Two devices on one account: a Master board, the training and the streak
   // the phone asks again and sees the same
   const again = await call('/progress', { token: p.token });
   eq((again.json.state as Record<string, any>).train?.[day]?.f, 39, 'the phone reads the website’s round');
+
+  // both at once, each with boards the account has not seen: every insert's foreign key holds a lock on the
+  // user's row, and a row lock taken the wrong way round here deadlocked two such pushes against each other
+  const burst = await Promise.all(Array.from({ length: 6 }, (_, i) => call('/progress', { token: p.token, body: {
+    levels: { ['burst' + i]: { cleared: true, stars: 1, ms: 30_000, tier: 4 }, ['burstB' + i]: { cleared: true, stars: 2, ms: 31_000, tier: 3 } },
+    device: i % 2 ? 'phoneDev01' : 'webDev0001', state: { train: { [day]: { g: 50 + i } }, loss: { [i % 2 ? 'phoneDev01' : 'webDev0001']: 10 + i } } } })));
+  eq(burst.map(r => r.status), [200, 200, 200, 200, 200, 200], 'six pushes from two devices at the same moment all land');
+  const end = await call('/progress', { token: p.token });
+  eq((end.json.state as Record<string, any>).train?.[day]?.g, 55, 'and the best of their rounds is kept');
+  eq(Object.keys(end.json.levels as object).length, 463, 'and every board of every one of them');
+
+  // only the tour sync may send a big body: everywhere else the server's own limit stands
+  const big = await call('/auth/name', { token: p.token, body: { name: 'x'.repeat(100_000) } });
+  eq(big.status, 413, 'a 100 KB body to another route is refused');
 }
 
 section('A link cannot delete somebody\u2019s account');
