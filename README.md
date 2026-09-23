@@ -959,9 +959,9 @@ links.
   Every round carries a **long game**: a 30-day and then a 90-day challenge (`TRAIN_GOALS`, `trainRun`:
   consecutive days that round was played, ending today or yesterday), a bar under the round in the list. The
   painting's credit after a round sits behind a `?` (`data-train-info`). All four are **gallery
-  rounds** on real paintings: forty-five works from The Metropolitan Museum of Art's Open Access collection
-  (CC0, public domain, every one in colour), listed with title, painter, date and source in `games/data/art.json` (fetched once,
-  `ART_VERSION`, `loadArt`) and kept resized (≤ 800 px, ~2.4 MB in all) in `images/art/`, cached forever by
+  rounds** on real paintings: 146 works from The Metropolitan Museum of Art's Open Access collection
+  (CC0, public domain, every one in colour; European, American and East Asian painting, nothing unclothed), listed with title, painter, date and source in `games/data/art.json` (fetched once,
+  `ART_VERSION`, `loadArt`) and kept resized (≤ 800 px, ~8 MB in all, fetched a painting at a time) in `images/art/`, cached forever by
   the worker. The day's works are the same for everybody (`artPicks`, seeded by the day). **Restore the
   Canvas** (`canvasStart`) cuts one painting into nine pieces (`.aa-art-tile`, the picture as a background
   at 300 %); tap a piece, tap where it goes; scored on wrong tries and time over 90 s. **The Forgery**

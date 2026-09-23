@@ -734,7 +734,7 @@
   // Every country faint; the tour countries outlined; cleared ones filled and numbered with their level;
   // the next level pulsing. Tap a country to play its level. Built by games/build-world-map.mjs.
   let MAP = null, mapPromise = null, mapDrawn = false;
-  const ART_VERSION = 1;
+  const ART_VERSION = 2;   // games/data/art.json: the gallery, 146 paintings since September 2026
   function loadMap() {
     if (!mapPromise) mapPromise = fetch(`/games/data/world-map.json?v=${MAP_VERSION}`, { cache: 'force-cache' }).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }).then(m => { MAP = m; return m; }).catch(e => { mapPromise = null; throw e; });
     return mapPromise;
@@ -2227,7 +2227,7 @@
   }
 
   // ── The gallery rounds: real paintings, public domain ──
-  // Forty-five works from The Metropolitan Museum of Art's Open Access collection (CC0), in games/data/art.json
+  // A hundred and forty-six works from The Metropolitan Museum of Art's Open Access collection (CC0), in games/data/art.json
   // with their titles, painters and dates, resized once and kept in images/art/. Every round names the work it
   // used, so ten minutes of training is also ten minutes in a museum. The day's picks are the same for everybody.
   let ART = null, artPromise = null;
