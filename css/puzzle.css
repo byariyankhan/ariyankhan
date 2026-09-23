@@ -812,10 +812,8 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-art-patch{ display:block; width:100%; height:100%; background-repeat:no-repeat; }
 .aa-art-slots{ display:grid; grid-template-columns:repeat(3, 1fr); grid-auto-rows:1fr; gap:2px; margin:0 0 12px; padding:2px; background:var(--bg2); border-radius:14px; width:100%; }
 .aa-art-slot{ min-width:0; min-height:0; padding:0; border:2px dashed color-mix(in srgb, var(--muted) 35%, transparent); border-radius:6px; background:var(--card); cursor:pointer; overflow:hidden; }
-.aa-art-slot.is-open{ border-color:var(--accent2); background:color-mix(in srgb, var(--accent2) 8%, var(--card)); }
 .aa-art-tray{ display:grid; grid-template-columns:repeat(5, 1fr); gap:6px; }
-.aa-art-piece{ display:block; width:100%; padding:0; border:2px solid transparent; border-radius:8px; background:none; cursor:pointer; overflow:hidden; }
-.aa-art-piece.is-sel{ border-color:var(--accent2); box-shadow:0 0 0 3px color-mix(in srgb, var(--accent2) 30%, transparent); }
+.aa-art-piece{ display:block; width:100%; padding:0; border:2px solid transparent; border-radius:8px; background:none; cursor:grab; overflow:hidden; }
 .aa-art-piece.is-placed{ height:100%; border:none; border-radius:0; }
 .aa-art-piece.is-locked{ outline:2px solid var(--good); outline-offset:-2px; }
 /* drag and drop: the tray and the frame do not scroll under a finger, the carried copy rides above everything */

@@ -2084,7 +2084,7 @@
     e: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12s3.5-6.5 9.5-6.5 9.5 6.5 9.5 6.5-3.5 6.5-9.5 6.5S2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></svg>',
   };
   const TRAIN_ROUNDS = [
-    { id: 'r', name: 'Restore the Canvas', blurb: 'A painting in nine pieces. Put it back together.', how: ['A painting is cut into nine pieces and the frame is empty.', 'Drag a piece from the tray into the frame, to the place it belongs. Drop it on another piece and they swap; a tap, then a tap, works too.', 'Every piece home wins the round. Wrong tries and time over 90 seconds cost points.'] },
+    { id: 'r', name: 'Restore the Canvas', blurb: 'A painting in nine pieces. Put it back together.', how: ['A painting is cut into nine pieces and the frame is empty.', 'Drag a piece from the tray into the frame, to the place it belongs. Drop it on another piece and they swap; drag a piece out of the frame to take it back.', 'Every piece home wins the round. Wrong tries and time over 90 seconds cost points.'] },
     { id: 'f', name: 'The Forgery', blurb: 'Three things are wrong in the copy. Find them.', how: ['The original and a forged copy, side by side or one above the other.', 'Three patches of the copy are wrong: one is mirrored, one is recoloured, one is from elsewhere in the painting.', 'Tap them in the copy. A tap on nothing costs points; time over a minute does too.'] },
     { id: 'g', name: 'Gallery Memory', blurb: 'Five paintings, five seconds. Rebuild the order.', how: ['Five paintings hang in a row, numbered, for five seconds.', 'Then the same five come back shuffled.', 'Tap them in the order they hung: first, second, third… A wrong tap costs points.'] },
     { id: 'e', name: 'The Curator\u2019s Eye', blurb: 'One painting, then: which detail was in it?', how: ['One painting, for six seconds. Look at the corners as well as the middle.', 'Then, three times, four close-ups: one is from that painting, three are from others.', 'Tap the one that is from it. Each right answer is a third of the score.'] },
@@ -2179,12 +2179,9 @@
     if (e.target.closest('[data-train-how]')) { trainHowCard(); return; }
     // a drag that just ended is not a tap on whatever it ended over
     if (train.game?.dragEnd && performance.now() - train.game.dragEnd < 400) return;
+    if (train.game?.kind === 'r' && e.target.closest('.aa-art-piece, .aa-art-slot')) return;   // pieces move by dragging, and by nothing else
     if (e.target.closest('[data-train-howclose]')) { $('.aa-train-howcard', el.trainBody)?.remove(); return; }
     if (e.target.closest('[data-train-hint]')) { void trainHint(); return; }
-    const tile = e.target.closest('[data-tile]');
-    if (tile && train.game?.kind === 'r') canvasTap(tile);
-    const slot = e.target.closest('[data-slot]');
-    if (slot && !tile && train.game?.kind === 'r') canvasSlot(+slot.dataset.slot);
     const pick = e.target.closest('[data-pick]');
     if (pick && train.game?.kind === 'g') galleryTap(+pick.dataset.pick);
     const detail = e.target.closest('[data-detail]');
@@ -2397,15 +2394,15 @@
     const rnd = mulberry32(hashStr('aa-canvas-deal-' + dayKey()));
     const tray = Array.from({ length: n * n }, (_, i) => i); for (let i = tray.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [tray[i], tray[j]] = [tray[j], tray[i]]; }
     const tile = i => `<span class="aa-art-tile" style="background-image:url('${w.file}');background-position:${(100 * (i % n) / (n - 1)).toFixed(2)}% ${(100 * Math.floor(i / n) / (n - 1)).toFixed(2)}%"></span>`;
-    train.game = { kind: 'r', w, n, tile, slots: Array(n * n).fill(null), sel: null, wrong: 0, t0: performance.now(), locked: new Set(), hint() {
+    train.game = { kind: 'r', w, n, tile, slots: Array(n * n).fill(null), wrong: 0, t0: performance.now(), locked: new Set(), hint() {
       // the first piece out of place goes home and stays there
       const g = train.game; if (!g) return;
       const k = g.slots.findIndex((t, i) => t !== i && !g.locked.has(i)); if (k < 0) return;
       const from = g.slots.indexOf(k); if (from >= 0) g.slots[from] = null;
-      g.slots[k] = k; g.locked.add(k); g.sel = null; canvasDraw(); canvasCheck();
+      g.slots[k] = k; g.locked.add(k); canvasDraw(); canvasCheck();
     } };
     box.innerHTML = `<div class="aa-train-hud"><span>Restore the Canvas</span><span id="aaCanvasTime">0:00</span>${hintBtnHtml()}</div>
-      <p class="aa-train-sub">Drag each piece to where it belongs. A tap, then a tap, works too.</p>
+      <p class="aa-train-sub">Drag each piece to where it belongs. Drag one out to take it back.</p>
       <div class="aa-art-slots" id="aaCanvasSlots" style="aspect-ratio:${w.w}/${w.h}">${tray.map((_, i) => `<button type="button" class="aa-art-slot" data-slot="${i}" aria-label="Place ${i + 1}"></button>`).join('')}</div>
       <div class="aa-art-tray" id="aaCanvasTray">${tray.map(i => `<button type="button" class="aa-art-piece" data-tile="${i}" aria-label="Piece" style="aspect-ratio:${w.w}/${w.h}">${tile(i)}</button>`).join('')}</div>`;
     train.timer = setInterval(() => { const g = train.game; if (!g || g.kind !== 'r') return; const t = $('#aaCanvasTime', box); if (t) t.textContent = fmtTime(performance.now() - g.t0); }, 500);
@@ -2415,9 +2412,10 @@
   /**
    * Drag and drop, with pointer events so a finger and a mouse are the same thing: press a piece, carry a
    * copy of it under the finger, drop it on a slot. Dropped on a full slot, the two swap (from a slot) or the
-   * occupant goes back to the tray (from the tray). A press that does not move six pixels is a tap, and the
-   * tap-then-tap way still works underneath. The sheet does not scroll from a piece (touch-action) so a
-   * drag never turns into a scroll halfway.
+   * occupant goes back to the tray (from the tray); dropped anywhere else, a piece from the frame goes back
+   * to the tray and one from the tray stays. Dragging is the only way a piece moves: a tap does nothing, so
+   * there is one thing to learn. The sheet does not scroll from a piece (touch-action) so a drag never turns
+   * into a scroll halfway.
    */
   function canvasDragWire(box) {
     let d = null;
@@ -2429,14 +2427,14 @@
       if (from >= 0 && g.locked.has(from)) return;
       const r = piece.getBoundingClientRect();
       d = { id: e.pointerId, tile: +piece.dataset.tile, from, piece, x0: e.clientX, y0: e.clientY, dx: e.clientX - r.left, dy: e.clientY - r.top, w: r.width, h: r.height, moved: false, ghost: null };
-      // no capture yet: captured from the press, the click that a plain tap becomes would land on the box
-      // rather than the piece, and the tap way would be gone. Captured once it moves, below.
+      // captured once it moves, below: captured from the press, the ? and Hint buttons above would lose a
+      // tap that started on a piece and slid
     });
     box.addEventListener('pointermove', e => {
       const g = train.game; if (!d || e.pointerId !== d.id || !g) return;
       if (!d.moved) {
         if (Math.hypot(e.clientX - d.x0, e.clientY - d.y0) < 6) return;
-        d.moved = true; g.sel = null;
+        d.moved = true;
         try { box.setPointerCapture(e.pointerId); } catch { /* fine without */ }
         d.ghost = document.createElement('div'); d.ghost.className = 'aa-art-drag'; d.ghost.style.width = `${d.w}px`; d.ghost.style.height = `${d.h}px`; d.ghost.innerHTML = g.tile(d.tile);
         document.body.appendChild(d.ghost); d.piece.classList.add('is-ghost');
@@ -2447,13 +2445,15 @@
     const end = e => {
       if (!d || e.pointerId !== d.id) return;
       const g = train.game, was = d; d = null;
-      if (!was.moved) return;   // a tap: the click handler has it
+      if (!was.moved) return;   // a press that went nowhere
       was.ghost?.remove(); was.piece.classList.remove('is-ghost');
       $$('.aa-art-slot.is-over', box).forEach(n => n.classList.remove('is-over'));
       if (!g || g.kind !== 'r') return;
       g.dragEnd = performance.now();
       const s = e.type === 'pointercancel' ? null : document.elementFromPoint(e.clientX, e.clientY)?.closest?.('.aa-art-slot');
-      if (s) canvasDrop(was.tile, was.from, +s.dataset.slot); else canvasDraw();
+      if (s) canvasDrop(was.tile, was.from, +s.dataset.slot);
+      else if (was.from >= 0 && e.type !== 'pointercancel') { g.slots[was.from] = null; canvasDraw(); }   // out of the frame: back to the tray
+      else canvasDraw();
     };
     box.addEventListener('pointerup', end);
     box.addEventListener('pointercancel', end);
@@ -2463,24 +2463,13 @@
     if (from === k) { canvasDraw(); return; }
     const occupant = g.slots[k];
     if (from >= 0) g.slots[from] = occupant != null ? occupant : null;   // from a slot: swap
-    g.slots[k] = tile; g.sel = null; SFX.shoot(); canvasDraw(); canvasCheck(); trainCoachEvent('placed');
-  }
-  function canvasTap(btn) {
-    const g = train.game; if (!g) return;
-    const i = +btn.dataset.tile, inSlot = btn.closest('.aa-art-slot');
-    if (inSlot) { const k = +inSlot.dataset.slot; if (g.locked.has(k)) return; g.slots[k] = null; g.sel = null; canvasDraw(); return; }
-    g.sel = g.sel === i ? null : i; canvasDraw();
-  }
-  function canvasSlot(k) {
-    const g = train.game; if (!g || g.sel == null || g.locked.has(k) || g.slots[k] != null) return;
-    const from = g.slots.indexOf(g.sel); if (from >= 0) g.slots[from] = null;
-    g.slots[k] = g.sel; g.sel = null; SFX.shoot(); canvasDraw(); canvasCheck(); trainCoachEvent('placed');
+    g.slots[k] = tile; SFX.shoot(); canvasDraw(); canvasCheck(); trainCoachEvent('placed');
   }
   function canvasDraw() {
     const g = train.game; if (!g) return;
     const slots = $('#aaCanvasSlots', el.trainBody), tray = $('#aaCanvasTray', el.trainBody); if (!slots || !tray) return;
-    $$('.aa-art-slot', slots).forEach((sl, k) => { const t = g.slots[k]; sl.innerHTML = t == null ? '' : `<span class="aa-art-piece is-placed${g.locked.has(k) ? ' is-locked' : ''}" data-tile="${t}">${g.tile(t)}</span>`; sl.classList.toggle('is-open', t == null && g.sel != null); });
-    $$('.aa-art-piece', tray).forEach(b => { const i = +b.dataset.tile; b.hidden = g.slots.includes(i); b.classList.toggle('is-sel', g.sel === i); });
+    $$('.aa-art-slot', slots).forEach((sl, k) => { const t = g.slots[k]; sl.innerHTML = t == null ? '' : `<span class="aa-art-piece is-placed${g.locked.has(k) ? ' is-locked' : ''}" data-tile="${t}">${g.tile(t)}</span>`; });
+    $$('.aa-art-piece', tray).forEach(b => { b.hidden = g.slots.includes(+b.dataset.tile); });
   }
   function canvasCheck() {
     const g = train.game; if (!g || g.slots.some(t => t == null)) return;
