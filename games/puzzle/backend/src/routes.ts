@@ -259,40 +259,43 @@ const H = {
   // A phone with the app has no Push API. What it has is a Firebase registration token, which the app hands
   // the page over the bridge and the page posts here. One row per token, refreshed on every open with
   // notifications on, so the row follows the sign-in and the token stays current.
+  // A device needs no account to be reached: the evening nudge goes to whoever has the switch on, signed in
+  // or not. Signed out, the writes are limited by address and the row is saved with no user; the same token
+  // posted again after a sign-in takes the account.
   async pushToken(req: Req, res: Res, me: Caller) {
-    if (!me.user) { await noStore(res).code(401).send({ error: 'signed_out' }); return; }
-    if (!(await limited('push_write', req, res, me.user.id))) return;
+    if (!(await limited('push_write', req, res, me.user?.id ?? null))) return;
     const token = String(body(req).token ?? '').trim();
     // A registration token is a long opaque string of a known alphabet. Nothing else is stored, because
     // whatever is stored here is sent to Google with our name on it.
     if (!/^[A-Za-z0-9_:\-]{20,4096}$/.test(token)) { await noStore(res).code(400).send({ error: 'bad_token' }); return; }
     // The same word the browser is given by a deploy with no keys: the switch then says so instead of failing.
     if (!push.appEnabled) { await noStore(res).code(503).send({ error: 'push_off' }); return; }
-    await push.saveToken(pool, me.user.id, token, String(req.headers['user-agent'] ?? ''), push.cleanTz(body(req).tz));
+    await push.saveToken(pool, me.user?.id ?? null, token, String(req.headers['user-agent'] ?? ''), push.cleanTz(body(req).tz), body(req).reminder !== false);
     await noStore(res).send({ ok: true, on: true });
   },
 
   // The evening nudge is the one notification a player may decline while keeping the rest. Per account,
   // because it is the account that is asked to come and play, on whichever device is nearest.
   async pushReminder(req: Req, res: Res, me: Caller) {
-    if (!me.user) { await noStore(res).code(401).send({ error: 'signed_out' }); return; }
-    if (!(await limited('push_write', req, res, me.user.id))) return;
+    if (!(await limited('push_write', req, res, me.user?.id ?? null))) return;
     const on = body(req).on !== false;
-    await push.setReminder(pool, me.user.id, on);
+    if (me.user) { await push.setReminder(pool, me.user.id, on); await noStore(res).send({ ok: true, reminder: on }); return; }
+    // No account: the switch is the device's own row, named by the token or endpoint only it knows.
+    const token = String(body(req).token ?? '').trim(), endpoint = String(body(req).endpoint ?? '').trim();
+    if (!token && !endpoint) { await noStore(res).code(400).send({ error: 'no_device' }); return; }
+    if (!(await push.setDeviceReminder(pool, on, token, endpoint))) { await noStore(res).code(404).send({ error: 'no_device' }); return; }
     await noStore(res).send({ ok: true, reminder: on });
   },
 
   async pushTokenDrop(req: Req, res: Res, me: Caller) {
-    if (!me.user) { await noStore(res).code(401).send({ error: 'signed_out' }); return; }
-    if (!(await limited('push_write', req, res, me.user.id))) return;
+    if (!(await limited('push_write', req, res, me.user?.id ?? null))) return;
     const token = String(body(req).token ?? '').trim();
-    if (token) await push.dropToken(pool, me.user.id, token);
-    await noStore(res).send({ ok: true, on: token ? await push.hasSubscription(pool, me.user.id) : true });
+    if (token) await push.dropToken(pool, me.user?.id ?? null, token);
+    await noStore(res).send({ ok: true, on: token && me.user ? await push.hasSubscription(pool, me.user.id) : !token });
   },
 
   async pushSubscribe(req: Req, res: Res, me: Caller) {
-    if (!me.user) { await noStore(res).code(401).send({ error: 'signed_out' }); return; }
-    if (!(await limited('push_write', req, res, me.user.id))) return;
+    if (!(await limited('push_write', req, res, me.user?.id ?? null))) return;
     if (!push.enabled) { await noStore(res).code(503).send({ error: 'push_off' }); return; }
     const b = body(req);
     const sub = (b.subscription ?? b) as { endpoint?: unknown; keys?: { p256dh?: unknown; auth?: unknown } };
@@ -304,16 +307,15 @@ const H = {
     if (!/^https:\/\/[^\s]+$/i.test(endpoint) || endpoint.length > 1000 || !p256dh || !auth || !pushHostOk(endpoint)) {
       await noStore(res).code(400).send({ error: 'bad_subscription' }); return;
     }
-    await push.saveSubscription(pool, me.user.id, { endpoint, keys: { p256dh, auth } }, String(req.headers['user-agent'] ?? ''), push.cleanTz(b.tz));
+    await push.saveSubscription(pool, me.user?.id ?? null, { endpoint, keys: { p256dh, auth } }, String(req.headers['user-agent'] ?? ''), push.cleanTz(b.tz), b.reminder !== false);
     await noStore(res).send({ ok: true, on: true });
   },
 
   async pushUnsubscribe(req: Req, res: Res, me: Caller) {
-    if (!me.user) { await noStore(res).code(401).send({ error: 'signed_out' }); return; }
-    if (!(await limited('push_write', req, res, me.user.id))) return;
+    if (!(await limited('push_write', req, res, me.user?.id ?? null))) return;
     const endpoint = String(body(req).endpoint ?? '').trim();
-    if (endpoint) await push.dropSubscription(pool, me.user.id, endpoint);
-    await noStore(res).send({ ok: true, on: endpoint ? await push.hasSubscription(pool, me.user.id) : true });
+    if (endpoint) await push.dropSubscription(pool, me.user?.id ?? null, endpoint);
+    await noStore(res).send({ ok: true, on: endpoint && me.user ? await push.hasSubscription(pool, me.user.id) : !endpoint });
   },
 
   async invite(req: Req, res: Res, me: Caller) {

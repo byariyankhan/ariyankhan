@@ -663,11 +663,18 @@ links.
   3,300, Legend 4,200, Immortal 5,200, **GOAT 6,236** — about a hundred boards at
   the difficulty the game deals by then. The brain fills with the arrows of the
   rank in hand, **from the bottom up**, and GOAT lights the lot in green. Under it:
-  the rank name with a pill carrying the arrow count, and one line, `Level n ·
-  Difficulty` — two lines and no more; how far the next rank is, the brain itself
-  shows, and the result card says in words. The rank is the headline and it is
-  not the level — a level says where a player is on the tour, a rank says what
-  they have done. The result card
+  the rank name and, under it, `Level n` — two words and no more; how far the next
+  rank is, the brain itself shows, and the card after a board says what it added
+  or cost. The rank is the headline and it is not the level — a level says where
+  a player is on the tour, a rank says what they have done. **A rank is earned
+  and lost:** a board cleared adds its arrows, a board lost (hearts gone) takes
+  the arrows still on it, never below zero. What was taken is kept per device
+  (`loss`: device id → arrows, `lossMap`/`loseArrows`) and synced in the state
+  blob: a device's own count only grows, so devices merge by the larger per
+  device (`adoptTour`) and the total is the sum — a single shared number could
+  not have been merged. The out-of-hearts card says `−N arrows · Rank` or
+  `Rank down: …`; a race costs nothing. Offline play counts the same and goes
+  up with the next sync once the player is online and signed in. The result card
   carries a line too (`.aa-card-rank`): `+N arrows · Rank · M to Next`, or `New
   rank: …` when the board moved it; a race has none. The share text names the rank.
   Redrawn only when the tier or the lit count changes (`brainKey`), and the fade-in
@@ -921,10 +928,23 @@ links.
   press-and-hold check, and what clearing the board does. The layer lets taps through, so the board is playable
   under it. Shown once (`coached`), never in a race or on the daily board, closed by winning, losing or
   leaving the board, and Settings → Help → "Show the tutorial again" brings it back on the next board.
-- **The brain has a rank** (`RANKS`, `arrowsShot`, `rankOf`, `#aaBrainSub`, `.aa-card-rank`): Newbie to
-  GOAT at 6,236 arrows, fourteen steps, counted from the arrows on the cleared boards the tour syncs, so it
-  is the account's and not the device's, and it is separate from the level — see "The brain on the home
-  screen" above.
+- **The brain has a rank** (`RANKS`, `arrowsShot`, `rankOf`, `loseArrows`, `.aa-card-rank`): Newbie to
+  GOAT at 6,236 arrows, fourteen steps, earned by the arrows on cleared boards and lost by the arrows left
+  on lost ones, synced with the account, and separate from the level — see "The brain on the home screen"
+  above. Under the brain: the rank and `Level n`, nothing else.
+- **The home corner is the player** (`renderHomeCorner`, `.aa-home-face`): signed in, the settings button
+  in the top-right corner shows the player's own picture (their initial without one) and still opens
+  Settings; signed out, the settings mark.
+- **The dashboard asks one thing less:** no "How long" (a match is one board, `matchLen()` is 1; the
+  server still plays longer ones), and the list under the tables is "Recently played".
+- **The evening nudge needs no account.** Notifications are offered signed out too (`renderNotify` no
+  longer waits for `auth.user`); a token or subscription is posted with no user, with the device's own
+  nudge answer (`remindOn()`, `reminder` in the post, `store 'remind'`), and the 7 pm sweep reaches those
+  rows by zone with a note that carries no name (`deviceTargets`, `dailyNote('')` → "It's time to train
+  your brain"). Signing in posts the same token again and the row takes the account; signing out posts it
+  again with none (`notifyRelease`), so the nudge keeps coming while the account's invitations and league
+  stop. Backend: migration `017_anon_push.sql` (nullable `user_id`, `reminder` per row), `/push/*` routes
+  open to strangers under the address limit, `/push/reminder` by token or endpoint when signed out.
 - **The build line is hidden where players are.** "Build N" under the credit shows only on localhost or
   in the debug app (`el.build.hidden = !devAllowed()`), the same places the seven taps work; a player's
   Settings ends at the credit line.

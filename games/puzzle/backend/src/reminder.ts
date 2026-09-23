@@ -61,21 +61,46 @@ export async function targets(tz: string, quietHours = config.reminder.quietHour
 }
 
 /** One pass. Returns the zones it was seven o'clock in and how many players each was told. */
+/**
+ * Devices in the zone that belong to no account: the nudge on for that row, and the game not opened in the
+ * quiet hours. `seen_at` is when the device last posted its token or subscription, which it does on every
+ * open, so it stands in for the last_played_at that a device with no account does not have.
+ */
+export async function deviceTargets(tz: string, quietHours = config.reminder.quietHours): Promise<{ tokens: push.TokenRow[]; subs: push.SubRow[] }> {
+  const tokens = await query<push.TokenRow>(pool, `
+    SELECT id, token FROM push_tokens
+     WHERE user_id IS NULL AND reminder AND tz = $1 AND seen_at < now() - ($2 || ' hours')::interval`, [tz, String(quietHours)]);
+  const subs = await query<push.SubRow>(pool, `
+    SELECT id, endpoint, p256dh, auth FROM push_subscriptions
+     WHERE user_id IS NULL AND reminder AND tz = $1 AND seen_at < now() - ($2 || ' hours')::interval`, [tz, String(quietHours)]);
+  return { tokens: tokens.rows, subs: subs.rows };
+}
+
 export async function reminderSweep(now = new Date()): Promise<{ zone: string; told: number }[]> {
   const out: { zone: string; told: number }[] = [];
   for (const tz of await zones()) {
     const clock = localClock(now, tz);
     if (!clock || !isDue(clock)) continue;
-    // This zone, this local date, once. NX makes the first sweep the only one; a Redis that is gone answers
-    // null and the evening is skipped rather than repeated.
     const first = await soft(() => redis.set(k('reminder', tz, clock.date), '1', 'EX', 36 * 3600, 'NX'), null);
     if (first !== 'OK') continue;
     let told = 0;
     for (const u of await targets(tz)) {
-      // And this player, once in twenty hours, whichever of their devices' zones came round first.
       const mine = await soft(() => redis.set(k('reminded', u.id), '1', 'EX', 20 * 3600, 'NX'), null);
       if (mine !== 'OK') continue;
       if (await push.sendToUser(u.id, push.dailyNote(u.name)) > 0) told++;
+    }
+    // Devices with no account, one by one, each marked so a second service (or a restart) does not tell the
+    // same phone twice. The note carries no name: there is none to carry.
+    const dev = await deviceTargets(tz);
+    for (const t of dev.tokens) {
+      const mine = await soft(() => redis.set(k('reminded', 'tok', t.id), '1', 'EX', 20 * 3600, 'NX'), null);
+      if (mine !== 'OK') continue;
+      if (await push.sendToTokens([t], push.dailyNote('')) > 0) told++;
+    }
+    for (const sub of dev.subs) {
+      const mine = await soft(() => redis.set(k('reminded', 'sub', sub.id), '1', 'EX', 20 * 3600, 'NX'), null);
+      if (mine !== 'OK') continue;
+      if (await push.sendToSubs([sub], push.dailyNote('')) > 0) told++;
     }
     out.push({ zone: tz, told });
   }

@@ -69,19 +69,28 @@ export async function setReminder(sql: Sql, userId: number, on: boolean): Promis
   await query(sql, `UPDATE users SET reminder = $2 WHERE id = $1`, [userId, on]);
 }
 
-/** Remember where to reach this phone. One row per token; a token that changes hands follows the sign-in. */
-export async function saveToken(sql: Sql, userId: number, token: string, agent: string, tz = config.reminder.defaultTz): Promise<void> {
+/**
+ * Remember where to reach this phone. One row per token; a token that changes hands follows the sign-in.
+ * A phone with no account (`userId` null) has a row too: the evening nudge needs no account, and most
+ * players never sign in. `reminder` is that phone's own answer to the nudge, read only while the row has no
+ * account; signed in, users.reminder decides.
+ */
+export async function saveToken(sql: Sql, userId: number | null, token: string, agent: string, tz = config.reminder.defaultTz, reminder = true): Promise<void> {
   await query(sql, `
-    INSERT INTO push_tokens (user_id, token, agent, tz)
-         VALUES ($1, $2, $3, $4)
+    INSERT INTO push_tokens (user_id, token, agent, tz, reminder)
+         VALUES ($1, $2, $3, $4, $5)
     ON CONFLICT (token) DO UPDATE
-            SET user_id = EXCLUDED.user_id, agent = EXCLUDED.agent, tz = EXCLUDED.tz, seen_at = now(), fails = 0`,
-    [userId, token, agent.slice(0, 200), tz]);
+            SET user_id = EXCLUDED.user_id, agent = EXCLUDED.agent, tz = EXCLUDED.tz, reminder = EXCLUDED.reminder, seen_at = now(), fails = 0`,
+    [userId, token, agent.slice(0, 200), tz, reminder]);
 }
 
-/** The player turning notifications off on this phone. Only their own token is theirs to drop. */
-export async function dropToken(sql: Sql, userId: number, token: string): Promise<void> {
-  await query(sql, `DELETE FROM push_tokens WHERE user_id = $1 AND token = $2`, [userId, token]);
+/**
+ * The player turning notifications off on this phone. Signed in, only their own token is theirs to drop;
+ * signed out, the token is the one thing only that phone knows, and knowing it is owning it.
+ */
+export async function dropToken(sql: Sql, userId: number | null, token: string): Promise<void> {
+  if (userId === null) await query(sql, `DELETE FROM push_tokens WHERE token = $1`, [token]);
+  else await query(sql, `DELETE FROM push_tokens WHERE user_id = $1 AND token = $2`, [userId, token]);
 }
 
 /**
@@ -90,19 +99,28 @@ export async function dropToken(sql: Sql, userId: number, token: string): Promis
  * Keyed by endpoint, so the same browser subscribing again updates its row rather than adding another, and a
  * browser that changes hands moves to whoever is signed in on it now.
  */
-export async function saveSubscription(sql: Sql, userId: number, sub: PushSub, agent: string, tz = config.reminder.defaultTz): Promise<void> {
+export async function saveSubscription(sql: Sql, userId: number | null, sub: PushSub, agent: string, tz = config.reminder.defaultTz, reminder = true): Promise<void> {
   await query(sql, `
-    INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth, agent, tz)
-         VALUES ($1, $2, $3, $4, $5, $6)
+    INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth, agent, tz, reminder)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
     ON CONFLICT (endpoint) DO UPDATE
             SET user_id = EXCLUDED.user_id, p256dh = EXCLUDED.p256dh, auth = EXCLUDED.auth,
-                agent = EXCLUDED.agent, tz = EXCLUDED.tz, seen_at = now(), fails = 0`,
-    [userId, sub.endpoint, sub.keys.p256dh, sub.keys.auth, agent.slice(0, 200), tz]);
+                agent = EXCLUDED.agent, tz = EXCLUDED.tz, reminder = EXCLUDED.reminder, seen_at = now(), fails = 0`,
+    [userId, sub.endpoint, sub.keys.p256dh, sub.keys.auth, agent.slice(0, 200), tz, reminder]);
 }
 
 /** The player turning notifications off on this browser, or the browser telling us it has dropped them. */
-export async function dropSubscription(sql: Sql, userId: number, endpoint: string): Promise<void> {
-  await query(sql, `DELETE FROM push_subscriptions WHERE user_id = $1 AND endpoint = $2`, [userId, endpoint]);
+export async function dropSubscription(sql: Sql, userId: number | null, endpoint: string): Promise<void> {
+  if (userId === null) await query(sql, `DELETE FROM push_subscriptions WHERE endpoint = $1`, [endpoint]);
+  else await query(sql, `DELETE FROM push_subscriptions WHERE user_id = $1 AND endpoint = $2`, [userId, endpoint]);
+}
+
+/** The nudge switch of a device with no account: set on its own row, found by the token or endpoint only it knows. */
+export async function setDeviceReminder(sql: Sql, on: boolean, token: string, endpoint: string): Promise<boolean> {
+  let n = 0;
+  if (token) n += (await query(sql, `UPDATE push_tokens SET reminder = $2 WHERE token = $1 AND user_id IS NULL`, [token, on])).rowCount ?? 0;
+  if (endpoint) n += (await query(sql, `UPDATE push_subscriptions SET reminder = $2 WHERE endpoint = $1 AND user_id IS NULL`, [endpoint, on])).rowCount ?? 0;
+  return n > 0;
 }
 
 /** Whether this player has any device listening — browser or phone — which is what the client's toggle reads back. */
@@ -129,13 +147,21 @@ export async function sendToUser(userId: number, note: PushNote): Promise<number
 }
 
 /** Every phone this player has the app on, through FCM. The same promises as the browsers: never throws, dead rows go. */
+export type TokenRow = { id: number; token: string };
+export type SubRow = { id: number; endpoint: string; p256dh: string; auth: string };
+
 async function sendToPhones(userId: number, note: PushNote): Promise<number> {
+  const rows = await query<TokenRow>(pool, `SELECT id, token FROM push_tokens WHERE user_id = $1`, [userId]);
+  return sendToTokens(rows.rows, note);
+}
+
+/** Phones by their rows: what the evening sweep uses for a phone that has no account to be found by. */
+export async function sendToTokens(rows: TokenRow[], note: PushNote): Promise<number> {
   if (!appEnabled) return 0;
   let sent = 0;
   try {
-    const rows = await query<{ id: number; token: string }>(pool, `SELECT id, token FROM push_tokens WHERE user_id = $1`, [userId]);
-    if (!rows.rowCount) return 0;
-    await Promise.all(rows.rows.map(async row => {
+    if (!rows.length) return 0;
+    await Promise.all(rows.map(async row => {
       const how = await fcm.send(row.token, note, config.push.ttlSeconds);
       if (how === 'sent') {
         sent++;
@@ -154,14 +180,18 @@ async function sendToPhones(userId: number, note: PushNote): Promise<number> {
 }
 
 async function sendToBrowsers(userId: number, note: PushNote): Promise<number> {
+  const rows = await query<SubRow>(pool, `SELECT id, endpoint, p256dh, auth FROM push_subscriptions WHERE user_id = $1`, [userId]);
+  return sendToSubs(rows.rows, note);
+}
+
+/** Browsers by their rows, for the same reason. */
+export async function sendToSubs(rows: SubRow[], note: PushNote): Promise<number> {
   if (!enabled) return 0;
   let sent = 0;
   try {
-    const rows = await query<{ id: number; endpoint: string; p256dh: string; auth: string }>(pool,
-      `SELECT id, endpoint, p256dh, auth FROM push_subscriptions WHERE user_id = $1`, [userId]);
-    if (!rows.rowCount) return 0;
+    if (!rows.length) return 0;
     const payload = JSON.stringify(note);
-    await Promise.all(rows.rows.map(async row => {
+    await Promise.all(rows.map(async row => {
       try {
         await webpush.sendNotification(
           { endpoint: row.endpoint, keys: { p256dh: row.p256dh, auth: row.auth } },
@@ -210,9 +240,11 @@ export const leagueNote = (rank: number, gold: number): PushNote => ({
 });
 
 /** Seven in the evening, and the player has not been on a board today. Named, because it is addressed to them. */
+// A device with no account gets the nudge without a name in it: the game does not know one, and "Hey there"
+// is a stranger pretending to.
 export const dailyNote = (name: string): PushNote => ({
   kind: 'daily',
-  title: `Hey ${name.trim() || 'there'}, it\u2019s time to train your brain`,
+  title: name.trim() ? `Hey ${name.trim()}, it\u2019s time to train your brain` : 'It\u2019s time to train your brain',
   body: 'A fresh board is waiting. A few minutes keeps the streak alive.',
   url: '/puzzle/',
   tag: 'daily',

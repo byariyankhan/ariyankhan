@@ -503,3 +503,14 @@ npx tsx ../tests/load.ts ws    2800 10
 
 Raise `PUZZLE_RATE_MULTIPLIER` when load testing, or you will be measuring the rate limiter. The runner
 says so if more than a hundredth of its requests failed, which is how that mistake gets caught.
+
+## Devices with no account (September 2026)
+
+`push_tokens.user_id` and `push_subscriptions.user_id` are nullable since `017_anon_push.sql`, and both
+tables carry `reminder`. A signed-out device posts its token or subscription like a signed-in one (the
+`/push/*` routes take a stranger, limited by address); the row stands with no user and the device's own
+nudge answer. The evening sweep (`reminder.ts`, `deviceTargets`) reaches those rows by time zone, using
+`seen_at` (refreshed on every open) for the quiet hours an account gets from `last_played_at`, and sends
+`dailyNote('')`, which carries no name. Invitations and the league still go by user only. The same token
+posted after a sign-in takes the account (the upsert), and `/push/reminder` with no session takes a
+`token` or `endpoint` and flips that row's own switch; signed in, it still flips `users.reminder`.

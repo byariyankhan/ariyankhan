@@ -514,7 +514,8 @@ section('A phone registers for notifications the way a browser does, and is told
 
   const p = await mint('phoneOwner');
   const out = await call('/push/token', { body: { token: 'x'.repeat(40) } });
-  eq(out.status, 401, 'a token needs an account to be attached to');
+  eq(out.status, 503, 'a token needs no account: signed out it is taken the same way, and refused here only for want of a service account');
+  eq(out.json.error, 'push_off', 'in the same word');
   const junk = await call('/push/token', { token: p.token, body: { token: 'short' } });
   eq(junk.status, 400, 'and has to look like one');
   eq(junk.json.error, 'bad_token', 'which is said before anything else is checked');
@@ -531,7 +532,9 @@ section('A phone registers for notifications the way a browser does, and is told
   eq([nudgeOff.status, nudgeOff.json.reminder], [200, false], 'and can be turned off');
   eq(((await call('/auth/me', { token: p.token })).json.user as { reminder: boolean }).reminder, false, 'which /auth/me then says');
   eq((await call('/push/reminder', { token: p.token, body: { on: true } })).json.reminder, true, 'and back on');
-  eq((await call('/push/reminder', { body: { on: false } })).status, 401, 'but not by a stranger');
+  // Signed out, the nudge switch is the device's own row, named by the token or endpoint only it knows.
+  eq((await call('/push/reminder', { body: { on: false } })).status, 400, 'a stranger with no device named has nothing to switch');
+  eq((await call('/push/reminder', { body: { on: false, token: 'y'.repeat(40) } })).status, 404, 'nor with a token nobody posted');
 }
 
 section('What a client sends is checked, not passed to the database');
