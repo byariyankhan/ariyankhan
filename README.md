@@ -523,7 +523,7 @@ offline; it starts on the first tap and stops when the tab is hidden. This is th
 same shell we will wrap for Android/iOS (TWA / Capacitor). Each level is a
 country's outline filled with arrows; tap an arrow to shoot it off the board if its
 run to the edge is clear, a blocked tap costs one heart, no clock (time is still recorded for the result card), 4 hearts and 3 hints per
-level (`LIVES_OF`, `HINTS_OF`: the same on every tier; fewer hearts or hints is not how the game gets hard), difficulty that follows the player and never the level number (one
+level on Easy and Normal, 3 hearts and 2 hints on Hard, 2 hearts and 2 hints on Expert, 2 hearts and 1 hint on Master (`LIVES_OF`, `HINTS_OF`: the top tiers are meant to be lost and taken again), difficulty that follows the player and never the level number (one
 tier 0 Easy / 1 Normal / 2 Hard / 3 Expert / 4 Master lives in `aa:v1:form` as
 `{tier, wins, losses}`; `nextForm` moves it on form alone: a cleared board earns
 `clearPoints` towards the next step, 2 for a flawless fast first-try clear (no
@@ -560,7 +560,18 @@ links.
   the end with more pieces on its run. Ords come from a topological order, so the
   solution removes newest-first and any other order stays solvable. ~10-40 ms a
   board; the whole thing is why play is a search rather than trail-following.
-- **Board choice**: `bestBoard()` generates `CANDIDATES_OF[tier]` boards (4/6/8/8/8)
+- **Hard, Expert and Master are big and tricky everywhere**, the way Italy's were by luck of its shape:
+  the grid is drawn finer (`KSCALE_OF` 1.5/1.65/1.8 within `CELL_CAP_OF` 900/1100/1300 cells and a
+  `SIDE_CAP` of 72), so Hard boards are ~110 arrows (were ~50), Expert ~130, Master ~145; snakes run to
+  14/16/18 cells (`MAXLEN_OF`); every end points at something (`NARROW_OF` 1) across a gap (`FAR_OF`
+  .9/.95/.98); lanes of up to 4/5/6 empty cells (`LANE_OF`, `HOLE_OF` .2) sit between arrows and their
+  blockers; the tightening runs 400/500/600 iterations (`TIGHTEN_OF`) and its objective now also pays for
+  **traps** (`TRAP_OF` 3/4/5, `trapw` in `generate`): arrows with two or more empty cells before the piece
+  that blocks them, which look free at a glance and cost a heart. Measured with `scratchpad/hardness.mjs`
+  (a nearest-free-arrow player over all 197 countries): Hard 111 arrows, ~3.3 free at any moment, a fifth
+  of the remaining arrows a trap; Master 144 arrows, ~3.7 free, 22 % traps. Long thin countries (Chile,
+  Japan) stay smaller because the long side is capped for the phone.
+- **Board choice**: `bestBoard()` generates `CANDIDATES_OF[tier]` boards (4/6/8/8/6)
   from the level seed and keeps the best by `boardScore()`, a simulated player who
   always takes the free arrow nearest the one just tapped: mean arrows free at any
   moment + 2 × share of freed arrows within two cells of the tap + 0.15 × free at

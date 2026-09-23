@@ -96,7 +96,7 @@
   // How long an invitation that arrived mid-board is worth offering afterwards. A room waits minutes, not
   // hours, and an invitation to one that has since filled up or been called off is worse than none.
   const INVITE_KEEP_MS = 120_000;
-  const HINTS_OF = [3, 3, 3, 3, 3];   // hints per tier: three everywhere (fewer hints or hearts is not how this game gets hard)
+  const HINTS_OF = [3, 3, 2, 2, 1];   // hints per tier: three on Easy and Normal; Hard and up are meant to be lost and taken again
   // Press and hold an arrow and it says whether its lane is clear: green it goes, red it does not. That was free
   // and invisible -- nothing in the game mentioned it, and nothing counted it. Four a level makes it a choice
   // worth making and puts it on the bar where a player can see it, beside the hearts and the lamp.
@@ -107,7 +107,7 @@
   const CHECKS_PER_LEVEL = 4;
   const CHECK_WORD = 'check';   // the icon is drawn in the markup now, beside the counter's value
   const hintsFor = tier => HINTS_OF[tier] ?? HINTS_PER_LEVEL;
-  const LIVES_OF = [4, 4, 4, 4, 4];   // hearts per tier: four everywhere
+  const LIVES_OF = [4, 4, 3, 2, 2];   // hearts per tier: four on Easy and Normal, three on Hard, two on Expert and Master
   const livesFor = tier => LIVES_OF[tier] ?? LIVES;
   // ── Adaptive difficulty ──
   // Difficulty follows the player, never the level number. One tier (0 Easy … 4 Master) lives on the device and
@@ -127,28 +127,31 @@
   };
   const formNow = () => ({ ...FORM0, ...(store.get('form', null) || {}) });
   const TIER_OF = () => clampTier(formNow().tier);
-  const MAXLEN_OF = [7, 9, 11, 14, 16];  // longest body per tier: long snakes, as on the reference boards -- and on Hard and Master, the long winding ones that fill a page
+  const MAXLEN_OF = [7, 9, 14, 16, 18];  // longest body per tier: long snakes, as on the reference boards -- and on Hard and Master, the long winding ones that fill a page
   // Hard and Master boards are drawn on a finer grid than the level data asks for: more cells, so more arrows
   // on the same outline. The scale is the same for everybody, so a match is still the same board for both.
-  const KSCALE_OF = [1, 1, 1, 1.18, 1.5];
+  const KSCALE_OF = [1, 1, 1.5, 1.65, 1.8];
   // ...within a budget. Brazil at 1.5 is two thousand cells, three hundred five-pixel arrows and six seconds
   // of drawing on a phone; so the scale is trimmed to what keeps the board under this many cells and this
   // long a side, and a big country simply stays nearer the size the level data gave it. Small countries,
   // where the extra cells are the point, get the whole scale.
-  const CELL_CAP_OF = [0, 0, 0, 800, 1100];
-  const SIDE_CAP = 66;
+  const CELL_CAP_OF = [0, 0, 900, 1100, 1300];
+  const SIDE_CAP = 72;
   // How narrow the play is per tier (see generate()): narrow = prefer the end whose run holds more pieces (blocked
   // longer), far = prefer the end with a gap right ahead (the arrow it frees when it goes is that far away), rail =
   // straighter, longer snakes, holes/lane = share and length of the lanes carved out first.
-  const NARROW_OF = [0.5, 0.75, 0.9, 1, 1];
-  const FAR_OF = [0.2, 0.4, 0.6, 0.85, 0.95];
-  const RAIL_OF = [0.1, 0.15, 0.2, 0.32, 0.42];    // share of pieces that run long and straight across the board
-  const HOLE_OF = [0.1, 0.15, 0.2, 0.18, 0.15];    // share of inland cells carved out as lanes: fewer on the top tiers, so the board is packed
-  const LANE_OF = [1, 2, 3, 3, 4];                 // longest lane (empty cells between an arrow and its blocker)
+  const NARROW_OF = [0.5, 0.75, 1, 1, 1];
+  const FAR_OF = [0.2, 0.4, 0.9, 0.95, 0.98];
+  const RAIL_OF = [0.1, 0.15, 0.32, 0.42, 0.5];    // share of pieces that run long and straight across the board
+  const HOLE_OF = [0.1, 0.15, 0.2, 0.2, 0.2];      // share of inland cells carved out as lanes: the gaps an arrow looks free across
+  const LANE_OF = [1, 2, 4, 5, 6];                 // longest lane (empty cells between an arrow and its blocker)
   // Tightening iterations per tier (see generate stage 3): a local search that turns arrows to face a blocker so a
   // simulated player has fewer free arrows to pick from at any moment. Hard and up.
-  const TIGHTEN_OF = [0, 0, 250, 380, 420];
-  const GEN_OPTS = tier => ({ narrow: NARROW_OF[tier], far: FAR_OF[tier], rail: RAIL_OF[tier], holes: HOLE_OF[tier], lane: LANE_OF[tier], tighten: TIGHTEN_OF[tier] });
+  const TIGHTEN_OF = [0, 0, 400, 500, 600];
+  // Weight of the traps in the tightening (see generate stage 3): arrows with two or more empty cells before
+  // their blocker, which look free and are not. Hard and up, and heaviest on Master.
+  const TRAP_OF = [0, 0, 3, 4, 5];
+  const GEN_OPTS = tier => ({ narrow: NARROW_OF[tier], far: FAR_OF[tier], rail: RAIL_OF[tier], holes: HOLE_OF[tier], lane: LANE_OF[tier], tighten: TIGHTEN_OF[tier], trapw: TRAP_OF[tier] });
   const DIRS = { r: [0, 1], l: [0, -1], d: [1, 0], u: [-1, 0] };
   const PALETTE = ['#FFED54', '#5CD6FF', '#8CFF7A', '#FF9AD5', '#C79BFF', '#FFB347', '#6EE7B7', '#FDBA74', '#F97373', '#38BDF8'];
 
@@ -1155,12 +1158,15 @@
     const key = L.id + ':' + tier;
     if (!maskCache.has(key)) {
       const k = L.k[tier];
-      let scale = (L.scene || L.focus) ? 1 : KSCALE_OF[tier];   // scene and focus boards were sized for their tiers already
+      let scale = KSCALE_OF[tier];   // the finer grid of the top tiers, on the tour and the focus and scene boards alike
       if (scale !== 1) {
         const base = rasterise(L.d, k);
         scale = Math.max(1, Math.min(scale, Math.sqrt(CELL_CAP_OF[tier] / Math.max(1, base.count)), SIDE_CAP / Math.max(1, base.w, base.h)));
       }
-      maskCache.set(key, scale === 1 ? rasterise(L.d, k) : rasterise(L.d, k * scale));
+      let m = scale === 1 ? rasterise(L.d, k) : rasterise(L.d, k * scale);
+      // both top tiers can run into the same cap; a higher tier is never the smaller board for it
+      if (tier > 0) { const below = maskFor(L, tier - 1); if (below.count > m.count) m = below; }
+      maskCache.set(key, m);
     }
     return maskCache.get(key);
   };
@@ -1178,7 +1184,7 @@
   //    the game prefers, per tier, one that points at pieces (`narrow`: it is then blocked until they go), across
   //    a gap (`far`: the arrow it frees when it goes is that far away), and with more pieces on its run. A snake
   //    with no legal end is split in two and tried again; a lone inland cell that fits nowhere becomes a gap.
-  function generate(mask, maxLen, seed, { far = 0.5, hug = 0.6, narrow = 0.8, rail = 0.2, holes = 0.2, lane = 3, tighten = 0 } = {}) {
+  function generate(mask, maxLen, seed, { far = 0.5, hug = 0.6, narrow = 0.8, rail = 0.2, holes = 0.2, lane = 3, tighten = 0, trapw = 0 } = {}) {
     const H = mask.rows.length, W = mask.rows[0].length;
     const land = mask.rows.map(r => r.split('').map(ch => ch === '1'));
     const shape = land.map(r => r.slice());   // the country itself; `land` loses the gaps
@@ -1318,6 +1324,10 @@
         const ends = alive.map(endsOf);
         const rayOf = e => { const [dr, dc] = DIRS[e.dir]; let [y, x] = e.cells[0]; y += dr; x += dc; const S = []; while (inb(y, x)) { const i = occ[y][x]; if (i >= 0 && at.has(i) && !S.includes(at.get(i))) S.push(at.get(i)); y += dr; x += dc; } return S; };
         const rays = ends.map(es => es.map(rayOf));   // alive indices on each run: they block that end
+        // empty cells between an end and the first piece on its run, or -1 when nothing is there: an arrow with
+        // two or more looks free at a glance and is not -- the trap a hard board is made of
+        const gapOf = e => { const [dr, dc] = DIRS[e.dir]; let [y, x] = e.cells[0]; y += dr; x += dc; let g = 0; while (inb(y, x)) { const i = occ[y][x]; if (i >= 0 && at.has(i)) return g; g++; y += dr; x += dc; } return -1; };
+        const gaps = ends.map(es => es.map(gapOf));
         const cur = alive.map((p, k) => ends[k].findIndex(e => e.dir === p.dir && e.cells[0][0] === p.cells[0][0] && e.cells[0][1] === p.cells[0][1]));
         if (cur.every(k => k >= 0)) {
           const bl = Array.from({ length: N }, () => new Set());
@@ -1333,7 +1343,8 @@
               if (pick < 0) return Infinity;
               if (left === N) start = cnt; sum += cnt; gone[pick] = 1; left--; last = ends[pick][cur[pick]].cells[0];
             }
-            return sum / N + 0.3 * start;
+            let traps = 0; if (trapw) for (let k = 0; k < N; k++) if (gaps[k][cur[k]] >= 2) traps++;
+            return sum / N + 0.3 * start - trapw * traps / N;
           };
           let score = width();
           for (let it = 0; it < tighten; it++) {
@@ -1375,7 +1386,7 @@
 
   // Generate a few candidate boards from the seed and keep the narrowest (fewest arrows free at the start), so the
   // difficulty a tier promises does not depend on the luck of one seed. Candidates per tier: CANDIDATES_OF.
-  const CANDIDATES_OF = [4, 6, 8, 6, 5];
+  const CANDIDATES_OF = [4, 6, 8, 8, 6];
   // Lower is better. A quick simulated player who always takes the free arrow nearest the one just tapped (the
   // way people actually play) measures how many arrows are free at any moment and how often the arrow freed by
   // a tap sits within two cells of it; lone arrowheads count too, and arrows free from the start most of all.
