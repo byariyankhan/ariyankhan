@@ -663,10 +663,11 @@ links.
   3,300, Legend 4,200, Immortal 5,200, **GOAT 6,236** — about a hundred boards at
   the difficulty the game deals by then. The brain fills with the arrows of the
   rank in hand, **from the bottom up**, and GOAT lights the lot in green. Under it:
-  the rank name, a pill with the arrow count, one line saying how many arrows are
-  left to the next rank, and small under that `Rank n of 14 · Level n · Difficulty`
-  (`#aaBrainSub`): the rank is the headline and it is not the level — a level says
-  where a player is on the tour, a rank says what they have done. The result card
+  the rank name with a pill carrying the arrow count, and one line, `Level n ·
+  Difficulty` — two lines and no more; how far the next rank is, the brain itself
+  shows, and the result card says in words. The rank is the headline and it is
+  not the level — a level says where a player is on the tour, a rank says what
+  they have done. The result card
   carries a line too (`.aa-card-rank`): `+N arrows · Rank · M to Next`, or `New
   rank: …` when the board moved it; a race has none. The share text names the rank.
   Redrawn only when the tier or the lit count changes (`brainKey`), and the fade-in

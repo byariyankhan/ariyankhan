@@ -123,7 +123,6 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-brain-diff--arrows{ color:var(--accent2); background:color-mix(in srgb, var(--accent2) 12%, transparent); font-variant-numeric:tabular-nums; }
 .aa-brain-diff--arrows.is-top{ color:var(--good); background:color-mix(in srgb, var(--good) 12%, transparent); }
 .aa-brain-note{ margin:0; font-size:13px; color:var(--muted); text-align:center; font-weight:800; }
-.aa-brain-sub{ margin:0; font-size:10px; letter-spacing:1px; text-transform:uppercase; color:var(--muted); text-align:center; font-weight:800; opacity:.75; }
 .aa-card-rank{ margin:8px 0 0; font-size:13px; font-weight:800; color:var(--muted); text-align:center; font-variant-numeric:tabular-nums; }
 .aa-card-rank b{ color:var(--accent2); font-weight:900; }
 .aa-card-rank.is-up{ font-size:16px; color:var(--ink); animation:aapop .45s ease-out; }
@@ -465,10 +464,10 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
    an arrow sitting on the edge of the glass is one the thumb cannot reach without the palm covering half the
    board. So the frame keeps a margin on every side, and a little more at the bottom, where the phone's own
    gesture bar lives. */
-.aa-board-wrap{ position:relative; flex:1; min-height:0; display:flex; align-items:center; justify-content:center; padding:10px 14px calc(16px + env(safe-area-inset-bottom, 0px)); overflow:hidden; touch-action:none; }
+.aa-board-wrap{ position:relative; flex:1; min-height:0; display:flex; align-items:center; justify-content:center; padding:52px 14px calc(16px + env(safe-area-inset-bottom, 0px)); overflow:hidden; touch-action:none; }   /* 52px top: the zoom buttons (36px at top 8px) sit above the board, never on it */
 .aa-board-track{ position:absolute; left:0; right:0; top:0; height:4px; background:var(--bg2); border-radius:4px; }
 .aa-board-bar{ height:100%; width:0; background:var(--accent); border-radius:4px; transition:width .3s; }
-.aa-board{ display:block; width:100%; height:auto; max-height:calc(var(--app-h) - 232px); touch-action:none; transform-origin:0 0; will-change:transform; user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; }
+.aa-board{ display:block; width:100%; height:auto; max-height:calc(var(--app-h) - 274px); touch-action:none; transform-origin:0 0; will-change:transform; user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; }
 .aa-board--tall{ max-height:calc(var(--app-h) - 212px); }
 .aa-outline{ fill:var(--accent); fill-opacity:0; stroke:none; transition:fill-opacity .35s; pointer-events:none; }
 .aa-guides{ display:none; }

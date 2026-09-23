@@ -163,7 +163,7 @@
     loading: $('#aaLoading'), error: $('#aaError'),
     gate: $('#aaGate'), accept: $('#aaAccept'), splash: $('#aaSplash'), splashQuote: $('#aaSplashQuote'),
     worldMap: $('#aaWorldMap'), worldCap: $('#aaWorldCap'), worldScroll: $('#aaWorldScroll'),
-    brainArt: $('#aaBrainArt'), brainLv: $('#aaBrainLv'), brainDiff: $('#aaBrainDiff'), brainNote: $('#aaBrainNote'), brainSub: $('#aaBrainSub'),
+    brainArt: $('#aaBrainArt'), brainLv: $('#aaBrainLv'), brainDiff: $('#aaBrainDiff'), brainNote: $('#aaBrainNote'),
     deck: $('#aaDeck'), deckTrack: $('#aaDeckTrack'), deckDots: $('#aaDeckDots'),
     notifyCap: $('#aaNotifyCap'), notifyGroup: $('#aaNotifyGroup'), btnNotify: $('#aaNotify'), notifyNote: $('#aaNotifyNote'), remindRow: $('#aaRemindRow'), btnRemind: $('#aaRemind'), mutedCap: $('#aaMutedCap'), mutedGroup: $('#aaMutedGroup'),
     statBoards: $('#aaStatBoards'), statCountries: $('#aaStatCountries'), statStreak: $('#aaStatStreak'),
@@ -838,13 +838,9 @@
     const frac = full ? 1 : (n - rk.lo) / (rk.hi - rk.lo);
     if (el.brainLv) el.brainLv.textContent = rk.name;
     if (el.brainDiff) { el.brainDiff.textContent = `${fmtN(n)} arrow${n === 1 ? '' : 's'}`; el.brainDiff.className = 'aa-brain-diff aa-brain-diff--arrows' + (full ? ' is-top' : ''); }
-    const togo = full ? 0 : rk.hi - n;
-    if (el.brainNote) el.brainNote.textContent = !em ? ''
-      : n === 0 ? 'Clear a board to shoot your first arrows.'
-      : full ? `${fmtN(n)} arrows. The whole brain is yours.`
-      : `${fmtN(togo)} more arrow${togo === 1 ? '' : 's'} to ${rk.next}.`;
-    // the level and the difficulty are still here, small: the rank is the headline, and it is not the level
-    if (el.brainSub) el.brainSub.textContent = `Rank ${rk.i + 1} of ${RANKS.length} · Level ${done + 1} · ${DIFF_OF(tier)}`;
+    // Two lines and no more: the rank with its arrows, and the level with its difficulty. How far the next
+    // rank is, the brain itself shows; the result card says it in words.
+    if (el.brainNote) el.brainNote.textContent = `Level ${done + 1} · ${DIFF_OF(tier)}`;
     if (!em) { svg.hidden = true; return; }
     svg.hidden = false;
     const lit = full ? em.pieces.length : Math.min(em.pieces.length - 1, Math.round(em.pieces.length * frac));
