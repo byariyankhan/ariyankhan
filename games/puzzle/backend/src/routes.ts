@@ -8,7 +8,7 @@ import { API_PREFIX, config } from './config.js';
 import { pool, query, tx } from './db.js';
 import * as R from './rooms.js';
 import { adClaim, balance } from './gold.js';
-import { deleteUser, endSession, googleVerify, providers, startSession, upsertUser, cleanName } from './auth.js';
+import { deleteUser, endSession, googleVerify, handoffRedeem, handoffStart, providers, startSession, upsertUser, cleanName, validCode, validNonce, HANDOFF_SECONDS } from './auth.js';
 import { publish, publishToUser } from './events.js';
 import { boardPace, cleanDevice, cleanLevels, cleanState, cleanStats, difficulty, mergeLevels, mergeStats, mergeState, readAll } from './progress.js';
 import * as L from './league.js';
@@ -88,6 +88,37 @@ const H = {
       user: shapeUser(out.user),
       gold_granted: out.created ? config.game.signupGold : 0,
       ...(wantsToken ? { token: out.token, expires_in_days: config.auth.sessionDays } : {}),
+    });
+  },
+
+  // The browser's half of a sign-in handed to the app (see auth.ts, handoffStart): a code for this account,
+  // spendable once, within five minutes, with the nonce the app put in the browser's address bar.
+  async handoff(req: Req, res: Res, me: Caller) {
+    if (!me.user) { await noStore(res).code(401).send({ error: 'signed_out' }); return; }
+    if (!(await limited('auth_write', req, res, me.user.id))) return;
+    const nonce = String(body(req).nonce ?? '');
+    if (!validNonce(nonce)) { await noStore(res).code(400).send({ error: 'bad_nonce' }); return; }
+    const code = await handoffStart(me.user.id, nonce);
+    if (!code) { await noStore(res).code(503).send({ error: 'unavailable' }); return; }
+    await noStore(res).send({ code, expires_in: HANDOFF_SECONDS });
+  },
+
+  // The app's half: code and nonce for a session. Limited like a sign-in, because that is what it is, and a
+  // wrong nonce burns the code rather than leaving it for a second guess.
+  async handoffRedeem(req: Req, res: Res, me: Caller) {
+    if (!(await limited('auth_signin', req, res, null))) return;
+    const code = String(body(req).code ?? ''), nonce = String(body(req).nonce ?? '');
+    if (!validCode(code) || !validNonce(nonce)) { await noStore(res).code(400).send({ error: 'bad_code' }); return; }
+    const user = await handoffRedeem(code, nonce);
+    if (!user) { await noStore(res).code(404).send({ error: 'bad_code' }); return; }
+    const wantsToken = me.client === 'app' || body(req).client === 'app';
+    const token = await tx(c => startSession(c, user.id, wantsToken ? 'app' : 'web'));
+    if (!wantsToken) setSessionCookie(res, token);
+    log.info('signed in', { user_id: user.id, created: false, client: wantsToken ? 'app' : 'web', via: 'handoff' });
+    await noStore(res).send({
+      user: shapeUser(user),
+      gold_granted: 0,
+      ...(wantsToken ? { token, expires_in_days: config.auth.sessionDays } : {}),
     });
   },
 
@@ -534,6 +565,8 @@ export function registerRoutes(app: FastifyInstance): void {
   app.get(`${v1}/auth/me`, withCaller(H.me));
   app.post(`${v1}/auth/google`, withCaller(H.google));
   app.post(`${v1}/auth/name`, withCaller(H.rename));
+  app.post(`${v1}/auth/handoff`, withCaller(H.handoff));
+  app.post(`${v1}/auth/handoff/redeem`, withCaller(H.handoffRedeem));
   app.post(`${v1}/auth/logout`, withCaller(H.logout));
   app.post(`${v1}/auth/delete`, withCaller(H.destroy));
 

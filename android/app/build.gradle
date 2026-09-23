@@ -98,6 +98,10 @@ dependencies {
     // matters now and matters more when this bridge is carrying purchases.
     implementation 'androidx.webkit:webkit:1.12.1'
 
+    // The browser, for the sign-in the phone cannot do natively: a Custom Tab of the game's own page, where
+    // Google's button works, which then hands the account back through puzzle://signin (README, "Sign-in").
+    implementation 'androidx.browser:browser:1.8.0'
+
     // AdMob. Not for drawing ads itself — the game's own AdSense tag does that — but for
     // MobileAds.registerWebView, which is the whole reason this app owns its WebView.
     implementation 'com.google.android.gms:play-services-ads:23.6.0'

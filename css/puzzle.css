@@ -43,7 +43,7 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-icon:hover{ background:rgba(0,0,0,.06); }
 .aa-icon:active{ transform:scale(.92); }
 .aa-btn{ display:inline-flex; align-items:center; justify-content:center; gap:8px; padding:12px 22px; border-radius:16px; border:none; background:linear-gradient(120deg, var(--accent2), color-mix(in srgb, var(--accent2) 62%, var(--accent))); color:#fff; cursor:pointer; font-weight:900; font-size:15px; letter-spacing:.2px; white-space:nowrap; box-shadow:0 4px 0 rgba(0,0,0,.12); transition:transform .1s, filter .15s; }
-.aa-btn{ position:relative; overflow:hidden; }
+.aa-btn{ position:relative; overflow:hidden; text-decoration:none; }   /* a link drawn as a button is a button */
 .aa-btn::after{ content:''; position:absolute; inset:0; pointer-events:none; background:url(/images/puzzle-brain-mark-white.svg?v=1) no-repeat right -10px center / 74px auto; opacity:.14; }
 .aa-btn--small::after{ background-size:48px auto; background-position:right -8px center; }
 .aa-btn--ghost::after, .aa-actions .aa-btn--soft::after, .aa-actions .aa-btn--danger::after{ content:none; }
@@ -193,6 +193,8 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
    game's own button at the same weight, wide enough to read as the one thing on the sheet to press. */
 .aa-signin-app{ width:100%; max-width:280px; }
 .aa-signin-app[disabled]{ opacity:.6; cursor:default; }
+.aa-signin-web{ margin-top:10px; width:100%; max-width:280px; }
+.aa-signin:has(.aa-signin-app){ flex-direction:column; align-items:center; }
 .aa-signin-list{ margin:0 0 14px; padding:0 0 0 18px; color:var(--muted); font-size:14px; line-height:1.7; }
 /* The player's own header: face, name, and the purse right under the name rather than adrift at the far edge. */
 .aa-me{ display:flex; align-items:center; gap:14px; margin:0 0 16px; min-width:0; }
@@ -534,11 +536,7 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-gate-inner, .aa-splash-inner{ width:100%; max-width:400px; display:flex; flex-direction:column; align-items:center; }
 .aa-gate-inner{ gap:26px; }
 .aa-gate-title{ font-size:clamp(34px,9.5vw,46px); font-weight:900; margin:0; color:var(--line); line-height:1.08; letter-spacing:-.3px; }
-.aa-gate-art{ width:min(66vw,240px); height:auto; }
-.aa-gate-lines path{ fill:none; stroke-width:5; stroke-linecap:round; stroke-linejoin:round; }
-.aa-gate-lines .c1{ stroke:var(--line); } .aa-gate-lines .c2{ stroke:var(--accent2); } .aa-gate-lines .c3{ stroke:var(--accent); }
-.aa-gate-lines .h{ stroke-width:2; } .aa-gate-lines .c1.h{ fill:var(--line); } .aa-gate-lines .c2.h{ fill:var(--accent2); } .aa-gate-lines .c3.h{ fill:var(--accent); }
-.aa-gate-dot{ fill:var(--muted); opacity:.45; }
+.aa-gate-art{ width:min(58vw,220px); height:auto; }
 .aa-gate-text{ font-size:17px; line-height:1.45; color:var(--muted); margin:0; }
 .aa-gate-text a{ color:var(--accent); font-weight:900; text-decoration:underline; text-underline-offset:3px; }
 .aa-gate-accept{ width:100%; max-width:360px; padding:17px 22px; font-size:22px; border-radius:20px; margin-top:6px; }

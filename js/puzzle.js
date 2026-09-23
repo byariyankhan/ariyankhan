@@ -2937,7 +2937,7 @@
   const auth = { user: null, providers: {}, match: null, ready: false };
   // me is a read; everything else changes something and is posted. The paths are the versioned ones, so a
   // later backend can add a v2 without this client noticing.
-  const AUTH_PATH = { me: '/auth/me', google: '/auth/google', name: '/auth/name', logout: '/auth/logout', delete: '/auth/delete' };
+  const AUTH_PATH = { me: '/auth/me', google: '/auth/google', name: '/auth/name', logout: '/auth/logout', delete: '/auth/delete', handoff: '/auth/handoff', redeem: '/auth/handoff/redeem' };
   /**
    * Every call to the service goes through here: same-origin cookie, no caching, JSON in and out, and a
    * failure thrown as an Error carrying the server's own word in `code` (plus whatever `extra` picks out of
@@ -3018,8 +3018,9 @@
       signInNote('Signing in is not in the app yet. Every board plays without an account, and the gold is waiting when it lands.');
       return;
     }
-    box.innerHTML = '<button type="button" class="aa-btn aa-btn--primary aa-signin-app" id="aaShellGoogle">Continue with Google</button>';
+    box.innerHTML = '<button type="button" class="aa-btn aa-btn--primary aa-signin-app" id="aaShellGoogle">Continue with Google</button><button type="button" class="aa-btn aa-btn--soft aa-btn--small aa-signin-web" id="aaShellWeb">Sign in in your browser instead</button>';
     $('#aaShellGoogle', box)?.addEventListener('click', shellSignIn);
+    $('#aaShellWeb', box)?.addEventListener('click', shellWebSignIn);
   }
 
   async function shellSignIn() {
@@ -3036,31 +3037,98 @@
     // "No credentials available" is Google's answer both to a phone with no Google account and to a build
     // whose signing certificate is not an OAuth client in the Cloud project yet. A phone that does have an
     // account is in the second case, so the note carries the fingerprint the Cloud form asks for.
-    const cert = d.cert ? ` If this phone does have one, this build is not registered with Google yet — signing certificate SHA-1 ${d.cert}.` : '';
-    signInNote(
-      d.error === 'no_account' ? 'No Google account on this phone yet. Add one in Android settings, then try again.' + cert
-      : d.error === 'unavailable' ? 'This phone cannot sign in with Google — it has no Play services.'
-      : 'That sign-in did not go through. Please try again.');
+    if (d.cert) console.warn('This build is signed with SHA-1 ' + d.cert);
+    if (d.error === 'unavailable') { signInNote('This phone cannot sign in with Google — it has no Play services.'); return; }
+    // "No credentials available" is also what Google answers for a build it has not been told about, and
+    // the browser does not care how the app is signed: sign in there and come back.
+    await shellWebSignIn();
   }
 
   async function onGoogleCredential(res) {
     try {
       const d = await authApi('google', { credential: res?.credential || '' });
-      auth.user = d.user || null;
-      const fresh = !!d.user && d.gold_granted;
-      closeSheets();
-      renderAccountRow();
-      if (auth.user) syncTour();   // a new phone gets the tour back here; a player who played signed out gives theirs up
-      if (auth.user) {
-        if (state.pendingCode) { const c = state.pendingCode; state.pendingCode = null; openMatchLink(c); }
-        else { await authLoad(true); if (!resumeLive()) openStakes(); }
-        toast(fresh ? `Welcome, ${auth.user.name}. ${Number(auth.user.gold || 0).toLocaleString('en-US')} gold to start you off.` : `Signed in as ${auth.user.name}`, 'good', fresh ? 5000 : 2800);
-        if (typeof gtag === 'function') gtag('event', 'login', { method: 'google', game: 'puzzle' });
-      }
+      await signedIn(d, 'google');
     } catch (e) {
       signInNote(e.code === 'google_not_configured' ? 'Google sign-in is not switched on yet.' : 'That sign-in did not go through. Please try again.');
     }
   }
+  /** What happens once the server has said who this is, whichever way the token reached it. */
+  async function signedIn(d, method) {
+    auth.user = d.user || null;
+    const fresh = !!d.user && d.gold_granted;
+    closeSheets();
+    renderAccountRow();
+    if (auth.user) syncTour();   // a new phone gets the tour back here; a player who played signed out gives theirs up
+    if (!auth.user) return;
+    // A browser the app opened only to sign in hands the account back to the app now, and plays nothing.
+    if (handoff.nonce) { await handoffFinish(); return; }
+    if (state.pendingCode) { const c = state.pendingCode; state.pendingCode = null; openMatchLink(c); }
+    else { await authLoad(true); if (!resumeLive()) openStakes(); }
+    toast(fresh ? `Welcome, ${auth.user.name}. ${Number(auth.user.gold || 0).toLocaleString('en-US')} gold to start you off.` : `Signed in as ${auth.user.name}`, 'good', fresh ? 5000 : 2800);
+    if (typeof gtag === 'function') gtag('event', 'login', { method, game: 'puzzle' });
+  }
+
+  // ── Sign-in handed from the browser to the app ──
+  //
+  // Google will not sign a WebView in, and the native way (shellSignIn) only works for a build whose signing
+  // certificate Google has been told about. When it fails, the app opens this same page in the phone's
+  // browser with ?handoff=<nonce>; there Google's own button works, and once signed in the page asks the
+  // server for a code and opens puzzle://signin?code=…, which is the app again. The app lands on
+  // #handoff=<code> and trades code and nonce for a session of its own. The nonce is made here, kept here,
+  // and never shown to anybody but the browser's address bar, so a code is worth nothing to anything else
+  // that might answer the puzzle: scheme. The server keeps a code for five minutes and one use.
+  const handoff = { nonce: '' };
+  {
+    const n = shell.on ? '' : new URLSearchParams(location.search).get('handoff') || '';
+    if (/^[A-Za-z0-9_-]{16,64}$/.test(n)) handoff.nonce = n;
+  }
+  const handoffNonce = () => { const b = new Uint8Array(24); crypto.getRandomValues(b); return btoa(String.fromCharCode(...b)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); };
+  /** In the app: open the browser to sign in there. */
+  async function shellWebSignIn() {
+    const nonce = handoffNonce();
+    store.set('handoffNonce', nonce);
+    signInNote('Opening your browser to sign in there. You will be brought straight back.');
+    const r = await shell.ask(`open ${location.origin}/puzzle/?handoff=${nonce}`, 4000);
+    if (!r?.ok) signInNote('Update Puzzle from Google Play, then sign in again: this version of the app cannot open the browser for it.');
+  }
+  /** In the browser: signed in, so ask for the code and go back to the app. */
+  async function handoffFinish() {
+    let d;
+    try { d = await authApi('handoff', { nonce: handoff.nonce }); }
+    catch { toast('The app could not be signed in. Go back to it and try again.', 'bad', 5000); return; }
+    const link = `puzzle://signin?code=${d.code}`;
+    let box = $('#aaHandoff');
+    if (!box) { box = document.createElement('div'); box.id = 'aaHandoff'; box.className = 'aa-gate'; document.body.appendChild(box); }
+    box.innerHTML = `<div class="aa-gate-inner">
+      <img class="aa-gate-art" src="/images/puzzle-brain-mark-rose.svg?v=1" alt="" width="220" height="220">
+      <h2 class="aa-gate-title">Signed in</h2>
+      <p class="aa-gate-text">You are <b>${escapeHtml(auth.user?.name || '')}</b>. Go back to the Puzzle app to play.</p>
+      <a class="aa-btn aa-gate-accept" href="${link}">Back to the app</a>
+    </div>`;
+    box.hidden = false;
+    // Chrome follows a link to another app on its own only close after a tap; the button is there for when
+    // it does not, and for a browser that asks first.
+    setTimeout(() => { try { location.href = link; } catch { /* the button */ } }, 300);
+  }
+  /** In the app, arrived from the browser: #handoff=<code> is traded for a session. */
+  async function handoffRedeem(code) {
+    history.replaceState(null, '', location.pathname + location.search);
+    const nonce = store.get('handoffNonce', '');
+    if (!nonce) { toast('That sign-in link was not made by this app. Tap Sign in and try again.', 'hint', 5000); return; }
+    try {
+      const d = await authApi('redeem', { code, nonce });
+      store.set('handoffNonce', '');
+      await signedIn(d, 'handoff');
+    } catch (e) {
+      toast(e.code === 'bad_code' ? 'That sign-in link has expired. Tap Sign in and try again.' : 'That sign-in did not go through. Please try again.', 'bad', 5000);
+    }
+  }
+  function handoffHash() {
+    if (!shell.on) return;
+    const m = /^#handoff=([a-f0-9]{64})$/.exec(location.hash);
+    if (m) void handoffRedeem(m[1]);
+  }
+  window.addEventListener('hashchange', handoffHash);
   // ── The tour, kept by the account rather than by this phone ──
   //
   // Everything a player has cleared used to live in this browser and nowhere else: sign in on a new phone and
@@ -3288,7 +3356,9 @@
    * replaces the one the server was still addressing.
    */
   async function notifyInitApp() {
-    if (!auth.user) { renderNotify(); return; }
+    // Signed out too: the evening nudge needs no account (the token is posted with none), and the phone's
+    // own permission is asked on the first open, whoever is signed in. Whether phones can be reached at all is
+    // the one thing the server is asked first.
     if (!push.asked) {
       push.asked = true;
       try { const d = await pushApi('key'); push.app = !!d.app; }
@@ -3315,7 +3385,7 @@
    * browser that says no for good.
    */
   async function notifyFirstAsk() {
-    if (!appPush() || store.get('pushAsked')) return;
+    if (!appPush() || store.get('pushAsked') || !store.get('welcomed')) return;   // after Accept, not under it
     if (!push.checked) { await notifyInit(); if (store.get('pushAsked')) return; }
     if (!push.app || push.on || push.granted === false) return;
     store.set('pushAsked', Date.now());
@@ -5246,7 +5316,7 @@
   function showGate(then) {
     if (!el.gate) { then?.(); return; }
     el.gate.hidden = false;
-    el.accept.addEventListener('click', () => { store.set('welcomed', Date.now()); analyticsOn(); el.gate.hidden = true; showSplash(then); }, { once: true });
+    el.accept.addEventListener('click', () => { store.set('welcomed', Date.now()); analyticsOn(); el.gate.hidden = true; showSplash(then); if (shell.on) void notifyFirstAsk(); }, { once: true });
     el.accept.focus({ preventScroll: true });
   }
   {
@@ -5270,6 +5340,10 @@
     // a time from last time that never got through goes now
     authEarly.then(() => {
       renderPurse(); renderAccountRow(); syncTour(); void notifyInit();
+      // Opened by the app to sign in: signed in already means straight back; otherwise the sheet, and the
+      // sign-in itself goes back (signedIn).
+      if (handoff.nonce) { if (auth.user) void handoffFinish(); else openSignIn('Sign in here and you will be taken straight back to the app.'); }
+      handoffHash();
       // Not when a link brought us here: that link names the room, and it wins over anything remembered.
       if (!matchHash()) resumeLive();
       return flushResult(false);

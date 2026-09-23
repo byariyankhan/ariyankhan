@@ -28,6 +28,19 @@
          enableOnBackInvokedCallback is what routes the back gesture through OnBackInvokedDispatcher, which is
          where MainActivity's OnBackPressedCallback listens. Without it the callback is never called on
          Android 13 and up and back would leave the game instead of walking its history. -->
+    <!-- Android 11 hides other packages unless asked for: the browser that will open the sign-in tab
+         (a Custom Tabs service, or failing that whatever opens https) has to be declared to be found. -->
+    <queries>
+        <intent>
+            <action android:name="android.support.customtabs.action.CustomTabsService" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.BROWSABLE" />
+            <data android:scheme="https" />
+        </intent>
+    </queries>
+
     <application
         android:label="@string/app_name"
         android:icon="@mipmap/ic_launcher"
@@ -120,6 +133,17 @@
                      since a link typed or pasted without the trailing slash is the same page. -->
                 <data android:scheme="https" android:host="@string/host" android:path="/puzzle/" />
                 <data android:scheme="https" android:host="@string/host" android:path="/puzzle" />
+            </intent-filter>
+
+            <!-- The browser handing a sign-in back (README, "Sign-in"): puzzle://signin?code=… A scheme of
+                 our own rather than a link to /puzzle/, because a link from a Custom Tab only reaches the
+                 app when App Links are verified, and this path exists for the phone where things are not
+                 in order. MainActivity turns it into the game's own URL with #handoff=<code>. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="puzzle" android:host="signin" />
             </intent-filter>
         </activity>
     </application>

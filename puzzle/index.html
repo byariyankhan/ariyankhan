@@ -101,7 +101,7 @@
          set these two when the backend moves to a host of its own and the client follows without a change:
          <meta name="puzzle-api" content="https://api.example.com" />
          <meta name="puzzle-ws"  content="wss://api.example.com" /> -->
-    <link rel="stylesheet" href="/css/puzzle.css?v=47" />
+    <link rel="stylesheet" href="/css/puzzle.css?v=48" />
     <link rel="preload" href="/games/data/puzzle.json?v=11" as="fetch" crossorigin="anonymous" />
 
     <!-- SCHEMA -->
@@ -181,19 +181,8 @@
     <div class="aa-gate" id="aaGate" hidden>
       <div class="aa-gate-inner">
         <h2 class="aa-gate-title">Welcome to<br />Puzzle</h2>
-        <svg class="aa-gate-art" viewBox="0 0 140 140" aria-hidden="true" focusable="false">
-          <g class="aa-gate-lines">
-            <path class="c1" d="M20 22v86h44" /><path class="c1 h" d="M64 102l10 6-10 6z" />
-            <path class="c2" d="M38 20h44v46" /><path class="c2 h" d="M76 66l6 10 6-10z" />
-            <path class="c3" d="M74 42h-30v26h34" /><path class="c3 h" d="M78 62l10 6-10 6z" />
-            <path class="c1" d="M118 40v82" /><path class="c1 h" d="M112 40l6-10 6 10z" />
-            <path class="c1" d="M96 90h-22" /><path class="c1 h" d="M74 84l-10 6 10 6z" />
-            <path class="c1" d="M28 120h30" /><path class="c1 h" d="M58 114l10 6-10 6z" />
-            <path class="c2" d="M100 24v-6" /><path class="c2 h" d="M94 18l6-10 6 10z" />
-            <path class="c3" d="M30 38v18" /><path class="c3 h" d="M24 56l6 10 6-10z" />
-          </g>
-          <circle class="aa-gate-dot" cx="72" cy="86" r="4" /><circle class="aa-gate-dot" cx="108" cy="72" r="4" /><circle class="aa-gate-dot" cx="52" cy="24" r="4" />
-        </svg>
+        <!-- The game's own mark, the brain drawn out of arrows: the same one the splash, the buttons and the icon carry. -->
+        <img class="aa-gate-art" src="/images/puzzle-brain-mark-rose.svg?v=1" alt="" width="220" height="220" />
         <p class="aa-gate-text">Please read and accept our <a href="/puzzle/terms.html">Terms of Service</a> and <a href="/puzzle/privacy.html">Privacy Policy</a>.</p>
         <button type="button" class="aa-btn aa-gate-accept" id="aaAccept">Accept</button>
       </div>
@@ -460,6 +449,6 @@
       </div>
     </div>
 
-    <script src="/js/puzzle.js?v=73"></script>
+    <script src="/js/puzzle.js?v=74"></script>
   </body>
 </html>
