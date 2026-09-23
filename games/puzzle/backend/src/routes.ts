@@ -10,7 +10,7 @@ import * as R from './rooms.js';
 import { adClaim, balance } from './gold.js';
 import { deleteUser, endSession, googleVerify, handoffRedeem, handoffStart, providers, startSession, upsertUser, cleanName, validCode, validNonce, HANDOFF_SECONDS } from './auth.js';
 import { publish, publishToUser } from './events.js';
-import { boardPace, cleanDevice, cleanLevels, cleanState, cleanStats, difficulty, mergeLevels, mergeStats, mergeState, readAll } from './progress.js';
+import { boardPace, cleanDevice, cleanLevels, cleanState, cleanStats, difficulty, mergeLevels, mergeStats, mergeState, PROGRESS_BODY_LIMIT, readAll } from './progress.js';
 import * as L from './league.js';
 import { liveProgress, online, roomPresence } from './presence.js';
 import { havePlayedTogether, isMuted, isRacing, mute, mutedList, recentPlayers, unmute } from './players.js';
@@ -582,7 +582,8 @@ export function registerRoutes(app: FastifyInstance): void {
   app.post(`${v1}/auth/delete`, withCaller(H.destroy));
 
   app.get(`${v1}/progress`, withCaller(H.progressRead));
-  app.post(`${v1}/progress`, withCaller(H.progressPush));
+  // a whole tour of 600 boards with its counts is about 115 KB; every other route keeps the server's 64 KB
+  app.post(`${v1}/progress`, { bodyLimit: PROGRESS_BODY_LIMIT }, withCaller(H.progressPush));
   app.get(`${v1}/boards/difficulty`, withCaller(H.difficulty));
 
   app.get(`${v1}/boards/pace`, withCaller(H.pace));

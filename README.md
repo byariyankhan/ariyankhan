@@ -1028,8 +1028,10 @@ links.
   chooses (`adOffer('trainhint')`, free where advertising is off); a hint costs ten points of that round
   (a piece put home and locked, a lie circled, the next painting marked, one more short look). Kept per day
   as `train:<day>` (best of the day per round, `h` hints used, `p` rounds played), pushed in the state blob
-  as `train` and merged by the better score per round and the larger `h`/`p` (`adoptTour`), so a second
-  device gets no second free round; the sheet shows the score, seven days of bars and the streak of days
+  as `train` and merged by the better score per round and the larger `h`/`p`, on the account
+  (`combineState`) and on the device (`adoptTour`), so a round played on the phone shows on the website and a
+  second device gets no second free round; the streaks merge as runs of days (`mergeStreak`), and a push carries
+  the last 120 days (`STATE_SEND_DAYS`), 400 after a long gap; the sheet shows the score, seven days of bars and the streak of days
   done. The page's title, description and keywords say brain training first.
 - **A sweep for dead and doubled code** (September 2026): gone from `js/puzzle.js` are three icons nothing
   drew, `MODES`, `RUSH_SECONDS`, a second copy of `freeAtStart` (the test has its own), four `el.*` entries

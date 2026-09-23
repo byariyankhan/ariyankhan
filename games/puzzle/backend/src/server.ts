@@ -22,7 +22,7 @@ import { trust } from './proxies.js';
 const app = Fastify({
   logger: false,                          // we write our own structured lines, with redaction
   trustProxy: trust,                       // nginx and Cloudflare are in front; req.ip must be the player, not either of them
-  bodyLimit: 64 * 1024,
+  bodyLimit: 64 * 1024,                  // the tour sync alone may send more (PROGRESS_BODY_LIMIT, on its own route)
 });
 
 // ── Cross-origin ──
