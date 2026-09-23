@@ -2270,7 +2270,7 @@
       if (spots.every(q => Math.abs(q.px - px) > s * 1.2 || Math.abs(q.py - py) > s * 1.2)) spots.push({ px, py });
     }
     // three kinds of lie: a patch mirrored, a patch recoloured, a patch taken from elsewhere in the painting
-    const lies = spots.map((q, i) => i === 0 ? { ...q, extra: 'transform:scaleX(-1)' } : i === 1 ? { ...q, extra: 'filter:hue-rotate(70deg) saturate(1.3)' } : { ...q, from: { px: 0.05 + rnd() * (0.9 - s), py: 0.05 + rnd() * (0.9 - s) } });
+    const lies = spots.map((q, i) => i === 0 ? { ...q, extra: 'transform:scaleX(-1)' } : i === 1 ? { ...q, extra: 'filter:hue-rotate(45deg) saturate(1.25)' } : { ...q, from: { px: 0.05 + rnd() * (0.9 - s), py: 0.05 + rnd() * (0.9 - s) } });
     const patches = lies.map((q, i) => { const src = q.from || q; return artPatch(w, src.px, src.py, s, 'aa-forge-lie', `left:${(100 * q.px).toFixed(2)}%;top:${(100 * q.py).toFixed(2)}%;width:${100 * s}%;height:${100 * s}%;${q.extra || ''}`, `data-lie="${i}"`); }).join('');
     train.game = { kind: 'f', w, lies, found: new Set(), wrong: 0, t0: performance.now(), hint() {
       const g = train.game; if (!g) return; const k = g.lies.findIndex((_, i) => !g.found.has(i)); if (k < 0) return; forgeryFound(k, true);
