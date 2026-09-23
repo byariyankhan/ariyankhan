@@ -160,7 +160,8 @@ export async function difficulty(c: Sql, minPlayers = 1): Promise<Difficulty[]> 
 // and the website each saw only their own training and their own streak, forever. So the keys that are records
 // of play are merged here the way the boards are: commutative, idempotent, never taking anything away.
 //
-//   train   day -> { r, f, g, e, h, p, pp, nx, at }   each round's best score; plays, hints and counts the larger
+//   train   day -> { r, f, g, e, h, p, pp, nx, cl, at }  each round's best score; plays, hints and counts the
+//           larger; cl, the puzzles finished (round -> serial -> when), the union with the earliest time of each
 //   daily   day -> { t, stars, quiz, tier, arrows, at } the better run: more stars, then the faster time
 //   loss    device -> arrows                            the larger per device (each device's count only grows)
 //   playStreak, dailyStreak  { count, last }           the later day; two runs that meet are joined
@@ -177,6 +178,7 @@ export const STATE_SEND_DAYS = 120;
 export const STATE_KEEP_DAYS = 1000;
 const MAX_OTHER_KEYS = 16;               // settings other than the records of play
 const MAX_OTHER_BYTES = 4 * 1024;        // each
+const MAX_SERIALS = 200;                 // puzzles of one round finished in one day
 const MAX_DEVICES = 256;                 // entries in `loss`: every browser and every install is a device, for years
 const TRAIN_IDS = ['r', 'f', 'g', 'e'] as const;
 const PLAY_KEYS = new Set(['train', 'daily', 'loss', 'playStreak', 'dailyStreak']);
@@ -223,6 +225,20 @@ function cleanTrainDay(raw: unknown): Rec | undefined {
     for (const id of TRAIN_IDS) { const v = cnt((raw[k] as Rec)[id]); if (v) m[id] = v; }
     if (Object.keys(m).length) out[k] = m;
   }
+  // the puzzles of each round finished that day: serial -> when. Each is a level on the player's main count.
+  if (isObj(raw.cl)) {
+    const cl: Rec = {};
+    for (const id of TRAIN_IDS) {
+      const m = (raw.cl as Rec)[id]; if (!isObj(m)) continue;
+      const o: Rec = {};
+      for (const [x, v] of Object.entries(m)) {
+        if (Object.keys(o).length >= MAX_SERIALS) break;
+        const when = num(v, 1, EPOCH_MAX); if (/^\d{1,4}$/.test(x) && when !== undefined) o[x] = Math.floor(when);
+      }
+      if (Object.keys(o).length) cl[id] = o;
+    }
+    if (Object.keys(cl).length) out.cl = cl;
+  }
   const at = num(raw.at, 0, EPOCH_MAX); if (at !== undefined) out.at = Math.floor(at);
   return Object.keys(out).some(k => k !== 'at') ? out : undefined;
 }
@@ -236,6 +252,13 @@ function mergeTrainDay(a: Rec | undefined, b: Rec | undefined): Rec | undefined 
     for (const id of TRAIN_IDS) { const v = Math.max((x[id] as number | undefined) ?? 0, (y[id] as number | undefined) ?? 0); if (v) m[id] = v; }
     if (Object.keys(m).length) out[k] = m;
   }
+  const ca = (a.cl as Rec | undefined) ?? {}, cb = (b.cl as Rec | undefined) ?? {}, cl: Rec = {};
+  for (const id of TRAIN_IDS) {
+    const o: Record<string, number> = { ...((ca[id] as Record<string, number> | undefined) ?? {}) };
+    for (const [x, v] of Object.entries((cb[id] as Record<string, number> | undefined) ?? {})) o[x] = x in o ? Math.min(o[x]!, v) : v;
+    if (Object.keys(o).length) cl[id] = o;
+  }
+  if (Object.keys(cl).length) out.cl = cl;
   return out;
 }
 

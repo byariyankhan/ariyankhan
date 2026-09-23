@@ -258,15 +258,20 @@
   function setHash(i) { if (history.replaceState) history.replaceState(null, '', location.pathname + location.search + (i >= 0 ? `#b-${DATA.levels[i].id}` : '')); }
   // Level numbers count the player's own journey: cleared boards in the order they were cleared, then the board in
   // hand. The tour list only decides what comes next, so a player who cleared 63 countries before the discovery
-  // boards existed is on level 65, not back on level 4 because Bhutan's animal sits fourth in the list.
+  // boards existed is on level 65, not back on level 4 because Bhutan's animal sits fourth in the list. A daily
+  // training puzzle finished is a level too, in its place by time among the boards (trainClearTimes), so the
+  // count is everything the player has cleared; i < 0 asks for the next level, whatever is played for it.
   let numCache = null;
   const forgetNums = () => { numCache = null; };
   function levelNo(i) {
     if (!numCache) {
-      const done = DATA.levels.map((_, j) => ({ j, rec: cleared(j) })).filter(x => x.rec).sort((a, b) => ((a.rec.at || 0) - (b.rec.at || 0)) || (a.j - b.j));
-      numCache = { n: done.length, of: new Map(done.map((x, k) => [x.j, k + 1])) };
+      const done = DATA.levels.map((_, j) => ({ j, rec: cleared(j) })).filter(x => x.rec).map(x => ({ j: x.j, at: x.rec.at || 0 }));
+      for (const at of trainClearTimes()) done.push({ j: -1, at });
+      done.sort((a, b) => (a.at - b.at) || (a.j - b.j));
+      const of = new Map(); done.forEach((x, k) => { if (x.j >= 0) of.set(x.j, k + 1); });
+      numCache = { n: done.length, of };
     }
-    return numCache.of.get(i) || numCache.n + 1;
+    return (i >= 0 && numCache.of.get(i)) || numCache.n + 1;
   }
 
   // ── Sound ──
@@ -847,14 +852,13 @@
   function renderBrain() {
     const svg = el.brainArt; if (!svg || !DATA) return;
     const tier = TIER_OF(), em = emblemFor(tier);
-    const done = DATA.levels.filter((_, i) => cleared(i)).length;
     const n = arrowsShot(), rk = rankOf(n), full = rk.top;
     // the brain fills with the arrows of the rank in hand, from the bottom up, and GOAT lights the lot in green
     const frac = full ? 1 : (n - rk.lo) / (rk.hi - rk.lo);
     if (el.brainLv) el.brainLv.textContent = rk.name;
     // Two words and no more: the rank, and the level. How far the next rank is, the brain itself shows; what
     // a board added or cost, the card after it says.
-    if (el.brainNote) el.brainNote.textContent = `Level ${done + 1}`;
+    if (el.brainNote) el.brainNote.textContent = `Level ${levelNo(-1)}`;   // the main count: boards and training clears
     if (!em) { svg.hidden = true; return; }
     svg.hidden = false;
     const lit = full ? em.pieces.length : Math.min(em.pieces.length - 1, Math.round(em.pieces.length * frac));
@@ -2134,7 +2138,11 @@
   };
   const tierParams = id => TIER_OF_ROUND[id](trainTier(id));
   // the level, in the round's bar once there is one to speak of: level 1 says nothing
-  const levelChip = id => trainTier(id) ? `<b class="aa-train-lv">Level ${trainTier(id) + 1}</b>` : '';
+  // The round's bar carries the level on the main count that finishing it will be -- the same number the home
+  // screen and the boards show, one more than is cleared -- unless this puzzle was finished already today (Play
+  // again), which is no new level. The round's own difficulty step (trainTier) is not shown: it is how hard the
+  // round is dealt, not a level anybody plays for.
+  const levelChip = id => trainCleared(trainDay(), id, train.serial | 0) ? '' : `<b class="aa-train-lv">Level ${levelNo(-1)}</b>`;
   // free: everywhere advertising is off; the day's round; a round unlocked today; and a round scored today,
   // so "Play again" is never an advertisement, not even for a round started before midnight and finished after
   // a start costs nothing unless it asks for a NEW puzzle where advertising is on
@@ -2158,12 +2166,57 @@
   const trainAll = t => TRAIN_ROUNDS.every(r => typeof t[r.id] === 'number');
   const trainScore = t => { const v = TRAIN_ROUNDS.map(r => t[r.id]).filter(x => typeof x === 'number'); return v.length ? Math.round(v.reduce((a, b) => a + b, 0) / v.length) : null; };
   const clamp100 = v => Math.max(0, Math.min(100, Math.round(v)));
+  // A round finished: its score (the day's best stands), and -- the first time this puzzle is finished -- a
+  // clear, which is a level on the main count (trainClearTimes, levelNo). A puzzle is the round's serial of the
+  // day: 0 the free one, 1, 2... each "Play next". Play again replays the same serial, so it is never a second
+  // level. Returns whether this finish was a new clear.
   function trainSave(k, score) {
     const t = trainDay(); score = clamp100(score);
-    if (typeof t[k] === 'number' && t[k] >= score) return;
-    t[k] = score; t.at = Date.now(); store.set(trainKey(), t);
-    renderTrainPill();
+    const fresh = !trainCleared(t, k, train.serial | 0);
+    if (fresh) {
+      t.cl = t.cl && typeof t.cl === 'object' ? t.cl : {};
+      const m = t.cl[k] && typeof t.cl[k] === 'object' ? t.cl[k] : (t.cl[k] = {});
+      m[String(train.serial | 0)] = Date.now();
+      forgetNums();
+    }
+    if (!fresh && typeof t[k] === 'number' && t[k] >= score) return false;
+    if (typeof t[k] !== 'number' || t[k] < score) { t[k] = score; t.at = Date.now(); }
+    store.set(trainKey(), t);
+    renderTrainPill(); if (fresh) renderBrain();   // the home card's level moved
     syncOwed = true; syncTour({}).catch(() => {});
+    return fresh;
+  }
+  // Whether a puzzle of a round was finished that day. A round scored before clears were kept has its free
+  // puzzle (serial 0) finished: nothing else could have been played before it.
+  const trainCleared = (t, id, serial) => !!(t.cl && t.cl[id] && typeof t.cl[id] === 'object' && String(serial) in t.cl[id]) || (serial === 0 && typeof t[id] === 'number');
+  // Every training puzzle ever finished, as the time it was finished: each is a level on the main count, in
+  // its place among the boards by time. A clear kept without its time (a round scored before clears were
+  // kept) takes the day's last save, or noon of that day.
+  function trainClearTimes() {
+    const out = [];
+    try {
+      for (const key of Object.keys(localStorage)) {
+        if (!key.startsWith(STORE + 'train:')) continue;
+        const day = key.slice(STORE.length + 6), t = trainDay(day);
+        const noon = Date.parse(day + 'T12:00:00') || 0, dayAt = Number(t.at) > 0 ? Number(t.at) : noon;
+        for (const r of TRAIN_ROUNDS) {
+          const m = t.cl && t.cl[r.id] && typeof t.cl[r.id] === 'object' ? t.cl[r.id] : {};
+          const serials = new Set(Object.keys(m).filter(x => /^\d{1,4}$/.test(x)));
+          if (typeof t[r.id] === 'number') serials.add('0');
+          for (const x of serials) { const v = Number(m[x]); out.push(Number.isFinite(v) && v > 0 ? v : dayAt); }
+        }
+      }
+    } catch { /* storage can be unreadable in a private window */ }
+    return out;
+  }
+  // Where today stands, in words: how many of the four are done until all of them are -- "done for today"
+  // with a round still to play read as if the day were finished -- and the run of days after it. With all
+  // four done, the day is congratulated, and the list says how to go on: a new puzzle with an advertisement
+  // where they are on, Play next where they are not. Empty when nothing has been played today.
+  function trainTally(t, streak, onResult = false) {
+    const n = TRAIN_ROUNDS.filter(r => typeof t[r.id] === 'number').length; if (!n) return '';
+    if (n === TRAIN_ROUNDS.length) return 'Congratulations! Today\u2019s brain training is done.' + (onResult ? '' : ads.isAd() ? ' You can keep training by watching an ad.' : ' You can keep training with Play next.');
+    return `${n} of ${TRAIN_ROUNDS.length} done today${streak > 1 ? ` \u00b7 ${streak} days in a row` : ''}`;
   }
   function trainStreak() { let n = 0; while (trainDone(trainDay(dayKeyBack(n + 1)))) n++; if (trainDone(trainDay())) n++; return n; }
   // What a round's card says, read off its state: a small line above the name (the tag) and the chip at the
@@ -2211,6 +2264,18 @@
   // stop: the round in hand ends (its result stays on the full screen); leave: back to the list, or out
   function trainStop() { clearInterval(train.timer); train.timer = 0; train.game = null; trainCoachEnd(false); }
   function trainLeave() { trainStop(); trainScreen(false); train.serial = 0; }
+  // Back out of a round (the corner arrow, the app's Back): asked about while a round is being played, the way
+  // leaving a board is, since what was done on it is not kept; from a result it just goes back to the list.
+  // The round's clock does not count the time the question was open.
+  async function trainBack() {
+    const g = train.game;
+    if (g) {
+      const asked = performance.now();
+      const leave = await ask({ title: 'Leave this round?', body: 'It is not scored, and it starts again from the beginning next time.', ok: 'Leave the round', cancel: 'Keep playing' });
+      if (!leave) { if (train.game === g && typeof g.t0 === 'number') g.t0 += performance.now() - asked; return; }
+    }
+    trainLeave(); renderTrain();
+  }
   function renderTrain() {
     const t = trainDay(), score = trainScore(t), done = trainDone(t), all = trainAll(t), streak = trainStreak();
     // seven days of bars, today on the right; a day with no score is an empty bar
@@ -2221,7 +2286,7 @@
         <div class="aa-train-score"><b>${score == null ? '—' : score}</b><span>Brain Score</span></div>
         <div class="aa-train-week" role="img" aria-label="Last seven days">${bars}</div>
       </div>
-      <p class="aa-train-line${!done && streak > 1 ? ' is-warn' : ''}"><span>${all ? `All four done${streak > 1 ? ` \u00b7 ${streak} days in a row` : ''}` : done ? `Done for today${streak > 1 ? ` \u00b7 ${streak} days in a row` : ''}` : streak > 1 ? `${streak} days in a row \u00b7 play today` : 'Four rounds, free every day'}</span><button type="button" class="aa-train-info" data-train-about aria-label="How Daily Training works" aria-expanded="false">?</button></p>
+      <p class="aa-train-line${!done && streak > 1 ? ' is-warn' : ''}"><span>${trainTally(t, streak) || (streak > 1 ? `${streak} days in a row \u00b7 play today` : 'Four rounds, free every day')}</span><button type="button" class="aa-train-info" data-train-about aria-label="How Daily Training works" aria-expanded="false">?</button></p>
       <p class="aa-sheet-note aa-train-about" id="aaTrainAbout" hidden>${ads.isAd() ? 'Every round is free once a day. Then play it again for nothing, as often as you like, or play a new one of it with a short advertisement. Your best score of the day counts, and the bar under a round is the days you have played it.' : 'Every round is free, every day. Play it again, or play a new one of it. Your best score of the day counts, and the bar under a round is the days you have played it.'}</p>
       <div class="aa-train-rounds">
         ${TRAIN_ROUNDS.map(r => { const c = trainCardState(t, r.id); return `<div class="aa-train-card ${c.cls}" data-train="${r.id}" data-train-mode="again" role="button" tabindex="0">${trainIcon(r.id)}<span class="aa-row-label">${c.tag ? `<small class="aa-train-tag">${c.tag}</small>` : ''}<span class="aa-train-name">${r.name}</span><small class="aa-train-run">${runLine(r.id)}</small></span><span class="aa-train-cta">${c.chips}</span></div>`; }).join('')}
@@ -2241,11 +2306,11 @@
   }
   el.trainBtn?.addEventListener('click', openTrain);
   // ← in a round or on its result: back to the list. ✕ on the list: out, as on every sheet.
-  $('[data-close-sheet]', el.trainSheet)?.addEventListener('click', e => { if (el.trainSheet.classList.contains('is-playing')) { e.stopImmediatePropagation(); trainLeave(); renderTrain(); } }, true);
+  $('[data-close-sheet]', el.trainSheet)?.addEventListener('click', e => { if (el.trainSheet.classList.contains('is-playing')) { e.stopImmediatePropagation(); void trainBack(); } }, true);
   el.trainBody?.addEventListener('click', e => {
     const rb = e.target.closest('[data-train]');
     if (rb) { void trainPlay(rb.dataset.train, rb.dataset.trainMode === 'next'); return; }
-    if (e.target.closest('[data-train-back]')) { trainLeave(); renderTrain(); return; }
+    if (e.target.closest('[data-train-back]')) { void trainBack(); return; }
     const info = e.target.closest('[data-train-info]');
     if (info) { const c = $('.aa-art-credit', el.trainBody); if (c) { c.hidden = !c.hidden; info.setAttribute('aria-expanded', String(!c.hidden)); } return; }
     const about = e.target.closest('[data-train-about]');
@@ -2452,18 +2517,18 @@
   }
   const hintCost = g => (g.hints | 0) * 10;
   function trainFinish(kind, score, lines, work = null, works = null) {
-    trainStop(); trainSave(kind, score);
+    trainStop(); const fresh = trainSave(kind, score);
+    const lvl = fresh ? levelNo(-1) - 1 : 0;   // the level this clear was: the latest on the main count
     const box = $('#aaTrainGame', el.trainBody); if (!box) return;
     const t = trainDay();
     // the painting's name, painter and source sit behind a ? -- there for whoever wants them, in nobody's way
     const credit = work ? artCredit(work) : works ? `<p class="aa-art-credit">${works.map((w, i) => `${i + 1}. <b>${escapeHtml(w.title)}</b> \u2014 ${escapeHtml(w.artist)}`).join('<br>')}<br>The Met, public domain</p>` : '';
     box.innerHTML = `<div class="aa-train-res">
-      <p class="aa-card-kicker">${TRAIN_ROUNDS.find(r => r.id === kind).name}${credit ? ' <button type="button" class="aa-train-info" data-train-info aria-label="About the painting" aria-expanded="false">?</button>' : ''}</p>
+      <p class="aa-card-kicker">${TRAIN_ROUNDS.find(r => r.id === kind).name}${lvl ? ` <b class="aa-train-lv">Level ${lvl}</b>` : ''}${credit ? ' <button type="button" class="aa-train-info" data-train-info aria-label="About the painting" aria-expanded="false">?</button>' : ''}</p>
       <p class="aa-train-big">${clamp100(score)}</p>
       <p class="aa-train-sub">${lines}</p>
-      ${(() => { const best = t[kind], tier = trainTier(kind); return typeof best === 'number' && best >= 85 && tier < TRAIN_TIERS - 1 ? '<p class="aa-train-sub"><b>Level up tomorrow.</b></p>' : typeof best === 'number' && best < 50 && tier > 0 ? '<p class="aa-train-sub">A little easier tomorrow.</p>' : ''; })()}
       ${credit.replace('<p class="aa-art-credit">', '<p class="aa-art-credit" hidden>')}
-      ${(() => { const n = TRAIN_ROUNDS.filter(r => typeof t[r.id] === 'number').length, st = trainStreak(); return n > 1 ? `<p class="aa-train-sub"><b>Brain Score today: ${trainScore(t)}</b></p>` : `<p class="aa-train-sub aa-train-ok">\u2713 Done for today${st > 1 ? ` \u00b7 ${st} days in a row` : ''}</p>`; })()}
+      ${(() => { const n = TRAIN_ROUNDS.filter(r => typeof t[r.id] === 'number').length; return (n > 1 ? `<p class="aa-train-sub"><b>Brain Score today: ${trainScore(t)}</b></p>` : '') + `<p class="aa-train-sub aa-train-ok">\u2713 ${trainTally(t, trainStreak(), true)}</p>`; })()}
       <div class="aa-actions aa-actions--stack"><button type="button" class="aa-btn aa-btn--primary${ads.isAd() ? ' aa-btn--ad' : ''}" data-train="${kind}" data-train-mode="next">Play next${ads.isAd() ? ICON_AD : ICON_NEXT}</button><button type="button" class="aa-btn aa-btn--soft" data-train="${kind}" data-train-mode="again">${ICON_AGAIN}Play again</button></div>
     </div>`;
     SFX.win(); vibe(20);
@@ -3701,6 +3766,16 @@
       for (const k of ['h', 'p']) { const v = Math.floor(Number(rec[k])); if (v > 0 && v > (mine[k] | 0)) { mine[k] = v; grew = true; } }
       if (rec.pp && typeof rec.pp === 'object') for (const r of TRAIN_ROUNDS) { const v = Math.floor(Number(rec.pp[r.id])); if (v > 0 && v > ((mine.pp && mine.pp[r.id]) | 0)) { mine.pp = mine.pp || {}; mine.pp[r.id] = v; grew = true; } }
       if (rec.nx && typeof rec.nx === 'object') for (const r of TRAIN_ROUNDS) { const v = Math.floor(Number(rec.nx[r.id])); if (v > 0 && v > ((mine.nx && mine.nx[r.id]) | 0)) { mine.nx = mine.nx || {}; mine.nx[r.id] = v; grew = true; } }
+      // the puzzles finished, each with the first time it was: every one is a level, on every device
+      if (rec.cl && typeof rec.cl === 'object') for (const r of TRAIN_ROUNDS) {
+        const theirs = rec.cl[r.id]; if (!theirs || typeof theirs !== 'object') continue;
+        for (const [x, at] of Object.entries(theirs)) {
+          const v = Number(at); if (!/^\d{1,4}$/.test(x) || !(v > 0)) continue;
+          mine.cl = mine.cl && typeof mine.cl === 'object' ? mine.cl : {};
+          const m = mine.cl[r.id] && typeof mine.cl[r.id] === 'object' ? mine.cl[r.id] : (mine.cl[r.id] = {});
+          if (!(Number(m[x]) > 0) || v < Number(m[x])) { m[x] = v; grew = true; }
+        }
+      }
       if (grew) { store.set(trainKey(day), mine); changed = true; }
     }
     if (!changed) return false;
@@ -5724,7 +5799,7 @@
   function backPressed() {
     if (askClose) { askClose(); return; }
     if (el.homeSheet && !el.homeSheet.hidden) { closeHomePage(); return; }
-    if (el.trainSheet && !el.trainSheet.hidden) { if (el.trainSheet.classList.contains('is-playing')) { trainLeave(); renderTrain(); } else closeSheets(); return; }
+    if (el.trainSheet && !el.trainSheet.hidden) { if (el.trainSheet.classList.contains('is-playing')) void trainBack(); else closeSheets(); return; }
     if ([el.sheet, el.signInSheet, el.matchSheet, el.leagueSheet].some(s => s && !s.hidden)) { closeSheets(); return; }
     if (!el.game.hidden) { el.btnLevels.click(); return; }
     shell.ask('leave', 2000);

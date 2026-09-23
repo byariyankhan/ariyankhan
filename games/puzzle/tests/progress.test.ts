@@ -189,6 +189,22 @@ section('Daily training played on two devices is on both');
   eq(((await readState(pool, p.id)) as Record<string, any>).train?.[today]?.f, 39, 'a worse score pushed later takes nothing away');
 }
 
+section('Training puzzles finished on two devices are all on the account, each with its first time');
+{
+  // every puzzle finished is a level on the main count, so a clear on the phone must reach the website
+  const a = { train: { [today]: { r: 90, cl: { r: { '0': 1000, '1': 3000 } } } } };
+  const b = { train: { [today]: { f: 40, cl: { r: { '1': 2000 }, f: { '0': 1500 } } } } };
+  const ab = combineState(combineState({}, a), b) as Record<string, any>, ba = combineState(combineState({}, b), a);
+  same(ab.train[today].cl, { r: { '0': 1000, '1': 2000 }, f: { '0': 1500 } }, 'the union of both, the earliest time of a puzzle both finished');
+  same(ab, ba, 'in either order');
+  same(combineState(ab, a), ab, 'and again changes nothing');
+  const dirty = cleanState({ train: { [today]: { cl: { r: { '0': 5, x: 9, '12345': 9, '2': -1 }, z: { '0': 5 } } } } }) as Record<string, any>;
+  same(dirty.train[today], { cl: { r: { '0': 5 } } }, 'a serial that is not a small number, a time that is not a time and a round that is not a round are dropped');
+  const p = await player('progClears');
+  await mergeState(pool, p.id, a); await mergeState(pool, p.id, b);
+  same(((await readState(pool, p.id)) as Record<string, any>).train?.[today]?.cl, { r: { '0': 1000, '1': 2000 }, f: { '0': 1500 } }, 'on the account as well');
+}
+
 section('Streaks from two devices join up');
 {
   eq(nextDay('2026-02-28'), '2026-03-01', 'the day after is a calendar day');
