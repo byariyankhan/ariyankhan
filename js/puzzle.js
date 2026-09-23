@@ -163,7 +163,7 @@
     loading: $('#aaLoading'), error: $('#aaError'),
     gate: $('#aaGate'), accept: $('#aaAccept'), splash: $('#aaSplash'), splashQuote: $('#aaSplashQuote'),
     worldMap: $('#aaWorldMap'), worldCap: $('#aaWorldCap'), worldScroll: $('#aaWorldScroll'),
-    brainArt: $('#aaBrainArt'), brainLv: $('#aaBrainLv'), brainDiff: $('#aaBrainDiff'), brainNote: $('#aaBrainNote'),
+    brainArt: $('#aaBrainArt'), brainLv: $('#aaBrainLv'), brainNote: $('#aaBrainNote'),
     deck: $('#aaDeck'), deckTrack: $('#aaDeckTrack'), deckDots: $('#aaDeckDots'),
     notifyCap: $('#aaNotifyCap'), notifyGroup: $('#aaNotifyGroup'), btnNotify: $('#aaNotify'), notifyNote: $('#aaNotifyNote'), remindRow: $('#aaRemindRow'), btnRemind: $('#aaRemind'), mutedCap: $('#aaMutedCap'), mutedGroup: $('#aaMutedGroup'),
     statBoards: $('#aaStatBoards'), statCountries: $('#aaStatCountries'), statStreak: $('#aaStatStreak'),
@@ -801,6 +801,17 @@
   const ARROWS_GUESS = [22, 40, 55, 80, 100];   // a record saved before boards remembered their arrows counts the tier's typical board
   const fmtN = n => Number(n || 0).toLocaleString('en-US');
   const recArrows = r => (r && typeof r === 'object' && (r.arrows || ARROWS_GUESS[clampTier(r.tier || 0)])) || 0;
+  // A rank is earned and it is lost. A board cleared adds its arrows; a board lost -- hearts gone -- takes
+  // the arrows that were still on it. What is taken is kept per device (`loss`: device id to arrows), because
+  // a count that only grows can be merged between devices by taking the larger, and a single shared number
+  // could not; the total is the sum. Never below zero: nobody owes arrows.
+  const lossMap = () => { const m = store.get('loss', {}); return m && typeof m === 'object' && !Array.isArray(m) ? m : {}; };
+  const lossTotal = m => Object.values(m).reduce((a, v) => a + (Number(v) > 0 ? Math.floor(Number(v)) : 0), 0);
+  function loseArrows(n) {
+    if (!(n > 0)) return;
+    const m = lossMap(); m[DEVICE] = (Number(m[DEVICE]) > 0 ? Math.floor(Number(m[DEVICE])) : 0) + Math.floor(n);
+    store.set('loss', m);
+  }
   function arrowsShot() {
     let n = 0;
     try {
@@ -809,7 +820,7 @@
         n += recArrows(store.get(k.slice(STORE.length)));
       }
     } catch { /* storage can be unreadable in a private window */ }
-    return n;
+    return Math.max(0, n - lossTotal(lossMap()));
   }
   function rankOf(n) {
     let i = 0; while (i + 1 < RANKS.length && n >= RANKS[i + 1][1]) i++;
@@ -837,10 +848,9 @@
     // the brain fills with the arrows of the rank in hand, from the bottom up, and GOAT lights the lot in green
     const frac = full ? 1 : (n - rk.lo) / (rk.hi - rk.lo);
     if (el.brainLv) el.brainLv.textContent = rk.name;
-    if (el.brainDiff) { el.brainDiff.textContent = `${fmtN(n)} arrow${n === 1 ? '' : 's'}`; el.brainDiff.className = 'aa-brain-diff aa-brain-diff--arrows' + (full ? ' is-top' : ''); }
-    // Two lines and no more: the rank with its arrows, and the level with its difficulty. How far the next
-    // rank is, the brain itself shows; the result card says it in words.
-    if (el.brainNote) el.brainNote.textContent = `Level ${done + 1} · ${DIFF_OF(tier)}`;
+    // Two words and no more: the rank, and the level. How far the next rank is, the brain itself shows; what
+    // a board added or cost, the card after it says.
+    if (el.brainNote) el.brainNote.textContent = `Level ${done + 1}`;
     if (!em) { svg.hidden = true; return; }
     svg.hidden = false;
     const lit = full ? em.pieces.length : Math.min(em.pieces.length - 1, Math.round(em.pieces.length * frac));
@@ -2030,10 +2040,22 @@
     if (!state.daily) countBoard(state.level.id, { f: 1 });
     SFX.lose(); renderHud();
     learnFrom(false);   // the form moves on a loss, whether or not the card says so
+    // The rank: the arrows still on the board come off it. A race is not the tour and costs none.
+    let rankLine = '';
+    if (!state.daily?.race && state.left > 0) {
+      const was = rankOf(arrowsShot());
+      loseArrows(state.left);
+      const now = arrowsShot(), rk = rankOf(now);
+      rankLine = rk.i < was.i ? `<p class="aa-card-rank is-down">Rank down: <b>${rk.name}</b> · ${fmtN(now)} arrows</p>`
+        : `<p class="aa-card-rank">−${fmtN(state.left)} arrows · <b>${rk.name}</b></p>`;
+      showBrainNext = true;
+      syncOwed = true; syncTour({}).catch(() => {});
+    }
     el.card.innerHTML = `
       <p class="aa-card-kicker">${state.daily ? (state.daily.race ? `Gold match · ${gpurse(state.daily.match?.stake || 0)}` : 'Daily board') : hudLabel()} · ${DIFF_OF(state.tier)}</p>
       <h3>${reason}</h3>
       <p class="aa-card-lead">${state.left} of ${state.pieces.length} arrows were still on the board.</p>
+      ${rankLine}
       ${state.daily?.race && sayOnce('race-retry') ? '<p class="aa-adapt">Try again puts you back on the same board with your hearts back. Nothing is lost until somebody else clears it.</p>' : ''}
       <div class="aa-actions aa-actions--stack aa-actions--out">
         ${adCanOffer('heart') ? `<button type="button" class="aa-btn aa-btn--ad aa-btn--big" data-act="adheart">${ICON_AD}Get a free life${ads.isAd() ? '<span class="aa-ad-pill">AD</span>' : ''}</button>` : ''}
@@ -2757,6 +2779,7 @@
     // A home country this device guessed from the connection is not the player's answer, so it stays here.
     // Only a home they picked in Settings is worth telling the account about.
     if (store.get('homeAuto', false)) delete out.home;
+    const loss = lossMap(); if (Object.keys(loss).length) out.loss = loss;
     const daily = {};
     try {
       for (const k of Object.keys(localStorage)) {
@@ -2785,6 +2808,12 @@
     const st = server?.state || {};
     for (const k of STATE_KEYS) if (st[k] !== undefined && JSON.stringify(st[k]) !== JSON.stringify(store.get(k, null))) { store.set(k, st[k]); changed = true; }
     if (st.home !== undefined) store.set('homeAuto', false);   // the account's home is a choice, however this device came by its own
+    // What each device took off the rank, merged by the larger per device: a device's own count only grows.
+    if (st.loss && typeof st.loss === 'object' && !Array.isArray(st.loss)) {
+      const mine = lossMap(); let grew = false;
+      for (const [dev, v] of Object.entries(st.loss)) { const n = Number(v) > 0 ? Math.floor(Number(v)) : 0; if (n > (Number(mine[dev]) || 0)) { mine[dev] = n; grew = true; } }
+      if (grew) { store.set('loss', mine); changed = true; }
+    }
     for (const [day, rec] of Object.entries(st.daily || {})) if (!store.get('daily:' + day)) { store.set('daily:' + day, rec); changed = true; }
     if (!changed) return false;
     // The home country may have moved, which reorders the whole tour, so rebuild it rather than only repainting.
@@ -2874,7 +2903,7 @@
   function renderNotify() {
     if (!el.btnNotify) return;
     const app = appPush();
-    const show = push.checked && !!auth.user && (app ? push.app : (!!push.key && pushable()));
+    const show = push.checked && (app ? push.app : (!!push.key && pushable()));
     if (el.notifyCap) el.notifyCap.hidden = !show;
     if (el.notifyGroup) el.notifyGroup.hidden = !show;
     if (!show) return;
@@ -2883,15 +2912,20 @@
     // The evening nudge has a switch of its own, shown only once notifications are on at all: it is the one
     // thing a player may decline while keeping the invitations and the league they turned the first on for.
     if (el.remindRow) el.remindRow.hidden = !push.on;
-    if (el.btnRemind) { el.btnRemind.setAttribute('aria-checked', String(auth.user?.reminder !== false)); el.btnRemind.disabled = !!push.remindBusy; }
+    if (el.btnRemind) { el.btnRemind.setAttribute('aria-checked', String(remindOn())); el.btnRemind.disabled = !!push.remindBusy; }
     // The one state a switch cannot get itself out of: the browser, or the phone, has been told no, and only
     // its own settings can change that. Saying so is the difference between a broken switch and a closed door.
     // Notification is the browser's global and a WebView need not have it, so in the app the app is asked.
     const blocked = app ? push.blocked : Notification.permission === 'denied';
     if (el.notifyNote) el.notifyNote.textContent = blocked
       ? (app ? 'Blocked for Puzzle in your phone\u2019s settings.' : 'Blocked in this browser — turn it back on in the site settings.')
-      : push.on ? (app ? 'On for this phone.' : 'On for this device.') : 'Only when somebody invites you, and when the league pays out.';
+      : push.on ? (app ? 'On for this phone.' : 'On for this device.')
+      : auth.user ? 'Only when somebody invites you, and when the league pays out.' : 'A nudge at 7 pm. Signed in, an invite and the league too.';
   }
+  // The nudge's switch: the account's answer when there is one, this device's own when there is not. A device
+  // with no account keeps it here and sends it with its token or subscription, and the server keeps it on
+  // that device's row.
+  const remindOn = () => auth.user ? auth.user.reminder !== false : store.get('remind', true) !== false;
 
   /**
    * What this device already has. Called when the account is known and again whenever Settings is opened,
@@ -2902,7 +2936,7 @@
     if (!el.btnNotify) return;
     push.checked = true;
     if (appPush()) { await notifyInitApp(); return; }
-    if (!pushable() || !auth.user) { renderNotify(); return; }
+    if (!pushable()) { renderNotify(); return; }
     if (!push.asked) {
       push.asked = true;
       // A failed ask is not an answer: it is asked again next time rather than left looking unavailable.
@@ -2934,7 +2968,7 @@
     push.on = !!s.on && !!s.token;
     push.blocked = push.on && s.enabled === false;
     if (push.on && s.token !== push.posted) {
-      try { await pushApi('token', { token: s.token, tz: TZ }); push.posted = s.token; }
+      try { await pushApi('token', { token: s.token, tz: TZ, reminder: remindOn() }); push.posted = s.token; }
       catch (err) { if (err.code === 'push_off') push.app = false; }
     }
     renderNotify();
@@ -2968,7 +3002,7 @@
           return;
         }
         push.granted = true;
-        await pushApi('token', { token: r.token, tz: TZ });
+        await pushApi('token', { token: r.token, tz: TZ, reminder: remindOn() });
         push.on = true; push.blocked = false; push.posted = r.token;
         toast('Notifications on. Only an invite, and the league.', 'good');
       }
@@ -3015,7 +3049,7 @@
         if (permission !== 'granted') { push.on = false; renderNotify(); toast(permission === 'denied' ? 'Your browser is blocking notifications for this site.' : 'Notifications stay off.', 'hint'); return; }
         const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlB64ToBytes(push.key) });
         const json = sub.toJSON();
-        await pushApi('subscribe', { endpoint: json.endpoint, keys: json.keys, tz: TZ });
+        await pushApi('subscribe', { endpoint: json.endpoint, keys: json.keys, tz: TZ, reminder: remindOn() });
         push.on = true;
         toast('Notifications on. Only an invite, and the league.', 'good');
       }
@@ -3032,13 +3066,15 @@
   el.btnNotify?.addEventListener('click', notifyToggle);
 
   async function remindToggle() {
-    if (!auth.user || push.remindBusy) return;
-    const on = auth.user.reminder === false;
+    if (push.remindBusy) return;
+    const on = !remindOn();
     push.remindBusy = true; renderNotify();
     try {
-      const d = await pushApi('reminder', { on });
-      auth.user.reminder = d.reminder !== false;
-      toast(auth.user.reminder ? 'A nudge at 7 pm, once a day, in your own time.' : 'No daily nudge. Invites and the league still come.', 'hint');
+      // With no account the switch is this device's row, named by what only this device holds.
+      const who = auth.user ? {} : appPush() ? { token: push.posted } : { endpoint: (await pushSub().catch(() => null))?.endpoint || '' };
+      const d = await pushApi('reminder', { on, ...who });
+      if (auth.user) auth.user.reminder = d.reminder !== false; else store.set('remind', d.reminder !== false);
+      toast(remindOn() ? 'A nudge at 7 pm, once a day, in your own time.' : (auth.user ? 'No daily nudge. Invites and the league still come.' : 'No daily nudge.'), 'hint');
     } catch (err) {
       toast(`Could not change that (${typeof err.code === 'string' ? err.code : 'failed'}).`, 'bad');
     } finally {
@@ -3067,6 +3103,25 @@
       await sub.unsubscribe().catch(() => {});
     } catch { /* a browser that will not say is a browser with nothing to unsubscribe */ }
     push.on = false;
+  }
+  /**
+   * Signing out, the device keeps its notifications as its own: the token or subscription is posted again
+   * with no account behind it, so the evening nudge still comes, and the invitations and the league -- which
+   * need an account -- stop by themselves. Called once the sign-out has gone through.
+   */
+  async function notifyRelease() {
+    try {
+      if (appPush()) {
+        const s = await shell.ask('pushState', 4000);
+        if (s?.ok && s.on && s.token) { await pushApi('token', { token: s.token, tz: TZ, reminder: remindOn() }); push.posted = s.token; }
+        return;
+      }
+      if (!pushable()) return;
+      const sub = await pushSub();
+      if (!sub) return;
+      const json = sub.toJSON();
+      await pushApi('subscribe', { endpoint: json.endpoint, keys: json.keys, tz: TZ, reminder: remindOn() });
+    } catch { /* a device that cannot be re-posted is one the nudge will miss; nothing else changes */ }
   }
 
   // ── Gold matches: stake, invite, play the same board, and the board pays its places ──
@@ -3367,12 +3422,10 @@
     el.matchTitle.textContent = 'Dashboard';
     el.matchBody.innerHTML = `
       ${meStrip()}
-      <p class="aa-cap">How long</p>
-      <div class="aa-opts" id="aaLenOpts">${lengthsHtml()}</div>
       <p class="aa-cap">Table</p>
       <div class="aa-stakes">${stakesHtml(gold, waiting)}</div>
       <label class="aa-fill"><input type="checkbox" id="aaFillOnline"${fill ? ' checked' : ''}><span>Fill from online</span></label>
-      <p class="aa-cap" id="aaRecentCap" hidden>Played with lately</p>
+      <p class="aa-cap" id="aaRecentCap" hidden>Recently played</p>
       <div id="aaRecentBox"></div>`;
     openSheet(el.matchSheet);
     wireFaces(el.matchBody);
@@ -3388,7 +3441,7 @@
     if (!cap) return;
     cap.textContent = picks.size
       ? `${picks.size} picked · now choose a table above`
-      : 'Played with lately · tap to invite';
+      : 'Recently played';
     cap.classList.toggle('is-armed', picks.size > 0);
   }
   async function refreshRecent() {
@@ -3408,8 +3461,9 @@
   // How long a match is, in boards. The list is the server's (the lobby sends it), so a length added there
   // reaches the player on their next look at the dashboard. Three is the default: a match should take a while.
   let LENGTHS = [1, 3, 5];
-  const matchLen = () => { const n = Number(store.get('matchLen', 3)); return LENGTHS.includes(n) ? n : LENGTHS[Math.min(1, LENGTHS.length - 1)]; };
-  const lengthsHtml = () => LENGTHS.map(n => `<button type="button" class="aa-dev-opt${n === matchLen() ? ' is-active' : ''}" data-len="${n}" aria-pressed="${n === matchLen()}">${n} board${n === 1 ? '' : 's'}</button>`).join('');
+  // A match is one board. The server still plays longer ones (the lobby lists the lengths), but the dashboard
+  // no longer asks: a choice nobody asked for is a choice in the way of the table.
+  const matchLen = () => 1;
   /** One line that says how long a room's match is, for the room card and the invitation. */
   const shapeLine = m => { const n = Number(m?.boards_n) || (Array.isArray(m?.boards) ? m.boards.length : 1); return n === 1 ? 'One board' : `${n} boards in a row`; };
   const stakesHtml = (gold, waiting) => STAKES.map(v =>
@@ -3874,14 +3928,6 @@
     store.set('fillOnline', e.target.checked);
   });
   el.matchBody?.addEventListener('click', async e => {
-    // How long: a tap marks the choice and it is kept for next time.
-    const len = e.target.closest('[data-len]')?.dataset.len;
-    if (len !== undefined) {
-      store.set('matchLen', Number(len));
-      const box = $('#aaLenOpts', el.matchBody); if (box) box.innerHTML = lengthsHtml();
-      vibe(8);
-      return;
-    }
     const inv = e.target.closest('[data-invite]');
     if (inv) {
       const id = Number(inv.dataset.invite), name = inv.dataset.name;
@@ -4052,7 +4098,25 @@
     toast('You left the challenge.');
   }
 
+  // The corner button on the home screen is the settings mark for a stranger and the player's own face once
+  // they are signed in: the face is the sign-in, and it opens the same page.
+  const homeCorner = $('#aaSettings');
+  const homeCornerMark = homeCorner ? homeCorner.innerHTML : '';
+  function renderHomeCorner() {
+    if (!homeCorner) return;
+    if (auth.user) {
+      homeCorner.classList.add('has-face');
+      homeCorner.innerHTML = `<span class="aa-row-face aa-home-face${faceClass(auth.user)}">${faceInner(auth.user)}</span>`;
+      homeCorner.setAttribute('aria-label', `Settings · ${auth.user.name || 'Player'}`);
+      wireFaces(homeCorner);
+    } else {
+      homeCorner.classList.remove('has-face');
+      homeCorner.innerHTML = homeCornerMark;
+      homeCorner.setAttribute('aria-label', 'Settings');
+    }
+  }
   function renderAccountRow() {
+    renderHomeCorner();
     if (!el.accountGroup) return;
     el.accountGroup.hidden = !auth.user;
     if (el.accountCap) el.accountCap.hidden = !auth.user;
@@ -4129,11 +4193,12 @@
   el.accountRow?.addEventListener('click', () => { if (auth.user) showRenameRow(); });
 
   el.signOutBtn?.addEventListener('click', async () => {
-    // Notifications go before the session does: a device left subscribed would keep ringing for an account
-    // that is no longer signed in on it.
-    await notifyDrop();
+    // The session goes, and the device keeps its notifications as its own: the token or subscription is
+    // posted again with no account behind it, so the evening nudge still comes and the account's invitations
+    // and league stop by themselves.
     try { await authApi('logout', {}); } catch { /* the cookie may already be gone */ }
     auth.user = null; live.close(); renderAccountRow(); renderNotify(); closeSheets(); toast('Signed out.');
+    await notifyRelease();
   });
   el.deleteAccBtn?.addEventListener('click', async () => {
     if (!await ask({ title: 'Delete your account?', body: 'Your gold and any matches go with it. The progress on this device stays.',

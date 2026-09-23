@@ -5,8 +5,8 @@
 // account that is signed in on it, disposable — and the words a notification arrives with.
 import { createVerify, generateKeyPairSync } from 'node:crypto';
 import { pool, query } from '../backend/src/db.js';
-import { appEnabled, cleanTz, dailyNote, dropSubscription, dropToken, hasSubscription, invitedNote, leagueNote, saveSubscription, saveToken, setReminder } from '../backend/src/push.js';
-import { isDue, localClock, reminderSweep, targets } from '../backend/src/reminder.js';
+import { appEnabled, cleanTz, dailyNote, dropSubscription, dropToken, hasSubscription, invitedNote, leagueNote, saveSubscription, saveToken, setDeviceReminder, setReminder } from '../backend/src/push.js';
+import { deviceTargets, isDue, localClock, reminderSweep, targets } from '../backend/src/reminder.js';
 import { k, redis } from '../backend/src/redis.js';
 import { assertion, enabled as fcmEnabled, messageFor, parseAccount } from '../backend/src/fcm.js';
 import { eq, finish, ok, player, reset, section } from './helpers.js';
@@ -191,7 +191,7 @@ section('Seven in the evening, wherever the phone is');
   eq(n.kind, 'daily', 'the nudge is its own kind, so the app can give it its own channel');
   ok(n.title.startsWith('Hey Ariyan,') && /train your brain/.test(n.title), 'and it says who it is talking to');
   eq(n.url, '/puzzle/', 'and lands on the game');
-  eq(dailyNote('   ').title.startsWith('Hey there,'), true, 'a blank name still reads as a sentence');
+  eq(dailyNote('   ').title, 'It\u2019s time to train your brain', 'no name, no greeting: a device with no account is not called "there"');
 
   // Who is told: an account with a device in the zone, the nudge on, and no board in the last few hours.
   const a = await player('nudge-a'), b = await player('nudge-b'), c = await player('nudge-c'), d = await player('nudge-d');
@@ -212,6 +212,51 @@ section('Seven in the evening, wherever the phone is');
   eq(await reminderSweep(new Date('2026-09-22T13:04:00Z')), [], 'four minutes later the same evening is not sent again');
   eq(await reminderSweep(new Date('2026-09-22T18:00:30Z')).then(z => z.map(x => x.zone)), ['Europe/London'], 'and London gets its own at its own seven');
   await redis.del(k('reminder', 'Asia/Dhaka', '2026-09-22'), k('reminder', 'Europe/London', '2026-09-22'), k('reminded', a.id), k('reminded', d.id));
+}
+
+section('A phone with no account is nudged too');
+{
+  // Signed out, a device posts its token or subscription with no user, and the sweep finds it by zone.
+  await saveToken(pool, null, fcmToken('x'), 'app', 'Asia/Dhaka');
+  await saveSubscription(pool, null, sub(31), 'Chrome', 'Asia/Dhaka');
+  await saveToken(pool, null, fcmToken('y'), 'app', 'Asia/Dhaka', false);   // the switch off on that phone
+  await saveToken(pool, null, fcmToken('z'), 'app', 'Europe/London');
+  const who = (await query<{ token: string; user_id: number | null }>(pool, `SELECT token, user_id FROM push_tokens WHERE token = $1`, [fcmToken('x')])).rows[0];
+  eq(who?.user_id, null, 'the row stands with no account');
+  await query(pool, `UPDATE push_tokens SET seen_at = now() - interval '1 day' WHERE user_id IS NULL`);
+  await query(pool, `UPDATE push_subscriptions SET seen_at = now() - interval '1 day' WHERE user_id IS NULL`);
+  let dev = await deviceTargets('Asia/Dhaka');
+  eq(dev.tokens.map(t => t.token).sort(), [fcmToken('x')], 'the Dhaka phone with the nudge on is a target; the one that said no is not, nor London');
+  eq(dev.subs.map(x => x.endpoint), [sub(31).endpoint], 'and so is the browser');
+  eq((await deviceTargets('Europe/London')).tokens.map(t => t.token), [fcmToken('z')], 'London at its own seven');
+  // Opened the game an hour ago: not nudged tonight, the same quiet hours an account gets.
+  await query(pool, `UPDATE push_tokens SET seen_at = now() WHERE token = $1`, [fcmToken('x')]);
+  eq((await deviceTargets('Asia/Dhaka')).tokens.length, 0, 'a phone that opened the game an hour ago is left alone');
+  await query(pool, `UPDATE push_tokens SET seen_at = now() - interval '1 day' WHERE token = $1`, [fcmToken('x')]);
+  // The switch, with no account: set on the row by the token or endpoint only the device knows.
+  ok(await setDeviceReminder(pool, false, fcmToken('x'), ''), 'the phone turns its nudge off');
+  eq((await deviceTargets('Asia/Dhaka')).tokens.length, 0, 'and is not a target');
+  ok(await setDeviceReminder(pool, true, '', sub(31).endpoint), 'a browser by its endpoint');
+  ok(!(await setDeviceReminder(pool, true, fcmToken('nobody'), '')), 'a token nobody posted changes nothing');
+  ok(await setDeviceReminder(pool, true, fcmToken('x'), ''), 'and back on');
+  // The sweep reaches the accountless devices in the zone and marks each so it is not told twice.
+  await redis.del(k('reminder', 'Asia/Dhaka', '2026-09-23'));
+  const swept = await reminderSweep(new Date('2026-09-23T13:00:30Z'));
+  eq(swept.map(z => z.zone), ['Asia/Dhaka'], 'the sweep goes to Dhaka at its seven');
+  eq(swept[0]?.told, 0, 'nobody is actually reached on a box with no keys');
+  await redis.del(k('reminder', 'Asia/Dhaka', '2026-09-23'));
+  // Signing in on that phone: the same token posted again takes the account, and the account's own switch
+  // decides from then on.
+  const e = await player('nudge-e');
+  await saveToken(pool, e.id, fcmToken('x'), 'app', 'Asia/Dhaka');
+  eq((await tokensFor(e.id)), [fcmToken('x')], 'the token moved to the account');
+  eq((await deviceTargets('Asia/Dhaka')).tokens.length, 0, 'and is no longer an accountless target');
+  ok(!(await setDeviceReminder(pool, false, fcmToken('x'), '')), 'the accountless switch no longer reaches it');
+  // Signed out again, the phone can still drop its own token: the token is the one thing only it knows.
+  await dropToken(pool, null, fcmToken('x'));
+  eq((await tokensFor(e.id)), [], 'dropped by the phone, with no account in hand');
+  await dropSubscription(pool, null, sub(31).endpoint);
+  eq((await query(pool, `SELECT 1 FROM push_subscriptions WHERE endpoint = $1`, [sub(31).endpoint])).rowCount, 0, 'and so can a browser');
 }
 
 await finish();
