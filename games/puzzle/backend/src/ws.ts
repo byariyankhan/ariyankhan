@@ -119,7 +119,7 @@ export function attachWebSocket(app: FastifyInstance): void {
       ws.on('pong', () => { c.alive = true; void online.seen(user.id); });
 
       ws.on('message', async raw => {
-        let msg: { type?: string; code?: string; pct?: number; run?: unknown };
+        let msg: { type?: string; code?: string; pct?: number; run?: unknown; hidden?: unknown };
         try { msg = JSON.parse(String(raw)) as typeof msg; } catch { return; }
         const code = String(msg.code ?? '').trim().toUpperCase();
 
@@ -127,6 +127,11 @@ export function attachWebSocket(app: FastifyInstance): void {
           case 'ping':
             send(c, { type: 'pong', at: Date.now() });
             await online.seen(user.id);
+            return;
+
+          case 'away':
+            // the page is hidden (or back): an invitation while hidden rings the phone instead
+            await online.away(user.id, msg.hidden === true);
             return;
 
           case 'watch': {

@@ -2093,15 +2093,11 @@
   // free where advertising is off). A hint costs ten points of the round it is used in.
   const TRAIN_FREE_HINTS = 1;
   const trainHintsLeft = () => Math.max(0, TRAIN_FREE_HINTS - (trainDay().h | 0));
-  // Rounds: one a day for nothing -- two on the very first day, so a newcomer meets two rounds with their
-  // instructions before anything asks for an advertisement; the rest, and any replay, for an advertisement
-  // the player chooses.
-  function trainFirstDay() {
-    try { const me = STORE + trainKey(); for (const k of Object.keys(localStorage)) if (k.startsWith(STORE + 'train:') && k !== me) return false; } catch { /* no storage: treat as first */ }
-    return true;
-  }
-  const trainFreePlays = () => trainFirstDay() ? 2 : 1;
-  const trainPlaysLeft = () => Math.max(0, trainFreePlays() - (trainDay().p | 0));
+  // Rounds: every round is free once a day and then locked for the day; playing it again is an advertisement
+  // the player chooses. A round counts as played when it starts (`pp` per round, `p` in all), so leaving one
+  // halfway is not a way round the lock.
+  const trainPlayed = (t, id) => ((t.pp && t.pp[id]) | 0) > 0;
+  const trainFree = id => !trainPlayed(trainDay(), id);
   // The long game of a round: consecutive days it was played, ending today or, if today is not played yet,
   // yesterday. 30 days is the first challenge, 90 the second.
   const TRAIN_GOALS = [30, 90];
@@ -2125,7 +2121,7 @@
   }
   function trainStreak() { let n = 0; while (trainDone(trainDay(dayKeyBack(n + 1)))) n++; if (trainDone(trainDay())) n++; return n; }
   // what a round's Play button says: the score once played today, else Play, marked AD once the free round is spent
-  const playLabel = (t, id) => typeof t[id] === 'number' ? String(t[id]) : trainPlaysLeft() > 0 || !ads.on() ? 'Play' : 'Play \u00b7 AD';
+  const playLabel = (t, id) => typeof t[id] === 'number' ? String(t[id]) : trainFree(id) || !ads.on() ? 'Play' : 'Play \u00b7 AD';
   const runLine = id => {
     const run = trainRun(id), goal = TRAIN_GOALS.find(g => run < g);
     if (!goal) return `<span class="aa-train-goal is-done"><i style="width:100%"></i></span><em>${TRAIN_GOALS[TRAIN_GOALS.length - 1]}-day challenge done \u2713 \u00b7 ${run} days</em>`;
@@ -2165,7 +2161,7 @@
         <div class="aa-train-week" role="img" aria-label="Last seven days">${bars}</div>
       </div>
       <p class="aa-train-line"><span>${done ? `Done for today. ${streak} day${streak === 1 ? '' : 's'} in a row.` : streak ? `${streak} day${streak === 1 ? '' : 's'} in a row · keep it going.` : 'Four rounds. Five minutes. Every day.'}</span><button type="button" class="aa-train-info" data-train-about aria-label="How Daily Training works" aria-expanded="false">?</button></p>
-      <p class="aa-sheet-note aa-train-about" id="aaTrainAbout" hidden>Each round is scored out of 100; play it again and the better score stays. ${trainFirstDay() ? 'Your first two rounds today are free.' : 'The first round of the day is free.'} Every round after that, every replay, and every hint after the first is an advertisement you choose. Every round also keeps a 30-day and a 90-day challenge: consecutive days you played it.</p>
+      <p class="aa-sheet-note aa-train-about" id="aaTrainAbout" hidden>Each round is scored out of 100 and is free once a day; after that it is locked for the day, and playing it again is an advertisement you choose (the better score stays). So is every hint after the first. Every round also keeps a 30-day and a 90-day challenge: consecutive days you played it.</p>
       <div class="aa-train-rounds">
         ${TRAIN_ROUNDS.map(r => `<button type="button" class="aa-train-card" data-train="${r.id}"><span class="aa-train-ico2">${TRAIN_ICON[r.id]}</span><span class="aa-row-label"><span class="aa-train-name">${r.name}</span><small class="aa-row-sub">${r.blurb}</small><small class="aa-train-run">${runLine(r.id)}</small></span><span class="aa-train-got${typeof t[r.id] === 'number' ? ' is-done' : ''}">${playLabel(t, r.id)}</span></button>`).join('')}
       </div>
@@ -2215,12 +2211,12 @@
     // The first time a round is opened, its instructions come first, on the full screen, and Start counts
     // as the play. The same card is behind the ? in the round's own bar.
     if (!seen && !store.get('trainHow:' + id)) { trainIntro(id); return; }
-    if (trainPlaysLeft() <= 0) {
+    if (!trainFree(id)) {
       train.busy = true;
       try { const got = await adOffer('trainplay', null, true); if (!got) return; }
       finally { train.busy = false; }
     }
-    const t = trainDay(); t.p = (t.p | 0) + 1; store.set(trainKey(), t);
+    const t = trainDay(); t.pp = t.pp && typeof t.pp === 'object' ? t.pp : {}; t.pp[id] = (t.pp[id] | 0) + 1; t.p = (t.p | 0) + 1; store.set(trainKey(), t);
     trainStart(id);
   }
   const howHtml = id => { const r = TRAIN_ROUNDS.find(x => x.id === id); return `<ol class="aa-train-how">${r.how.map(h => `<li>${h}</li>`).join('')}</ol>`; };
@@ -2235,7 +2231,7 @@
       <p class="aa-card-kicker">How to play</p>
       <h3>${r.name}</h3>
       ${howHtml(id)}
-      <div class="aa-actions aa-actions--stack"><button type="button" class="aa-btn aa-btn--primary" data-train-go="${id}">Start${trainPlaysLeft() > 0 || !ads.on() ? '' : ' \u00b7 AD'}</button><button type="button" class="aa-btn aa-btn--soft" data-train-back>Back</button></div>
+      <div class="aa-actions aa-actions--stack"><button type="button" class="aa-btn aa-btn--primary" data-train-go="${id}">Start${trainFree(id) || !ads.on() ? '' : ' \u00b7 AD'}</button><button type="button" class="aa-btn aa-btn--soft" data-train-back>Back</button></div>
     </div>`;
   }
   const howBtnHtml = () => '<button type="button" class="aa-train-info" data-train-how aria-label="How to play">?</button>';
@@ -2267,7 +2263,7 @@
       <p class="aa-train-sub">${lines}</p>
       ${credit.replace('<p class="aa-art-credit">', '<p class="aa-art-credit" hidden>')}
       ${all ? `<p class="aa-train-sub"><b>Brain Score today: ${trainScore(t)}</b></p>` : ''}
-      <div class="aa-actions aa-actions--stack"><button type="button" class="aa-btn aa-btn--primary" data-train-back>Back to training</button><button type="button" class="aa-btn aa-btn--soft" data-train="${kind}">${ICON_AGAIN}Play again${trainPlaysLeft() > 0 || !ads.on() ? '' : ' \u00b7 AD'}</button></div>
+      <div class="aa-actions aa-actions--stack"><button type="button" class="aa-btn aa-btn--primary" data-train-back>Back to training</button><button type="button" class="aa-btn aa-btn--soft" data-train="${kind}">${ICON_AGAIN}Play again${!ads.on() ? '' : ' \u00b7 AD'}</button></div>
     </div>`;
     SFX.win(); vibe(20);
   }
@@ -2904,7 +2900,7 @@
       grant() { /* the round in hand takes it: trainHint applies it once this resolves */ },
     },
     trainplay: {
-      earn: 'Watch this through for one more round of training today.',
+      earn: 'Watch this through to play this round again today.',
       board: false,
       grant() { /* trainPlay starts the round once this resolves */ },
     },
@@ -3352,6 +3348,7 @@
       for (const r of TRAIN_ROUNDS) { const v = Number(rec[r.id]); if (Number.isFinite(v) && v > (Number(mine[r.id]) || -1)) { mine[r.id] = clamp100(v); grew = true; } }
       // hints used and rounds played: the larger, so a second device gets no second free round or hint
       for (const k of ['h', 'p']) { const v = Math.floor(Number(rec[k])); if (v > 0 && v > (mine[k] | 0)) { mine[k] = v; grew = true; } }
+      if (rec.pp && typeof rec.pp === 'object') for (const r of TRAIN_ROUNDS) { const v = Math.floor(Number(rec.pp[r.id])); if (v > 0 && v > ((mine.pp && mine.pp[r.id]) | 0)) { mine.pp = mine.pp || {}; mine.pp[r.id] = v; grew = true; } }
       if (grew) { store.set(trainKey(day), mine); changed = true; }
     }
     if (!changed) return false;
@@ -3758,6 +3755,7 @@
       this.ws = ws;
       ws.onopen = () => {
         this.tries = 0;
+        if (document.hidden) this.away(true);   // opened from the background: say so before an invitation is judged deliverable
         if (this.code) this.send({ type: 'watch', code: this.code });
         this.onTune?.();
       };
@@ -3789,6 +3787,7 @@
     send(o) { if (this.connected) { try { this.ws.send(JSON.stringify(o)); } catch { /* the close handler tidies up */ } } },
     progress(pct, run) { this.send(run ? { type: 'progress', pct, run } : { type: 'progress', pct }); },
     resync() { this.send({ type: 'resync' }); },
+    away(hidden) { this.send({ type: 'away', hidden: !!hidden }); },
 
     close() {
       clearTimeout(this.retry);
@@ -5392,6 +5391,7 @@
   // the board is a gesture it will accept, and the music that was built silently comes up then.
   document.addEventListener('pointerdown', () => { try { if (music.on && audio?.state === 'suspended') audio.resume(); } catch { /* ignore */ } }, { passive: true });
   document.addEventListener('visibilitychange', () => {
+    live.away(document.hidden);   // an invitation while hidden rings the phone instead of landing on a tab nobody sees
     if (document.hidden) { musicStop(); heartbeatStop(); deckStop(); return; }
     syncIfStale();                        // what another device cleared meanwhile, and what this one owes
     if (!el.select.hidden) deckStart();   // the home deck turns while somebody is looking at it, and not otherwise

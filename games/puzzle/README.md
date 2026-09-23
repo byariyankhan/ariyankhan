@@ -198,7 +198,10 @@ screen), `push` (their phone or browser will ring) or `none` (send the link). Th
 "are they racing", so a muted sender cannot learn that the muter is on a board; a full room answers
 `room_full` at the invitation rather than at the join; and "played together" (`havePlayedTogether`,
 `recentPlayers`) means a match that actually **started** — a room somebody sat in for a minute, or one the
-sweeper voided, gives nobody the right to ring a phone.
+sweeper voided, gives nobody the right to ring a phone. A phone rings **once per room** (`rang:<user>:<code>`,
+an hour), however many times the same person is asked; and "online" means a socket open **and** the page in
+front of them — the page sends `{type:'away', hidden}` on the socket when it is hidden or back
+(`online.away`, three hours), and an invitation to somebody hidden rings their phone instead.
 
 ## Public URLs
 

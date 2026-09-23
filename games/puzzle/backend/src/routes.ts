@@ -17,6 +17,7 @@ import { havePlayedTogether, isMuted, isRacing, mute, mutedList, recentPlayers, 
 import * as push from './push.js';
 import { body, caller, clearSessionCookie, limited, noStore, setSessionCookie, shapeUser, type Caller } from './httpkit.js';
 import { log } from './log.js';
+import { k, redis, soft } from './redis.js';
 
 /** A tier is one of the five, as a whole number; anything else is the client's mistake, not a 500. */
 const tierOf = (v: unknown): number | null => {
@@ -381,13 +382,20 @@ const H = {
     // What the sender is told is where the invitation went: onto a screen that has the game open, to a phone
     // or a browser that will ring, or nowhere -- in which case the link is the way. A socket that opens a
     // second later still gets nothing, and saying so is kinder than a silent wait.
-    const here = await online.is(to);
+    // Here means a socket open AND the page in front of them: a tab hidden behind other windows keeps its
+    // socket for hours, and an invitation delivered only there reaches nobody.
+    const here = (await online.is(to)) && !(await online.isAway(to));
     // Somebody with the game open in front of them already has the invitation on their screen and does not
-    // need it twice; anybody else has their phone told, because the room will be gone in a few minutes.
+    // need it twice; anybody else has their phone told, because the room will be gone in a few minutes --
+    // told once per room: a phone that rang for this room does not ring for it again because the sender
+    // kept tapping, however many times they are asked (the ask itself is not refused, and reads the same).
     let reach: 'live' | 'push' | 'none' = 'live';
     if (!here) {
       reach = (await push.hasSubscription(pool, to)) ? 'push' : 'none';
-      if (reach === 'push') void push.sendToUser(to, push.invitedNote(me.user.name, m.stake, m.code));
+      if (reach === 'push') {
+        const first = await soft(() => redis.set(k('rang', to, m.code), '1', 'EX', 3600, 'NX'), 'OK');
+        if (first === 'OK') void push.sendToUser(to, push.invitedNote(me.user.name, m.stake, m.code));
+      }
     }
     await noStore(res).send({ ok: true, delivered: here, reach });
   },
