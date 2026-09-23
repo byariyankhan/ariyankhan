@@ -948,29 +948,29 @@ links.
   Discover does). **The home brain's arrows are always the rose** — GOAT is the whole brain lit, not a
   green one — and **lit arrows keep moving** (`aabrainflow`: a small step along each arrow's own direction
   and back, each on its own beat, off under `prefers-reduced-motion`).
-- **Daily Brain Training** (`TRAIN_ROUNDS`, `openTrain`, `trainSave`, `#aaTrainSheet`, `.aa-train-*`): a third
-  home button, "Daily Training", with a pill (`0/3` today, or the day's score in green). Three rounds a day,
-  each scored 0-100, the day's **Brain Score** their mean: the **Arrow board** is today's daily board
+- **Daily Brain Training** (`TRAIN_ROUNDS`, `openTrain`, `trainSave`, `#aaTrainSheet`, `.aa-train-*`): an icon
+  in the top bar (`#aaTrainBtn`) with a pill (`0/5` today, or the day's score in green). Five rounds a day,
+  each scored 0-100, the day's **Brain Score** their mean. The **Arrow board** is today's daily board
   (`dailyPick`, the same country for everybody), scored by `focusOf` on a clear and by half the share cleared
-  on a loss, and its result card carries "Back to training" while `train.on`; **Flag match** is eight pairs of
-  flags (regional-indicator emoji from `a2`), the same eight for everybody that day (`trainPicks`), scored on
-  moves over eight and time over 45 s; **Capital sprint** is 45 seconds of four-choice capitals, +8 right, −4
-  wrong. Kept per day as `train:<day>` (best of the day per round), pushed in the state blob as `train` and
-  merged by the better score per round (`adoptTour`); the sheet shows the score, seven days of bars and the
-  streak of days done. The page's title, description and keywords say brain training first.
-- **Four picture rounds and a hint system** in Daily Training (seven rounds now: `a j d m o w c`). The art
-  is the game's own data, so every device shows the same round: **Piece the map** (`jigStart`) cuts a square
-  window of the world map around today's country into nine tiles (`mapWindow`, `mapDefs`: the whole map once
-  in a hidden svg, every tile a `<use>` of it with its own viewBox); tap a tile, tap a slot; two tiles that
-  show the same thing (open sea) are interchangeable (`sig`). **Counterfeit** (`counterfeitStart`,
-  `boardSvg`) draws today's board twice and turns three arrows round in the copy; tap them there. **Shape
-  order** (`orderStart`) shows five country outlines for five seconds, then the same five shuffled to tap in
-  order. **What was there?** (`thereStart`) colours a few countries in a window of the map for six seconds,
-  then asks three yes/no questions. Every round has a **Hint** (`trainHint`): one free a day
-  (`TRAIN_FREE_HINTS`, `train:<day>.h`), then an advertisement the player chooses (`adOffer('trainhint')`,
-  free where advertising is off); a hint costs ten points of that round. Hints: a pair shown for a moment
-  (flags), two wrong capitals removed (sprint), a tile put home and locked (map), a difference circled
-  (counterfeit), the next shape marked (order), one more short look (what was there).
+  on a loss; its result card carries "Back to training" while `train.on`. The other four are **gallery
+  rounds** on real paintings: forty-five works from The Metropolitan Museum of Art's Open Access collection
+  (CC0, public domain, every one in colour), listed with title, painter, date and source in `games/data/art.json` (fetched once,
+  `ART_VERSION`, `loadArt`) and kept resized (≤ 800 px, ~2.4 MB in all) in `images/art/`, cached forever by
+  the worker. The day's works are the same for everybody (`artPicks`, seeded by the day). **Restore the
+  Canvas** (`canvasStart`) cuts one painting into nine pieces (`.aa-art-tile`, the picture as a background
+  at 300 %); tap a piece, tap where it goes; scored on wrong tries and time over 90 s. **The Forgery**
+  (`forgeryStart`) shows the painting and a copy with three patches wrong in it (`artPatch`: one mirrored,
+  one recoloured, one taken from elsewhere in the same work); tap them in the copy, beside the original for a tall
+  work and under it for a wide one. **Gallery Memory**
+  (`galleryStart`) hangs five paintings for five seconds, then asks for the same five in that order.
+  **The Curator's Eye** (`curatorStart`) shows one painting for six seconds, then three times four details
+  — which is from it? Every round ends with the work's credit (`artCredit`). Every round has a **Hint**
+  (`trainHint`): one free a day (`TRAIN_FREE_HINTS`, `train:<day>.h`), then an advertisement the player
+  chooses (`adOffer('trainhint')`, free where advertising is off); a hint costs ten points of that round
+  (a piece put home and locked, a lie circled, the next painting marked, one more short look). Kept per day
+  as `train:<day>` (best of the day per round), pushed in the state blob as `train` and merged by the
+  better score per round (`adoptTour`); the sheet shows the score, seven days of bars and the streak of
+  days done. The page's title, description and keywords say brain training first.
 - **A sweep for dead and doubled code** (September 2026): gone from `js/puzzle.js` are three icons nothing
   drew, `MODES`, `RUSH_SECONDS`, a second copy of `freeAtStart` (the test has its own), four `el.*` entries
   nothing read, and the `lastRun` record nothing read back; the six fetch wrappers (`authApi`,
