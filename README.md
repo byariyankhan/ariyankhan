@@ -969,9 +969,11 @@ links.
   tradition, nearest first → same continent → the rest by distance, and each day draws from a window at the
   top of that list that widens by seven works a training day, so a player in Dhaka begins with Mughal and
   Bengal and reaches Paris in a few weeks. Same home country, same day, same paintings. All four are **gallery
-  rounds** on real paintings: 146 works from The Metropolitan Museum of Art's Open Access collection
-  (CC0, public domain, every one in colour; European, American and East Asian painting, nothing unclothed), listed with title, painter, date and source in `games/data/art.json` (fetched once,
-  `ART_VERSION`, `loadArt`) and kept resized (≤ 800 px, ~8 MB in all, fetched a painting at a time) in `images/art/`, cached forever by
+  rounds** on real paintings: 247 works from The Metropolitan Museum of Art's Open Access collection
+  (CC0, public domain, every one in colour, nothing unclothed): European and American painting, East Asian
+  scrolls, and a hundred Mughal, Deccani, Bengal, Rajput, Pahari, Jain, Persian, Ottoman, Tibetan, Nepalese
+  and Burmese works, so the gallery has something near for most of the world, listed with title, painter, date and source in `games/data/art.json` (fetched once,
+  `ART_VERSION`, `loadArt`) and kept resized (≤ 800 px, ~13 MB in all, fetched a painting at a time) in `images/art/`, cached forever by
   the worker. The day's works are the same for everybody (`artPicks`, seeded by the day). **Restore the
   Canvas** (`canvasStart`) cuts one painting into nine pieces (`.aa-art-tile`, the picture as a background
   at 300 %); tap a piece, tap where it goes; scored on wrong tries and time over 90 s. **The Forgery**
