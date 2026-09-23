@@ -15,6 +15,19 @@ export const online = {
   async is(userId: number): Promise<boolean> {
     return (await soft(() => redis.exists(k('presence', 'user', userId)), 0)) === 1;
   },
+  /**
+   * A socket that is open is not a player who is looking. A tab left open on a desk keeps its socket alive
+   * for hours, and an invitation delivered to it reaches nobody -- so the page says when it is hidden, and an
+   * invitation to somebody hidden rings their phone as if they were away. Kept longer than the socket, so a
+   * tab closed while hidden stays "away" rather than flipping back to reachable.
+   */
+  async away(userId: number, hidden: boolean): Promise<void> {
+    if (hidden) await soft(() => redis.setex(k('presence', 'away', userId), 3 * 3600, '1'), 'OK');
+    else await soft(() => redis.del(k('presence', 'away', userId)), 0);
+  },
+  async isAway(userId: number): Promise<boolean> {
+    return (await soft(() => redis.exists(k('presence', 'away', userId)), 0)) === 1;
+  },
   /** How many distinct players this process can see. Reported by /health for the dashboards. */
   async count(): Promise<number> {
     return soft(async () => {

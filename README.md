@@ -951,10 +951,10 @@ links.
 - **Daily Brain Training** (`TRAIN_ROUNDS`, `openTrain`, `trainSave`, `#aaTrainSheet`, `.aa-train-*`): an icon
   in the top bar (`#aaTrainBtn`) with a pill (`0/4` today, or the day's score in green). Four rounds a day,
   each scored 0-100, the day's **Brain Score** their mean. (The arrow board was a fifth round for a while and
-  is not any more: the daily board is its own thing.) **The first round of the day is free** (`TRAIN_FREE_PLAYS`,
-  `train:<day>.p`, counted when a round starts); every round after it, and every replay, is an advertisement
-  the player chooses (`adOffer('trainplay')`, free where advertising is off) — the Play button says `Play · AD`
-  once the free round is spent. A round is played **full screen** (`trainScreen`: the sheet takes
+  is not any more: the daily board is its own thing.) **Every round is free once a day** (`trainFree`, `train:<day>.pp`
+  per round and `p` in all, counted when a round starts), then locked for the day; playing it again is an
+  advertisement the player chooses (`adOffer('trainplay')`, free where advertising is off) — the button says
+  `Play · AD` for a round already started today. A round is played **full screen** (`trainScreen`: the sheet takes
   `aa-sheet--page`, the lobby is gone, the board music comes on with `musicBegin` and goes with the round).
   Every round carries a **long game**: a 30-day and then a 90-day challenge (`TRAIN_GOALS`, `trainRun`:
   consecutive days that round was played, ending today or yesterday), a bar under the round in the list. The
@@ -962,9 +962,9 @@ links.
   explanation (`data-train-about`). The rounds are cards with **drawn icons** (`TRAIN_ICON`: line marks in the
   brain's colour, no emoji). **Every round has instructions** (`how`, three steps): shown full screen the first
   time a round is opened (`trainIntro`, `trainHow:<id>`; Start is the play) and behind the `?` in the round's
-  own bar afterwards (`trainHowCard`). **The very first day gives two free rounds** (`trainFirstDay`,
-  `trainFreePlays`), so a newcomer meets two rounds with their instructions before an advertisement is asked
-  for. **The gallery starts where the player is** (`artRanked`, `TRAD_OF`, `trainDays`): every work carries
+  own bar afterwards (`trainHowCard`). **Every round is free once a day** (`trainFree`, `train:<day>.pp` per
+  round, counted when it starts) and then locked for the day; playing it again is an advertisement the
+  player chooses. **The gallery starts where the player is** (`artRanked`, `TRAD_OF`, `trainDays`): every work carries
   its country (`cc`) and tradition (`trad`: is / hb / ea / we); works are ranked home country → home
   tradition, nearest first → same continent → the rest by distance, and each day draws from a window at the
   top of that list that widens by seven works a training day, so a player in Dhaka begins with Mughal and
@@ -1023,10 +1023,12 @@ links.
   within minutes); the lobby socket keeps reconnecting with a backoff up to 30 s while it is wanted instead
   of giving up after four tries; `goldError` and `invitePlayer` name `room_full`, `no_match`,
   `rate_limited`, `not_yours` and `try_later`. Server: `room_full` at the invitation, mute checked before
-  racing, and "played together" means a match that started (`players.ts`). Still open, by design or for
-  later: repeat invitations do re-ring a phone (the suite asserts it; the 20-a-minute limit bounds it), an
-  open desktop tab counts as "online" so the phone is not rung, and `reach:'push'` is reported before the
-  push is known to have gone.
+  racing, and "played together" means a match that started (`players.ts`). Then the two left over: **a phone rings once per room** (`rang:<user>:<code>` in Redis, an hour; the
+  ask itself is never refused and reads the same), and **a hidden tab is not "online"**: the page tells its
+  socket when it is hidden or back (`live.away`, the `away` message, `online.away`/`isAway` in
+  `presence.ts`, kept three hours so a tab closed while hidden stays away), and an invitation to somebody
+  hidden rings their phone instead of landing on a tab nobody sees. Still reported before it is known to
+  have gone: `reach:'push'`.
 - **The evening nudge needs no account.** Notifications are offered signed out too (`renderNotify` no
   longer waits for `auth.user`); a token or subscription is posted with no user, with the device's own
   nudge answer (`remindOn()`, `reminder` in the post, `store 'remind'`), and the 7 pm sweep reaches those

@@ -608,14 +608,19 @@ section('Mute: the one answer to being asked too often');
 
   const room = await call('/matches', { token: host.token, body: { stake: config.game.stakes[0], open_to_all: false } });
   const code = (room.json.match as { code: string }).code;
-  // Asking twice in a row is simply asking twice: there is no cooldown and no cap any more.
+  // Asking twice in a row is simply asking twice: the ask is never refused. The phone, though, rings once per room.
   eq((await call(`/matches/${code}/invite`, { token: host.token, body: { user_id: mate.id } })).status, 200, 'the first ask goes');
   const twice = await call(`/matches/${code}/invite`, { token: host.token, body: { user_id: mate.id } });
   eq([twice.status, twice.json.reach], [200, 'none'], 'and so does the second, straight away -- reaching nobody, because mate is not online');
   await online.seen(mate.id);
   eq((await call(`/matches/${code}/invite`, { token: host.token, body: { user_id: mate.id } })).json.reach, 'live', 'with the game open it lands on the screen');
-  await online.gone(mate.id);
   await query(pool, `INSERT INTO push_tokens (user_id, token) VALUES ($1, $2)`, [mate.id, 'fcm:' + 'm'.repeat(40)]);
+  // A socket open behind other windows is not a player looking: hidden, the phone is told instead.
+  await online.away(mate.id, true);
+  eq((await call(`/matches/${code}/invite`, { token: host.token, body: { user_id: mate.id } })).json.reach, 'push', 'with the tab hidden, the phone is told even though a socket is open');
+  await online.away(mate.id, false);
+  eq((await call(`/matches/${code}/invite`, { token: host.token, body: { user_id: mate.id } })).json.reach, 'live', 'and back in front of it, the screen again');
+  await online.gone(mate.id);
   eq((await call(`/matches/${code}/invite`, { token: host.token, body: { user_id: mate.id } })).json.reach, 'push', 'with the game closed and a phone registered, the phone is told');
 
   // Mate has had enough.
