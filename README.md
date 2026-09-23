@@ -960,7 +960,7 @@ links.
   consecutive days that round was played, ending today or yesterday), a bar under the round in the list. The
   painting's credit after a round sits behind a `?` (`data-train-info`), and so does the sheet's own
   explanation (`data-train-about`). The rounds are cards with **drawn icons** (`TRAIN_ICON`: line marks in the
-  brain's colour, no emoji). **Every round is taught the way the board is** (`TRAIN_COACH`, `trainCoachStart`/`Show`/`Place`/`Event`/`End`): the first time a round is opened, a spotlight (`.aa-coach-spot`) sits on the thing to touch, a one-sentence card sits under it, and where the move is a drag a hand (`.aa-hand`, Web Animations) makes the move over and over until the player does; each step clears itself on the move it asked for (`wait`: `placed`, `found`, `play`, `ask`) or on Next; once through or skipped it is not shown again (`trainHow:<id>`). The three-step text stays behind the `?` in the round's bar (`trainHowCard`). **Restore the Canvas is drag and drop** (`canvasDragWire`, `canvasDrop`: pointer events, a carried copy `.aa-art-drag`, the slot under the finger lit `.is-over`, a swap when dropped on a full slot from another slot, `touch-action:none` so a drag never turns into a scroll; a piece dragged out of the frame goes back to the tray. Dragging is the only way a piece moves — the tap-then-tap way is gone, so there is one thing to learn). **Every round is free once a day** (`trainFree`, `train:<day>.pp` per
+  brain's colour, no emoji). **Every round is taught the way the board is** (`TRAIN_COACH`, `trainCoachStart`/`Show`/`Place`/`Event`/`End`): the first time a round is opened, a spotlight (`.aa-coach-spot`) sits on the thing to touch, a one-sentence card sits under it, and where the move is a drag a hand (`.aa-hand`, Web Animations) makes the move over and over until the player does; each step clears itself on the move it asked for (`wait`: `placed`, `found`, `play`, `ask`) or on Next; once through or skipped it is not shown again (`trainHow:<id>`). The three-step text stays behind the `?` in the round's bar (`trainHowCard`). **Restore the Canvas is drag and drop** (`canvasDragWire`, `canvasDrop`: pointer events, a carried copy `.aa-art-drag`, the slot under the finger lit `.is-over`, a swap when dropped on a full slot from another slot, `touch-action:none` so a drag never turns into a scroll; a piece dragged out of the frame goes back to the tray. Dragging is the only way a piece moves — the tap-then-tap way is gone, so there is one thing to learn; Gallery Memory is wired through the same `trainDragWire`, and its coach shows the hand carrying the first painting to place 1). **Every round is free once a day** (`trainFree`, `train:<day>.pp` per
   round, counted when it starts) and then locked for the day; playing it again is an advertisement the
   player chooses. **The gallery starts where the player is** (`artRanked`, `TRAD_OF`, `trainDays`): every work carries
   its country (`cc`) and tradition (`trad`: is / hb / ea / we); works are ranked home country → home
@@ -973,14 +973,25 @@ links.
   and Burmese works, so the gallery has something near for most of the world, listed with title, painter, date and source in `games/data/art.json` (fetched once,
   `ART_VERSION`, `loadArt`) and kept resized (≤ 800 px, ~13 MB in all, fetched a painting at a time) in `images/art/`, cached forever by
   the worker. The day's works are the same for everybody (`artPicks`, seeded by the day). **Restore the
-  Canvas** (`canvasStart`) cuts one painting into nine pieces (`.aa-art-tile`, the picture as a background
-  at 300 %); tap a piece, tap where it goes; scored on wrong tries and time over 90 s. **The Forgery**
-  (`forgeryStart`) shows the painting and a copy with three patches wrong in it (`artPatch`: one mirrored,
-  one recoloured, one taken from elsewhere in the same work); tap them in the copy, beside the original for a tall
+  Canvas** (`canvasStart`) cuts one painting into pieces (`.aa-art-tile`, the picture as a background
+  at n × 100 %); drag each piece home; scored on wrong tries and time over the allowance. **The Forgery**
+  (`forgeryStart`) shows the painting and a copy with patches wrong in it (`artPatch`: mirrored,
+  recoloured, taken from elsewhere in the same work, cycling); tap them in the copy, beside the original for a tall
   work and under it for a wide one. **Gallery Memory**
-  (`galleryStart`) hangs five paintings for five seconds, then asks for the same five in that order.
-  **The Curator's Eye** (`curatorStart`) shows one painting for six seconds, then three times four details
-  — which is from it? Every round ends with the work's credit (`artCredit`, behind the `?`). Every round has a **Hint**
+  (`galleryStart`) hangs the paintings numbered for a few seconds, takes them down, and deals them into a
+  tray: the player **drags each one back to its number** (`galleryDragWire`, `galleryDrop`, `galleryDraw`,
+  through the same `trainDragWire` as the canvas; a piece dropped on a full place swaps with it, one dragged
+  out goes back to the tray). When every place is filled the wrong ones are outlined (`.is-wrong`,
+  `galleryCheck`, ten points each) and the round goes on until all hang right; the hint hangs the first
+  wrong one where it belongs and locks it. **The Curator's Eye** (`curatorStart`) shows one painting for a
+  few seconds, then, several times, four details — which is from it? **Every round gets harder the way the
+  board does** (`TRAIN_TIERS`, `trainTier`, `TIER_OF_ROUND`, `tierParams`): five levels per round, shown as
+  a chip in the list and the round's bar (`levelChip`, `.aa-train-lv`); a day scored 85 or more takes the
+  round up a level, a day under 50 takes it down, read off the days before today so the level holds still
+  within a day and every device with the same history agrees. Level 1 → 5: the canvas 3×3 → 5×5 pieces
+  (allowance 90 s → 200 s), the forgery 3 → 5 patches, smaller and closer in colour, the gallery 5 → 8
+  paintings shown for 5 → 4 seconds, the curator 3 → 5 questions with smaller details after 6 → 4 seconds.
+  The result says "Level up tomorrow." or "A little easier tomorrow." when the day's score moved it. Every round ends with the work's credit (`artCredit`, behind the `?`). Every round has a **Hint**
   (`trainHint`): one free a day (`TRAIN_FREE_HINTS`, `train:<day>.h`), then an advertisement the player
   chooses (`adOffer('trainhint')`, free where advertising is off); a hint costs ten points of that round
   (a piece put home and locked, a lie circled, the next painting marked, one more short look). Kept per day
