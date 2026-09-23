@@ -976,7 +976,8 @@ links.
   streak alive and nothing played yet it says "3 days in a row · play today" in rose. **Done for today** is
   one round scored (`trainDone`), the streak counts such days, `trainAll` is the bonus of all four; the
   per-round bar counts days that round was played, in all (`trainRun`: cumulative, so it only ever grows).
-  The home pill is a dot until something is scored, then the day's Brain Score. The result always offers **Play
+  The home pill is a dot until something is scored, then the day's Brain Score. Once the day is done the list ends in the same **Play next** button as the result
+  (`.aa-train-nextrow`), so the next round is one tap away from the list too. The result always offers **Play
   next** (`trainNext`: the next unscored round, else the next along; an advertisement with the video mark
   and an AD pill unless it is the day's free round, whatever was played before; the caption "Next: The
   Forgery · free tomorrow" saying what and why) and **Play again** (always free). In a round and on its result the corner
