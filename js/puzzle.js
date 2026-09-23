@@ -1857,6 +1857,7 @@
   const ICO = (d, extra = '') => `<svg class="aa-bi" viewBox="0 0 24 24" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">${d}</g>${extra}</svg>`;
   const ICON_NEXT  = ICO('<path d="M4.5 12h14"/><path d="M12.5 6l6 6-6 6"/>');
   const ICON_BACK  = ICO('<path d="M19.5 12h-14"/><path d="M11.5 6l-6 6 6 6"/>');
+  const ICON_LOCK  = ICO('<rect x="5" y="10.5" width="14" height="10" rx="2.2"/><path d="M8.5 10.5V7.8a3.5 3.5 0 0 1 7 0v2.7"/>');
   const ICON_AGAIN = ICO('<path d="M20 12a8 8 0 1 1-2.5-5.8"/><path d="M20 3.6V9h-5.4"/>');
   const ICON_SHARE = ICO('<circle cx="17.5" cy="5.5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="17.5" cy="18.5" r="2.6"/><path d="M8.4 10.7l6.8-3.9"/><path d="M8.4 13.3l6.8 3.9"/>');
   const ICON_AD    = ICO('<rect x="2.8" y="4.8" width="18.4" height="14.4" rx="2.4"/><path d="M10.2 9.4l4.6 2.6-4.6 2.6z"/>');
@@ -2168,14 +2169,18 @@
   // "AD" only where an advertisement is what will actually be shown (ads.isAd): the free stand-in the site
   // runs until the network approves it is not one, and must not be called one.
   const ICON_PLAY = ICO('<path d="M8 5.5v13l10.5-6.5z"/>');
+  // Before the day's round is played there is one button on the screen: Play. Once a round is scored the
+  // choice is two: Play again (free) and Play with ads (another round). The other rounds are locked, and
+  // say so with a lock and no button, until then.
   function trainCardState(t, id) {
     if (typeof t[id] === 'number') return { cls: 'is-done', tag: `\u2713 ${t[id]}`, chip: `${ICON_AGAIN}Play again` };
     const free = id === trainFreeId();
     if (!ads.isAd()) return { cls: free ? 'is-free' : '', tag: free ? 'Today' : '', chip: free ? `${ICON_PLAY}Play` : 'Play' };
     if (free) return { cls: 'is-free', tag: 'Free today', chip: `${ICON_PLAY}Play` };
     if (trainPlayed(t, id)) return { cls: '', tag: 'Unlocked', chip: `${ICON_PLAY}Play` };
-    const n = trainFreeIn(id);
-    return { cls: 'is-ad', tag: n === 1 ? 'Free tomorrow' : `Free in ${n} days`, chip: `${ICON_AD}Play \u00b7 AD` };
+    const n = trainFreeIn(id), tag = n === 1 ? 'Free tomorrow' : `Free in ${n} days`;
+    if (!trainDone(t)) return { cls: 'is-locked', tag, chip: ICON_LOCK };
+    return { cls: 'is-ad', tag, chip: `${ICON_AD}Play with ads` };
   }
   const runLine = id => {
     const run = trainRun(id), goal = TRAIN_GOALS.find(g => run < g);
@@ -2219,7 +2224,7 @@
         <div class="aa-train-week" role="img" aria-label="Last seven days">${bars}</div>
       </div>
       <p class="aa-train-line${!done && streak > 1 ? ' is-warn' : ''}"><span>${all ? `All four done${streak > 1 ? ` \u00b7 ${streak} days in a row` : ''}` : done ? `Done for today${streak > 1 ? ` \u00b7 ${streak} days in a row` : ''}` : streak > 1 ? `${streak} days in a row \u00b7 play today` : ads.isAd() ? 'One free round a day \u00b7 more with AD' : `Today\u2019s round: ${freeName}`}</span><button type="button" class="aa-train-info" data-train-about aria-label="How Daily Training works" aria-expanded="false">?</button></p>
-      <p class="aa-sheet-note aa-train-about" id="aaTrainAbout" hidden>${ads.isAd() ? 'One round is free every day, and it changes daily. Each of the other three takes one short advertisement, then that round is yours for the rest of the day. Your best score of the day counts, and the bar under a round is the days you have played it.' : 'One round is today\u2019s, and it changes daily. Here on the website every round is free, always. Your best score of the day counts, and the bar under a round is the days you have played it.'}</p>
+      <p class="aa-sheet-note aa-train-about" id="aaTrainAbout" hidden>${ads.isAd() ? 'One round is free every day, and it changes daily. Play it, then play it again as often as you like, or play another round with a short advertisement; that round is then yours for the rest of the day. Your best score of the day counts, and the bar under a round is the days you have played it.' : 'One round is today\u2019s, and it changes daily. Here on the website every round is free, always. Your best score of the day counts, and the bar under a round is the days you have played it.'}</p>
       <div class="aa-train-rounds">
         ${TRAIN_ROUNDS.map(r => { const c = trainCardState(t, r.id); return `<button type="button" class="aa-train-card ${c.cls}" data-train="${r.id}">${trainIcon(r.id)}<span class="aa-row-label">${c.tag ? `<small class="aa-train-tag">${c.tag}</small>` : ''}<span class="aa-train-name">${r.name}</span><small class="aa-train-run">${runLine(r.id)}</small></span><span class="aa-train-got">${c.chip}</span></button>`; }).join('')}
       </div>
@@ -2275,6 +2280,8 @@
   async function trainPlay(id) {
     if (train.busy || !TRAIN_ROUNDS.some(r => r.id === id)) return;
     if (!trainFree(id)) {
+      // locked until the day's round is played: one button before that, Play
+      if (!trainDone(trainDay())) { toast(`Play today\u2019s round first: ${TRAIN_ROUNDS.find(r => r.id === trainFreeId()).name}.`, 'hint', 2600); return; }
       train.busy = true;
       try { const got = await adOffer('trainplay', null, true); if (!got) return; }
       finally { train.busy = false; }
@@ -2396,7 +2403,7 @@
         const name = TRAIN_ROUNDS.find(r => r.id === nx).name, ad = !trainFree(nx), n = trainFreeIn(nx);
         const when = !ads.isAd() ? '' : nx === trainFreeId() ? ' \u00b7 free today' : trainPlayed(t, nx) ? '' : n === 1 ? ' \u00b7 free tomorrow' : ` \u00b7 free in ${n} days`;
         return `<p class="aa-train-sub aa-train-next">Next: ${name}${when}</p>
-      <div class="aa-actions aa-actions--stack"><button type="button" class="aa-btn aa-btn--primary${ad ? ' aa-btn--ad' : ''}" data-train="${nx}">${ad ? ICON_AD : ''}Play next${ad ? '<span class="aa-ad-pill">AD</span>' : ''}</button><button type="button" class="aa-btn aa-btn--soft" data-train="${kind}">${ICON_AGAIN}Play again</button></div>`;
+      <div class="aa-actions aa-actions--stack"><button type="button" class="aa-btn aa-btn--primary${ad ? ' aa-btn--ad' : ''}" data-train="${nx}">${ad ? `${ICON_AD}Play with ads<span class="aa-ad-pill">AD</span>` : 'Play next'}</button><button type="button" class="aa-btn aa-btn--soft" data-train="${kind}">${ICON_AGAIN}Play again</button></div>`;
       })()}
     </div>`;
     SFX.win(); vibe(20);
