@@ -2,7 +2,7 @@
    Scope is the whole origin (it has to be, to control the game page), but the fetch
    handler only ever answers for the game's own files; every other request on the
    site is left to the network exactly as if no worker were installed. */
-const VERSION = 'ptw-cache-v122';
+const VERSION = 'ptw-cache-v123';
 const GAME_FILES = new Set([
   '/piece-the-world.html', '/css/style.css', '/css/piece-the-world.css',
   '/js/piece-the-world.js', '/js/site-nav.js', '/js/site-footer.js',
@@ -16,6 +16,8 @@ const GAME_FILES = new Set([
   '/favicon/favicon.ico', '/favicon/favicon-96x96.png', '/favicon/apple-touch-icon.png',
 ]);
 const isLevelData = p => p.startsWith('/games/data/') && p.endsWith('.json');
+// The gallery: the paintings never change (art.json is versioned by query string), so a painting seen once is kept.
+const isArt = p => p.startsWith('/images/art/');
 
 /* Put the game in the cache now, rather than when somebody happens to ask for it again.
 
@@ -48,8 +50,8 @@ self.addEventListener('fetch', event => {
   // The game's backend is never cached, and never touched by this worker: every answer it gives is about right
   // now. It falls outside GAME_FILES anyway, but saying so here keeps a later broad rule from swallowing it.
   if (path.startsWith('/api/puzzle/') || path.startsWith('/ws/puzzle')) return;
-  if (isLevelData(path)) {
-    // Level data is versioned by query string → cache first, forever.
+  if (isLevelData(path) || isArt(path)) {
+    // Level data is versioned by query string, and a painting is a painting → cache first, forever.
     event.respondWith(caches.open(VERSION).then(async cache => {
       const hit = await cache.match(req); if (hit) return hit;
       const res = await fetch(req); if (res.ok) cache.put(req, res.clone()); return res;
