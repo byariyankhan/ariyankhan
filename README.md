@@ -962,24 +962,24 @@ links.
   explanation (`data-train-about`). The rounds are cards with **drawn icons** (`TRAIN_ICON`: line marks in the
   brain's colour, no emoji). **Every round is taught the way the board is** (`TRAIN_COACH`, `trainCoachStart`/`Show`/`Place`/`Event`/`End`): the first time a round is opened, a spotlight (`.aa-coach-spot`) sits on the thing to touch, a one-sentence card sits under it, and where the move is a drag a hand (`.aa-hand`, Web Animations) makes the move over and over until the player does; each step clears itself on the move it asked for (`wait`: `placed`, `found`, `play`, `ask`) or on Next; once through or skipped it is not shown again (`trainHow:<id>`). The three-step text stays behind the `?` in the round's bar (`trainHowCard`). **Restore the Canvas is drag and drop** (`canvasDragWire`, `canvasDrop`: pointer events, a carried copy `.aa-art-drag`, the slot under the finger lit `.is-over`, a swap when dropped on a full slot from another slot, `touch-action:none` so a drag never turns into a scroll; a piece dragged out of the frame goes back to the tray. Dragging is the only way a piece moves — the tap-then-tap way is gone, so there is one thing to learn; Gallery Memory is wired through the same `trainDragWire`, and its coach shows the hand carrying the first painting to place 1). **One round a day is free, and the game says which** (`trainFreeId`: the four in turn, a different
   one each calendar day from the local `dayKey`, the same for everyone; `trainFreeIn` says how many days
-  until a round's turn). The free round is played as often as the player likes. Every other round that day
-  is unlocked by an advertisement the player chooses, once (`trainPlay` → `adOffer('trainplay')`,
-  counted when the round starts, `train:<day>.pp`), and is then free for the rest of the day
-  (`trainFree`). Where advertising is off (the site) every round is simply free and nothing says AD. The
-  list reads the rule off the cards (`trainCardState`, `.aa-train-tag`, `.aa-train-got`): the free round's
-  card is ringed with "FREE TODAY" and a filled ▶ Play; the others say "FREE TOMORROW" / "FREE IN 2 DAYS"
-  with an outlined "▣ Play · AD"; a round unlocked but left says "UNLOCKED · Play"; a round scored today
-  goes green with "✓ 100" and "↻ Play again". The line above the list is "One free round a day · more with
-  AD" (site: "Today's round: …"), then "Done for today · 3 days in a row", then "All four done"; with a
-  streak alive and nothing played yet it says "3 days in a row · play today" in rose. **Done for today** is
-  one round scored (`trainDone`), the streak counts such days, `trainAll` is the bonus of all four; the
-  per-round bar counts days that round was played, in all (`trainRun`: cumulative, so it only ever grows).
-  The home pill is a dot until something is scored, then the day's Brain Score. The result offers **Play
-  next** (`trainNext`: the free round if unscored, else the next unscored; with the video mark and an AD
-  pill when it costs one, the caption "Next: The Forgery · free tomorrow" saying what and why) and **Play
-  again** (always free); with all four scored it offers Done. In a round and on its result the corner
-  button is ← back to the list (`trainScreen`, a capture-phase handler before `closeSheets`; the phone's
-  back button does the same in `backPressed`); on the list it is ✕. **The round marks
+  until a round's turn). The free round is played as often as the player likes. Every other round costs an
+  advertisement the player chooses, each time it is played (`trainFree`, `trainPlay` →
+  `adOffer('trainplay')`, counted when the round starts, `train:<day>.pp`). Where advertising is off (the
+  site) every round is simply free and nothing says AD. The list reads the rule off the cards
+  (`trainCardState`, `.aa-train-tag`, `.aa-train-got`): the free round's card is ringed with "FREE TODAY"
+  and a filled ▶ Play; the others say "FREE TOMORROW" / "FREE IN 2 DAYS" with an outlined "▣ Play · AD"; a
+  round scored today goes green with "✓ 100" and "↻ Play again", or "▣ Play again · AD" when it is not the
+  day's round. The line above the list is "One free round a day · more with AD" (site: "Today's round: …"),
+  then "Done for today · 3 days in a row", then "All four done"; with a streak alive and nothing played yet
+  it says "3 days in a row · play today" in rose. **Done for today** is one round scored (`trainDone`), the
+  streak counts such days, `trainAll` is the bonus of all four; the per-round bar counts days that round was
+  played, in all (`trainRun`: cumulative, so it only ever grows). The home pill is a dot until something is
+  scored, then the day's Brain Score. The result offers **Play next** (`trainNext`: the free round if
+  unscored, else the next unscored; with the video mark and an AD pill when it costs one, the caption "Next:
+  The Forgery · free tomorrow" saying what and why) and **Play again** (free on the day's round, "Play again
+  · AD" on any other); with all four scored it offers Done. In a round and on its result the corner button
+  is ← back to the list (`trainScreen`, a capture-phase handler before `closeSheets`; the phone's back
+  button does the same in `backPressed`); on the list it is ✕. **The round marks
   are paintings** (`trainIcon`, `.aa-train-art--r/f/g/e`): a canvas with a piece gone, the original beside a
   recoloured copy, three on a wall, one detail through a lens, from picks of their own (salt `icon-<id>`) so
   nothing of the day's rounds is given away; the drawn line marks (`TRAIN_ICON`) stand in until the gallery

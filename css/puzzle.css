@@ -804,6 +804,7 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-train-got .aa-bi{ width:14px; height:14px; }
 .aa-train-card.is-free .aa-train-got{ background:linear-gradient(120deg, var(--accent2), color-mix(in srgb, var(--accent2) 62%, var(--accent))); color:#fff; box-shadow:0 2px 0 color-mix(in srgb, var(--accent2) 70%, #000); }
 .aa-train-card.is-done .aa-train-got{ background:color-mix(in srgb, var(--good) 14%, transparent); color:var(--good); }
+.aa-train-card.is-done.is-ad .aa-train-got{ background:transparent; color:var(--accent2); box-shadow:inset 0 0 0 1.5px color-mix(in srgb, var(--accent2) 40%, transparent); }
 .aa-train-card.is-ad .aa-train-got{ background:transparent; box-shadow:inset 0 0 0 1.5px color-mix(in srgb, var(--accent2) 40%, transparent); }
 /* the small line above a round's name: FREE TODAY, ✓ 100, FREE TOMORROW */
 .aa-train-tag{ display:block; margin-bottom:2px; font-size:11px; font-weight:900; letter-spacing:.9px; text-transform:uppercase; color:var(--muted); }
