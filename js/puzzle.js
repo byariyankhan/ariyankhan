@@ -2972,6 +2972,27 @@
       catch (err) { if (err.code === 'push_off') push.app = false; }
     }
     renderNotify();
+    if (store.get('welcomed')) void notifyFirstAsk();
+  }
+
+  /**
+   * The first time the app is opened, the phone is asked for notifications straight away: its own dialog,
+   * once, and not again -- what the phone answers is its answer, and the switch in Settings stays for
+   * changing it. Only in the app: a browser asked on a first visit is a browser that says no for good.
+   */
+  async function notifyFirstAsk() {
+    if (!appPush() || store.get('pushAsked')) return;
+    if (!push.checked) { await notifyInit(); if (store.get('pushAsked')) return; }
+    if (!push.app || push.on || push.granted === false) return;
+    store.set('pushAsked', Date.now());
+    try {
+      const r = await shell.ask('pushOn', 120000);
+      if (!r?.ok || !r.token) { if (r?.error === 'denied') push.granted = false; renderNotify(); return; }
+      push.granted = true;
+      await pushApi('token', { token: r.token, tz: TZ, reminder: remindOn() });
+      push.on = true; push.blocked = false; push.posted = r.token;
+    } catch { /* asked and not answered: the switch in Settings is still there */ }
+    renderNotify();
   }
 
   async function notifyToggleApp() {
@@ -4907,7 +4928,7 @@
   function showGate(then) {
     if (!el.gate) { then?.(); return; }
     el.gate.hidden = false;
-    el.accept.addEventListener('click', () => { store.set('welcomed', Date.now()); analyticsOn(); el.gate.hidden = true; showSplash(then); }, { once: true });
+    el.accept.addEventListener('click', () => { store.set('welcomed', Date.now()); analyticsOn(); el.gate.hidden = true; showSplash(then); if (shell.on) setTimeout(() => { void notifyFirstAsk(); }, 1500); }, { once: true });
     el.accept.focus({ preventScroll: true });
   }
   {

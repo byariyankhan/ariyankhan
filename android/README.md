@@ -389,3 +389,11 @@ In the order it is meant to arrive:
    three days or Play refunds them, and clawed back through the Voided Purchases API when somebody refunds a
    purchase they have already spent.
 3. **The two Firebase files** described above, without which the notifications built here reach nobody.
+
+## The APK beside the bundle
+
+The bundle workflow builds `assembleRelease` too and keeps it as `puzzle-<version>-<code>-apk`: the same
+code, signed with the same upload key, installable on a phone straight from the run for a try before the
+bundle goes to Play. It will not install over a copy Play installed (Play signs with its own key): uninstall
+that first, or try it on a phone that has none. Sign-in works in it because the upload key's SHA-1 is an
+Android OAuth client of the Cloud project.

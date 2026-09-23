@@ -180,7 +180,9 @@ jobs:
           PUZZLE_KEY_PASSWORD: ${{ secrets.PUZZLE_KEY_PASSWORD }}
           PUZZLE_VERSION_CODE: ${{ steps.ver.outputs.code }}
           PUZZLE_VERSION_NAME: ${{ github.event.inputs.version_name }}
-        run: ./gradlew --no-daemon bundleRelease
+        # The bundle is what Play takes; the APK, signed with the same upload key, is what a phone takes
+        # straight from here for a try before the upload. Both from one build.
+        run: ./gradlew --no-daemon bundleRelease assembleRelease
 
       # A bundle that is not signed, or is signed with the wrong key, looks fine until Play refuses it. Say so
       # here instead, where the run is still on screen.
@@ -203,6 +205,18 @@ jobs:
         with:
           name: puzzle-${{ github.event.inputs.version_name }}-${{ steps.ver.outputs.code }}
           path: android/app/build/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
+          retention-days: 30
+
+      # The same build as an installable APK, signed with the upload key: for a phone to try before the bundle
+      # goes to Play. It will not install over a copy Play installed (Play signs with its own key); uninstall
+      # that first, or use a phone that has none.
+      - name: Keep the APK too
+        if: ${{ !inputs.debug_apk && !inputs.check_signing }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: puzzle-${{ github.event.inputs.version_name }}-${{ steps.ver.outputs.code }}-apk
+          path: android/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 30
 

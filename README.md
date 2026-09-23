@@ -937,6 +937,12 @@ links.
   Settings; signed out, the settings mark.
 - **The dashboard asks one thing less:** no "How long" (a match is one board, `matchLen()` is 1; the
   server still plays longer ones), and the list under the tables is "Recently played".
+- **Every button is the brain's colour** (`.aa-btn`: the rose-to-coral gradient of Play & Discover, white
+  text), the table tiles (`.aa-stake`) carry the same rose in their wash and edge, and the dashboard header
+  is one row: the picture, the name, the gold to its right (`.aa-me-id`). "Get a free life" stays orange.
+- **The app asks for notifications on first open** (`notifyFirstAsk`): the phone's own dialog, once
+  (`pushAsked`), after the welcome is accepted; the answer is kept, and the switch in Settings stays.
+  Browsers are never asked unprompted.
 - **The evening nudge needs no account.** Notifications are offered signed out too (`renderNotify` no
   longer waits for `auth.user`); a token or subscription is posted with no user, with the device's own
   nudge answer (`remindOn()`, `reminder` in the post, `store 'remind'`), and the 7 pm sweep reaches those
