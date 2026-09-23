@@ -666,27 +666,66 @@ public final class MainActivity extends ComponentActivity {
             answer(reply, fail("refused"));
             return;
         }
+        String browser = null;
+        try { browser = CustomTabsClient.getPackageName(this, null); } catch (RuntimeException cannotAsk) { /* below */ }
+        if (browser == null || browser.equals(getPackageName())) browser = defaultBrowser();
+        if (browser != null) {
+            try {
+                CustomTabsIntent tab = new CustomTabsIntent.Builder().setShowTitle(false).build();
+                tab.intent.setPackage(browser);
+                tab.launchUrl(this, u);
+                answer(reply, ok("opened", true));
+                return;
+            } catch (RuntimeException notAsATab) {
+                // A browser with no Custom Tabs service still opens a plain link.
+                try {
+                    startActivity(new Intent(Intent.ACTION_VIEW, u).setPackage(browser).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+                    answer(reply, ok("opened", true));
+                    return;
+                } catch (RuntimeException notEvenThat) {
+                    // the chooser, below
+                }
+            }
+        }
+        // No browser could be named: let the phone offer whatever opens https, with this app left out of the
+        // list, or the link would come straight back to the WebView it is trying to leave.
         try {
-            String browser = CustomTabsClient.getPackageName(this, null);
-            if (browser == null) browser = defaultBrowser();
-            if (browser == null) { answer(reply, fail("no_browser")); return; }
-            CustomTabsIntent tab = new CustomTabsIntent.Builder().setShowTitle(false).build();
-            tab.intent.setPackage(browser);
-            tab.launchUrl(this, u);
+            Intent view = new Intent(Intent.ACTION_VIEW, u);
+            Intent chooser = Intent.createChooser(view, null);
+            if (Build.VERSION.SDK_INT >= 24) {
+                chooser.putExtra(Intent.EXTRA_EXCLUDE_COMPONENTS, new android.content.ComponentName[] { new android.content.ComponentName(this, MainActivity.class) });
+            }
+            startActivity(chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
             answer(reply, ok("opened", true));
         } catch (RuntimeException nothingOpens) {
             answer(reply, fail("no_browser"));
         }
     }
 
-    /** Whatever opens https on this phone, unless that is us. */
+    /**
+     * Whatever opens https on this phone, unless that is us: the default handler first, then any browser at
+     * all, Chrome preferred, because it is the one whose Custom Tabs behave the same everywhere.
+     */
     @Nullable
     private String defaultBrowser() {
-        Intent probe = new Intent(Intent.ACTION_VIEW, Uri.parse("https://example.com/"));
-        android.content.pm.ResolveInfo r = getPackageManager().resolveActivity(probe, PackageManager.MATCH_DEFAULT_ONLY);
-        if (r == null || r.activityInfo == null) return null;
-        String pkg = r.activityInfo.packageName;
-        return getPackageName().equals(pkg) ? null : pkg;
+        Intent probe = new Intent(Intent.ACTION_VIEW, Uri.parse("https://example.com/")).addCategory(Intent.CATEGORY_BROWSABLE);
+        PackageManager pm = getPackageManager();
+        try {
+            android.content.pm.ResolveInfo r = pm.resolveActivity(probe, PackageManager.MATCH_DEFAULT_ONLY);
+            if (r != null && r.activityInfo != null && !getPackageName().equals(r.activityInfo.packageName)
+                    && !"android".equals(r.activityInfo.packageName)) return r.activityInfo.packageName;
+            String any = null;
+            for (android.content.pm.ResolveInfo ri : pm.queryIntentActivities(probe, Build.VERSION.SDK_INT >= 23 ? PackageManager.MATCH_ALL : 0)) {
+                if (ri.activityInfo == null) continue;
+                String pkg = ri.activityInfo.packageName;
+                if (getPackageName().equals(pkg)) continue;
+                if ("com.android.chrome".equals(pkg)) return pkg;
+                if (any == null) any = pkg;
+            }
+            return any;
+        } catch (RuntimeException cannotAsk) {
+            return null;
+        }
     }
 
     /**

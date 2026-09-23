@@ -137,8 +137,8 @@ button works. Signed in there, the page posts the nonce to `POST /auth/handoff` 
 `#handoff=<code>`. The page trades code and nonce at `POST /auth/handoff/redeem` for a session of its own.
 A code is one account, five minutes, one use, and worth nothing without the nonce — which never left the
 app — so an app that hijacked the `puzzle:` scheme would hold a code it cannot spend. Nothing about how the
-app is signed matters to any of it. "Sign in in your browser instead" under the Google button is the same
-path, chosen by hand.
+app is signed matters to any of it. There is one button, "Continue with Google": the app's own way is tried
+first and the browser follows by itself when that fails; a second button only confused people.
 
 ## Digital Asset Links — what it is still for
 

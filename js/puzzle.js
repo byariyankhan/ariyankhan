@@ -56,6 +56,8 @@
     // cannot reach it. Absent on an old System WebView, where the feature does not exist — hence a function
     // and not a flag, because it appears as the page loads rather than before it.
     bridge: () => window.PuzzleShell || null,
+    // what the app said it can do, from its answer to hello: open (the browser, for a sign-in), push
+    caps: {},
     /**
      * Ask the app something and wait for its answer. One question at a time, which is all this is ever asked
      * for: signing in is modal, and nothing else uses the bridge yet. Every failure resolves rather than
@@ -3018,9 +3020,8 @@
       signInNote('Signing in is not in the app yet. Every board plays without an account, and the gold is waiting when it lands.');
       return;
     }
-    box.innerHTML = '<button type="button" class="aa-btn aa-btn--primary aa-signin-app" id="aaShellGoogle">Continue with Google</button><button type="button" class="aa-btn aa-btn--soft aa-btn--small aa-signin-web" id="aaShellWeb">Sign in in your browser instead</button>';
+    box.innerHTML = '<button type="button" class="aa-btn aa-btn--primary aa-signin-app" id="aaShellGoogle">Continue with Google</button>';
     $('#aaShellGoogle', box)?.addEventListener('click', shellSignIn);
-    $('#aaShellWeb', box)?.addEventListener('click', shellWebSignIn);
   }
 
   async function shellSignIn() {
@@ -3083,13 +3084,16 @@
     if (/^[A-Za-z0-9_-]{16,64}$/.test(n)) handoff.nonce = n;
   }
   const handoffNonce = () => { const b = new Uint8Array(24); crypto.getRandomValues(b); return btoa(String.fromCharCode(...b)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); };
-  /** In the app: open the browser to sign in there. */
+  /** In the app, once its own way has failed: the browser, by itself -- there is no button for this. */
   async function shellWebSignIn() {
     const nonce = handoffNonce();
     store.set('handoffNonce', nonce);
     signInNote('Opening your browser to sign in there. You will be brought straight back.');
-    const r = await shell.ask(`open ${location.origin}/puzzle/?handoff=${nonce}`, 4000);
-    if (!r?.ok) signInNote('Update Puzzle from Google Play, then sign in again: this version of the app cannot open the browser for it.');
+    const r = await shell.ask(`open ${location.origin}/puzzle/?handoff=${nonce}`, 8000);
+    if (r?.ok) return;
+    // An app from before this path has no `open`; the note says what to do. A newer one that could not
+    // find a browser says that instead.
+    signInNote(shell.caps.open ? 'No browser could be opened on this phone. Try again, or sign in at ariyankhan.com/puzzle.' : 'Update Puzzle from Google Play, then sign in again: this version of the app cannot open the browser for it.');
   }
   /** In the browser: signed in, so ask for the code and go back to the app. */
   async function handoffFinish() {
@@ -3387,7 +3391,10 @@
   async function notifyFirstAsk() {
     if (!appPush() || store.get('pushAsked') || !store.get('welcomed')) return;   // after Accept, not under it
     if (!push.checked) { await notifyInit(); if (store.get('pushAsked')) return; }
-    if (!push.app || push.on || push.granted === false) return;
+    // Not granted yet is the whole point of asking: on Android 13 and up a permission never asked for reads
+    // as not granted, the same as one refused. A refusal from an earlier install comes straight back from
+    // the phone, without a dialog, and the switch in Settings is still there.
+    if (!push.app || push.on) return;
     store.set('pushAsked', Date.now());
     try {
       const r = await shell.ask('pushOn', 120000);
@@ -5221,7 +5228,7 @@
     if (!b || b === shellWired) return;
     try { b.addEventListener('message', e => { let d; try { d = JSON.parse(e.data); } catch { return; } if (d && d.event === 'back') backPressed(); }); } catch { return; }
     shellWired = b;
-    shell.ask('hello', 4000);   // so the app holds a way to reach this page
+    shell.ask('hello', 4000).then(d => { if (d?.ok) shell.caps = d; });   // so the app holds a way to reach this page, and the page knows what the app can do
   }
   if (shell.on) { shellListen(); window.addEventListener('load', shellListen); setTimeout(() => { void notifyFirstAsk(); }, 400); }
   el.btnSound.addEventListener('click', () => { state.muted = !state.muted; store.set('muted', state.muted); renderSound(); if (!state.muted) SFX.shoot(); });
