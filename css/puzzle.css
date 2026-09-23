@@ -775,6 +775,19 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-train-ico2{ flex:none; display:inline-flex; align-items:center; justify-content:center; width:46px; height:46px; border-radius:15px; background:color-mix(in srgb, var(--accent2) 12%, transparent); }
 .aa-train-ico2 svg{ width:26px; height:26px; fill:none; stroke:var(--accent2); stroke-width:1.9; stroke-linecap:round; stroke-linejoin:round; }
 .aa-train-ico2--big{ width:72px; height:72px; border-radius:22px; margin:6px auto 12px; }
+/* the marks made of paintings: a canvas with a piece gone, original and copy, three on a wall, a lens */
+.aa-train-art{ position:relative; overflow:hidden; width:54px; height:54px; border-radius:16px; background:var(--bg2); }
+.aa-train-art i{ display:block; background:var(--bg2) center/cover no-repeat; }
+.aa-train-art--r i, .aa-train-art--e i{ width:100%; height:100%; }
+.aa-train-art--r::after{ content:""; position:absolute; inset:0; background:linear-gradient(var(--card), var(--card)) 33.3% 0/2px 100% no-repeat, linear-gradient(var(--card), var(--card)) 66.6% 0/2px 100% no-repeat, linear-gradient(var(--card), var(--card)) 0 33.3%/100% 2px no-repeat, linear-gradient(var(--card), var(--card)) 0 66.6%/100% 2px no-repeat, linear-gradient(var(--card), var(--card)) 100% 100%/33% 33% no-repeat; }
+.aa-train-art--f{ display:flex; gap:2px; }
+.aa-train-art--f i{ width:50%; height:100%; }
+.aa-train-art--f i + i{ filter:hue-rotate(50deg) saturate(1.2); }
+.aa-train-art--g{ display:flex; align-items:center; justify-content:center; gap:3px; }
+.aa-train-art--g i{ width:11px; height:15px; border-radius:2px; box-shadow:0 0 0 1px var(--card); }
+.aa-train-art--g i:nth-child(2){ height:21px; width:13px; }
+.aa-train-art--e i{ background-size:260%; }
+.aa-train-art--e::after{ content:""; position:absolute; inset:9px; border-radius:50%; box-shadow:0 0 0 2px #fff, 0 0 0 60px rgba(255,255,255,.5); }
 .aa-train-ico2--big svg{ width:40px; height:40px; }
 .aa-train-how{ margin:0 0 18px; padding:0 0 0 22px; text-align:left; font-size:15px; line-height:1.45; color:var(--ink); }
 .aa-train-how li{ margin:0 0 8px; padding-left:4px; }
