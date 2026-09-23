@@ -233,7 +233,7 @@ function cleanTrainDay(raw: unknown): Rec | undefined {
       const o: Rec = {};
       for (const [x, v] of Object.entries(m)) {
         if (Object.keys(o).length >= MAX_SERIALS) break;
-        const when = num(v, 1, EPOCH_MAX); if (/^\d{1,4}$/.test(x) && when !== undefined) o[x] = Math.floor(when);
+        const when = num(v, 1, EPOCH_MAX); if (/^(0|[1-9]\d{0,3})$/.test(x) && when !== undefined) o[x] = Math.floor(when);
       }
       if (Object.keys(o).length) cl[id] = o;
     }
@@ -256,7 +256,10 @@ function mergeTrainDay(a: Rec | undefined, b: Rec | undefined): Rec | undefined 
   for (const id of TRAIN_IDS) {
     const o: Record<string, number> = { ...((ca[id] as Record<string, number> | undefined) ?? {}) };
     for (const [x, v] of Object.entries((cb[id] as Record<string, number> | undefined) ?? {})) o[x] = x in o ? Math.min(o[x]!, v) : v;
-    if (Object.keys(o).length) cl[id] = o;
+    // the lowest MAX_SERIALS, as cleanTrainDay keeps: the union of two capped maps can pass the cap, and "the
+    // lowest k of the union" stays commutative and idempotent where "whatever came first" would not
+    const keep = Object.keys(o).sort((m, n) => Number(m) - Number(n)).slice(0, MAX_SERIALS);
+    if (keep.length) cl[id] = Object.fromEntries(keep.map(x => [x, o[x]!]));
   }
   if (Object.keys(cl).length) out.cl = cl;
   return out;

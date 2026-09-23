@@ -198,8 +198,12 @@ section('Training puzzles finished on two devices are all on the account, each w
   same(ab.train[today].cl, { r: { '0': 1000, '1': 2000 }, f: { '0': 1500 } }, 'the union of both, the earliest time of a puzzle both finished');
   same(ab, ba, 'in either order');
   same(combineState(ab, a), ab, 'and again changes nothing');
-  const dirty = cleanState({ train: { [today]: { cl: { r: { '0': 5, x: 9, '12345': 9, '2': -1 }, z: { '0': 5 } } } } }) as Record<string, any>;
-  same(dirty.train[today], { cl: { r: { '0': 5 } } }, 'a serial that is not a small number, a time that is not a time and a round that is not a round are dropped');
+  const dirty = cleanState({ train: { [today]: { cl: { r: { '0': 5, x: 9, '12345': 9, '007': 9, '2': -1 }, z: { '0': 5 } } } } }) as Record<string, any>;
+  same(dirty.train[today], { cl: { r: { '0': 5 } } }, 'a serial that is not a small number (or is written with a leading zero), a time that is not a time and a round that is not a round are dropped');
+  const many = (from: number) => Object.fromEntries(Array.from({ length: 200 }, (_, i) => [String(from + i), 1000 + i]));
+  const capped = combineState({ train: { [today]: { cl: { r: many(100) } } } }, { train: { [today]: { cl: { r: many(0) } } } }) as Record<string, any>;
+  eq(Object.keys(capped.train[today].cl.r).length, 200, 'the union of two full rounds keeps 200 puzzles');
+  ok('0' in capped.train[today].cl.r && !('250' in capped.train[today].cl.r), 'the lowest of them, whichever device pushed first');
   const p = await player('progClears');
   await mergeState(pool, p.id, a); await mergeState(pool, p.id, b);
   same(((await readState(pool, p.id)) as Record<string, any>).train?.[today]?.cl, { r: { '0': 1000, '1': 2000 }, f: { '0': 1500 } }, 'on the account as well');
