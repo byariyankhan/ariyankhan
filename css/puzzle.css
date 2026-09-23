@@ -164,9 +164,15 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 /* compact secondary actions under the map: daily board and the level list */
 /* the country picker gets a line of its own: squeezed beside the label it wrapped into five lines */
 .aa-row-label small{ display:block; font-size:12px; font-weight:600; color:var(--muted); }
-/* the licence credit, in Settings > About: a line of small print with its two links, not a row to tap */
-.aa-row--credit small{ line-height:1.5; margin-top:2px; }
-.aa-row--credit small a{ color:inherit; text-decoration:underline; text-underline-offset:3px; }
+/* Settings > About > Credits: a row like the others, the licence text opening under it when tapped.
+   (Not .aa-credit: that is the painting's credit on a training result, centred, with accent links.) */
+.aa-row + .aa-about-credit{ border-top:1px solid var(--bg2); }
+.aa-about-credit > summary{ list-style:none; cursor:pointer; }
+.aa-about-credit > summary::-webkit-details-marker{ display:none; }
+.aa-about-credit > summary .aa-row-chev{ transition:transform .2s; }
+.aa-about-credit[open] > summary .aa-row-chev{ transform:rotate(90deg); }
+.aa-about-credit-text{ margin:-6px 0 0; padding:0 0 16px 42px; font-size:13px; font-weight:700; line-height:1.55; color:var(--muted); text-align:left; }
+.aa-about-credit-text a{ color:inherit; text-decoration:underline; text-underline-offset:3px; }
 #aaHomeSheet{ z-index:51; }   /* opened from Settings, so it must paint over it */
 .aa-row-go{ color:var(--muted); font-size:24px; font-weight:900; line-height:1; padding-right:4px; }
 .aa-search{ font:inherit; font-weight:700; font-size:15px; color:var(--ink); background:var(--bg2); border:none; border-radius:14px; padding:12px 14px; width:100%; margin:0 0 12px; box-sizing:border-box; -webkit-appearance:none; appearance:none; }
