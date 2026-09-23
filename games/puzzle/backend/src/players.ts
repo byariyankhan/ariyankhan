@@ -49,7 +49,7 @@ export async function recentPlayers(sql: Sql, userId: number, limit = 24): Promi
     SELECT u.id, u.name, u.pic, MAX(m.created_at) AS last_at, COUNT(DISTINCT m.code) AS matches
       FROM mine
       JOIN match_players p ON p.code = mine.code AND p.user_id <> $1
-      JOIN matches m       ON m.code = mine.code
+      JOIN matches m       ON m.code = mine.code AND m.started_at IS NOT NULL
       JOIN users u         ON u.id = p.user_id
      WHERE p.user_id NOT IN (SELECT muted_id FROM mutes WHERE user_id = $1)
      GROUP BY u.id, u.name, u.pic
@@ -134,13 +134,16 @@ export async function mutedList(sql: Sql, userId: number): Promise<{ id: number;
  *
  * Only if they have shared a table before. An invitation is a notification on somebody else's screen, so the
  * right to send one has to be earned by something they took part in — and playing a match together is exactly
- * that. It also means no account list, no search by name, and nothing for a stranger to harvest.
+ * that. It also means no account list, no search by name, and nothing for a stranger to harvest. A match that
+ * never started -- a room somebody sat in for a minute and left, or one the sweeper voided -- is not a table
+ * shared, and gives nobody the right to ring a phone.
  */
 export async function havePlayedTogether(sql: Sql, a: number, b: number): Promise<boolean> {
   const r = await query<{ ok: boolean }>(sql, `
     SELECT EXISTS (
       SELECT 1 FROM match_players me
        JOIN match_players them ON them.code = me.code AND them.user_id = $2
+       JOIN matches m ON m.code = me.code AND m.started_at IS NOT NULL
       WHERE me.user_id = $1
     ) AS ok`, [a, b]);
   return !!r.rows[0]?.ok;

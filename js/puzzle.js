@@ -734,7 +734,7 @@
   // Every country faint; the tour countries outlined; cleared ones filled and numbered with their level;
   // the next level pulsing. Tap a country to play its level. Built by games/build-world-map.mjs.
   let MAP = null, mapPromise = null, mapDrawn = false;
-  const ART_VERSION = 2;   // games/data/art.json: the gallery, 146 paintings since September 2026
+  const ART_VERSION = 3;   // games/data/art.json: the gallery, 247 works, tagged by country and tradition, since September 2026
   function loadMap() {
     if (!mapPromise) mapPromise = fetch(`/games/data/world-map.json?v=${MAP_VERSION}`, { cache: 'force-cache' }).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }).then(m => { MAP = m; return m; }).catch(e => { mapPromise = null; throw e; });
     return mapPromise;
@@ -2075,19 +2075,33 @@
   // every round after it, and every replay, is an advertisement the player chooses (free where advertising is
   // off), the same as hints after the first. Each round also carries a long game: a 30-day and then a 90-day
   // challenge, counted in consecutive days that round was played (trainRun).
+  // Each round's icon is drawn, not an emoji: a line mark in the brain's colour, the same weight as the rest of
+  // the interface. `how` is the instruction card shown before the first go at a round, and behind the ? after.
+  const TRAIN_ICON = {
+    r: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2.5"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/></svg>',
+    f: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="6.5"/><path d="M15 15l6 6M7.5 10h5M10 7.5v5"/></svg>',
+    g: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="5" width="5.5" height="8" rx="1"/><rect x="9.25" y="3" width="5.5" height="10" rx="1"/><rect x="16" y="5" width="5.5" height="8" rx="1"/><path d="M4 20.5h16M12 13v7.5"/></svg>',
+    e: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12s3.5-6.5 9.5-6.5 9.5 6.5 9.5 6.5-3.5 6.5-9.5 6.5S2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></svg>',
+  };
   const TRAIN_ROUNDS = [
-    { id: 'r', name: 'Restore the Canvas', blurb: 'A painting in nine pieces. Put it back together.', ico: '\u{1F5BC}\uFE0F' },
-    { id: 'f', name: 'The Forgery', blurb: 'Three things are wrong in the copy. Find them.', ico: '\u{1F50D}' },
-    { id: 'g', name: 'Gallery Memory', blurb: 'Five paintings, five seconds. Rebuild the order.', ico: '\u{1F3A8}' },
-    { id: 'e', name: 'The Curator\u2019s Eye', blurb: 'One painting, then: which detail was in it?', ico: '\u{1F441}\uFE0F' },
+    { id: 'r', name: 'Restore the Canvas', blurb: 'A painting in nine pieces. Put it back together.', how: ['A painting is cut into nine pieces and the frame is empty.', 'Tap a piece in the tray, then tap the place it belongs. Tap a placed piece to take it out again.', 'Every piece home wins the round. Wrong tries and time over 90 seconds cost points.'] },
+    { id: 'f', name: 'The Forgery', blurb: 'Three things are wrong in the copy. Find them.', how: ['The original and a forged copy, side by side or one above the other.', 'Three patches of the copy are wrong: one is mirrored, one is recoloured, one is from elsewhere in the painting.', 'Tap them in the copy. A tap on nothing costs points; time over a minute does too.'] },
+    { id: 'g', name: 'Gallery Memory', blurb: 'Five paintings, five seconds. Rebuild the order.', how: ['Five paintings hang in a row, numbered, for five seconds.', 'Then the same five come back shuffled.', 'Tap them in the order they hung: first, second, third… A wrong tap costs points.'] },
+    { id: 'e', name: 'The Curator\u2019s Eye', blurb: 'One painting, then: which detail was in it?', how: ['One painting, for six seconds. Look at the corners as well as the middle.', 'Then, three times, four close-ups: one is from that painting, three are from others.', 'Tap the one that is from it. Each right answer is a third of the score.'] },
   ];
   // Hints: one a day for nothing, the rest for an advertisement the player chooses (adOffer('trainhint');
   // free where advertising is off). A hint costs ten points of the round it is used in.
   const TRAIN_FREE_HINTS = 1;
   const trainHintsLeft = () => Math.max(0, TRAIN_FREE_HINTS - (trainDay().h | 0));
-  // Rounds: one a day for nothing; the rest, and any replay, for an advertisement the player chooses.
-  const TRAIN_FREE_PLAYS = 1;
-  const trainPlaysLeft = () => Math.max(0, TRAIN_FREE_PLAYS - (trainDay().p | 0));
+  // Rounds: one a day for nothing -- two on the very first day, so a newcomer meets two rounds with their
+  // instructions before anything asks for an advertisement; the rest, and any replay, for an advertisement
+  // the player chooses.
+  function trainFirstDay() {
+    try { const me = STORE + trainKey(); for (const k of Object.keys(localStorage)) if (k.startsWith(STORE + 'train:') && k !== me) return false; } catch { /* no storage: treat as first */ }
+    return true;
+  }
+  const trainFreePlays = () => trainFirstDay() ? 2 : 1;
+  const trainPlaysLeft = () => Math.max(0, trainFreePlays() - (trainDay().p | 0));
   // The long game of a round: consecutive days it was played, ending today or, if today is not played yet,
   // yesterday. 30 days is the first challenge, 90 the second.
   const TRAIN_GOALS = [30, 90];
@@ -2150,11 +2164,11 @@
         <div class="aa-train-score"><b>${score == null ? '—' : score}</b><span>Brain Score${done ? '' : ' · so far'}</span></div>
         <div class="aa-train-week" role="img" aria-label="Last seven days">${bars}</div>
       </div>
-      <p class="aa-train-line">${done ? `Done for today. ${streak} day${streak === 1 ? '' : 's'} in a row.` : streak ? `${streak} day${streak === 1 ? '' : 's'} in a row · keep it going.` : 'Four rounds. Five minutes. Every day.'}</p>
-      <div class="aa-group aa-train-rounds">
-        ${TRAIN_ROUNDS.map(r => `<button type="button" class="aa-row aa-row--link aa-train-row" data-train="${r.id}"><span class="aa-row-ico">${r.ico}</span><span class="aa-row-label">${r.name}<small class="aa-row-sub">${r.blurb}</small><small class="aa-train-run">${runLine(r.id)}</small></span><span class="aa-train-got${typeof t[r.id] === 'number' ? ' is-done' : ''}">${playLabel(t, r.id)}</span></button>`).join('')}
+      <p class="aa-train-line"><span>${done ? `Done for today. ${streak} day${streak === 1 ? '' : 's'} in a row.` : streak ? `${streak} day${streak === 1 ? '' : 's'} in a row · keep it going.` : 'Four rounds. Five minutes. Every day.'}</span><button type="button" class="aa-train-info" data-train-about aria-label="How Daily Training works" aria-expanded="false">?</button></p>
+      <p class="aa-sheet-note aa-train-about" id="aaTrainAbout" hidden>Each round is scored out of 100; play it again and the better score stays. ${trainFirstDay() ? 'Your first two rounds today are free.' : 'The first round of the day is free.'} Every round after that, every replay, and every hint after the first is an advertisement you choose. Every round also keeps a 30-day and a 90-day challenge: consecutive days you played it.</p>
+      <div class="aa-train-rounds">
+        ${TRAIN_ROUNDS.map(r => `<button type="button" class="aa-train-card" data-train="${r.id}"><span class="aa-train-ico2">${TRAIN_ICON[r.id]}</span><span class="aa-row-label"><span class="aa-train-name">${r.name}</span><small class="aa-row-sub">${r.blurb}</small><small class="aa-train-run">${runLine(r.id)}</small></span><span class="aa-train-got${typeof t[r.id] === 'number' ? ' is-done' : ''}">${playLabel(t, r.id)}</span></button>`).join('')}
       </div>
-      <p class="aa-sheet-note">Each round is scored out of 100; play it again and the better score stays. The first round of the day is free. Every round after it, every replay, and every hint after the first is an advertisement you choose.</p>
       <div id="aaTrainGame" hidden></div>`;
   }
   el.trainBtn?.addEventListener('click', openTrain);
@@ -2164,6 +2178,12 @@
     if (e.target.closest('[data-train-back]')) { trainLeave(); renderTrain(); return; }
     const info = e.target.closest('[data-train-info]');
     if (info) { const c = $('.aa-art-credit', el.trainBody); if (c) { c.hidden = !c.hidden; info.setAttribute('aria-expanded', String(!c.hidden)); } return; }
+    const about = e.target.closest('[data-train-about]');
+    if (about) { const c = $('#aaTrainAbout', el.trainBody); if (c) { c.hidden = !c.hidden; about.setAttribute('aria-expanded', String(!c.hidden)); } return; }
+    const go = e.target.closest('[data-train-go]')?.dataset.trainGo;
+    if (go) { store.set('trainHow:' + go, 1); void trainPlay(go, true); return; }
+    if (e.target.closest('[data-train-how]')) { trainHowCard(); return; }
+    if (e.target.closest('[data-train-howclose]')) { $('.aa-train-howcard', el.trainBody)?.remove(); return; }
     if (e.target.closest('[data-train-hint]')) { void trainHint(); return; }
     const tile = e.target.closest('[data-tile]');
     if (tile && train.game?.kind === 'r') canvasTap(tile);
@@ -2176,7 +2196,7 @@
   });
   // The hint button of the round in hand: free once a day, then an advertisement the player chooses.
   const hintLabel = () => `\u{1F4A1} Hint${trainHintsLeft() > 0 ? '' : ads.on() ? ' \u00b7 AD' : ''}`;
-  const hintBtnHtml = () => `<button type="button" class="aa-train-hint" data-train-hint>${hintLabel()}</button>`;
+  const hintBtnHtml = () => `${howBtnHtml()}<button type="button" class="aa-train-hint" data-train-hint>${hintLabel()}</button>`;
   async function trainHint() {
     const g = train.game; if (!g || !g.hint || g.hintBusy) return;
     if (trainHintsLeft() > 0) {
@@ -2190,8 +2210,11 @@
   }
   // Play: the day's free round, or an advertisement first. The round counts as played when it starts, not
   // when it ends, so leaving one halfway is not a way round the limit.
-  async function trainPlay(id) {
+  async function trainPlay(id, seen = false) {
     if (train.busy || !TRAIN_ROUNDS.some(r => r.id === id)) return;
+    // The first time a round is opened, its instructions come first, on the full screen, and Start counts
+    // as the play. The same card is behind the ? in the round's own bar.
+    if (!seen && !store.get('trainHow:' + id)) { trainIntro(id); return; }
     if (trainPlaysLeft() <= 0) {
       train.busy = true;
       try { const got = await adOffer('trainplay', null, true); if (!got) return; }
@@ -2199,6 +2222,29 @@
     }
     const t = trainDay(); t.p = (t.p | 0) + 1; store.set(trainKey(), t);
     trainStart(id);
+  }
+  const howHtml = id => { const r = TRAIN_ROUNDS.find(x => x.id === id); return `<ol class="aa-train-how">${r.how.map(h => `<li>${h}</li>`).join('')}</ol>`; };
+  function trainIntro(id) {
+    if (!$('#aaTrainGame', el.trainBody)) renderTrain();
+    const box = $('#aaTrainGame', el.trainBody); if (!box) return;
+    const r = TRAIN_ROUNDS.find(x => x.id === id);
+    $$('.aa-train-top, .aa-train-line, .aa-train-about, .aa-train-rounds, .aa-sheet-note', el.trainBody).forEach(n => { n.hidden = true; });
+    box.hidden = false; trainScreen(true);
+    box.innerHTML = `<div class="aa-train-intro">
+      <span class="aa-train-ico2 aa-train-ico2--big">${TRAIN_ICON[id]}</span>
+      <p class="aa-card-kicker">How to play</p>
+      <h3>${r.name}</h3>
+      ${howHtml(id)}
+      <div class="aa-actions aa-actions--stack"><button type="button" class="aa-btn aa-btn--primary" data-train-go="${id}">Start${trainPlaysLeft() > 0 || !ads.on() ? '' : ' \u00b7 AD'}</button><button type="button" class="aa-btn aa-btn--soft" data-train-back>Back</button></div>
+    </div>`;
+  }
+  const howBtnHtml = () => '<button type="button" class="aa-train-info" data-train-how aria-label="How to play">?</button>';
+  function trainHowCard() {
+    const g = train.game; if (!g) return;
+    $('.aa-train-howcard', el.trainBody)?.remove();
+    const card = document.createElement('div'); card.className = 'aa-train-howcard';
+    card.innerHTML = `<div class="aa-train-howcard-in"><h3>${TRAIN_ROUNDS.find(x => x.id === g.kind).name}</h3>${howHtml(g.kind)}<button type="button" class="aa-btn aa-btn--primary" data-train-howclose>Got it</button></div>`;
+    $('#aaTrainGame', el.trainBody)?.appendChild(card);
   }
   function trainStart(id) {
     if (!$('#aaTrainGame', el.trainBody)) renderTrain();
@@ -2227,9 +2273,9 @@
   }
 
   // ── The gallery rounds: real paintings, public domain ──
-  // A hundred and forty-six works from The Metropolitan Museum of Art's Open Access collection (CC0), in games/data/art.json
+  // Two hundred and forty-seven works from The Metropolitan Museum of Art's Open Access collection (CC0), in games/data/art.json
   // with their titles, painters and dates, resized once and kept in images/art/. Every round names the work it
-  // used, so ten minutes of training is also ten minutes in a museum. The day's picks are the same for everybody.
+  // used, so ten minutes of training is also ten minutes in a museum. The day's picks depend on where the player is.
   let ART = null, artPromise = null;
   function loadArt() {
     if (ART) return Promise.resolve(ART);
@@ -2241,9 +2287,44 @@
     box.innerHTML = '<p class="aa-sheet-note">Opening the gallery…</p>';
     try { await loadArt(); return true; } catch { box.innerHTML = '<p class="aa-sheet-note">The gallery could not be loaded. Check the connection and try again.</p><div class="aa-actions aa-actions--stack"><button type="button" class="aa-btn aa-btn--soft" data-train-back>Back</button></div>'; return false; }
   }
+  // ── Which paintings, for whom ──
+  // The gallery starts where the player is, the way the tour does. Every work carries the country it comes
+  // from (`cc`) and the tradition it belongs to (`trad`: is = Islamic, hb = Hindu and Buddhist, ea = East
+  // Asian, we = European and American); a player's home country (the tour's) has a tradition of its own from
+  // the table below. Works are ranked: the home country's own first, then the home tradition's nearest first,
+  // then the rest of the continent, then everything else by distance. The first days draw from the top of that
+  // list and the window widens a little every training day, so a player in Dhaka begins with Mughal and Bengal
+  // and reaches Paris in a few weeks, and a player in Lyon the other way round. Days are still seeded: the same
+  // home country sees the same paintings on the same day.
+  const TRAD_OF = (() => {
+    const t = {};
+    for (const c of 'AF AL AZ BH BD BN DJ DZ EG GM GN ID IQ IR JO KM KW KG KZ LB LY MA ML MR MV MY NE OM PK PS QA SA SD SN SL SO SY TJ TM TN TR AE UZ XK YE TD TL EH'.split(' ')) t[c] = 'is';
+    for (const c of 'IN NP LK BT MM TH KH LA MU FJ'.split(' ')) t[c] = 'hb';
+    for (const c of 'CN JP KR KP TW VN MN HK MO SG'.split(' ')) t[c] = 'ea';
+    return t;
+  })();
+  const tradOf = cc => TRAD_OF[cc] || 'we';
+  function artRanked() {
+    const home = store.get('home', null) || '';
+    const H = DATA?.canon?.find(L => L.a2 === home);
+    if (!H) return ART.works.slice();
+    const ht = tradOf(home);
+    const at = cc => DATA.canon.find(L => L.a2 === cc);
+    const tier = w => w.cc === home ? 0 : tradOf(w.cc) === ht ? 1 : (at(w.cc)?.cont && at(w.cc).cont === H.cont) ? 2 : 3;
+    const km = w => { const C = at(w.cc); return C ? kmBetween(H.c, C.c) : 20000; };
+    return ART.works.map(w => ({ w, t: tier(w), d: km(w) })).sort((a, b) => a.t - b.t || a.d - b.d).map(x => x.w);
+  }
+  // how many training days this device has seen, today included: the window of the gallery open to it
+  function trainDays() {
+    let n = 0;
+    try { for (const k of Object.keys(localStorage)) if (k.startsWith(STORE + 'train:')) n++; } catch { /* none */ }
+    return Math.max(1, n);
+  }
   function artPicks(n, salt) {
-    const rnd = mulberry32(hashStr('aa-art-' + salt + '-' + dayKey()));
-    const pool = ART.works.slice();
+    const home = store.get('home', null) || '';
+    const rnd = mulberry32(hashStr('aa-art-' + salt + '-' + home + '-' + dayKey()));
+    const ranked = artRanked();
+    const pool = ranked.slice(0, Math.min(ranked.length, Math.max(n + 9, 14 + 7 * (trainDays() - 1))));
     for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
     return pool.slice(0, n);
   }
@@ -3103,8 +3184,14 @@
     if (!auth.user) return;
     // A browser the app opened only to sign in hands the account back to the app now, and plays nothing.
     if (handoff.nonce) { await handoffFinish(); return; }
-    if (state.pendingCode) { const c = state.pendingCode; state.pendingCode = null; openMatchLink(c); }
-    else { await authLoad(true); if (!resumeLive()) openStakes(); }
+    // The socket, the invitations and the purse come up whichever way the sign-in came: straight from the
+    // sheet, or from a challenge link that asked for it first. The link is kept in storage as well as in
+    // memory, because the app's browser sign-in comes back as a fresh page.
+    await authLoad(true);
+    const pend = state.pendingCode || pendingLink();
+    state.pendingCode = null; store.set('pendingCode', null);
+    if (pend) openMatchLink(pend);
+    else if (!resumeLive()) openStakes();
     toast(fresh ? `Welcome, ${auth.user.name}. ${Number(auth.user.gold || 0).toLocaleString('en-US')} gold to start you off.` : `Signed in as ${auth.user.name}`, 'good', fresh ? 5000 : 2800);
     if (typeof gtag === 'function') gtag('event', 'login', { method, game: 'puzzle' });
   }
@@ -3690,8 +3777,12 @@
     // a player on a network that blocks WebSockets should not spend their match reconnecting.
     fallback() {
       clearTimeout(this.retry);
-      if ((!this.code && !this.hold) || this.tries >= 4) return;
-      const wait = Math.min(8000, 500 * 2 ** this.tries++);
+      // A room's socket gives up after four tries (the poll carries the room); the lobby's, held open for
+      // invitations, keeps trying at a slower and slower pace -- a deploy or a tunnel must not leave a player
+      // unreachable for the rest of the session.
+      if (!this.code && !this.hold) return;
+      if (this.code && this.tries >= 4) return;
+      const wait = Math.min(this.hold && !this.code ? 30000 : 8000, 500 * 2 ** Math.min(this.tries++, 8));
       this.retry = setTimeout(() => this.open(), wait);
     },
 
@@ -3842,6 +3933,10 @@
         : err.code === 'in_a_match' ? `${name} is on a board right now. Try again when they are done.`
         : err.code === 'taken' ? 'That room has already started.'
         : err.code === 'already_in' ? `${name} is already in this room.`
+        : err.code === 'room_full' ? 'The room is full.'
+        : err.code === 'rate_limited' ? `${name} was asked a moment ago. Give it a minute.`
+        : err.code === 'try_later' ? 'Invitations are paused for a moment. Try again shortly.'
+        : err.code === 'not_yours' ? 'Only somebody in the room can invite into it.'
         : 'Could not send that invitation.', 'bad', 4200);
       return false;
     }
@@ -3867,7 +3962,7 @@
     // a challenge appearing under a thumb already on its way to a button is how somebody ends up in a match
     // they never chose. It is kept instead, and offered when they are back in the lobby.
     if (state.daily?.race) { state.inviteWaiting = { ...d, at: Date.now() }; toast(`${d.from || 'Somebody'} is challenging you. Finish here first.`, 'hint', 4000); return; }
-    if (state.pendingMatch?.code === d.code) return;            // already looking at this room
+    if (state.pendingMatch?.code === d.code || state.invite?.code === d.code) return;   // already looking at this room
     try {
       const r = await matchApi('get', { code: d.code });
       if (!r.match || r.match.state !== 'open') return;
@@ -4121,7 +4216,10 @@
       <p class="aa-flash" hidden></p>`;
     openSheet(el.matchSheet);
     wireFaces(el.matchBody);
-    state.pendingMatch = m;
+    // Kept apart from pendingMatch: that is the room this player may be sitting in, and its poll writes it
+    // back every few seconds. An invitation that shared the slot was overwritten mid-sheet, so Confirm joined
+    // the player's own room and Mute muted nobody.
+    state.invite = m;
   }
 
   // ── Muting ──
@@ -4380,7 +4478,9 @@
     adOffer('gold');
   });
 
-  const goldError = e => e.code === 'not_enough_gold' ? 'You do not have that much gold.' : e.code === 'taken' ? 'Someone already took that match.' : e.code === 'own_match' ? 'That is your own invitation.' : e.code === 'signed_out' ? 'Please sign in again.' : 'Something went wrong. Please try again.';
+  const goldError = e => e.code === 'not_enough_gold' ? 'You do not have that much gold.' : e.code === 'taken' ? 'Someone already took that match.' : e.code === 'own_match' ? 'That is your own invitation.' : e.code === 'signed_out' ? 'Please sign in again.' : e.code === 'room_full' ? 'That room is already full.' : e.code === 'no_match' ? 'That room is gone.' : e.code === 'rate_limited' ? 'Too many at once. Give it a minute.' : 'Something went wrong. Please try again.';
+  // a challenge link kept while signing in: good for an hour, and only the shape a link has
+  const pendingLink = () => { const p = store.get('pendingCode', null); return p && typeof p === 'object' && /^[A-Za-z0-9]{4,12}$/.test(p.code || '') && Date.now() - (p.at || 0) < 3600e3 ? p.code : ''; };
 
   el.matchBody?.addEventListener('change', e => {
     if (e.target.id !== 'aaFillOnline') return;
@@ -4409,7 +4509,9 @@
     if (stake) {
       const btn = e.target.closest('[data-stake]'); btn.disabled = true;
       try {
-        const d = await matchApi('create', { stake: +stake, tier: TIER_OF(), open_to_all: fillOn(), boards: matchLen() });
+        // People picked on the dashboard are invited into a room of their own: a public room can be walked into
+        // by a stranger, moved or voided within minutes, and the phone that rang would find nothing there.
+        const d = await matchApi('create', { stake: +stake, tier: TIER_OF(), open_to_all: picks.size ? false : fillOn(), boards: matchLen() });
         setGold(d.gold);
         showRoom(d.match);
         // People were picked on the dashboard before the table was: now there is a room to point them at.
@@ -4435,17 +4537,24 @@
       return;
     }
     if (!act) return;
-    const m = state.pendingMatch;
+    const m = state.invite;
     if (act === 'stakes') openFriends();
     else if (act === 'mute') muteHost(m);
-    else if (act === 'close') { closeSheets(); if (state.daily?.race && state.finished) goToLevels(); }
+    else if (act === 'close') { state.invite = null; closeSheets(); if (state.daily?.race && state.finished) goToLevels(); }
     else if (act === 'join' && m) {
       const btn = e.target.closest('[data-mact]'); btn.disabled = true;
-      try { const d = await matchApi('join', { code: m.code, tier: TIER_OF() }); setGold(d.gold); showRoom(d.match); }
+      try { const d = await matchApi('join', { code: m.code, tier: TIER_OF() }); state.invite = null; setGold(d.gold); showRoom(d.match); }
       catch (err) {
         btn.disabled = false;
         if (typeof err.gold === 'number') setGold(err.gold);
-        if (err.code === 'in_match' && err.matchCode) { toast('You are already in a match. Here it is.', 'hint', 4000); openMatchLink(err.matchCode); }
+        if (err.code === 'in_match' && err.matchCode && err.matchCode !== m.code && state.pendingMatch?.state === 'open') {
+          // Sitting in a room of their own that has not started: one tap to leave it for this one.
+          const yes = await ask({ title: 'Leave your room?', body: `You are waiting in another room. Leave it and join ${m.host}'s?`, ok: 'Leave and join', cancel: 'Stay' });
+          if (!yes) return;
+          try { await matchApi('cancel', { code: err.matchCode }); const d = await matchApi('join', { code: m.code, tier: TIER_OF() }); state.invite = null; setGold(d.gold); showRoom(d.match); }
+          catch (e2) { toast(goldError(e2), 'bad'); }
+        }
+        else if (err.code === 'in_match' && err.matchCode) { toast('You are already in a match. Here it is.', 'hint', 4000); openMatchLink(err.matchCode); }
         else if (err.code === 'not_enough_gold' && ads.on() && auth.user) adOffer('gold', 'Not enough gold for that table. Watch a short advertisement through and some is added to your purse.');
         else toast(goldError(err), 'bad');
       }
@@ -4504,7 +4613,7 @@
       const m = d.match;
       if (typeof d.gold === 'number') setGold(d.gold);
       if (state.daily?.race && state.daily.match?.code === code) return;   // already on this board: leave it alone
-      if (!auth.user) { state.pendingCode = code; openSignIn(`${m.host} put ${gfmt(m.stake)} gold on a board for you. Sign in to take the challenge.`); return; }
+      if (!auth.user) { state.pendingCode = code; store.set('pendingCode', { code, at: Date.now() }); openSignIn(`${m.host} put ${gfmt(m.stake)} gold on a board for you. Sign in to take the challenge.`); return; }
       if (m.you && m.state === 'playing') { if (m.your_ms == null && m.board) playMatch(m); else showMatchState(m); return; }
       if (m.you && m.state === 'done') { showMatchState(m); return; }
       if (m.state === 'void') { toast('That invitation was called off.', 'hint', 4000); return; }
