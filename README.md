@@ -999,7 +999,7 @@ links.
   scrolls, and a hundred Mughal, Deccani, Bengal, Rajput, Pahari, Jain, Persian, Ottoman, Tibetan, Nepalese
   and Burmese works, so the gallery has something near for most of the world, listed with title, painter, date and source in `games/data/art.json` (fetched once,
   `ART_VERSION`, `loadArt`) and kept resized (≤ 800 px, ~13 MB in all, fetched a painting at a time) in `images/art/`, cached forever by
-  the worker. The day's works are the same for everybody (`artPicks`, seeded by the day). **Restore the
+  the worker. The day's works are the same for everybody (`artPicks`, seeded by the day). Every round fits the screen (`trainFit`, run when a round draws and on resize): what a round draws under its line gets the room left below it, read from the layout (offsets up to the sheet, the panel's bottom padding, and a further safe strip, `TRAIN_SAFE`, 24 px, for a gesture bar or a toolbar coming back), and the paintings are as big as that room allows and no bigger, so both halves of the Forgery, the whole frame with its tray (the tray takes five to ten columns, whichever leaves the frame widest, then the pieces biggest, with a 30 px floor under a piece and 36 px under a place in the frame: where even that leaves no room for the whole frame the frame gives way, not the pieces, and on the shortest screens the tray's last row scrolls), the Curator's painting and then its four details are on the glass together, nothing to scroll for. **Restore the
   Canvas** (`canvasStart`) cuts one painting into pieces (`.aa-art-tile`, the picture as a background
   at n × 100 %): the painting hangs whole in the frame for four seconds (`CANVAS_LOOK`, a countdown in the
   bar, no dragging, the coach's first step), then it comes apart and the pieces tumble into the tray
@@ -1007,8 +1007,8 @@ links.
   another with a small tumble, `SFX.scatter`, nothing under reduced motion) and the clock starts; drag each
   piece home; scored on wrong tries and time over the allowance. **The Forgery**
   (`forgeryStart`) shows the painting and a copy with patches wrong in it (`artPatch`: mirrored,
-  recoloured, taken from elsewhere in the same work, cycling); tap them in the copy, beside the original for a tall
-  work and under it for a wide one. **Gallery Memory**
+  recoloured, taken from elsewhere in the same work, cycling); tap them in the copy, under the original or beside it,
+  whichever leaves the two bigger on that screen (`trainFit` decides and the line says which). **Gallery Memory**
   (`galleryStart`) hangs the paintings numbered for a few seconds, takes them down (the same `trainFly`
   flight, each painting falling from where it hung to where it lands in the tray, `SFX.scatter`), and deals
   them into a tray: the player **drags each one back to its number** (`galleryDragWire`, `galleryDrop`, `galleryDraw`,

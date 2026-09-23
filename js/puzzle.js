@@ -2370,6 +2370,71 @@
     Object.assign(tcoach, { on: false, id: '', step: 0, box: null });
   }
   window.addEventListener('resize', () => { if (tcoach.on) trainCoachPlace(); });
+  // A round fits the screen. Whatever a round draws under its line gets the room left below it and no more:
+  // the paintings are as big as that room allows and no bigger, so both halves of the Forgery, the whole frame
+  // with its tray, the Curator's painting and then its four details are on the glass together, nothing to
+  // scroll for. The room is read from the layout (offsets up to the sheet, the panel's bottom padding), not
+  // from the viewport, so it holds on a turned phone too; and it is read again whenever the window changes.
+  // a clear strip kept under the last painting on top of the panel's own padding: a phone's gesture bar, a
+  // browser's toolbar coming back, a line that wraps one more time -- none of them reaches the art
+  const TRAIN_SAFE = 24;
+  function trainFit() {
+    const g = train.game, box = $('#aaTrainGame', el.trainBody), sheet = el.trainSheet; if (!g || !box || !sheet) return;
+    const panel = $('.aa-sheet-panel', sheet);
+    const room = first => {
+      let top = 0; for (let n = first; n && n !== sheet; n = n.offsetParent) top += n.offsetTop;
+      const pad = panel ? parseFloat(getComputedStyle(panel).paddingBottom) || 0 : 0;
+      return Math.max(220, sheet.clientHeight - top - pad - TRAIN_SAFE);
+    };
+    const px = (node, w, full) => { if (node) node.style.width = w < full - 0.5 ? `${w.toFixed(1)}px` : ''; };
+    const q = g.w ? g.w.w / g.w.h : 1;   // the painting's width over its height
+    if (g.kind === 'f') {
+      // the copy goes under the original or beside it, whichever leaves the two bigger on this screen: under
+      // it on a tall phone even for a tall work, beside it where the room is short; the line says which
+      const pair = $('.aa-forge-pair', box); if (!pair) return;
+      const W = pair.clientWidth, colW = (W - 10) / 2;
+      let r = room(pair);
+      const side = Math.min(colW, r * q) > Math.min(W, (r - 10) / 2 * q);
+      pair.classList.toggle('is-side', side);
+      const where = $('#aaForgeWhere', box); if (where) where.textContent = side ? 'beside' : 'below';
+      r = room(pair);   // the line may have rewrapped
+      $$('.aa-art', pair).forEach(a => px(a, side ? Math.min(colW, r * q) : Math.min(W, (r - 10) / 2 * q), side ? colW : W));
+    } else if (g.kind === 'r') {
+      const slots = $('#aaCanvasSlots', box), tray = $('#aaCanvasTray', box); if (!slots || !tray) return;
+      // measured under the line the round will carry once the pieces are down, which is the longer one
+      const line = $('#aaCanvasLine', box), look = g.phase === 'show' ? line?.textContent : null;
+      if (look != null && line) line.textContent = CANVAS_PLAY_LINE;
+      const W = box.clientWidth, r = room(slots), N = g.n * g.n, MIN = 30, FMIN = Math.min(W, g.n * 36 + (g.n - 1) * 2 + 4);   // a place under 36 px is too small to drop on
+      if (look != null && line) line.textContent = look;
+      // the frame first: as wide as the box whenever the tray under it can be made to fit, the tray taking as
+      // many columns as that needs (five to ten) with pieces as big as the columns then allow; where even
+      // thumb-sized pieces (MIN wide) leave no room for the whole frame, the frame gives way and the pieces
+      // do not, since a piece too small to take is a piece that cannot be played; nor does the frame go below
+      // places a finger can drop on (FMIN) -- on the shortest screens the tray's last row may then need a scroll
+      let best = null;
+      for (let c = 5; c <= 10; c++) {
+        const rows = Math.ceil(N / c), pwFull = (W - (c - 1) * 6) / c; if (pwFull < MIN) break;
+        const pwMax = ((r - 12 - W / q - (rows - 1) * 6) / rows) * q;   // the widest piece that still leaves the frame the whole width
+        const pw = Math.max(MIN, Math.min(pwFull, pwMax));
+        const wb = Math.max(FMIN, Math.min(W, (r - 12 - rows * pw / q - (rows - 1) * 6) * q)), wt = pw * c + (c - 1) * 6;
+        // the widest frame; then the biggest pieces; then the fewest rows and the fewest columns, a tray in shape
+        if (!best || wb > best.wb + 0.5 || (wb > best.wb - 0.5 && (pw > best.pw + 0.5 || (pw > best.pw - 0.5 && rows < best.rows)))) best = { c, pw, wb, wt, rows };
+      }
+      if (!best) return;
+      px(slots, best.wb, W); px(tray, best.wt, W);
+      tray.style.gridTemplateColumns = `repeat(${best.c}, 1fr)`;
+    } else if (g.kind === 'e') {
+      const art = $('#aaCurator > .aa-art', box), opts = $('.aa-curator-opts', box), W = box.clientWidth;
+      if (art) px(art, Math.min(W, room(art) * q), W);
+      if (opts) px(opts, Math.min(W, room(opts)), W);
+    }
+  }
+  // Fitted again when the window changes -- a frame later, once the turn handler at the foot of the file has
+  // had its say, since a turned page is another shape -- and once the fonts are in, a line measured before
+  // its font came being a line shorter. The coach's spotlight follows whatever moved.
+  function trainRefit() { if (!train.game) return; trainFit(); if (tcoach.on) trainCoachPlace(); }
+  window.addEventListener('resize', () => requestAnimationFrame(trainRefit));
+  document.fonts?.ready?.then?.(trainRefit);
   function trainHowCard() {
     const g = train.game; if (!g) return;
     $('.aa-train-howcard', el.trainBody)?.remove();
@@ -2486,6 +2551,7 @@
       <p class="aa-train-sub" id="aaCanvasLine">Look at the painting. Remember where things are.</p>
       <div class="aa-art-slots" id="aaCanvasSlots" style="aspect-ratio:${w.w}/${w.h};grid-template-columns:repeat(${n}, 1fr)">${tray.map((_, i) => `<button type="button" class="aa-art-slot" data-slot="${i}" aria-label="Place ${i + 1}"><span class="aa-art-piece is-placed" data-tile="${i}">${tile(i)}</span></button>`).join('')}</div>
       <div class="aa-art-tray" id="aaCanvasTray">${tray.map(i => `<button type="button" class="aa-art-piece" data-tile="${i}" aria-label="Piece" style="aspect-ratio:${w.w}/${w.h}" hidden>${tile(i)}</button>`).join('')}</div>`;
+    trainFit();
     const showUntil = performance.now() + CANVAS_LOOK * 1000;
     train.timer = setInterval(() => {
       const g = train.game; if (!g || g.kind !== 'r') return; const t = $('#aaCanvasTime', box);
@@ -2496,12 +2562,13 @@
     trainCoachStart('r');
   }
   const CANVAS_LOOK = 4;   // seconds the painting hangs whole before it comes apart
+  const CANVAS_PLAY_LINE = 'Drag each piece to where it belongs. Drag one out to take it back.';
   function canvasScatter(box) {
     const g = train.game; if (!g || g.kind !== 'r' || g.phase !== 'show') return;
     const from = new Map($$('#aaCanvasSlots .aa-art-piece', box).map(p => [+p.dataset.tile, p.getBoundingClientRect()]));
     g.phase = 'play'; g.t0 = performance.now();
     canvasDraw();   // the frame empties, the tray fills; each piece then flies from where it hung to where it lies
-    const line = $('#aaCanvasLine', box); if (line) line.textContent = 'Drag each piece to where it belongs. Drag one out to take it back.';
+    const line = $('#aaCanvasLine', box); if (line) line.textContent = CANVAS_PLAY_LINE;
     const t = $('#aaCanvasTime', box); if (t) t.textContent = '0:00';
     SFX.scatter(); vibe(15);
     trainFly($$('#aaCanvasTray .aa-art-piece:not([hidden])', box).map(el => ({ el, from: from.get(+el.dataset.tile) })), { tumble: 12 }).then(() => { if (train.game === g) trainCoachEvent('play'); });
@@ -2614,8 +2681,9 @@
       const g = train.game; if (!g) return; const k = g.lies.findIndex((_, i) => !g.found.has(i)); if (k < 0) return; forgeryFound(k, true);
     } };
     box.innerHTML = `<div class="aa-train-hud"><span>The Forgery ${levelChip('f')}</span><span id="aaForgeLeft">${nLies} to find</span><span id="aaForgeTime">0:00</span>${hintBtnHtml()}</div>
-      <p class="aa-train-sub">${['Three', 'Four', 'Five'][nLies - 3]} things are wrong in the copy ${w.h > w.w ? 'beside' : 'below'} the original. Tap them there.</p>
+      <p class="aa-train-sub">${['Three', 'Four', 'Five'][nLies - 3]} things are wrong in the copy <span id="aaForgeWhere">${w.h > w.w ? 'beside' : 'below'}</span> the original. Tap them there.</p>
       <div class="aa-forge-pair${w.h > w.w ? ' is-side' : ''}">${artFrame(w, 'aa-forge-orig')}${artFrame(w, 'aa-forge-copy', patches, 'id="aaForgeCopy" role="img" aria-label="The copy"')}</div>`;
+    trainFit();
     $('#aaForgeCopy', box)?.addEventListener('click', e => {
       const g = train.game; if (!g || g.kind !== 'f') return;
       const lie = e.target.closest('[data-lie]');
@@ -2713,13 +2781,14 @@
     });
     train.game = { kind: 'e', w, s, ask, q: 0, right: 0, phase: 'show', hint() {
       // one more look, a short one
-      const g = train.game; if (!g || g.phase !== 'ask' || g.peeked) return; g.peeked = true;
+      const g = train.game; if (!g || g.phase !== 'ask' || g.peeked || g.lock) return; g.peeked = true;
       const box2 = $('#aaCurator', el.trainBody); if (!box2) return;
-      const keep = box2.innerHTML; box2.innerHTML = artFrame(g.w, 'is-peek'); setTimeout(() => { if (train.game === g) box2.innerHTML = keep; }, 1500);
+      const keep = box2.innerHTML; box2.innerHTML = artFrame(g.w, 'is-peek'); trainFit(); setTimeout(() => { if (train.game === g) { box2.innerHTML = keep; trainFit(); } }, 1500);
     } };
     box.innerHTML = `<div class="aa-train-hud"><span>The Curator’s Eye ${levelChip('e')}</span><span id="aaCuratorTime">${secs}</span>${hintBtnHtml()}</div>
       <p class="aa-train-sub" id="aaCuratorLine">Look closely. You will be asked about the details.</p>
       <div id="aaCurator">${artFrame(w)}</div>`;
+    trainFit();
     let left = secs;
     train.timer = setInterval(() => {
       const g = train.game; if (!g || g.kind !== 'e' || g.phase !== 'show') return;
@@ -2734,6 +2803,7 @@
     const t = $('#aaCuratorTime', el.trainBody); if (t) t.textContent = `${g.q + 1} of ${g.ask.length}`;
     const line = $('#aaCuratorLine', el.trainBody); if (line) line.textContent = 'Which detail is from the painting you saw?';
     box.innerHTML = `<div class="aa-curator-opts">${opts.map((o, i) => `<button type="button" class="aa-curator-opt" data-detail="${i}" aria-label="Detail ${i + 1}">${artPatch(o.w, o.px, o.py, g.s)}</button>`).join('')}</div>`;
+    trainFit();
   }
   function curatorAnswer(i) {
     const g = train.game; if (!g || g.phase !== 'ask' || g.lock) return;
@@ -5688,6 +5758,7 @@
     r.toggle('is-turned', turn.dir !== 0);
     r.toggle('is-turned-ccw', turn.dir === -90);
     r.toggle('is-turned-cw', turn.dir === 90);
+    trainRefit();   // a round in hand is fitted to the page's new shape
   }
   sideways.addEventListener?.('change', onTurn);
   screen.orientation?.addEventListener?.('change', onTurn);

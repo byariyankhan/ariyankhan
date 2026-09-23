@@ -847,11 +847,12 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-train-hud .aa-train-hint{ margin-left:auto; border:none; background:color-mix(in srgb, var(--accent2) 12%, transparent); color:var(--accent2); font:inherit; font-size:13px; font-weight:900; padding:6px 10px; border-radius:12px; cursor:pointer; }
 .aa-train-hud .aa-train-hint:active{ transform:scale(.96); }
 /* the gallery rounds: real paintings, each drawn as a background so a piece, a patch or a whole work is one box */
-.aa-art{ display:block; width:100%; border-radius:14px; background:var(--bg2) center/cover no-repeat; overflow:hidden; }
+/* what a round draws is sized to the room under its line (trainFit sets the widths); what it shrinks sits centred */
+.aa-art{ display:block; width:100%; margin:0 auto; border-radius:14px; background:var(--bg2) center/cover no-repeat; overflow:hidden; }
 .aa-art-patch{ display:block; width:100%; height:100%; background-repeat:no-repeat; }
-.aa-art-slots{ display:grid; grid-template-columns:repeat(3, 1fr); grid-auto-rows:1fr; gap:2px; margin:0 0 12px; padding:2px; background:var(--bg2); border-radius:14px; width:100%; }
+.aa-art-slots{ display:grid; grid-template-columns:repeat(3, 1fr); grid-auto-rows:1fr; gap:2px; margin:0 auto 12px; padding:2px; background:var(--bg2); border-radius:14px; width:100%; }
 .aa-art-slot{ min-width:0; min-height:0; padding:0; border:2px dashed color-mix(in srgb, var(--muted) 35%, transparent); border-radius:6px; background:var(--card); cursor:pointer; overflow:hidden; }
-.aa-art-tray{ display:grid; grid-template-columns:repeat(5, 1fr); gap:6px; }
+.aa-art-tray{ display:grid; grid-template-columns:repeat(5, 1fr); gap:6px; margin:0 auto; }
 .aa-art-piece{ display:block; width:100%; padding:0; border:2px solid transparent; border-radius:8px; background:none; cursor:grab; overflow:hidden; }
 .aa-art-piece.is-placed{ height:100%; border:none; border-radius:0; }
 .aa-art-piece.is-locked{ outline:2px solid var(--good); outline-offset:-2px; }
@@ -895,7 +896,7 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-train-hud .aa-train-lv{ margin:0 0 0 6px; }
 .aa-art-thumb{ display:block; width:100%; aspect-ratio:1; border-radius:8px; background:var(--bg2) center/cover no-repeat; }
 .aa-art.is-peek{ outline:3px solid var(--accent2); outline-offset:2px; }
-.aa-curator-opts{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.aa-curator-opts{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:0 auto; }
 .aa-curator-opt{ aspect-ratio:1; padding:0; border:3px solid transparent; border-radius:14px; background:var(--card); cursor:pointer; overflow:hidden; }
 .aa-curator-opt.is-right{ border-color:var(--good); }
 .aa-curator-opt.is-wrong{ border-color:var(--bad); animation:aashake .3s; }
