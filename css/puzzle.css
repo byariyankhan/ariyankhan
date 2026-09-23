@@ -121,10 +121,6 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-brain-meta{ display:flex; flex-direction:column; align-items:center; gap:4px; width:100%; }
 .aa-brain-line{ display:flex; align-items:center; justify-content:center; gap:10px; margin:0; }
 .aa-brain-lv{ font-size:22px; font-weight:900; color:var(--line); letter-spacing:-.3px; }
-.aa-brain-diff{ font-size:12px; font-weight:900; letter-spacing:.6px; text-transform:uppercase; color:var(--muted); background:color-mix(in srgb, var(--muted) 12%, transparent); border-radius:30px; padding:4px 10px; }
-.aa-brain-diff--hard{ color:var(--hard); background:color-mix(in srgb, var(--hard) 12%, transparent); }
-.aa-brain-diff--expert{ color:var(--expert); background:color-mix(in srgb, var(--expert) 14%, transparent); }
-.aa-brain-diff--master{ color:var(--master); background:color-mix(in srgb, var(--master) 12%, transparent); }
 .aa-brain-note{ margin:0; font-size:13px; color:var(--muted); text-align:center; font-weight:800; }
 .aa-card-rank{ margin:8px 0 0; font-size:13px; font-weight:800; color:var(--muted); text-align:center; font-variant-numeric:tabular-nums; }
 .aa-card-rank b{ color:var(--accent2); font-weight:900; }
@@ -166,10 +162,7 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-title{ font-size:clamp(28px,7.5vw,40px); font-weight:900; margin:0; letter-spacing:-.5px; color:var(--line); }
 .aa-tagline{ margin:6px 0 0; color:var(--muted); font-size:15px; }
 /* compact secondary actions under the map: daily board and the level list */
-.aa-minis{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
 /* the country picker gets a line of its own: squeezed beside the label it wrapped into five lines */
-.aa-row--select{ cursor:default; flex-wrap:wrap; }
-.aa-row--select .aa-row-label{ flex:1 1 140px; min-width:0; }
 .aa-row-label small{ display:block; font-size:12px; font-weight:600; color:var(--muted); }
 #aaHomeSheet{ z-index:51; }   /* opened from Settings, so it must paint over it */
 .aa-row-go{ color:var(--muted); font-size:24px; font-weight:900; line-height:1; padding-right:4px; }
@@ -179,14 +172,6 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-row--pick.is-on .aa-radio{ background:var(--accent); border-color:var(--accent); }
 .aa-row--pick.is-on .aa-radio::after{ content:'✓'; }
 .aa-home-none{ font-size:13px; color:var(--muted); padding:14px 12px; }
-.aa-mini-slot{ display:contents; }
-.aa-mini{ display:flex; flex-direction:column; align-items:flex-start; gap:2px; min-height:64px; padding:10px 14px; border-radius:16px; border:none; text-align:left; color:#fff; cursor:pointer; box-shadow:var(--shadow); font-family:inherit; transition:transform .15s; }
-.aa-mini:active{ transform:scale(.98); }
-.aa-mini--daily{ background:linear-gradient(160deg,#E38A3E,#B85A2B); }
-.aa-mini--tour{ background:linear-gradient(160deg,#4E9C7E,#2F6B57); }
-.aa-mini-kicker{ font-size:11px; font-weight:800; letter-spacing:1px; text-transform:uppercase; opacity:.85; }
-.aa-mini-big{ font-size:17px; font-weight:900; line-height:1.15; }
-.aa-mini-sub{ font-size:12px; opacity:.85; line-height:1.3; }
 .aa-play{ position:relative; overflow:hidden; display:grid; grid-template-columns:52px 1fr 30px; align-items:center; width:100%; min-height:78px; padding:12px 12px 12px 6px; border-radius:20px; border:none; background:linear-gradient(120deg, var(--accent2), color-mix(in srgb, var(--accent2) 62%, var(--accent))); color:#fff; cursor:pointer; font-family:inherit; box-shadow:0 6px 0 color-mix(in srgb, var(--accent2) 70%, #000); transition:transform .1s; margin-top:8px; text-align:center; }
 /* a thin brain of arrows, faint, riding the right of the first button: the mark, not a poster of it */
 .aa-play:not(.aa-play--ghost)::after{ content:''; position:absolute; inset:0; pointer-events:none; background:url(/images/puzzle-brain-mark-white.svg?v=1) no-repeat right -14px center / 118px auto; opacity:.13; }
@@ -202,7 +187,6 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
    lines on a narrow phone and read as a second first button */
 .aa-play--ghost .aa-play-label{ font-size:23px; }
 .aa-play--ghost:active{ box-shadow:0 1px 0 var(--line-soft); }
-.aa-row--soon{ opacity:.55; }
 .aa-signin{ display:flex; justify-content:center; min-height:44px; margin:4px 0 12px; }
 .aa-signin:empty{ display:none; margin:0; min-height:0; }   /* no empty gap when Google's button could not load */
 /* The app's own sign-in button, where Google's rendered one cannot go. Google draws a 260px pill; this is the
@@ -264,8 +248,6 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 @media(max-width:340px){ .aa-stake-coin{ width:20px; height:20px; } .aa-stake-amt{ font-size:12px; } }
 /* one switch: does this room take players from online, or only the ones you send the link to */
 .aa-fill{ display:flex; align-items:center; gap:9px; margin:12px 2px 2px; font-size:14px; font-weight:800; color:var(--muted); cursor:pointer; }
-.aa-opts{ display:flex; gap:6px; margin:2px 0 10px; }
-.aa-opts .aa-dev-opt{ font-size:13px; padding:9px 4px; }
 .aa-shape{ margin:-6px 0 10px; font-size:13px; font-weight:800; color:var(--muted); text-align:center; }
 .aa-fill input{ appearance:none; width:42px; height:24px; border-radius:999px; background:var(--line-soft); position:relative; cursor:pointer; transition:background .15s; flex:0 0 auto; margin:0; }
 .aa-fill input::after{ content:""; position:absolute; top:3px; left:3px; width:18px; height:18px; border-radius:50%; background:var(--card); box-shadow:0 1px 3px rgba(0,0,0,.25); transition:transform .15s; }
@@ -277,7 +259,6 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-input{ width:100%; margin:10px 0 2px; padding:12px 14px; border:2px solid var(--outline); border-radius:14px; background:var(--bg2); color:var(--ink); font-family:inherit; font-weight:800; font-size:17px; text-align:center; }
 .aa-input:focus{ outline:none; border-color:var(--accent); }
 .aa-gold{ margin-left:auto; display:flex; align-items:center; gap:5px; font-size:16px; font-weight:900; color:var(--ink); background:var(--bg2); border-radius:999px; padding:7px 13px; flex:0 0 auto; font-variant-numeric:tabular-nums; }
-.aa-soon{ font-size:11px; font-weight:900; letter-spacing:1px; text-transform:uppercase; color:var(--muted); background:var(--bg2); border-radius:999px; padding:4px 10px; flex:0 0 auto; }
 .aa-vs{ display:grid; gap:6px; margin:0 0 14px; }
 .aa-vs-who{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .aa-vs-face{ flex:0 0 auto; width:30px; height:30px; font-size:13px; }
@@ -660,8 +641,6 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-seo-legal a{ color:var(--muted); text-decoration:underline; text-underline-offset:3px; }
 .aa-seo-legal a:hover{ color:var(--ink); }
 .aa-adapt{ font-size:13px; font-weight:800; color:var(--muted); margin:-6px 0 14px; }
-.aa-adapt--up{ color:var(--hard); }
-.aa-adapt--down{ color:var(--good); }
 .aa-actions{ display:flex; flex-wrap:wrap; justify-content:center; gap:8px; }
 .aa-actions .aa-btn{ background:var(--bg2); color:var(--ink); box-shadow:none; }
 .aa-actions .aa-btn--primary{ background:var(--accent2); color:#fff; }
@@ -673,7 +652,6 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-actions--stack .aa-btn--primary{ grid-column:1 / -1; }
 /* An offer, not an action: it is the only warm one in the card, so it reads as the extra thing on the row
    rather than as a second way of doing what the primary does. */
-.aa-actions .aa-btn--ad{ background:var(--accent); color:var(--accent-ink); }
 /* the out-of-hearts card, as drawn: the free life first and biggest, Try again under it in a soft tint, and the
    rest as links -- one decision on top, the others a glance below */
 .aa-actions--out{ grid-template-columns:1fr; gap:10px; }
@@ -729,18 +707,12 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-sheet-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; }
 .aa-sheet-head h2{ margin:0; font-size:22px; font-weight:900; }
 .aa-sheet-note{ font-size:13px; color:var(--muted); margin:0 0 12px; }
-.aa-setting{ display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 0; border-top:1px solid var(--bg2); font-size:15px; }
-.aa-setting--col{ flex-direction:column; align-items:stretch; }
-.aa-setting > span:first-child{ font-weight:900; }
 .aa-themes{ display:flex; gap:8px; }
 .aa-theme{ flex:1; padding:10px; border-radius:12px; border:2px solid transparent; cursor:pointer; font-weight:900; font-size:13px; color:#fff; }
 .aa-theme[data-theme="paper"]{ background:#5B3F26; }
 .aa-theme[data-theme="night"]{ background:#141416; }
 .aa-theme[data-theme="mint"]{ background:#17423A; }
 .aa-theme.is-active{ border-color:var(--accent); box-shadow:0 0 0 2px var(--card); }
-.aa-about{ border-top:1px solid var(--bg2); padding:12px 0; }
-.aa-about-summary{ cursor:pointer; list-style:none; font-weight:900; font-size:15px; }
-.aa-about-summary::-webkit-details-marker{ display:none; }
 .aa-credit{ font-size:13px; color:var(--muted); text-align:center; margin:14px 0 0; }
 /* The build line, and the way in to the developer switch. Quiet enough that nobody reads it twice, and
    un-selectable so that seven taps do not end in a highlighted word and a copy menu. */
@@ -767,27 +739,9 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-legal-back{ display:block; font-size:14px; margin-bottom:18px; text-decoration:none; }
 .aa-legal-date{ font-size:13px; }
 .aa-legal-foot{ margin-top:34px; padding-top:16px; border-top:1px solid var(--bg2); font-size:13px; }
-.aa-seo-cta{ text-align:center; margin:18px 0 0; }
 .aa-seo .aa-btn{ text-decoration:none; }
 
 /* ── About content (reused sections) ── */
-.aa-page{ padding:8px 0 0; font-weight:600; }
-.aa-page section{ padding:14px 0; }
-.aa-page .tag-pill{ display:inline-block; font-size:11px; font-weight:900; letter-spacing:1.5px; text-transform:uppercase; color:var(--accent); margin-bottom:6px; }
-.aa-page .section-title{ font-size:22px; font-weight:900; margin:0 0 10px; line-height:1.1; }
-.aa-page .section-title .yl{ color:var(--accent); }
-.aa-page p, .aa-page .section-desc{ font-size:14px; line-height:1.7; color:var(--muted); margin:0 0 12px; }
-.aa-page p strong{ color:var(--ink); }
-.aa-steps{ counter-reset:step; list-style:none; margin:0; padding:0; display:grid; gap:10px; }
-.aa-steps li{ position:relative; background:var(--card); border-radius:14px; padding:14px 16px; margin:0; font-size:14px; color:var(--muted); line-height:1.6; }
-.aa-steps li::before{ counter-increment:step; content:counter(step, decimal-leading-zero); display:block; font-size:22px; font-weight:900; color:var(--accent); line-height:1; margin-bottom:6px; }
-.aa-steps li strong{ display:block; color:var(--ink); font-size:15px; margin-bottom:2px; }
-.aa-callout{ border-left:3px solid var(--accent); background:var(--bg2); border-radius:0 12px 12px 0; padding:12px 14px; margin:14px 0; }
-.aa-callout p{ margin:0; }
-.aa-author{ display:grid; grid-template-columns:56px 1fr; gap:14px; align-items:center; background:var(--card); border-radius:16px; padding:14px; }
-.aa-author img{ width:56px; height:56px; border-radius:50%; object-fit:cover; }
-.aa-author p{ margin:0; font-size:13px; }
-.aa-author .aa-author-name{ font-size:16px; font-weight:900; color:var(--ink); }
 .faq-item{ background:var(--card); border-radius:14px; margin-bottom:8px; overflow:hidden; }
 .faq-q{ display:flex; align-items:center; gap:10px; width:100%; padding:12px 14px; border:none; background:none; color:var(--ink); cursor:pointer; text-align:left; font-family:inherit; }
 .faq-icon{ display:none; }
@@ -797,17 +751,5 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .faq-a{ max-height:0; overflow:hidden; transition:max-height .25s; }
 .faq-item.open .faq-a{ max-height:600px; }
 .faq-a p{ padding:0 14px 14px; margin:0; }
-.aa-cta, .aa-explore{ text-align:center; }
-.aa-explore-label{ font-size:11px; font-weight:900; letter-spacing:1.5px; text-transform:uppercase; color:var(--muted); margin:0 0 10px; }
-.aa-explore-links{ display:flex; flex-wrap:wrap; justify-content:center; gap:8px; }
-.aa-explore-link{ display:inline-flex; align-items:center; gap:8px; padding:8px 14px; border-radius:30px; background:var(--bg2); color:var(--ink) !important; font-size:13px; text-decoration:none; }
-.aa-explore-link svg{ width:16px; height:16px; fill:none; stroke:currentColor; stroke-width:1.8; }
-.aa-table-wrap{ overflow-x:auto; }
-.aa-table{ width:100%; border-collapse:collapse; font-size:13px; }
-.aa-table th, .aa-table td{ text-align:left; padding:8px 10px; border-bottom:1px solid var(--bg2); vertical-align:top; }
-.aa-table th{ font-size:11px; letter-spacing:1px; text-transform:uppercase; color:var(--accent); }
-.aa-table td{ color:var(--muted); }
-.aa-table td:first-child{ color:var(--ink); font-weight:900; white-space:nowrap; }
-.aa-page .aa-btn--primary{ color:#fff; text-decoration:none; }
 
 @media(prefers-reduced-motion:reduce){ .aa-piece.is-shake .aa-track, .aa-piece.is-shake .aa-head, .aa-piece.is-hint .aa-track, .aa-sheet-panel, .aa-lives.is-last .is-on{ animation:none; } }

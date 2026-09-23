@@ -89,7 +89,6 @@
   const comboStep = n => n === 3 || n === 5 || n === 8 || n === 12 || (n > 12 && (n - 12) % 5 === 0);
   const CHEER_HOLD = 3;           // after a cheer, the next three shots stay quiet whatever the combo
   const MILESTONES = [25, 50, 75, 90];
-  const RUSH_SECONDS = 90;
   const HINT_PENALTY_MS = 5000;
   const HINTS_PER_LEVEL = 3;
   // How long an invitation that arrived mid-board is worth offering afterwards. A room waits minutes, not
@@ -106,7 +105,6 @@
   const CHECKS_PER_LEVEL = 4;
   const CHECK_WORD = 'check';   // the icon is drawn in the markup now, beside the counter's value
   const hintsFor = tier => HINTS_OF[tier] ?? HINTS_PER_LEVEL;
-  const MODES = { classic: 'Classic' };  // one way to play: the tour ramps up, and the player's own form shifts it
   const LIVES_OF = [4, 4, 4, 4, 4];   // hearts per tier: four everywhere
   const livesFor = tier => LIVES_OF[tier] ?? LIVES;
   // ── Adaptive difficulty ──
@@ -153,16 +151,16 @@
   const PALETTE = ['#FFED54', '#5CD6FF', '#8CFF7A', '#FF9AD5', '#C79BFF', '#FFB347', '#6EE7B7', '#FDBA74', '#F97373', '#38BDF8'];
 
   const el = {
-    select: $('#aaSelect'), tagline: $('#aaTagline'), homeRow: $('#aaHomeRow'), homeNow: $('#aaHomeNow'), homeSheet: $('#aaHomeSheet'), homeBack: $('#aaHomeBack'), homeSearch: $('#aaHomeSearch'), homeList: $('#aaHomeList'), purse: $('#aaPurse'), purseNo: $('#aaPurseNo'), goldAd: $('#aaGoldAd'), hudDiff: $('#aaHudDiff'), play: $('#aaPlay'), path: $('#aaPath'), btnVibe: $('#aaVibe'), btnGuides: $('#aaGuides'), btnMusic: $('#aaMusic'),
+    select: $('#aaSelect'), homeRow: $('#aaHomeRow'), homeNow: $('#aaHomeNow'), homeSheet: $('#aaHomeSheet'), homeBack: $('#aaHomeBack'), homeSearch: $('#aaHomeSearch'), homeList: $('#aaHomeList'), purse: $('#aaPurse'), purseNo: $('#aaPurseNo'), goldAd: $('#aaGoldAd'), hudDiff: $('#aaHudDiff'), play: $('#aaPlay'), path: $('#aaPath'), btnVibe: $('#aaVibe'), btnGuides: $('#aaGuides'), btnMusic: $('#aaMusic'),
     sheet: $('#aaSheet'), friends: $('#aaFriends'), signInSheet: $('#aaSignInSheet'), googleBtn: $('#aaGoogleBtn'), signInNote: $('#aaSignInNote'), ranks: $('#aaRanks'), league: $('#aaLeague'), leagueEnds: $('#aaLeagueEnds'), leagueSheet: $('#aaLeagueSheet'), leagueBody: $('#aaLeagueBody'), leagueInfo: $('#aaLeagueInfo'), matchSheet: $('#aaMatchSheet'), matchBody: $('#aaMatchBody'), matchTitle: $('#aaMatchTitle'), accountGroup: $('#aaAccountGroup'), accountCap: $('#aaAccountCap'), accountRow: $('#aaAccountRow'), accountName: $('#aaAccountName'), accountWho: $('#aaAccountWho'), accountGold: $('#aaAccountGold'), accountFace: $('#aaAccountFace'), sessionGroup: $('#aaSessionGroup'), sessionCap: $('#aaSessionCap'), signOutBtn: $('#aaSignOut'), deleteAccBtn: $('#aaDeleteAcc'), settingsBtns: $$('#aaSettings, #aaSettingsG'), themeBtn: $('#aaTheme'), themes: $('#aaThemes'), build: $('#aaBuild'), devCap: $('#aaDevCap'), devGroup: $('#aaDevGroup'), devAds: $('#aaDevAds'), devAdsNote: $('#aaDevAdsNote'), devLast: $('#aaDevLast'), devTools: $('#aaDevTools'), devHide: $('#aaDevHide'),
     game: $('#aaGame'), boardWrap: $('#aaBoardWrap'), board: $('#aaBoard'), toast: $('#aaToast'), confetti: $('#aaConfetti'),
     coach: $('#aaCoach'), coachSpot: $('#aaCoachSpot'), coachStep: $('#aaCoachStep'), coachTitle: $('#aaCoachTitle'), coachBody: $('#aaCoachBody'), coachNext: $('#aaCoachNext'), coachSkip: $('#aaCoachSkip'), coachAgain: $('#aaCoachAgain'), hudLives: $('#aaHudLives'),
-    hudLevel: $('#aaHudLevel'), hudMode: $('#aaHudMode'), hudTime: $('#aaHudTime'), hudLeft: $('#aaHudLeft'), hudLives: $('#aaHudLives'), hudLivesWrap: $('#aaHudLivesWrap'), hudPct: $('#aaHudPct'), boardBar: $('#aaBoardBar'),
+    hudLevel: $('#aaHudLevel'), hudTime: $('#aaHudTime'), hudLeft: $('#aaHudLeft'), hudLives: $('#aaHudLives'), hudPct: $('#aaHudPct'), boardBar: $('#aaBoardBar'),
     btnHint: $('#aaHint'), btnCheck: $('#aaCheck'), hintVal: $('#aaHintVal'), checkVal: $('#aaCheckVal'), btnLevels: $('#aaBackToLevels'), btnSound: $('#aaSound'),
     overlay: $('#aaOverlay'), card: $('#aaCard'),
     loading: $('#aaLoading'), error: $('#aaError'),
     gate: $('#aaGate'), accept: $('#aaAccept'), splash: $('#aaSplash'), splashQuote: $('#aaSplashQuote'),
-    worldMap: $('#aaWorldMap'), worldCap: $('#aaWorldCap'), worldScroll: $('#aaWorldScroll'),
+    worldMap: $('#aaWorldMap'), worldCap: $('#aaWorldCap'),
     brainArt: $('#aaBrainArt'), brainLv: $('#aaBrainLv'), brainNote: $('#aaBrainNote'),
     deck: $('#aaDeck'), deckTrack: $('#aaDeckTrack'), deckDots: $('#aaDeckDots'),
     notifyCap: $('#aaNotifyCap'), notifyGroup: $('#aaNotifyGroup'), btnNotify: $('#aaNotify'), notifyNote: $('#aaNotifyNote'), remindRow: $('#aaRemindRow'), btnRemind: $('#aaRemind'), mutedCap: $('#aaMutedCap'), mutedGroup: $('#aaMutedGroup'),
@@ -1375,7 +1373,6 @@
   // Generate a few candidate boards from the seed and keep the narrowest (fewest arrows free at the start), so the
   // difficulty a tier promises does not depend on the luck of one seed. Candidates per tier: CANDIDATES_OF.
   const CANDIDATES_OF = [4, 6, 8, 6, 5];
-  function freeAtStart(b) { const { W, H, occ } = b; return b.pieces.filter(p => { const [dr, dc] = DIRS[p.dir]; let [y, x] = p.cells[0]; y += dr; x += dc; while (y >= 0 && y < H && x >= 0 && x < W) { if (occ[y][x] >= 0) return false; y += dr; x += dc; } return true; }).length; }
   // Lower is better. A quick simulated player who always takes the free arrow nearest the one just tapped (the
   // way people actually play) measures how many arrows are free at any moment and how often the arrow freed by
   // a tap sits within two cells of it; lone arrowheads count too, and arrows free from the start most of all.
@@ -1813,7 +1810,6 @@
     const run = { firstTry: won && state.fails === 0, heartsLost: state.livesMax - state.lives, hints: state.hintsUsed, secPerArrow: state.elapsed / 1000 / Math.max(1, state.pieces.length) };
     const before = formNow(), after = nextForm(before, won, run), points = won ? clearPoints(run) : 0;
     store.set('form', after);
-    store.set('lastRun', { level: levelNo(state.idx), disc: !!state.disc, tier: state.tier, won, ...run, points, at: Date.now() });
     return { before, after, points };
   }
   // ── Focus ──
@@ -1859,11 +1855,8 @@
   const ICON_NEXT  = ICO('<path d="M4.5 12h14"/><path d="M12.5 6l6 6-6 6"/>');
   const ICON_AGAIN = ICO('<path d="M20 12a8 8 0 1 1-2.5-5.8"/><path d="M20 3.6V9h-5.4"/>');
   const ICON_SHARE = ICO('<circle cx="17.5" cy="5.5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="17.5" cy="18.5" r="2.6"/><path d="M8.4 10.7l6.8-3.9"/><path d="M8.4 13.3l6.8 3.9"/>');
-  const ICON_SHUFFLE = ICO('<path d="M3.5 6.5h3.2l10.6 11h3.2"/><path d="M3.5 17.5h3.2l10.6-11h3.2"/><path d="M17.6 3.6l2.9 2.9-2.9 2.9"/><path d="M17.6 14.6l2.9 2.9-2.9 2.9"/>');
   const ICON_AD    = ICO('<rect x="2.8" y="4.8" width="18.4" height="14.4" rx="2.4"/><path d="M10.2 9.4l4.6 2.6-4.6 2.6z"/>');
-  const ICON_SKIP  = ICO('<path d="M5.5 5.5l9 6.5-9 6.5z"/><path d="M18 5.5v13"/>');
   const ICON_FLAG  = ICO('<path d="M6 21V4"/><path d="M6 5h11l-2.2 3.4L17 12H6z"/>');
-  const ICON_MAP   = ICO('<circle cx="12" cy="12" r="8.6"/><path d="M3.4 12h17.2"/><path d="M12 3.4c2.7 2.9 2.7 14 0 17.2"/><path d="M12 3.4c-2.7 2.9-2.7 14 0 17.2"/>');
   // The bar is filled in front of the player rather than handed to them finished: the brain travels, the
   // number counts up with it, and the sound climbs alongside. That second is the whole point of the reading —
   // it is the only part of the card that is worth watching happen.
@@ -2620,11 +2613,16 @@
   // me is a read; everything else changes something and is posted. The paths are the versioned ones, so a
   // later backend can add a v2 without this client noticing.
   const AUTH_PATH = { me: '/auth/me', google: '/auth/google', name: '/auth/name', logout: '/auth/logout', delete: '/auth/delete' };
-  function authApi(a, body) {
-    const method = a === 'me' ? 'GET' : 'POST';
-    return fetch(`${API_V1}${AUTH_PATH[a] || '/auth/me'}`, { method, credentials: 'include', cache: 'no-store', headers: method === 'POST' ? { 'Content-Type': 'application/json' } : {}, body: method === 'POST' ? JSON.stringify(body || {}) : undefined })
-      .then(async r => { const d = await r.json().catch(() => ({})); if (!r.ok) throw Object.assign(new Error(d.error || `HTTP ${r.status}`), { code: d.error }); return d; });
+  /**
+   * Every call to the service goes through here: same-origin cookie, no caching, JSON in and out, and a
+   * failure thrown as an Error carrying the server's own word in `code` (plus whatever `extra` picks out of
+   * the body, for the match calls that answer with gold or a code). GET when there is no body.
+   */
+  function apiCall(url, body, method = body ? 'POST' : 'GET', extra = null) {
+    return fetch(url, { method, credentials: 'include', cache: 'no-store', headers: method === 'POST' ? { 'Content-Type': 'application/json' } : {}, body: method === 'POST' ? JSON.stringify(body || {}) : undefined })
+      .then(async r => { const d = await r.json().catch(() => ({})); if (!r.ok) throw Object.assign(new Error(d.error || `HTTP ${r.status}`), { code: d.error }, extra ? extra(d) : {}); return d; });
   }
+  const authApi = (a, body) => apiCall(`${API_V1}${AUTH_PATH[a] || '/auth/me'}`, body, a === 'me' ? 'GET' : 'POST');
   async function authLoad(force) {
     if (auth.ready && !force) return auth;
     try {
@@ -2748,12 +2746,7 @@
   //
   // None of it is ever in the way of playing. A push that fails costs freshness, not progress: the record is
   // already in local storage and goes up with the next sync.
-  const progressApi = body =>
-    fetch(`${API_V1}/progress`, {
-      method: body ? 'POST' : 'GET', credentials: 'include', cache: 'no-store',
-      headers: body ? { 'Content-Type': 'application/json' } : {},
-      body: body ? JSON.stringify(body) : undefined,
-    }).then(async r => { const d = await r.json().catch(() => ({})); if (!r.ok) throw Object.assign(new Error(d.error || `HTTP ${r.status}`), { code: d.error }); return d; });
+  const progressApi = body => apiCall(`${API_V1}/progress`, body);
 
   const STATE_KEYS = ['home', 'form', 'dailyStreak', 'playStreak'];   // what a new device needs before it can show the right tour
 
@@ -2884,12 +2877,7 @@
   const appPush = () => shell.on && !!shell.bridge();
   // Where this device is, so the evening nudge comes at seven here and not at seven somewhere else.
   const TZ = (() => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch { return ''; } })();
-  const pushApi = (path, body) =>
-    fetch(`${API_V1}/push/${path}`, {
-      method: body ? 'POST' : 'GET', credentials: 'include', cache: 'no-store',
-      headers: body ? { 'Content-Type': 'application/json' } : {},
-      body: body ? JSON.stringify(body) : undefined,
-    }).then(async r => { const d = await r.json().catch(() => ({})); if (!r.ok) throw Object.assign(new Error(d.error || `HTTP ${r.status}`), { code: d.error }); return d; });
+  const pushApi = (path, body) => apiCall(`${API_V1}/push/${path}`, body);
   // The server hands out its public key base64url; the browser wants the raw bytes.
   const urlB64ToBytes = b64 => {
     const pad = '='.repeat((4 - b64.length % 4) % 4);
@@ -3001,6 +2989,15 @@
     renderNotify();
   }
 
+  /** The phone lets its token go, and so does the row that would have been sent to. Never throws. */
+  async function dropAppToken() {
+    try {
+      const r = await shell.ask('pushOff', 8000);
+      if (r?.token) await pushApi('token/drop', { token: r.token }).catch(() => {});
+    } catch { /* an app with no bridge has nothing to drop */ }
+    push.on = false; push.posted = '';
+  }
+
   async function notifyToggleApp() {
     if (push.busy || !push.app) return;
     push.busy = true; renderNotify();
@@ -3008,9 +3005,8 @@
       if (push.on) {
         // Off means off on this phone: the app lets its token go, and so does the row that would have been
         // sent to.
-        const r = await shell.ask('pushOff', 8000);
-        if (r?.token) await pushApi('token/drop', { token: r.token }).catch(() => {});
-        push.on = false; push.blocked = false; push.posted = '';
+        await dropAppToken();
+        push.blocked = false;
         toast('Notifications off on this phone.', 'hint');
       } else {
         // Straight to the phone's own dialog: the switch is the question, and a card before it was one too many.
@@ -3102,11 +3098,7 @@
     if (appPush()) {
       // The phone's token goes with the account the way a browser's subscription does: off is off, and
       // whoever signs in next turns it on for themselves.
-      try {
-        const r = await shell.ask('pushOff', 8000);
-        if (r?.token) await pushApi('token/drop', { token: r.token }).catch(() => {});
-      } catch { /* an app with no bridge has nothing to drop */ }
-      push.on = false; push.posted = '';
+      await dropAppToken();
       return;
     }
     if (!pushable()) return;
@@ -3183,8 +3175,7 @@
   }
   const matchApi = (a, body, query = '') => {
     const { url, method } = matchUrl(a, body, query);
-    return fetch(url, { method, credentials: 'include', cache: 'no-store', headers: method === 'POST' ? { 'Content-Type': 'application/json' } : {}, body: method === 'POST' ? JSON.stringify(body || {}) : undefined })
-      .then(async r => { const d = await r.json().catch(() => ({})); if (!r.ok) throw Object.assign(new Error(d.error || `HTTP ${r.status}`), { code: d.error, gold: d.gold, matchCode: d.match_code, retryAfter: d.retry_after }); return d; });
+    return apiCall(url, body, method, d => ({ gold: d.gold, matchCode: d.match_code, retryAfter: d.retry_after }));
   };
   // ── The live socket ──
   //
@@ -3678,12 +3669,7 @@
   // The one answer to being asked too often: this person's invitations stop coming -- to the screen and to
   // the phone -- and they leave the list of people to ask. They are never told. Settings lists who is muted,
   // with a way back, so a tap in irritation is not for ever.
-  const playersApi = (path, body) =>
-    fetch(`${API_V1}/players/${path}`, {
-      method: body ? 'POST' : 'GET', credentials: 'include', cache: 'no-store',
-      headers: body ? { 'Content-Type': 'application/json' } : {},
-      body: body ? JSON.stringify(body) : undefined,
-    }).then(async r => { const d = await r.json().catch(() => ({})); if (!r.ok) throw Object.assign(new Error(d.error || `HTTP ${r.status}`), { code: d.error }); return d; });
+  const playersApi = (path, body) => apiCall(`${API_V1}/players/${path}`, body);
 
   async function muteHost(m) {
     if (!m?.host_id) return;
@@ -4478,8 +4464,7 @@
   // What is worked out here is only the countdown, from the end the server gave: a clock that ticks without
   // asking again, and one request when the screen is opened.
   const league = { data: null, at: 0, tick: 0, view: 'now' };
-  const leagueApi = () => fetch(`${API_V1}/league`, { credentials: 'include', cache: 'no-store' })
-    .then(async r => { const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.error || `HTTP ${r.status}`); return d; });
+  const leagueApi = () => apiCall(`${API_V1}/league`);
 
   // A table of ten seven-digit numbers is a wall. 5.12M is a prize.
   const gshort = n => {
