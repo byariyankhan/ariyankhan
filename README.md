@@ -968,15 +968,17 @@ links.
   (`trainFree`). Where advertising is off (the site) every round is simply free and nothing says AD. The
   list reads the rule off the cards (`trainCardState`, `.aa-train-tag`, `.aa-train-got`): the free round's
   card is ringed with "FREE TODAY" and a filled ▶ Play; the others say "FREE TOMORROW" / "FREE IN 2 DAYS"
-  with an outlined "▣ Play · AD"; a round unlocked but left says "UNLOCKED · Play"; a round scored today
-  goes green with "✓ 100" and "↻ Play again". The line above the list is "One free round a day · more with
+  with a lock and no button until a round is scored today (a tap says to play today's round first), then an
+  outlined "▣ Play with ads"; a round unlocked but left says "UNLOCKED · Play"; a round scored today
+  goes green with "✓ 100" and "↻ Play again". Before the day's round is played there is one button on the
+  screen, Play; after it, two: Play again and Play with ads, on the cards and on the result alike. The line above the list is "One free round a day · more with
   AD" (site: "Today's round: …"), then "Done for today · 3 days in a row", then "All four done"; with a
   streak alive and nothing played yet it says "3 days in a row · play today" in rose. **Done for today** is
   one round scored (`trainDone`), the streak counts such days, `trainAll` is the bonus of all four; the
   per-round bar counts days that round was played, in all (`trainRun`: cumulative, so it only ever grows).
   The home pill is a dot until something is scored, then the day's Brain Score. The result offers **Play
-  next** (`trainNext`: the free round if unscored, else the next unscored; with the video mark and an AD
-  pill when it costs one, the caption "Next: The Forgery · free tomorrow" saying what and why) and **Play
+  with ads** (`trainNext`: the next unscored round, with the video mark and an AD pill; "Play next" when
+  that round is free; the caption "Next: The Forgery · free tomorrow" saying what and why) and **Play
   again** (always free); with all four scored it offers Done. In a round and on its result the corner
   button is ← back to the list (`trainScreen`, a capture-phase handler before `closeSheets`; the phone's
   back button does the same in `backPressed`); on the list it is ✕. **The round marks
