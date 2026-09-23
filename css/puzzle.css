@@ -776,8 +776,6 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-train-ico2 svg{ width:26px; height:26px; fill:none; stroke:var(--accent2); stroke-width:1.9; stroke-linecap:round; stroke-linejoin:round; }
 .aa-train-ico2--big{ width:72px; height:72px; border-radius:22px; margin:6px auto 12px; }
 .aa-train-ico2--big svg{ width:40px; height:40px; }
-.aa-train-intro{ text-align:center; padding:8px 0 4px; }
-.aa-train-intro h3{ margin:0 0 12px; font-size:26px; font-weight:900; }
 .aa-train-how{ margin:0 0 18px; padding:0 0 0 22px; text-align:left; font-size:15px; line-height:1.45; color:var(--ink); }
 .aa-train-how li{ margin:0 0 8px; padding-left:4px; }
 .aa-train-how li::marker{ color:var(--accent2); font-weight:900; }
@@ -820,6 +818,16 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-art-piece.is-sel{ border-color:var(--accent2); box-shadow:0 0 0 3px color-mix(in srgb, var(--accent2) 30%, transparent); }
 .aa-art-piece.is-placed{ height:100%; border:none; border-radius:0; }
 .aa-art-piece.is-locked{ outline:2px solid var(--good); outline-offset:-2px; }
+/* drag and drop: the tray and the frame do not scroll under a finger, the carried copy rides above everything */
+.aa-art-tray, .aa-art-slots, .aa-art-piece{ touch-action:none; -webkit-user-select:none; user-select:none; }
+.aa-art-piece.is-ghost{ opacity:.25; }
+.aa-art-slot.is-over{ border-color:var(--accent2); border-style:solid; background:color-mix(in srgb, var(--accent2) 16%, var(--card)); }
+.aa-art-drag{ position:fixed; left:0; top:0; z-index:120; pointer-events:none; border-radius:8px; overflow:hidden; box-shadow:0 12px 28px rgba(0,0,0,.35); will-change:transform; }
+/* the rounds' coach: the same spotlight and card as the board's, and a hand that shows the move */
+.aa-train-coach{ z-index:115; }
+.aa-hand{ position:absolute; left:0; top:0; width:40px; height:40px; pointer-events:none; will-change:transform; }
+.aa-hand svg{ width:40px; height:40px; fill:none; stroke:#fff; stroke-width:3; }
+.aa-hand svg circle:last-child{ fill:var(--accent2); stroke:none; }
 .aa-art-tile{ display:block; width:100%; height:100%; background-size:300% 300%; background-repeat:no-repeat; }
 .aa-forge-pair{ display:grid; grid-template-columns:1fr; gap:10px; }   /* a wide painting: the copy under the original; a tall one: side by side, both in view */
 .aa-forge-pair.is-side{ grid-template-columns:1fr 1fr; }

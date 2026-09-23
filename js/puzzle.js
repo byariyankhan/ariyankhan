@@ -2084,7 +2084,7 @@
     e: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12s3.5-6.5 9.5-6.5 9.5 6.5 9.5 6.5-3.5 6.5-9.5 6.5S2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></svg>',
   };
   const TRAIN_ROUNDS = [
-    { id: 'r', name: 'Restore the Canvas', blurb: 'A painting in nine pieces. Put it back together.', how: ['A painting is cut into nine pieces and the frame is empty.', 'Tap a piece in the tray, then tap the place it belongs. Tap a placed piece to take it out again.', 'Every piece home wins the round. Wrong tries and time over 90 seconds cost points.'] },
+    { id: 'r', name: 'Restore the Canvas', blurb: 'A painting in nine pieces. Put it back together.', how: ['A painting is cut into nine pieces and the frame is empty.', 'Drag a piece from the tray into the frame, to the place it belongs. Drop it on another piece and they swap; a tap, then a tap, works too.', 'Every piece home wins the round. Wrong tries and time over 90 seconds cost points.'] },
     { id: 'f', name: 'The Forgery', blurb: 'Three things are wrong in the copy. Find them.', how: ['The original and a forged copy, side by side or one above the other.', 'Three patches of the copy are wrong: one is mirrored, one is recoloured, one is from elsewhere in the painting.', 'Tap them in the copy. A tap on nothing costs points; time over a minute does too.'] },
     { id: 'g', name: 'Gallery Memory', blurb: 'Five paintings, five seconds. Rebuild the order.', how: ['Five paintings hang in a row, numbered, for five seconds.', 'Then the same five come back shuffled.', 'Tap them in the order they hung: first, second, third… A wrong tap costs points.'] },
     { id: 'e', name: 'The Curator\u2019s Eye', blurb: 'One painting, then: which detail was in it?', how: ['One painting, for six seconds. Look at the corners as well as the middle.', 'Then, three times, four close-ups: one is from that painting, three are from others.', 'Tap the one that is from it. Each right answer is a third of the score.'] },
@@ -2148,7 +2148,7 @@
     if (on) musicBegin(); else if (el.game.hidden) musicStop();
   }
   // stop: the round in hand ends (its result stays on the full screen); leave: back to the list, or out
-  function trainStop() { clearInterval(train.timer); train.timer = 0; train.game = null; }
+  function trainStop() { clearInterval(train.timer); train.timer = 0; train.game = null; trainCoachEnd(false); }
   function trainLeave() { trainStop(); trainScreen(false); }
   function renderTrain() {
     const t = trainDay(), score = trainScore(t), done = trainDone(t), streak = trainStreak();
@@ -2176,9 +2176,9 @@
     if (info) { const c = $('.aa-art-credit', el.trainBody); if (c) { c.hidden = !c.hidden; info.setAttribute('aria-expanded', String(!c.hidden)); } return; }
     const about = e.target.closest('[data-train-about]');
     if (about) { const c = $('#aaTrainAbout', el.trainBody); if (c) { c.hidden = !c.hidden; about.setAttribute('aria-expanded', String(!c.hidden)); } return; }
-    const go = e.target.closest('[data-train-go]')?.dataset.trainGo;
-    if (go) { store.set('trainHow:' + go, 1); void trainPlay(go, true); return; }
     if (e.target.closest('[data-train-how]')) { trainHowCard(); return; }
+    // a drag that just ended is not a tap on whatever it ended over
+    if (train.game?.dragEnd && performance.now() - train.game.dragEnd < 400) return;
     if (e.target.closest('[data-train-howclose]')) { $('.aa-train-howcard', el.trainBody)?.remove(); return; }
     if (e.target.closest('[data-train-hint]')) { void trainHint(); return; }
     const tile = e.target.closest('[data-tile]');
@@ -2206,11 +2206,8 @@
   }
   // Play: the day's free round, or an advertisement first. The round counts as played when it starts, not
   // when it ends, so leaving one halfway is not a way round the limit.
-  async function trainPlay(id, seen = false) {
+  async function trainPlay(id) {
     if (train.busy || !TRAIN_ROUNDS.some(r => r.id === id)) return;
-    // The first time a round is opened, its instructions come first, on the full screen, and Start counts
-    // as the play. The same card is behind the ? in the round's own bar.
-    if (!seen && !store.get('trainHow:' + id)) { trainIntro(id); return; }
     if (!trainFree(id)) {
       train.busy = true;
       try { const got = await adOffer('trainplay', null, true); if (!got) return; }
@@ -2220,21 +2217,84 @@
     trainStart(id);
   }
   const howHtml = id => { const r = TRAIN_ROUNDS.find(x => x.id === id); return `<ol class="aa-train-how">${r.how.map(h => `<li>${h}</li>`).join('')}</ol>`; };
-  function trainIntro(id) {
-    if (!$('#aaTrainGame', el.trainBody)) renderTrain();
-    const box = $('#aaTrainGame', el.trainBody); if (!box) return;
-    const r = TRAIN_ROUNDS.find(x => x.id === id);
-    $$('.aa-train-top, .aa-train-line, .aa-train-about, .aa-train-rounds, .aa-sheet-note', el.trainBody).forEach(n => { n.hidden = true; });
-    box.hidden = false; trainScreen(true);
-    box.innerHTML = `<div class="aa-train-intro">
-      <span class="aa-train-ico2 aa-train-ico2--big">${TRAIN_ICON[id]}</span>
-      <p class="aa-card-kicker">How to play</p>
-      <h3>${r.name}</h3>
-      ${howHtml(id)}
-      <div class="aa-actions aa-actions--stack"><button type="button" class="aa-btn aa-btn--primary" data-train-go="${id}">Start${trainFree(id) || !ads.on() ? '' : ' \u00b7 AD'}</button><button type="button" class="aa-btn aa-btn--soft" data-train-back>Back</button></div>
-    </div>`;
-  }
   const howBtnHtml = () => '<button type="button" class="aa-train-info" data-train-how aria-label="How to play">?</button>';
+
+  // ── The coach for the rounds ──
+  // The first time a round is opened it is taught the way the arrow board is: not a page of text but a
+  // spotlight on the thing to touch, a card of one sentence, and -- where the move is a drag -- a hand that
+  // makes the move over and over until the player makes it. The card never blocks the round; each step
+  // clears itself when the move it asked for is made (`wait`), or on Next. Once through, or skipped, it is
+  // not shown again (`trainHow:<id>`); the text version stays behind the ? in the round's bar.
+  const TRAIN_COACH = {
+    r: [
+      { title: 'Drag it home', body: 'Press a piece and drag it into the frame, to the place it belongs.', target: () => $('#aaCanvasTray .aa-art-piece:not([hidden])', el.trainBody), hand: () => [$('#aaCanvasTray .aa-art-piece:not([hidden])', el.trainBody), $(`[data-slot="${$('#aaCanvasTray .aa-art-piece:not([hidden])', el.trainBody)?.dataset.tile}"]`, el.trainBody)], wait: 'placed' },
+      { title: 'Now the rest', body: 'Every piece home wins the round. A wrong try costs a little, so does time over 90 seconds. Hint puts one piece home for you.', target: () => $('#aaCanvasSlots', el.trainBody) },
+    ],
+    f: [
+      { title: 'Find what is wrong', body: 'Three patches of this copy are not in the original: one mirrored, one recoloured, one from elsewhere. Tap the first one you spot.', target: () => $('#aaForgeCopy', el.trainBody), wait: 'found' },
+      { title: 'Two more', body: 'A tap on nothing costs a little. Hint circles one for you.', target: () => $('.aa-train-hud', el.trainBody) },
+    ],
+    g: [
+      { title: 'Remember the order', body: 'Five paintings hang here for five seconds. Remember which is first, second, third…', target: () => $('#aaGalleryRow', el.trainBody), wait: 'play' },
+      { title: 'Now tap them in order', body: 'First, then second, then third. A wrong tap costs a little.', target: () => $('#aaGalleryRow', el.trainBody) },
+    ],
+    e: [
+      { title: 'Look closely', body: 'Six seconds. The corners as much as the middle.', target: () => $('#aaCurator', el.trainBody), wait: 'ask' },
+      { title: 'Which is from it?', body: 'One of these four is a detail of that painting. Tap it. Three times over.', target: () => $('.aa-curator-opts', el.trainBody) },
+    ],
+  };
+  const tcoach = { on: false, id: '', step: 0, box: null, anim: null };
+  function trainCoachStart(id) {
+    if (store.get('trainHow:' + id) || !TRAIN_COACH[id] || !el.trainSheet) return;
+    trainCoachEnd(false);
+    const box = document.createElement('div'); box.className = 'aa-coach aa-train-coach';
+    box.innerHTML = `<div class="aa-coach-spot"></div><div class="aa-hand" hidden><svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="15" /><circle cx="20" cy="20" r="6" /></svg></div>
+      <div class="aa-coach-card" role="dialog" aria-modal="false"><p class="aa-coach-step"></p><h3></h3><p class="aa-coach-body"></p>
+      <div class="aa-coach-actions"><button type="button" class="aa-linkbtn" data-tc="skip">Skip</button><button type="button" class="aa-btn aa-btn--primary" data-tc="next">Next</button></div></div>`;
+    box.addEventListener('click', e => { const a = e.target.closest('[data-tc]')?.dataset.tc; if (a === 'skip') trainCoachEnd(true); else if (a === 'next') trainCoachShow(tcoach.step + 1); });
+    document.body.appendChild(box);
+    Object.assign(tcoach, { on: true, id, step: 0, box });
+    trainCoachShow(0);
+  }
+  function trainCoachShow(n) {
+    const steps = TRAIN_COACH[tcoach.id]; if (!tcoach.on || !steps) return;
+    if (n >= steps.length) { trainCoachEnd(true); return; }
+    tcoach.step = n; const st = steps[n], box = tcoach.box;
+    $('.aa-coach-step', box).textContent = `Step ${n + 1} of ${steps.length}`;
+    $('h3', box).textContent = st.title; $('.aa-coach-body', box).textContent = st.body;
+    $('[data-tc="next"]', box).textContent = n === steps.length - 1 ? 'Got it' : 'Next';
+    trainCoachPlace();
+  }
+  function trainCoachPlace() {
+    const steps = TRAIN_COACH[tcoach.id]; if (!tcoach.on || !steps) return;
+    const st = steps[tcoach.step], box = tcoach.box, spot = $('.aa-coach-spot', box), hand = $('.aa-hand', box);
+    const t = st.target?.(), r = t?.getBoundingClientRect?.();
+    if (!r || !r.width) spot.classList.add('is-none');
+    else { spot.classList.remove('is-none'); const pad = 10; spot.style.left = `${r.left - pad}px`; spot.style.top = `${r.top - pad}px`; spot.style.width = `${r.width + pad * 2}px`; spot.style.height = `${r.height + pad * 2}px`; }
+    // the hand: from the thing to press to the place it goes, again and again, until the player does it
+    if (tcoach.anim) { tcoach.anim.cancel(); tcoach.anim = null; }
+    const pair = st.hand?.(), a = pair?.[0]?.getBoundingClientRect?.(), b = pair?.[1]?.getBoundingClientRect?.();
+    if (!a || !b || !a.width || !b.width || calmer()) { hand.hidden = true; return; }
+    hand.hidden = false;
+    const from = [a.left + a.width / 2 - 20, a.top + a.height / 2 - 20], to = [b.left + b.width / 2 - 20, b.top + b.height / 2 - 20];
+    hand.style.transform = `translate(${from[0]}px, ${from[1]}px)`;
+    tcoach.anim = hand.animate([
+      { transform: `translate(${from[0]}px, ${from[1]}px) scale(1)`, opacity: 0, offset: 0 },
+      { transform: `translate(${from[0]}px, ${from[1]}px) scale(1)`, opacity: 1, offset: 0.15 },
+      { transform: `translate(${from[0]}px, ${from[1]}px) scale(.8)`, opacity: 1, offset: 0.3 },
+      { transform: `translate(${to[0]}px, ${to[1]}px) scale(.8)`, opacity: 1, offset: 0.8 },
+      { transform: `translate(${to[0]}px, ${to[1]}px) scale(1)`, opacity: 0, offset: 1 },
+    ], { duration: 2200, iterations: Infinity, easing: 'ease-in-out' });
+  }
+  // a round reporting a move: the step that was waiting for it clears
+  function trainCoachEvent(kind) { const st = TRAIN_COACH[tcoach.id]?.[tcoach.step]; if (tcoach.on && st?.wait === kind) trainCoachShow(tcoach.step + 1); }
+  function trainCoachEnd(done) {
+    if (tcoach.anim) { tcoach.anim.cancel(); tcoach.anim = null; }
+    if (tcoach.box) tcoach.box.remove();
+    if (done && tcoach.id) store.set('trainHow:' + tcoach.id, 1);
+    Object.assign(tcoach, { on: false, id: '', step: 0, box: null });
+  }
+  window.addEventListener('resize', () => { if (tcoach.on) trainCoachPlace(); });
   function trainHowCard() {
     const g = train.game; if (!g) return;
     $('.aa-train-howcard', el.trainBody)?.remove();
@@ -2345,10 +2405,65 @@
       g.slots[k] = k; g.locked.add(k); g.sel = null; canvasDraw(); canvasCheck();
     } };
     box.innerHTML = `<div class="aa-train-hud"><span>Restore the Canvas</span><span id="aaCanvasTime">0:00</span>${hintBtnHtml()}</div>
-      <p class="aa-train-sub">Tap a piece, then the place it belongs.</p>
+      <p class="aa-train-sub">Drag each piece to where it belongs. A tap, then a tap, works too.</p>
       <div class="aa-art-slots" id="aaCanvasSlots" style="aspect-ratio:${w.w}/${w.h}">${tray.map((_, i) => `<button type="button" class="aa-art-slot" data-slot="${i}" aria-label="Place ${i + 1}"></button>`).join('')}</div>
       <div class="aa-art-tray" id="aaCanvasTray">${tray.map(i => `<button type="button" class="aa-art-piece" data-tile="${i}" aria-label="Piece" style="aspect-ratio:${w.w}/${w.h}">${tile(i)}</button>`).join('')}</div>`;
     train.timer = setInterval(() => { const g = train.game; if (!g || g.kind !== 'r') return; const t = $('#aaCanvasTime', box); if (t) t.textContent = fmtTime(performance.now() - g.t0); }, 500);
+    canvasDragWire(box);
+    trainCoachStart('r');
+  }
+  /**
+   * Drag and drop, with pointer events so a finger and a mouse are the same thing: press a piece, carry a
+   * copy of it under the finger, drop it on a slot. Dropped on a full slot, the two swap (from a slot) or the
+   * occupant goes back to the tray (from the tray). A press that does not move six pixels is a tap, and the
+   * tap-then-tap way still works underneath. The sheet does not scroll from a piece (touch-action) so a
+   * drag never turns into a scroll halfway.
+   */
+  function canvasDragWire(box) {
+    let d = null;
+    const over = (x, y) => { const s = document.elementFromPoint(x, y)?.closest?.('.aa-art-slot'); $$('.aa-art-slot.is-over', box).forEach(n => { if (n !== s) n.classList.remove('is-over'); }); if (s && !train.game?.locked.has(+s.dataset.slot)) s.classList.add('is-over'); return s; };
+    box.addEventListener('pointerdown', e => {
+      const g = train.game; if (!g || g.kind !== 'r' || e.button) return;
+      const piece = e.target.closest('.aa-art-piece'); if (!piece) return;
+      const slot = piece.closest('.aa-art-slot'); const from = slot ? +slot.dataset.slot : -1;
+      if (from >= 0 && g.locked.has(from)) return;
+      const r = piece.getBoundingClientRect();
+      d = { id: e.pointerId, tile: +piece.dataset.tile, from, piece, x0: e.clientX, y0: e.clientY, dx: e.clientX - r.left, dy: e.clientY - r.top, w: r.width, h: r.height, moved: false, ghost: null };
+      // no capture yet: captured from the press, the click that a plain tap becomes would land on the box
+      // rather than the piece, and the tap way would be gone. Captured once it moves, below.
+    });
+    box.addEventListener('pointermove', e => {
+      const g = train.game; if (!d || e.pointerId !== d.id || !g) return;
+      if (!d.moved) {
+        if (Math.hypot(e.clientX - d.x0, e.clientY - d.y0) < 6) return;
+        d.moved = true; g.sel = null;
+        try { box.setPointerCapture(e.pointerId); } catch { /* fine without */ }
+        d.ghost = document.createElement('div'); d.ghost.className = 'aa-art-drag'; d.ghost.style.width = `${d.w}px`; d.ghost.style.height = `${d.h}px`; d.ghost.innerHTML = g.tile(d.tile);
+        document.body.appendChild(d.ghost); d.piece.classList.add('is-ghost');
+      }
+      d.ghost.style.transform = `translate(${e.clientX - d.dx}px, ${e.clientY - d.dy}px)`;
+      over(e.clientX, e.clientY);
+    });
+    const end = e => {
+      if (!d || e.pointerId !== d.id) return;
+      const g = train.game, was = d; d = null;
+      if (!was.moved) return;   // a tap: the click handler has it
+      was.ghost?.remove(); was.piece.classList.remove('is-ghost');
+      $$('.aa-art-slot.is-over', box).forEach(n => n.classList.remove('is-over'));
+      if (!g || g.kind !== 'r') return;
+      g.dragEnd = performance.now();
+      const s = e.type === 'pointercancel' ? null : document.elementFromPoint(e.clientX, e.clientY)?.closest?.('.aa-art-slot');
+      if (s) canvasDrop(was.tile, was.from, +s.dataset.slot); else canvasDraw();
+    };
+    box.addEventListener('pointerup', end);
+    box.addEventListener('pointercancel', end);
+  }
+  function canvasDrop(tile, from, k) {
+    const g = train.game; if (!g || g.locked.has(k)) { canvasDraw(); return; }
+    if (from === k) { canvasDraw(); return; }
+    const occupant = g.slots[k];
+    if (from >= 0) g.slots[from] = occupant != null ? occupant : null;   // from a slot: swap
+    g.slots[k] = tile; g.sel = null; SFX.shoot(); canvasDraw(); canvasCheck(); trainCoachEvent('placed');
   }
   function canvasTap(btn) {
     const g = train.game; if (!g) return;
@@ -2359,7 +2474,7 @@
   function canvasSlot(k) {
     const g = train.game; if (!g || g.sel == null || g.locked.has(k) || g.slots[k] != null) return;
     const from = g.slots.indexOf(g.sel); if (from >= 0) g.slots[from] = null;
-    g.slots[k] = g.sel; g.sel = null; SFX.shoot(); canvasDraw(); canvasCheck();
+    g.slots[k] = g.sel; g.sel = null; SFX.shoot(); canvasDraw(); canvasCheck(); trainCoachEvent('placed');
   }
   function canvasDraw() {
     const g = train.game; if (!g) return;
@@ -2400,10 +2515,11 @@
       g.wrong++; SFX.block(); vibe(30); toast('Not there.', 'hint', 900);
     });
     train.timer = setInterval(() => { const g = train.game; if (!g || g.kind !== 'f') return; const t = $('#aaForgeTime', box); if (t) t.textContent = fmtTime(performance.now() - g.t0); }, 500);
+    trainCoachStart('f');
   }
   function forgeryFound(i, byHint) {
     const g = train.game; if (!g) return;
-    g.found.add(i); if (!byHint) SFX.shoot();
+    g.found.add(i); if (!byHint) SFX.shoot(); trainCoachEvent('found');
     const p = $(`[data-lie="${i}"]`, el.trainBody); if (p) p.classList.add('is-found');
     const left = g.lies.length - g.found.size;
     const el2 = $('#aaForgeLeft', el.trainBody); if (el2) el2.textContent = left ? `${left} to find` : 'Found';
@@ -2436,8 +2552,10 @@
         const row = $('#aaGalleryRow', box); if (row) row.innerHTML = g.deal.map(i => `<button type="button" class="aa-gallery-pick" data-pick="${i}" aria-label="Painting">${artThumb(g.picks[i])}</button>`).join('');
         const line = $('#aaGalleryLine', box); if (line) line.textContent = 'Now tap them in that order: first, second, third…';
         if (t) t.textContent = '1 of 5';
+        trainCoachEvent('play');
       }
     }, 1000);
+    trainCoachStart('g');
   }
   function galleryTap(i) {
     const g = train.game; if (!g || g.phase !== 'play') return;
@@ -2475,8 +2593,9 @@
     train.timer = setInterval(() => {
       const g = train.game; if (!g || g.kind !== 'e' || g.phase !== 'show') return;
       left--; const t = $('#aaCuratorTime', box); if (t) t.textContent = String(Math.max(0, left));
-      if (left <= 0) { clearInterval(train.timer); train.timer = 0; g.phase = 'ask'; curatorAsk(); }
+      if (left <= 0) { clearInterval(train.timer); train.timer = 0; g.phase = 'ask'; curatorAsk(); trainCoachEvent('ask'); }
     }, 1000);
+    trainCoachStart('e');
   }
   function curatorAsk() {
     const g = train.game; if (!g) return;
