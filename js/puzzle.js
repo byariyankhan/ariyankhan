@@ -2093,10 +2093,12 @@
   // free where advertising is off). A hint costs ten points of the round it is used in.
   const TRAIN_FREE_HINTS = 1;
   const trainHintsLeft = () => Math.max(0, TRAIN_FREE_HINTS - (trainDay().h | 0));
-  // Rounds: every round is free once a day and then locked for the day; playing it again is an advertisement
-  // the player chooses. A round counts as played when it starts (`pp` per round, `p` in all), so leaving one
-  // halfway is not a way round the lock.
+  // Rounds: the first round played in a day is the free one, and stays free all day (play it again as often
+  // as you like). Every other round that day is unlocked by an advertisement the player chooses, once; then
+  // it too is free for the day. A round counts as played, so unlocked, when it starts (`pp` per round, `p` in
+  // all), so leaving one halfway is not a way round it.
   const trainPlayed = (t, id) => ((t.pp && t.pp[id]) | 0) > 0;
+  const trainAnyPlayed = t => TRAIN_ROUNDS.some(r => trainPlayed(t, r.id));
   // ── Difficulty ──
   // Each round climbs the way the board does: a good day (85 or more) takes the round up a level, a poor one
   // (under 50) takes it down, five levels in all. The level is read off the days before today, so it holds
@@ -2118,8 +2120,11 @@
     e: t => ({ secs: [6, 5, 5, 4, 4][t], q: [3, 3, 4, 4, 5][t], s: [0.34, 0.3, 0.26, 0.22, 0.2][t] }),
   };
   const tierParams = id => TIER_OF_ROUND[id](trainTier(id));
-  const levelChip = id => `<b class="aa-train-lv">L${trainTier(id) + 1}</b>`;
-  const trainFree = id => !trainPlayed(trainDay(), id);
+  // the level, in the round's bar once there is one to speak of: level 1 says nothing
+  const levelChip = id => trainTier(id) ? `<b class="aa-train-lv">Level ${trainTier(id) + 1}</b>` : '';
+  const trainFree = id => { const t = trainDay(); return !trainAnyPlayed(t) || trainPlayed(t, id); };
+  // the round to offer after this one: the next in the list not scored today, else the next along
+  const trainNext = id => { const t = trainDay(), ids = TRAIN_ROUNDS.map(r => r.id), i = ids.indexOf(id), order = [...ids.slice(i + 1), ...ids.slice(0, i)]; return order.find(k => typeof t[k] !== 'number') || order[0]; };
   // The long game of a round: consecutive days it was played, ending today or, if today is not played yet,
   // yesterday. 30 days is the first challenge, 90 the second.
   const TRAIN_GOALS = [30, 90];
@@ -2142,14 +2147,15 @@
     syncOwed = true; syncTour({}).catch(() => {});
   }
   function trainStreak() { let n = 0; while (trainDone(trainDay(dayKeyBack(n + 1)))) n++; if (trainDone(trainDay())) n++; return n; }
-  // what a round's Play button says: the score once played today, else Play, marked AD once the free round is spent
+  // what a round's Play button says: the score once played today, else Play, marked AD for a round the day's
+  // free one does not cover
   // "AD" only where an advertisement is what will actually be shown (ads.isAd): the free stand-in the site
   // runs until the network approves it is not one, and must not be called one
   const playLabel = (t, id) => typeof t[id] === 'number' ? String(t[id]) : trainFree(id) || !ads.isAd() ? 'Play' : 'Play \u00b7 AD';
   const runLine = id => {
     const run = trainRun(id), goal = TRAIN_GOALS.find(g => run < g);
-    if (!goal) return `${levelChip(id)}<span class="aa-train-goal is-done"><i style="width:100%"></i></span><em>${TRAIN_GOALS[TRAIN_GOALS.length - 1]}-day challenge done \u2713 \u00b7 ${run} days</em>`;
-    return `${levelChip(id)}<span class="aa-train-goal"><i style="width:${Math.round(100 * run / goal)}%"></i></span><em>${goal}-day challenge \u00b7 ${run}/${goal}</em>`;
+    if (!goal) return `<span class="aa-train-goal is-done"><i style="width:100%"></i></span><em>${run} days \u2713</em>`;
+    return `<span class="aa-train-goal"><i style="width:${Math.round(100 * run / goal)}%"></i></span><em>${run}/${goal} days</em>`;
   };
   function renderTrainPill() {
     if (!el.trainPill) return;
@@ -2184,12 +2190,23 @@
         <div class="aa-train-score"><b>${score == null ? '—' : score}</b><span>Brain Score${done ? '' : ' · so far'}</span></div>
         <div class="aa-train-week" role="img" aria-label="Last seven days">${bars}</div>
       </div>
-      <p class="aa-train-line"><span>${done ? `Done for today. ${streak} day${streak === 1 ? '' : 's'} in a row.` : streak ? `${streak} day${streak === 1 ? '' : 's'} in a row · keep it going.` : 'Four rounds. Five minutes. Every day.'}</span><button type="button" class="aa-train-info" data-train-about aria-label="How Daily Training works" aria-expanded="false">?</button></p>
-      <p class="aa-sheet-note aa-train-about" id="aaTrainAbout" hidden>Each round is scored out of 100 and is free once a day; after that it is locked for the day, and playing it again ${ads.isAd() ? 'is an advertisement you choose' : 'is a tap, for now'} (the better score stays). So is every hint after the first. Every round also keeps a 30-day and a 90-day challenge: consecutive days you played it.</p>
+      <p class="aa-train-line"><span>${done ? `Done for today${streak > 1 ? ` \u00b7 ${streak} days in a row` : ''}` : trainAnyPlayed(t) ? `Free today: ${TRAIN_ROUNDS.find(r => trainPlayed(t, r.id)).name}${ads.isAd() ? ' \u00b7 more with AD' : ''}` : `One round free today${ads.isAd() ? ' \u00b7 more with AD' : ''}`}</span><button type="button" class="aa-train-info" data-train-about aria-label="How Daily Training works" aria-expanded="false">?</button></p>
+      <p class="aa-sheet-note aa-train-about" id="aaTrainAbout" hidden>The first round you play each day is free, as often as you like. ${ads.isAd() ? 'Each other round that day is unlocked by an advertisement you choose, then it is free too.' : 'The other rounds are a tap away, for now.'} Your best score of the day counts. One hint a day is free${ads.isAd() ? ', the rest are an advertisement' : ''}. Every round keeps a 30-day and a 90-day challenge: days in a row you played it.</p>
       <div class="aa-train-rounds">
-        ${TRAIN_ROUNDS.map(r => `<button type="button" class="aa-train-card" data-train="${r.id}"><span class="aa-train-ico2">${TRAIN_ICON[r.id]}</span><span class="aa-row-label"><span class="aa-train-name">${r.name}</span><small class="aa-row-sub">${r.blurb}</small><small class="aa-train-run">${runLine(r.id)}</small></span><span class="aa-train-got${typeof t[r.id] === 'number' ? ' is-done' : ''}">${playLabel(t, r.id)}</span></button>`).join('')}
+        ${TRAIN_ROUNDS.map(r => `<button type="button" class="aa-train-card" data-train="${r.id}">${trainIcon(r.id)}<span class="aa-row-label"><span class="aa-train-name">${r.name}</span><small class="aa-train-run">${runLine(r.id)}</small></span><span class="aa-train-got${typeof t[r.id] === 'number' ? ' is-done' : ''}">${playLabel(t, r.id)}</span></button>`).join('')}
       </div>
       <div id="aaTrainGame" hidden></div>`;
+    // the marks are paintings: fetched once, and the list drawn again when they arrive
+    if (!ART) loadArt().then(() => { const list = $('.aa-train-rounds', el.trainBody); if (list && !list.hidden) renderTrain(); }).catch(() => {});
+  }
+  // Each round's mark is made of paintings, not a glyph: a canvas with a piece gone, the copy beside the
+  // original, three on a wall, one detail through a lens. Picks of their own (salt 'icon'), so nothing of
+  // the day's rounds is given away. Until the gallery has loaded, the drawn line mark stands in.
+  function trainIcon(id) {
+    if (!ART) return `<span class="aa-train-ico2">${TRAIN_ICON[id]}</span>`;
+    const p = artPicks(3, 'icon-' + id), bg = w => `background-image:url('${w.file}')`;
+    const inner = id === 'f' ? `<i style="${bg(p[0])}"></i><i style="${bg(p[0])}"></i>` : id === 'g' ? p.map(w => `<i style="${bg(w)}"></i>`).join('') : `<i style="${bg(p[0])}"></i>`;
+    return `<span class="aa-train-ico2 aa-train-art aa-train-art--${id}" aria-hidden="true">${inner}</span>`;
   }
   el.trainBtn?.addEventListener('click', openTrain);
   el.trainBody?.addEventListener('click', e => {
@@ -2223,8 +2240,8 @@
     try { const got = await adOffer('trainhint', null, true); if (got && train.game === g) { g.hints = (g.hints | 0) + 1; g.hint(); } }
     finally { if (train.game === g) g.hintBusy = false; }
   }
-  // Play: the day's free round, or an advertisement first. The round counts as played when it starts, not
-  // when it ends, so leaving one halfway is not a way round the limit.
+  // Play: the day's free round, a round already unlocked today, or an advertisement first. The round counts
+  // as played when it starts, not when it ends, so leaving one halfway is not a way round it.
   async function trainPlay(id) {
     if (train.busy || !TRAIN_ROUNDS.some(r => r.id === id)) return;
     if (!trainFree(id)) {
@@ -2343,7 +2360,8 @@
       ${(() => { const best = t[kind], tier = trainTier(kind); return typeof best === 'number' && best >= 85 && tier < TRAIN_TIERS - 1 ? '<p class="aa-train-sub"><b>Level up tomorrow.</b></p>' : typeof best === 'number' && best < 50 && tier > 0 ? '<p class="aa-train-sub">A little easier tomorrow.</p>' : ''; })()}
       ${credit.replace('<p class="aa-art-credit">', '<p class="aa-art-credit" hidden>')}
       ${all ? `<p class="aa-train-sub"><b>Brain Score today: ${trainScore(t)}</b></p>` : ''}
-      <div class="aa-actions aa-actions--stack"><button type="button" class="aa-btn aa-btn--primary" data-train-back>Back to training</button><button type="button" class="aa-btn aa-btn--soft" data-train="${kind}">${ICON_AGAIN}Play again${ads.isAd() ? ' \u00b7 AD' : ''}</button></div>
+      <div class="aa-actions aa-actions--stack">${(() => { const nx = trainNext(kind); return `<button type="button" class="aa-btn aa-btn--primary" data-train="${nx}">Play next${ads.isAd() && !trainFree(nx) ? ' \u00b7 AD' : ''}</button>`; })()}<button type="button" class="aa-btn aa-btn--soft" data-train="${kind}">${ICON_AGAIN}Play again</button></div>
+      <p class="aa-card-out"><button type="button" class="aa-linkbtn" data-train-back>All rounds</button></p>
     </div>`;
     SFX.win(); vibe(20);
   }
