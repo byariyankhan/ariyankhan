@@ -1001,12 +1001,17 @@ links.
   `ART_VERSION`, `loadArt`) and kept resized (≤ 800 px, ~13 MB in all, fetched a painting at a time) in `images/art/`, cached forever by
   the worker. The day's works are the same for everybody (`artPicks`, seeded by the day). **Restore the
   Canvas** (`canvasStart`) cuts one painting into pieces (`.aa-art-tile`, the picture as a background
-  at n × 100 %); drag each piece home; scored on wrong tries and time over the allowance. **The Forgery**
+  at n × 100 %): the painting hangs whole in the frame for four seconds (`CANVAS_LOOK`, a countdown in the
+  bar, no dragging, the coach's first step), then it comes apart and the pieces tumble into the tray
+  (`canvasScatter`, `trainFly`: each piece flies from the slot it hung in to its place in the tray, one after
+  another with a small tumble, `SFX.scatter`, nothing under reduced motion) and the clock starts; drag each
+  piece home; scored on wrong tries and time over the allowance. **The Forgery**
   (`forgeryStart`) shows the painting and a copy with patches wrong in it (`artPatch`: mirrored,
   recoloured, taken from elsewhere in the same work, cycling); tap them in the copy, beside the original for a tall
   work and under it for a wide one. **Gallery Memory**
-  (`galleryStart`) hangs the paintings numbered for a few seconds, takes them down, and deals them into a
-  tray: the player **drags each one back to its number** (`galleryDragWire`, `galleryDrop`, `galleryDraw`,
+  (`galleryStart`) hangs the paintings numbered for a few seconds, takes them down (the same `trainFly`
+  flight, each painting falling from where it hung to where it lands in the tray, `SFX.scatter`), and deals
+  them into a tray: the player **drags each one back to its number** (`galleryDragWire`, `galleryDrop`, `galleryDraw`,
   through the same `trainDragWire` as the canvas; a piece dropped on a full place swaps with it, one dragged
   out goes back to the tray). When every place is filled the wrong ones are outlined (`.is-wrong`,
   `galleryCheck`, ten points each) and the round goes on until all hang right; the hint hangs the first

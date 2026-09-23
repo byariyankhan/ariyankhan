@@ -858,6 +858,7 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 /* drag and drop: the tray and the frame do not scroll under a finger, the carried copy rides above everything */
 .aa-art-tray, .aa-art-slots, .aa-art-piece{ touch-action:none; -webkit-user-select:none; user-select:none; }
 .aa-art-piece.is-ghost{ opacity:.25; }
+.aa-art-piece.is-flying, .aa-gal-piece.is-flying{ position:relative; z-index:3; pointer-events:none; }
 .aa-art-slot.is-over{ border-color:var(--accent2); border-style:solid; background:color-mix(in srgb, var(--accent2) 16%, var(--card)); }
 .aa-art-drag{ position:fixed; left:0; top:0; z-index:120; pointer-events:none; border-radius:8px; overflow:hidden; box-shadow:0 12px 28px rgba(0,0,0,.35); will-change:transform; }
 /* the rounds' coach: the same spotlight and card as the board's, and a hand that shows the move */
