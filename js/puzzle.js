@@ -2060,7 +2060,7 @@
       ${rankLine}
       ${state.daily?.race && sayOnce('race-retry') ? '<p class="aa-adapt">Try again puts you back on the same board with your hearts back. Nothing is lost until somebody else clears it.</p>' : ''}
       <div class="aa-actions aa-actions--stack aa-actions--out">
-        ${adCanOffer('heart') ? `<button type="button" class="aa-btn aa-btn--ad aa-btn--big" data-act="adheart">${ICON_AD}Get a free life${ads.isAd() ? '<span class="aa-ad-pill">AD</span>' : ''}</button>` : ''}
+        ${adCanOffer('heart') ? `<button type="button" class="aa-btn aa-btn--ad aa-btn--big" data-act="adheart">Get a free life${ads.isAd() ? ICON_AD : ''}</button>` : ''}
         <button type="button" class="aa-btn aa-btn--soft aa-btn--big" data-act="retry">${ICON_AGAIN}Try again</button>
         ${state.daily?.race ? `<button type="button" class="aa-btn aa-btn--big" data-act="giveup">${ICON_FLAG}Give the board up</button>` : ''}
       </div>
@@ -2164,7 +2164,7 @@
   // Before a round is played its card has one button: Play. Once it is scored, two: Play again (the same
   // puzzle, free) and Play next (a new one, an advertisement where advertising is on).
   const chipAgain = id => `<button type="button" class="aa-train-got is-again" data-train="${id}" data-train-mode="again">${ICON_AGAIN}Play again</button>`;
-  const chipNext = id => `<button type="button" class="aa-train-got is-next" data-train="${id}" data-train-mode="next">${ads.isAd() ? `${ICON_AD}Play next \u00b7 AD` : `${ICON_NEXT}Play next`}</button>`;
+  const chipNext = id => `<button type="button" class="aa-train-got is-next" data-train="${id}" data-train-mode="next">Play next${ads.isAd() ? ICON_AD : ICON_NEXT}</button>`;
   function trainCardState(t, id) {
     if (typeof t[id] === 'number') return { cls: 'is-done', tag: `\u2713 ${t[id]}`, chips: chipAgain(id) + chipNext(id) };
     return { cls: '', tag: '', chips: `<span class="aa-train-got">${ICON_PLAY}Play</span>` };
@@ -2210,7 +2210,7 @@
         <div class="aa-train-score"><b>${score == null ? '—' : score}</b><span>Brain Score</span></div>
         <div class="aa-train-week" role="img" aria-label="Last seven days">${bars}</div>
       </div>
-      <p class="aa-train-line${!done && streak > 1 ? ' is-warn' : ''}"><span>${all ? `All four done${streak > 1 ? ` \u00b7 ${streak} days in a row` : ''}` : done ? `Done for today${streak > 1 ? ` \u00b7 ${streak} days in a row` : ''}` : streak > 1 ? `${streak} days in a row \u00b7 play today` : `Four rounds, free every day${ads.isAd() ? ' \u00b7 more with AD' : ''}`}</span><button type="button" class="aa-train-info" data-train-about aria-label="How Daily Training works" aria-expanded="false">?</button></p>
+      <p class="aa-train-line${!done && streak > 1 ? ' is-warn' : ''}"><span>${all ? `All four done${streak > 1 ? ` \u00b7 ${streak} days in a row` : ''}` : done ? `Done for today${streak > 1 ? ` \u00b7 ${streak} days in a row` : ''}` : streak > 1 ? `${streak} days in a row \u00b7 play today` : 'Four rounds, free every day'}</span><button type="button" class="aa-train-info" data-train-about aria-label="How Daily Training works" aria-expanded="false">?</button></p>
       <p class="aa-sheet-note aa-train-about" id="aaTrainAbout" hidden>${ads.isAd() ? 'Every round is free once a day. Then play it again for nothing, as often as you like, or play a new one of it with a short advertisement. Your best score of the day counts, and the bar under a round is the days you have played it.' : 'Every round is free, every day. Play it again, or play a new one of it. Your best score of the day counts, and the bar under a round is the days you have played it.'}</p>
       <div class="aa-train-rounds">
         ${TRAIN_ROUNDS.map(r => { const c = trainCardState(t, r.id); return `<div class="aa-train-card ${c.cls}" data-train="${r.id}" data-train-mode="again" role="button" tabindex="0">${trainIcon(r.id)}<span class="aa-row-label">${c.tag ? `<small class="aa-train-tag">${c.tag}</small>` : ''}<span class="aa-train-name">${r.name}</span><small class="aa-train-run">${runLine(r.id)}</small></span><span class="aa-train-cta">${c.chips}</span></div>`; }).join('')}
@@ -2249,13 +2249,13 @@
     if (detail && train.game?.kind === 'e') curatorAnswer(+detail.dataset.detail);
   });
   // The hint button of the round in hand: free once a day, then an advertisement the player chooses.
-  const hintLabel = () => `\u{1F4A1} Hint${trainHintsLeft() > 0 ? '' : ads.isAd() ? ' \u00b7 AD' : ''}`;
+  const hintLabel = () => `\u{1F4A1} Hint${trainHintsLeft() > 0 ? '' : ads.isAd() ? ICON_AD : ''}`;
   const hintBtnHtml = () => `${howBtnHtml()}<button type="button" class="aa-train-hint" data-train-hint>${hintLabel()}</button>`;
   async function trainHint() {
     const g = train.game; if (!g || !g.hint || g.hintBusy) return;
     if (trainHintsLeft() > 0) {
       const t = trainDay(); t.h = (t.h | 0) + 1; store.set(trainKey(), t);
-      g.hints = (g.hints | 0) + 1; g.hint(); $$('[data-train-hint]', el.trainBody).forEach(b => { b.textContent = hintLabel(); });
+      g.hints = (g.hints | 0) + 1; g.hint(); $$('[data-train-hint]', el.trainBody).forEach(b => { b.innerHTML = hintLabel(); });
       return;
     }
     g.hintBusy = true;
@@ -2387,7 +2387,7 @@
       ${(() => { const best = t[kind], tier = trainTier(kind); return typeof best === 'number' && best >= 85 && tier < TRAIN_TIERS - 1 ? '<p class="aa-train-sub"><b>Level up tomorrow.</b></p>' : typeof best === 'number' && best < 50 && tier > 0 ? '<p class="aa-train-sub">A little easier tomorrow.</p>' : ''; })()}
       ${credit.replace('<p class="aa-art-credit">', '<p class="aa-art-credit" hidden>')}
       ${(() => { const n = TRAIN_ROUNDS.filter(r => typeof t[r.id] === 'number').length, st = trainStreak(); return n > 1 ? `<p class="aa-train-sub"><b>Brain Score today: ${trainScore(t)}</b></p>` : `<p class="aa-train-sub aa-train-ok">\u2713 Done for today${st > 1 ? ` \u00b7 ${st} days in a row` : ''}</p>`; })()}
-      <div class="aa-actions aa-actions--stack"><button type="button" class="aa-btn aa-btn--primary${ads.isAd() ? ' aa-btn--ad' : ''}" data-train="${kind}" data-train-mode="next">${ads.isAd() ? `${ICON_AD}Play next<span class="aa-ad-pill">AD</span>` : `${ICON_NEXT}Play next`}</button><button type="button" class="aa-btn aa-btn--soft" data-train="${kind}" data-train-mode="again">${ICON_AGAIN}Play again</button></div>
+      <div class="aa-actions aa-actions--stack"><button type="button" class="aa-btn aa-btn--primary${ads.isAd() ? ' aa-btn--ad' : ''}" data-train="${kind}" data-train-mode="next">Play next${ads.isAd() ? ICON_AD : ICON_NEXT}</button><button type="button" class="aa-btn aa-btn--soft" data-train="${kind}" data-train-mode="again">${ICON_AGAIN}Play again</button></div>
     </div>`;
     SFX.win(); vibe(20);
   }
