@@ -769,9 +769,9 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-train-about{ margin:-6px 0 14px; }
 /* the four rounds: a card each, a drawn icon in the brain's colour, the score or Play at the end */
 .aa-train-rounds{ display:grid; gap:10px; margin:0 0 14px; }
-.aa-train-card{ display:flex; align-items:center; gap:14px; width:100%; padding:14px 14px 14px 12px; border:none; border-radius:20px; background:var(--card); color:var(--ink); text-align:left; font:inherit; cursor:pointer; box-shadow:0 2px 10px rgba(0,0,0,.05); transition:transform .1s; }
+.aa-train-card{ display:flex; align-items:center; gap:12px; width:100%; padding:14px 14px 14px 12px; border:none; border-radius:20px; background:var(--card); color:var(--ink); text-align:left; font:inherit; cursor:pointer; box-shadow:0 2px 10px rgba(0,0,0,.05); transition:transform .1s; }
 .aa-train-card:active{ transform:scale(.99); }
-.aa-train-name{ display:block; font-size:18px; font-weight:800; line-height:1.15; margin-bottom:2px; }
+.aa-train-name{ display:block; font-size:17px; font-weight:800; line-height:1.15; margin-bottom:2px; }
 .aa-train-ico2{ flex:none; display:inline-flex; align-items:center; justify-content:center; width:46px; height:46px; border-radius:15px; background:color-mix(in srgb, var(--accent2) 12%, transparent); }
 .aa-train-ico2 svg{ width:26px; height:26px; fill:none; stroke:var(--accent2); stroke-width:1.9; stroke-linecap:round; stroke-linejoin:round; }
 .aa-train-ico2--big{ width:72px; height:72px; border-radius:22px; margin:6px auto 12px; }
@@ -798,8 +798,24 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-train-howcard-in .aa-btn{ width:100%; }
 .aa-train-hud .aa-train-info{ margin-left:auto; }
 .aa-train-hud .aa-train-info + .aa-train-hint{ margin-left:0; }
-.aa-train-got{ min-width:48px; text-align:center; padding:6px 10px; border-radius:12px; font-size:13px; font-weight:900; background:color-mix(in srgb, var(--accent2) 12%, transparent); color:var(--accent2); }
-.aa-train-got.is-done{ background:color-mix(in srgb, var(--good) 14%, transparent); color:var(--good); }
+/* the chip at the end of a card: filled rose = do this one, rose with the video mark = a short advertisement,
+   green with the tick above = done today, play again free; grey never, every card is tappable */
+.aa-train-got{ flex:none; display:inline-flex; align-items:center; justify-content:center; gap:5px; min-width:48px; padding:7px 10px; border-radius:12px; font-size:13px; font-weight:900; white-space:nowrap; background:color-mix(in srgb, var(--accent2) 12%, transparent); color:var(--accent2); }
+.aa-train-got .aa-bi{ width:14px; height:14px; }
+.aa-train-card.is-free .aa-train-got{ background:linear-gradient(120deg, var(--accent2), color-mix(in srgb, var(--accent2) 62%, var(--accent))); color:#fff; box-shadow:0 2px 0 color-mix(in srgb, var(--accent2) 70%, #000); }
+.aa-train-card.is-done .aa-train-got{ background:color-mix(in srgb, var(--good) 14%, transparent); color:var(--good); }
+.aa-train-card.is-ad .aa-train-got{ background:transparent; box-shadow:inset 0 0 0 1.5px color-mix(in srgb, var(--accent2) 40%, transparent); }
+/* the small line above a round's name: FREE TODAY, ✓ 100, FREE TOMORROW */
+.aa-train-tag{ display:block; margin-bottom:2px; font-size:11px; font-weight:900; letter-spacing:.9px; text-transform:uppercase; color:var(--muted); }
+.aa-train-card.is-free .aa-train-tag{ color:var(--accent2); }
+.aa-train-card.is-done .aa-train-tag{ color:var(--good); }
+.aa-train-card.is-free{ background:color-mix(in srgb, var(--accent2) 5%, var(--card)); box-shadow:0 0 0 2px color-mix(in srgb, var(--accent2) 45%, transparent), 0 2px 10px rgba(0,0,0,.05); }
+.aa-train-card.is-done{ box-shadow:0 0 0 2px color-mix(in srgb, var(--good) 35%, transparent), 0 2px 10px rgba(0,0,0,.05); }
+.aa-train-pill.is-dot{ min-width:12px; width:12px; height:12px; padding:0; right:-2px; bottom:0; }
+.aa-train-next{ margin:10px 0 2px; }
+.aa-train-ok{ color:var(--good); }
+.aa-train-line.is-warn span{ color:var(--accent2); }
+.aa-sheet.is-playing .aa-sheet-head [data-close-sheet]{ order:-1; margin-left:-8px; }
 .aa-train-run{ display:flex !important; align-items:center; gap:8px; margin-top:6px; font-size:11px !important; font-weight:800 !important; color:var(--muted); }
 .aa-train-run em{ font-style:normal; white-space:nowrap; }
 .aa-train-goal{ flex:1; max-width:120px; height:5px; border-radius:3px; background:color-mix(in srgb, var(--muted) 18%, transparent); overflow:hidden; }
