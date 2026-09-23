@@ -976,10 +976,10 @@ links.
   streak alive and nothing played yet it says "3 days in a row · play today" in rose. **Done for today** is
   one round scored (`trainDone`), the streak counts such days, `trainAll` is the bonus of all four; the
   per-round bar counts days that round was played, in all (`trainRun`: cumulative, so it only ever grows).
-  The home pill is a dot until something is scored, then the day's Brain Score. The result offers **Play
-  with ads** (`trainNext`: the next unscored round, with the video mark and an AD pill; "Play next" when
-  that round is free; the caption "Next: The Forgery · free tomorrow" saying what and why) and **Play
-  again** (always free); with all four scored it offers Done. In a round and on its result the corner
+  The home pill is a dot until something is scored, then the day's Brain Score. The result always offers **Play
+  next** (`trainNext`: the next unscored round, else the next along; an advertisement with the video mark
+  and an AD pill unless it is the day's free round, whatever was played before; the caption "Next: The
+  Forgery · free tomorrow" saying what and why) and **Play again** (always free). In a round and on its result the corner
   button is ← back to the list (`trainScreen`, a capture-phase handler before `closeSheets`; the phone's
   back button does the same in `backPressed`); on the list it is ✕. **The round marks
   are paintings** (`trainIcon`, `.aa-train-art--r/f/g/e`): a canvas with a piece gone, the original beside a
