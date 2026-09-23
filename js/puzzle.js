@@ -2096,10 +2096,11 @@
   const trainHintsLeft = () => Math.max(0, TRAIN_FREE_HINTS - (trainDay().h | 0));
   // Rounds: one round a day is free, and which one is the game's to say -- the four in turn, a different one
   // each calendar day, the same for everyone, the way a daily puzzle is everybody's puzzle. The free round is
-  // played as often as the player likes. Every other round costs an advertisement the player chooses, each
-  // time it is played -- as many times as they like, an advertisement a go. A round counts as played when it
-  // starts (`pp` per round, `p` in all). Where advertising is off (the site) every round is simply free, and
-  // nothing is called an advertisement.
+  // played as often as the player likes. Every other round that day is unlocked by an advertisement the
+  // player chooses, once -- the advertisement is for playing a NEW round, never for playing one again; then
+  // it too is free for the rest of the day. A round counts as played, so
+  // unlocked, when it starts (`pp` per round, `p` in all), so leaving one halfway is not a way round it.
+  // Where advertising is off (the site) every round is simply free, and nothing is called an advertisement.
   const trainPlayed = (t, id) => ((t.pp && t.pp[id]) | 0) > 0;
   const dayIndexOf = k => { const [y, m, d] = k.split('-').map(Number); return Math.round(Date.UTC(y, m - 1, d) / 864e5); };
   const trainFreeId = (k = dayKey()) => TRAIN_ROUNDS[((dayIndexOf(k) % TRAIN_ROUNDS.length) + TRAIN_ROUNDS.length) % TRAIN_ROUNDS.length].id;
@@ -2128,8 +2129,9 @@
   const tierParams = id => TIER_OF_ROUND[id](trainTier(id));
   // the level, in the round's bar once there is one to speak of: level 1 says nothing
   const levelChip = id => trainTier(id) ? `<b class="aa-train-lv">Level ${trainTier(id) + 1}</b>` : '';
-  // free: everywhere advertising is off, and the day's round; everything else is an advertisement a go
-  const trainFree = id => !ads.isAd() || id === trainFreeId();
+  // free: everywhere advertising is off; the day's round; a round unlocked today; and a round scored today,
+  // so "Play again" is never an advertisement, not even for a round started before midnight and finished after
+  const trainFree = id => { const t = trainDay(); return !ads.isAd() || id === trainFreeId() || trainPlayed(t, id) || typeof t[id] === 'number'; };
   // the round to offer after this one: the day's free round if it has no score yet, else the next in the
   // list without one, else nothing (all four are done)
   const trainNext = id => { const t = trainDay(), f = trainFreeId(); if (typeof t[f] !== 'number') return f; const ids = TRAIN_ROUNDS.map(r => r.id), i = ids.indexOf(id); return [...ids.slice(i + 1), ...ids.slice(0, i)].find(k => typeof t[k] !== 'number') || null; };
@@ -2167,10 +2169,11 @@
   // runs until the network approves it is not one, and must not be called one.
   const ICON_PLAY = ICO('<path d="M8 5.5v13l10.5-6.5z"/>');
   function trainCardState(t, id) {
-    const done = typeof t[id] === 'number', free = trainFree(id);
-    if (done) return { cls: free ? 'is-done' : 'is-done is-ad', tag: `\u2713 ${t[id]}`, chip: free ? `${ICON_AGAIN}Play again` : `${ICON_AD}Play again \u00b7 AD` };
-    if (!ads.isAd()) return { cls: free && id === trainFreeId() ? 'is-free' : '', tag: id === trainFreeId() ? 'Today' : '', chip: id === trainFreeId() ? `${ICON_PLAY}Play` : 'Play' };
+    if (typeof t[id] === 'number') return { cls: 'is-done', tag: `\u2713 ${t[id]}`, chip: `${ICON_AGAIN}Play again` };
+    const free = id === trainFreeId();
+    if (!ads.isAd()) return { cls: free ? 'is-free' : '', tag: free ? 'Today' : '', chip: free ? `${ICON_PLAY}Play` : 'Play' };
     if (free) return { cls: 'is-free', tag: 'Free today', chip: `${ICON_PLAY}Play` };
+    if (trainPlayed(t, id)) return { cls: '', tag: 'Unlocked', chip: `${ICON_PLAY}Play` };
     const n = trainFreeIn(id);
     return { cls: 'is-ad', tag: n === 1 ? 'Free tomorrow' : `Free in ${n} days`, chip: `${ICON_AD}Play \u00b7 AD` };
   }
@@ -2216,7 +2219,7 @@
         <div class="aa-train-week" role="img" aria-label="Last seven days">${bars}</div>
       </div>
       <p class="aa-train-line${!done && streak > 1 ? ' is-warn' : ''}"><span>${all ? `All four done${streak > 1 ? ` \u00b7 ${streak} days in a row` : ''}` : done ? `Done for today${streak > 1 ? ` \u00b7 ${streak} days in a row` : ''}` : streak > 1 ? `${streak} days in a row \u00b7 play today` : ads.isAd() ? 'One free round a day \u00b7 more with AD' : `Today\u2019s round: ${freeName}`}</span><button type="button" class="aa-train-info" data-train-about aria-label="How Daily Training works" aria-expanded="false">?</button></p>
-      <p class="aa-sheet-note aa-train-about" id="aaTrainAbout" hidden>${ads.isAd() ? 'One round is free every day, and it changes daily. Each of the other three takes a short advertisement, each time you play it. Your best score of the day counts, and the bar under a round is the days you have played it.' : 'One round is today\u2019s, and it changes daily. Here on the website every round is free, always. Your best score of the day counts, and the bar under a round is the days you have played it.'}</p>
+      <p class="aa-sheet-note aa-train-about" id="aaTrainAbout" hidden>${ads.isAd() ? 'One round is free every day, and it changes daily. Each of the other three takes one short advertisement, then that round is yours for the rest of the day. Your best score of the day counts, and the bar under a round is the days you have played it.' : 'One round is today\u2019s, and it changes daily. Here on the website every round is free, always. Your best score of the day counts, and the bar under a round is the days you have played it.'}</p>
       <div class="aa-train-rounds">
         ${TRAIN_ROUNDS.map(r => { const c = trainCardState(t, r.id); return `<button type="button" class="aa-train-card ${c.cls}" data-train="${r.id}">${trainIcon(r.id)}<span class="aa-row-label">${c.tag ? `<small class="aa-train-tag">${c.tag}</small>` : ''}<span class="aa-train-name">${r.name}</span><small class="aa-train-run">${runLine(r.id)}</small></span><span class="aa-train-got">${c.chip}</span></button>`; }).join('')}
       </div>
@@ -2267,7 +2270,8 @@
     try { const got = await adOffer('trainhint', null, true); if (got && train.game === g) { g.hints = (g.hints | 0) + 1; g.hint(); } }
     finally { if (train.game === g) g.hintBusy = false; }
   }
-  // Play: the day's free round, or an advertisement first, every time. The round counts as played when it starts.
+  // Play: the day's free round, a round already unlocked today, or an advertisement first. The round counts
+  // as played when it starts, not when it ends, so leaving one halfway is not a way round it.
   async function trainPlay(id) {
     if (train.busy || !TRAIN_ROUNDS.some(r => r.id === id)) return;
     if (!trainFree(id)) {
@@ -2388,13 +2392,11 @@
       ${(() => { const n = TRAIN_ROUNDS.filter(r => typeof t[r.id] === 'number').length, st = trainStreak(); return n > 1 ? `<p class="aa-train-sub"><b>Brain Score today: ${trainScore(t)}</b></p>` : `<p class="aa-train-sub aa-train-ok">\u2713 Done for today${st > 1 ? ` \u00b7 ${st} days in a row` : ''}</p>`; })()}
       ${(() => {
         // what comes next, said before the button: the round that was the surprise, and what it costs
-        // play again: free on the day's round, an advertisement on any other, and the button says which
-        const againBtn = k => `<button type="button" class="aa-btn aa-btn--soft" data-train="${k}">${trainFree(k) ? ICON_AGAIN : ICON_AD}Play again${trainFree(k) ? '' : ' \u00b7 AD'}</button>`;
-        const nx = trainNext(kind); if (!nx) return `<div class="aa-actions aa-actions--stack"><button type="button" class="aa-btn aa-btn--primary" data-train-back>Done</button>${againBtn(kind)}</div>`;
+        const nx = trainNext(kind); if (!nx) return `<div class="aa-actions aa-actions--stack"><button type="button" class="aa-btn aa-btn--primary" data-train-back>Done</button><button type="button" class="aa-btn aa-btn--soft" data-train="${kind}">${ICON_AGAIN}Play again</button></div>`;
         const name = TRAIN_ROUNDS.find(r => r.id === nx).name, ad = !trainFree(nx), n = trainFreeIn(nx);
-        const when = !ads.isAd() ? '' : nx === trainFreeId() ? ' \u00b7 free today' : n === 1 ? ' \u00b7 free tomorrow' : ` \u00b7 free in ${n} days`;
+        const when = !ads.isAd() ? '' : nx === trainFreeId() ? ' \u00b7 free today' : trainPlayed(t, nx) ? '' : n === 1 ? ' \u00b7 free tomorrow' : ` \u00b7 free in ${n} days`;
         return `<p class="aa-train-sub aa-train-next">Next: ${name}${when}</p>
-      <div class="aa-actions aa-actions--stack"><button type="button" class="aa-btn aa-btn--primary${ad ? ' aa-btn--ad' : ''}" data-train="${nx}">${ad ? ICON_AD : ''}Play next${ad ? '<span class="aa-ad-pill">AD</span>' : ''}</button>${againBtn(kind)}</div>`;
+      <div class="aa-actions aa-actions--stack"><button type="button" class="aa-btn aa-btn--primary${ad ? ' aa-btn--ad' : ''}" data-train="${nx}">${ad ? ICON_AD : ''}Play next${ad ? '<span class="aa-ad-pill">AD</span>' : ''}</button><button type="button" class="aa-btn aa-btn--soft" data-train="${kind}">${ICON_AGAIN}Play again</button></div>`;
       })()}
     </div>`;
     SFX.win(); vibe(20);
@@ -3108,7 +3110,7 @@
       grant() { /* the round in hand takes it: trainHint applies it once this resolves */ },
     },
     trainplay: {
-      earn: 'Watch this through to play this round now.',
+      earn: 'Watch this through and this round is yours for the rest of today.',
       board: false,
       grant() { /* trainPlay starts the round once this resolves */ },
     },
