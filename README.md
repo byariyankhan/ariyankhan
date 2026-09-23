@@ -958,6 +958,19 @@ links.
   wrong. Kept per day as `train:<day>` (best of the day per round), pushed in the state blob as `train` and
   merged by the better score per round (`adoptTour`); the sheet shows the score, seven days of bars and the
   streak of days done. The page's title, description and keywords say brain training first.
+- **Four picture rounds and a hint system** in Daily Training (seven rounds now: `a j d m o w c`). The art
+  is the game's own data, so every device shows the same round: **Piece the map** (`jigStart`) cuts a square
+  window of the world map around today's country into nine tiles (`mapWindow`, `mapDefs`: the whole map once
+  in a hidden svg, every tile a `<use>` of it with its own viewBox); tap a tile, tap a slot; two tiles that
+  show the same thing (open sea) are interchangeable (`sig`). **Counterfeit** (`counterfeitStart`,
+  `boardSvg`) draws today's board twice and turns three arrows round in the copy; tap them there. **Shape
+  order** (`orderStart`) shows five country outlines for five seconds, then the same five shuffled to tap in
+  order. **What was there?** (`thereStart`) colours a few countries in a window of the map for six seconds,
+  then asks three yes/no questions. Every round has a **Hint** (`trainHint`): one free a day
+  (`TRAIN_FREE_HINTS`, `train:<day>.h`), then an advertisement the player chooses (`adOffer('trainhint')`,
+  free where advertising is off); a hint costs ten points of that round. Hints: a pair shown for a moment
+  (flags), two wrong capitals removed (sprint), a tile put home and locked (map), a difference circled
+  (counterfeit), the next shape marked (order), one more short look (what was there).
 - **A sweep for dead and doubled code** (September 2026): gone from `js/puzzle.js` are three icons nothing
   drew, `MODES`, `RUSH_SECONDS`, a second copy of `freeAtStart` (the test has its own), four `el.*` entries
   nothing read, and the `lastRun` record nothing read back; the six fetch wrappers (`authApi`,

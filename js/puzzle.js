@@ -2075,10 +2075,18 @@
   // mean, kept per day (`train:<day>`, best of the day per round) and synced with the account like the daily
   // board's record. A day is done when all three are; the streak counts days done.
   const TRAIN_ROUNDS = [
-    { id: 'a', name: 'Arrow board', blurb: 'Today’s board, at your difficulty.', ico: '\u{1F3AF}' },
+    { id: 'a', name: 'Arrow board', blurb: 'Today\u2019s board, at your difficulty.', ico: '\u{1F3AF}' },
+    { id: 'j', name: 'Piece the map', blurb: 'Nine tiles of today\u2019s country. Put them back.', ico: '\u{1F9E9}' },
+    { id: 'd', name: 'Counterfeit', blurb: 'Two boards, three arrows differ. Find them.', ico: '\u{1F50D}' },
     { id: 'm', name: 'Flag match', blurb: 'Eight pairs of flags, from memory.', ico: '\u{1F6A9}' },
-    { id: 'c', name: 'Capital sprint', blurb: 'Forty-five seconds of capitals.', ico: '\u{1F3DB}️' },
+    { id: 'o', name: 'Shape order', blurb: 'Five countries, five seconds. Rebuild the order.', ico: '\u{1F5FA}\uFE0F' },
+    { id: 'w', name: 'What was there?', blurb: 'A map for six seconds, then three questions.', ico: '\u{1F441}\uFE0F' },
+    { id: 'c', name: 'Capital sprint', blurb: 'Forty-five seconds of capitals.', ico: '\u{1F3DB}\uFE0F' },
   ];
+  // Hints: one a day for nothing, the rest for an advertisement the player chooses (adOffer('trainhint');
+  // free where advertising is off). A hint costs ten points of the round it is used in.
+  const TRAIN_FREE_HINTS = 1;
+  const trainHintsLeft = () => Math.max(0, TRAIN_FREE_HINTS - (trainDay().h | 0));
   const train = { on: false, game: null, timer: 0 };
   const trainKey = d => 'train:' + (d || dayKey());
   const trainDay = d => { const t = store.get(trainKey(d), null); return t && typeof t === 'object' ? t : {}; };
@@ -2126,11 +2134,11 @@
         <div class="aa-train-score"><b>${score == null ? '—' : score}</b><span>Brain Score${done ? '' : ' · so far'}</span></div>
         <div class="aa-train-week" role="img" aria-label="Last seven days">${bars}</div>
       </div>
-      <p class="aa-train-line">${done ? `Done for today. ${streak} day${streak === 1 ? '' : 's'} in a row.` : streak ? `${streak} day${streak === 1 ? '' : 's'} in a row · keep it going.` : 'Three rounds. Five minutes. Every day.'}</p>
+      <p class="aa-train-line">${done ? `Done for today. ${streak} day${streak === 1 ? '' : 's'} in a row.` : streak ? `${streak} day${streak === 1 ? '' : 's'} in a row · keep it going.` : 'Seven rounds. Ten minutes. Every day.'}</p>
       <div class="aa-group aa-train-rounds">
         ${TRAIN_ROUNDS.map(r => `<button type="button" class="aa-row aa-row--link aa-train-row" data-train="${r.id}"><span class="aa-row-ico">${r.ico}</span><span class="aa-row-label">${r.name}<small class="aa-row-sub">${r.blurb}</small></span><span class="aa-train-got${typeof t[r.id] === 'number' ? ' is-done' : ''}">${typeof t[r.id] === 'number' ? t[r.id] : 'Play'}</span></button>`).join('')}
       </div>
-      <p class="aa-sheet-note">Each round is scored out of 100. Play a round again and the better score stays.</p>
+      <p class="aa-sheet-note">Each round is scored out of 100. Play a round again and the better score stays. One free hint a day; after that a hint is an advertisement you choose.</p>
       <div id="aaTrainGame" hidden></div>`;
   }
   el.trainBtn?.addEventListener('click', openTrain);
@@ -2138,11 +2146,34 @@
     const r = e.target.closest('[data-train]')?.dataset.train;
     if (r) { trainStart(r); return; }
     if (e.target.closest('[data-train-back]')) { trainStop(); renderTrain(); return; }
+    if (e.target.closest('[data-train-hint]')) { void trainHint(); return; }
     const opt = e.target.closest('[data-cap]');
     if (opt && train.game?.kind === 'c') sprintAnswer(opt.dataset.cap);
     const card = e.target.closest('[data-flag]');
     if (card && train.game?.kind === 'm') flagFlip(+card.dataset.flag);
+    const tile = e.target.closest('[data-tile]');
+    if (tile && train.game?.kind === 'j') jigTap(tile);
+    const slot = e.target.closest('[data-slot]');
+    if (slot && !tile && train.game?.kind === 'j') jigSlot(+slot.dataset.slot);
+    const shape = e.target.closest('[data-shape]');
+    if (shape && train.game?.kind === 'o') orderTap(+shape.dataset.shape);
+    const yn = e.target.closest('[data-yn]');
+    if (yn && train.game?.kind === 'w') thereAnswer(yn.dataset.yn === 'yes');
   });
+  // The hint button of the round in hand: free once a day, then an advertisement the player chooses.
+  const hintLabel = () => `\u{1F4A1} Hint${trainHintsLeft() > 0 ? '' : ads.on() ? ' \u00b7 AD' : ''}`;
+  const hintBtnHtml = () => `<button type="button" class="aa-train-hint" data-train-hint>${hintLabel()}</button>`;
+  async function trainHint() {
+    const g = train.game; if (!g || !g.hint || g.hintBusy) return;
+    if (trainHintsLeft() > 0) {
+      const t = trainDay(); t.h = (t.h | 0) + 1; store.set(trainKey(), t);
+      g.hints = (g.hints | 0) + 1; g.hint(); $$('[data-train-hint]', el.trainBody).forEach(b => { b.textContent = hintLabel(); });
+      return;
+    }
+    g.hintBusy = true;
+    try { const got = await adOffer('trainhint', null, true); if (got && train.game === g) { g.hints = (g.hints | 0) + 1; g.hint(); } }
+    finally { if (train.game === g) g.hintBusy = false; }
+  }
   function trainStart(id) {
     if (id === 'a') {
       // the daily board, with the way back leading here
@@ -2153,8 +2184,9 @@
     const box = $('#aaTrainGame', el.trainBody); if (!box) return;
     $$('.aa-train-top, .aa-train-line, .aa-train-rounds, .aa-sheet-note', el.trainBody).forEach(n => { n.hidden = true; });
     box.hidden = false;
-    if (id === 'm') flagStart(box); else sprintStart(box);
+    if (id === 'm') flagStart(box); else if (id === 'c') sprintStart(box); else if (id === 'j') void jigStart(box); else if (id === 'd') counterfeitStart(box); else if (id === 'o') orderStart(box); else if (id === 'w') void thereStart(box);
   }
+  const hintCost = g => (g.hints | 0) * 10;
   function trainFinish(kind, score, lines) {
     trainStop(); trainSave(kind, score);
     const box = $('#aaTrainGame', el.trainBody); if (!box) return;
@@ -2177,8 +2209,15 @@
     const rnd = mulberry32(hashStr('aa-flagdeal-' + dayKey()));
     for (let i = cards.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [cards[i], cards[j]] = [cards[j], cards[i]]; }
     cards.forEach((c, i) => { c.i = i; });
-    train.game = { kind: 'm', cards, open: [], moves: 0, pairs: 0, t0: performance.now(), lock: false };
-    box.innerHTML = `<div class="aa-train-hud"><span>Flag match</span><span id="aaFlagMoves">0 moves</span><span id="aaFlagTime">0:00</span></div>
+    train.game = { kind: 'm', cards, open: [], moves: 0, pairs: 0, t0: performance.now(), lock: false, hint() {
+      // a pair shown for a moment, then face down again: the memory is still the player's to keep
+      const g = train.game; if (!g || g.lock) return;
+      const left = g.cards.filter(c => !c.done && !c.up); if (left.length < 2) return;
+      const a = left[0], b = left.find(c => c !== a && c.L.id === a.L.id); if (!b) return;
+      g.lock = true; a.up = b.up = true; flagDraw();
+      setTimeout(() => { if (!a.done) a.up = false; if (!b.done) b.up = false; g.lock = false; flagDraw(); }, 900);
+    } };
+    box.innerHTML = `<div class="aa-train-hud"><span>Flag match</span><span id="aaFlagMoves">0 moves</span><span id="aaFlagTime">0:00</span>${hintBtnHtml()}</div>
       <div class="aa-flags">${cards.map(c => `<button type="button" class="aa-flag" data-flag="${c.i}" aria-label="Card ${c.i + 1}"><span class="aa-flag-face">${flagOf(c.L.a2)}</span></button>`).join('')}</div>
       <p class="aa-sheet-note">Tap two cards. A pair of the same flag stays up.</p>`;
     train.timer = setInterval(() => { const g = train.game; if (!g || g.kind !== 'm') return; const el2 = $('#aaFlagTime', box); if (el2) el2.textContent = fmtTime(performance.now() - g.t0); }, 500);
@@ -2195,7 +2234,7 @@
       a.done = b.done = true; g.pairs++; SFX.shoot(); flagDraw();
       if (g.pairs === 8) {
         const secs = (performance.now() - g.t0) / 1000;
-        const score = clamp100(100 - Math.max(0, g.moves - 8) * 4 - Math.max(0, secs - 45) * 0.8);
+        const score = clamp100(100 - Math.max(0, g.moves - 8) * 4 - Math.max(0, secs - 45) * 0.8 - hintCost(g));
         trainFinish('m', score, `${g.moves} moves · ${fmtTime(secs * 1000)}`);
       }
     } else {
@@ -2214,8 +2253,12 @@
   function sprintStart(box) {
     const pool = countries();
     const rnd = mulberry32(hashStr('aa-sprint-' + dayKey() + '-' + Date.now()));
-    train.game = { kind: 'c', pool, rnd, right: 0, wrong: 0, asked: new Set(), left: SPRINT_SECONDS, cur: null, lock: false };
-    box.innerHTML = `<div class="aa-train-hud"><span>Capital sprint</span><span id="aaSprintScore">0</span><span id="aaSprintTime">0:${SPRINT_SECONDS}</span></div>
+    train.game = { kind: 'c', pool, rnd, right: 0, wrong: 0, asked: new Set(), left: SPRINT_SECONDS, cur: null, lock: false, hint() {
+      // two of the three wrong capitals go
+      const g = train.game; if (!g || !g.cur) return;
+      $$('.aa-sprint-opt', el.trainBody).filter(b => b.dataset.cap !== g.cur.cap && !b.disabled).slice(0, 2).forEach(b => { b.disabled = true; b.classList.add('is-gone'); });
+    } };
+    box.innerHTML = `<div class="aa-train-hud"><span>Capital sprint</span><span id="aaSprintScore">0</span><span id="aaSprintTime">0:${SPRINT_SECONDS}</span>${hintBtnHtml()}</div>
       <div class="aa-sprint" id="aaSprint"></div>`;
     sprintNext();
     const t0 = performance.now();
@@ -2224,7 +2267,7 @@
       g.left = Math.max(0, SPRINT_SECONDS - (performance.now() - t0) / 1000);
       const el2 = $('#aaSprintTime', box); if (el2) el2.textContent = `0:${String(Math.ceil(g.left)).padStart(2, '0')}`;
       if (g.left <= 0) {
-        const score = clamp100(g.right * 8 - g.wrong * 4);
+        const score = clamp100(g.right * 8 - g.wrong * 4 - hintCost(g));
         trainFinish('c', score, `${g.right} right · ${g.wrong} wrong`);
       }
     }, 200);
@@ -2249,6 +2292,223 @@
     $$('.aa-sprint-opt', el.trainBody).forEach(b => { if (b.dataset.cap === g.cur.cap) b.classList.add('is-right'); else if (b.dataset.cap === cap) b.classList.add('is-wrong'); b.disabled = true; });
     const sc = $('#aaSprintScore', el.trainBody); if (sc) sc.textContent = String(Math.max(0, g.right * 8 - g.wrong * 4));
     setTimeout(sprintNext, ok ? 220 : 650);
+  }
+
+  // ── The picture rounds: today's country, drawn by the game itself ──
+  // No photographs and no paintings: the map, the outlines and the arrow boards are the art, and they are
+  // built here from the same data the tour is built from, so every device shows the same round.
+  const numsOf = d => (d.match(/-?\d+(?:\.\d+)?/g) || []).map(Number);
+  function mapBox(c) { const n = numsOf(c.d); let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9; for (let i = 0; i + 1 < n.length; i += 2) { x0 = Math.min(x0, n[i]); x1 = Math.max(x1, n[i]); y0 = Math.min(y0, n[i + 1]); y1 = Math.max(y1, n[i + 1]); } return { x0, y0, x1, y1 }; }
+  // a square window of the map around a country, at least `min` map units wide, kept inside the map
+  function mapWindow(c, grow, min) {
+    const b = mapBox(c); let size = Math.max(min, (b.x1 - b.x0) * grow, (b.y1 - b.y0) * grow);
+    size = Math.min(size, MAP.h);
+    let x = (b.x0 + b.x1) / 2 - size / 2, y = (b.y0 + b.y1) / 2 - size / 2;
+    x = Math.max(0, Math.min(MAP.w - size, x)); y = Math.max(0, Math.min(MAP.h - size, y));
+    return { x, y, size };
+  }
+  // the whole map once, in a hidden svg, for every tile and window to <use>
+  function mapDefs(meId) {
+    let d = document.getElementById('aaMapDefs');
+    if (!d) {
+      d = svgEl('svg', { id: 'aaMapDefs', class: 'aa-mapdefs', width: '0', height: '0', 'aria-hidden': 'true' });
+      const g = svgEl('g', { id: 'aaMapG' });
+      for (const c of MAP.countries) g.appendChild(svgEl('path', { d: c.d, 'data-id': c.id }));
+      d.appendChild(g); document.body.appendChild(d);
+    }
+    $$('#aaMapG path', d).forEach(p => { p.classList.toggle('is-me', p.dataset.id === meId); p.classList.remove('is-on'); });
+    return d;
+  }
+  const dailyCountry = () => { const d = dailyPick(); return DATA.levels[d.idx]; };
+  const mapCountry = L => (MAP?.countries || []).find(c => c.id === L.id);
+  async function needMap(box) {
+    if (MAP) return true;
+    box.innerHTML = '<p class="aa-sheet-note">Loading the map…</p>';
+    try { await loadMap(); return true; } catch { box.innerHTML = '<p class="aa-sheet-note">The map could not be loaded. Check the connection and try again.</p><div class="aa-actions aa-actions--stack"><button type="button" class="aa-btn aa-btn--soft" data-train-back>Back</button></div>'; return false; }
+  }
+  const windowSvg = (win, cls = '') => `<svg class="aa-mapwin ${cls}" viewBox="${win.x} ${win.y} ${win.size} ${win.size}" preserveAspectRatio="none" aria-hidden="true"><rect x="${win.x}" y="${win.y}" width="${win.size}" height="${win.size}" class="aa-mapwin-sea"/><use href="#aaMapG"/></svg>`;
+
+  // Piece the map: nine tiles of the window around today's country, shuffled; tap a tile, tap a slot.
+  async function jigStart(box) {
+    if (!(await needMap(box))) return;
+    const L = dailyCountry(), c = mapCountry(L) || MAP.countries[0];
+    mapDefs(c.id);
+    const win = mapWindow(c, 2.2, 90), n = 3, tw = win.size / n;
+    // what each tile shows, by the countries whose box crosses it: two tiles that show the same thing (open
+    // sea, most often) are the same tile, and either goes in either place
+    const boxes = MAP.countries.map(k => ({ id: k.id, b: mapBox(k) }));
+    const sigOf = (x, y) => boxes.filter(k => k.b.x1 > x && k.b.x0 < x + tw && k.b.y1 > y && k.b.y0 < y + tw).map(k => k.id).sort().join(',');
+    const tiles = Array.from({ length: n * n }, (_, i) => { const x = win.x + (i % n) * tw, y = win.y + Math.floor(i / n) * tw; return { i, x, y, sig: sigOf(x, y) }; });
+    const rnd = mulberry32(hashStr('aa-jig-' + dayKey()));
+    const tray = tiles.slice(); for (let i = tray.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [tray[i], tray[j]] = [tray[j], tray[i]]; }
+    const tileSvg = t => `<svg viewBox="${t.x} ${t.y} ${tw} ${tw}" preserveAspectRatio="none" aria-hidden="true"><rect x="${t.x}" y="${t.y}" width="${tw}" height="${tw}" class="aa-mapwin-sea"/><use href="#aaMapG"/></svg>`;
+    train.game = { kind: 'j', tiles, tileSvg, slots: Array(n * n).fill(null), sel: null, wrong: 0, t0: performance.now(), locked: new Set(), hint() {
+      // the first tile out of place goes home and stays there
+      const g = train.game; if (!g) return;
+      const k = g.slots.findIndex((t, i) => t !== i && !g.locked.has(i)); if (k < 0) return;
+      const from = g.slots.indexOf(k); if (from >= 0) g.slots[from] = null;
+      g.slots[k] = k; g.locked.add(k); g.sel = null;
+      jigDraw(); jigCheck();
+    } };
+    box.innerHTML = `<div class="aa-train-hud"><span>Piece the map</span><span id="aaJigTime">0:00</span>${hintBtnHtml()}</div>
+      <p class="aa-train-sub">${escapeHtml(L.name)}. Tap a tile, then where it goes.</p>
+      <div class="aa-jig-slots" id="aaJigSlots">${tiles.map((_, i) => `<button type="button" class="aa-jig-slot" data-slot="${i}" aria-label="Slot ${i + 1}"></button>`).join('')}</div>
+      <div class="aa-jig-tray" id="aaJigTray">${tray.map(t => `<button type="button" class="aa-jig-tile" data-tile="${t.i}" aria-label="Tile">${tileSvg(t)}</button>`).join('')}</div>`;
+    train.timer = setInterval(() => { const g = train.game; if (!g || g.kind !== 'j') return; const t = $('#aaJigTime', box); if (t) t.textContent = fmtTime(performance.now() - g.t0); }, 500);
+  }
+  function jigTap(btn) {
+    const g = train.game; if (!g) return;
+    const i = +btn.dataset.tile;
+    const inSlot = btn.closest('.aa-jig-slot');
+    if (inSlot) { const k = +inSlot.dataset.slot; if (g.locked.has(k)) return; g.slots[k] = null; g.sel = null; jigDraw(); return; }   // back to the tray
+    g.sel = g.sel === i ? null : i; jigDraw();
+  }
+  function jigSlot(k) {
+    const g = train.game; if (!g || g.sel == null || g.locked.has(k) || g.slots[k] != null) return;
+    const from = g.slots.indexOf(g.sel); if (from >= 0) g.slots[from] = null;
+    g.slots[k] = g.sel; g.sel = null; SFX.shoot(); jigDraw(); jigCheck();
+  }
+  function jigDraw() {
+    const g = train.game; if (!g) return;
+    const slots = $('#aaJigSlots', el.trainBody), tray = $('#aaJigTray', el.trainBody); if (!slots || !tray) return;
+    $$('.aa-jig-slot', slots).forEach((sl, k) => { const t = g.slots[k]; sl.innerHTML = t == null ? '' : `<span class="aa-jig-tile is-placed${g.locked.has(k) ? ' is-locked' : ''}" data-tile="${t}">${g.tileSvg(g.tiles[t])}</span>`; sl.classList.toggle('is-open', t == null && g.sel != null); });
+    $$('.aa-jig-tile', tray).forEach(b => { const i = +b.dataset.tile; b.hidden = g.slots.includes(i); b.classList.toggle('is-sel', g.sel === i); });
+  }
+  function jigCheck() {
+    const g = train.game; if (!g || g.slots.some(t => t == null)) return;
+    const wrongNow = g.slots.filter((t, i) => t !== i && g.tiles[t].sig !== g.tiles[i].sig).length;
+    if (wrongNow) { g.wrong++; toast(`${wrongNow} tile${wrongNow === 1 ? ' is' : 's are'} in the wrong place.`, 'hint', 1800); SFX.block(); return; }
+    const secs = (performance.now() - g.t0) / 1000;
+    trainFinish('j', 100 - g.wrong * 8 - Math.max(0, secs - 90) * 0.5 - hintCost(g), `${fmtTime(secs * 1000)} · ${g.wrong} wrong tr${g.wrong === 1 ? 'y' : 'ies'}`);
+  }
+
+  // Counterfeit: today's board twice, three arrows turned round in the copy. Tap the copy where it differs.
+  function boardSvg(b, pieces, cls, attrs = '') {
+    const rows = pieces.map(p => {
+      const [dr, dc] = DIRS[p.dir], head = p.cells[0], hx = head[1] + 0.5, hy = head[0] + 0.5, tipX = hx + dc * 0.32, tipY = hy + dr * 0.32;
+      const body = p.cells.slice().reverse().map(([y, x]) => `${x + 0.5} ${y + 0.5}`).join('L');
+      return `<g class="aa-cf-p" data-i="${p.idx}"><path class="aa-cf-hit" d="${p.cells.map(([y, x]) => `M${x} ${y}h1v1h-1z`).join('')}"/><path class="aa-cf-track" d="M${body}L${tipX} ${tipY}"/><g transform="translate(${tipX} ${tipY}) rotate(${ARROW[p.dir]})"><path class="aa-cf-head" d="M-0.36 -0.3 L0.14 0 L-0.36 0.3 Z"/></g></g>`;
+    }).join('');
+    return `<svg class="aa-cf ${cls}" viewBox="-0.6 -0.6 ${b.W + 1.2} ${b.H + 1.2}" ${attrs}>${rows}</svg>`;
+  }
+  const FLIP = { r: 'l', l: 'r', u: 'd', d: 'u' };
+  function counterfeitStart(box) {
+    const L = dailyCountry(), tier = 1;
+    const b = generate(maskFor(L, tier), MAXLEN_OF[tier], 700000 + (hashStr('aa-cf-' + dayKey()) % 100000), GEN_OPTS(tier));
+    const rnd = mulberry32(hashStr('aa-cf-pick-' + dayKey()));
+    const long = b.pieces.filter(p => p.cells.length >= 2);
+    const changed = new Set(); while (changed.size < Math.min(3, long.length)) changed.add(long[Math.floor(rnd() * long.length)].idx);
+    const copy = b.pieces.map(p => changed.has(p.idx) ? { ...p, dir: FLIP[p.dir], cells: p.cells.slice().reverse() } : p);
+    train.game = { kind: 'd', b, changed, found: new Set(), wrong: 0, t0: performance.now(), hint() {
+      const g = train.game; if (!g) return; const k = [...g.changed].find(i => !g.found.has(i)); if (k == null) return; cfFound(k, true);
+    } };
+    box.innerHTML = `<div class="aa-train-hud"><span>Counterfeit</span><span id="aaCfLeft">${changed.size} to find</span><span id="aaCfTime">0:00</span>${hintBtnHtml()}</div>
+      <p class="aa-train-sub">${escapeHtml(L.name)}. ${changed.size} arrows point the other way on the second board. Tap them there.</p>
+      <div class="aa-cf-pair">${boardSvg(b, b.pieces, 'aa-cf--orig')}${boardSvg(b, copy, 'aa-cf--copy', 'id="aaCfCopy" role="img" aria-label="The copy"')}</div>`;
+    $('#aaCfCopy', box)?.addEventListener('click', e => {
+      const g = train.game; if (!g || g.kind !== 'd') return;
+      const hit = e.target.closest('.aa-cf-p'); const i = hit ? +hit.dataset.i : -1;
+      if (i >= 0 && g.changed.has(i)) { if (!g.found.has(i)) cfFound(i, false); return; }
+      g.wrong++; SFX.block(); vibe(30); toast('Not that one.', 'hint', 900);
+    });
+    train.timer = setInterval(() => { const g = train.game; if (!g || g.kind !== 'd') return; const t = $('#aaCfTime', box); if (t) t.textContent = fmtTime(performance.now() - g.t0); }, 500);
+  }
+  function cfFound(i, byHint) {
+    const g = train.game; if (!g) return;
+    g.found.add(i); if (!byHint) SFX.shoot();
+    $$(`.aa-cf-p[data-i="${i}"]`, el.trainBody).forEach(p => p.classList.add('is-found'));
+    const left = g.changed.size - g.found.size;
+    const el2 = $('#aaCfLeft', el.trainBody); if (el2) el2.textContent = left ? `${left} to find` : 'Found';
+    if (left === 0) {
+      const secs = (performance.now() - g.t0) / 1000;
+      trainFinish('d', 100 - g.wrong * 10 - Math.max(0, secs - 60) * 0.5 - hintCost(g), `${fmtTime(secs * 1000)} · ${g.wrong} wrong tap${g.wrong === 1 ? '' : 's'}`);
+    }
+  }
+
+  // Shape order: five outlines for five seconds, then the same five shuffled. Tap them in the order shown.
+  const shapeSvg = L => `<svg class="aa-shape" viewBox="0 0 100 100" aria-hidden="true"><path d="${L.d}" fill-rule="evenodd"/></svg>`;
+  function orderStart(box) {
+    const picks = trainPicks(5, 'order');
+    const rnd = mulberry32(hashStr('aa-order-deal-' + dayKey()));
+    const deal = picks.map((L, i) => i); for (let i = deal.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [deal[i], deal[j]] = [deal[j], deal[i]]; }
+    train.game = { kind: 'o', picks, deal, next: 0, wrong: 0, phase: 'show', hint() {
+      const g = train.game; if (!g || g.phase !== 'play') return;
+      $$('.aa-order-pick', el.trainBody).forEach(b => b.classList.toggle('is-hint', +b.dataset.shape === g.next));
+    } };
+    box.innerHTML = `<div class="aa-train-hud"><span>Shape order</span><span id="aaOrderTime">5</span>${hintBtnHtml()}</div>
+      <p class="aa-train-sub" id="aaOrderLine">Memorise the order.</p>
+      <div class="aa-order-row" id="aaOrderRow">${picks.map(L => `<span class="aa-order-pick" data-c="${L.id}">${shapeSvg(L)}<small>${escapeHtml(L.name)}</small></span>`).join('')}</div>`;
+    let left = 5;
+    train.timer = setInterval(() => {
+      const g = train.game; if (!g || g.kind !== 'o' || g.phase !== 'show') return;
+      left--; const t = $('#aaOrderTime', box); if (t) t.textContent = String(Math.max(0, left));
+      if (left <= 0) {
+        clearInterval(train.timer); train.timer = 0; g.phase = 'play';
+        const row = $('#aaOrderRow', box); if (row) row.innerHTML = g.deal.map(i => `<button type="button" class="aa-order-pick" data-shape="${i}" aria-label="Shape">${shapeSvg(g.picks[i])}</button>`).join('');
+        const line = $('#aaOrderLine', box); if (line) line.textContent = 'Now tap them in that order: first, second, third…';
+        if (t) t.textContent = '1 of 5';
+      }
+    }, 1000);
+  }
+  function orderTap(i) {
+    const g = train.game; if (!g || g.phase !== 'play') return;
+    const btn = $(`.aa-order-pick[data-shape="${i}"]`, el.trainBody);
+    if (btn?.classList.contains('is-done')) return;
+    if (i === g.next) {
+      g.next++; btn?.classList.add('is-done'); btn?.classList.remove('is-hint'); SFX.shoot();
+      const t = $('#aaOrderTime', el.trainBody); if (t) t.textContent = `${Math.min(5, g.next + 1)} of 5`;
+      if (g.next >= 5) trainFinish('o', 100 - g.wrong * 15 - hintCost(g), `${g.wrong} wrong tap${g.wrong === 1 ? '' : 's'}`);
+    } else { g.wrong++; SFX.block(); vibe(30); btn?.classList.add('is-wrong'); setTimeout(() => btn?.classList.remove('is-wrong'), 400); }
+  }
+
+  // What was there: a window of the map with some countries coloured, for six seconds; then three questions.
+  async function thereStart(box) {
+    if (!(await needMap(box))) return;
+    const L = dailyCountry(), c = mapCountry(L) || MAP.countries[0];
+    const defs = mapDefs('');
+    let win = mapWindow(c, 4, 160), inside = [];
+    for (let grow = 4; inside.length < 6 && grow < 40; grow *= 1.5) { win = mapWindow(c, grow, 160 * grow / 4); inside = MAP.countries.filter(k => k.cx > win.x && k.cx < win.x + win.size && k.cy > win.y && k.cy < win.y + win.size && DATA.levels.some(x => x.id === k.id)); }
+    const rnd = mulberry32(hashStr('aa-there-' + dayKey()));
+    const pool = inside.slice(); for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
+    const on = pool.slice(0, Math.min(4, Math.max(2, Math.floor(pool.length / 2)))), onIds = new Set(on.map(k => k.id));
+    $$('#aaMapG path', defs).forEach(p => p.classList.toggle('is-on', onIds.has(p.dataset.id)));
+    // three questions, at least one yes and one no
+    const asked = [on[0], pool.find(k => !onIds.has(k.id)) || on[1], pool[Math.floor(rnd() * pool.length)]].filter(Boolean);
+    train.game = { kind: 'w', win, on: onIds, asked, q: 0, right: 0, phase: 'show', hint() {
+      // one more look, a short one
+      const g = train.game; if (!g || g.phase !== 'ask' || g.peeked) return; g.peeked = true;
+      const box2 = $('#aaThere', el.trainBody); if (!box2) return;
+      const keep = box2.innerHTML; box2.innerHTML = windowSvg(g.win, 'is-peek'); setTimeout(() => { if (train.game === g) box2.innerHTML = keep; }, 1500);
+    } };
+    box.innerHTML = `<div class="aa-train-hud"><span>What was there?</span><span id="aaThereTime">6</span>${hintBtnHtml()}</div>
+      <p class="aa-train-sub" id="aaThereLine">Which countries are coloured? Remember them.</p>
+      <div id="aaThere">${windowSvg(win)}</div>`;
+    let left = 6;
+    train.timer = setInterval(() => {
+      const g = train.game; if (!g || g.kind !== 'w' || g.phase !== 'show') return;
+      left--; const t = $('#aaThereTime', box); if (t) t.textContent = String(Math.max(0, left));
+      if (left <= 0) { clearInterval(train.timer); train.timer = 0; g.phase = 'ask'; thereAsk(); }
+    }, 1000);
+  }
+  function thereAsk() {
+    const g = train.game; if (!g) return;
+    const k = g.asked[g.q]; const box = $('#aaThere', el.trainBody); if (!box || !k) return;
+    const t = $('#aaThereTime', el.trainBody); if (t) t.textContent = `${g.q + 1} of ${g.asked.length}`;
+    const line = $('#aaThereLine', el.trainBody); if (line) line.textContent = '';
+    box.innerHTML = `<p class="aa-sprint-q">Was <b>${escapeHtml(k.n)}</b> coloured?</p>
+      <div class="aa-sprint-opts"><button type="button" class="aa-btn aa-btn--soft aa-sprint-opt" data-yn="yes">Yes</button><button type="button" class="aa-btn aa-btn--soft aa-sprint-opt" data-yn="no">No</button></div>`;
+  }
+  function thereAnswer(yes) {
+    const g = train.game; if (!g || g.phase !== 'ask') return;
+    const k = g.asked[g.q]; const truth = g.on.has(k.id);
+    if (yes === truth) { g.right++; SFX.shoot(); } else { SFX.block(); vibe(30); }
+    $$('[data-yn]', el.trainBody).forEach(b => { b.disabled = true; if ((b.dataset.yn === 'yes') === truth) b.classList.add('is-right'); else if ((b.dataset.yn === 'yes') === yes) b.classList.add('is-wrong'); });
+    g.q++;
+    setTimeout(() => {
+      if (train.game !== g) return;
+      if (g.q < g.asked.length) thereAsk();
+      else trainFinish('w', Math.round(100 * g.right / g.asked.length) - hintCost(g), `${g.right} of ${g.asked.length} right`);
+    }, 600);
   }
 
   el.card.addEventListener('click', e => {
@@ -2647,6 +2907,11 @@
       earn: 'Watch this through and the board carries on where it stopped, with one heart.',
       board: true,
       grant() { state.lives = 1; state.moves++; state.finished = false; state.busy = false; el.overlay.hidden = true; renderHud(); startTimer(); heartLost(); toast('One heart. Make it count.', 'good'); },
+    },
+    trainhint: {
+      earn: 'Watch this through for a hint in this round.',
+      board: false,
+      grant() { /* the round in hand takes it: trainHint applies it once this resolves */ },
     },
     hint: {
       earn: 'Watch this through for one more hint on this board.',
