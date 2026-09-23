@@ -538,7 +538,7 @@
     if (!heart.on) { heart.on = true; heartBeat(); }      // already beating: it carries on, at the new rate
   }
 
-  const SFX = { shoot: () => beep([[880, 0, 0.07], [1320, 0.04, 0.08]]), cheer: lv => { const f = 587 * Math.pow(2, lv * 3 / 12); beep([[f, 0, 0.09], [f * 1.26, 0.07, 0.1], [f * 1.5, 0.14, 0.14], [f * 2, 0.21, 0.22, 'sine', 0.06]]); }, block: () => beep([[220, 0, 0.06, 'square', 0.05], [110, 0.05, 0.22, 'triangle', 0.06]]), win: () => beep([[523, 0, 0.12], [659, 0.1, 0.12], [784, 0.2, 0.12], [1047, 0.3, 0.35]]), lose: () => beep([[300, 0, 0.2, 'triangle'], [220, 0.2, 0.35, 'triangle']]), taken: () => beep([[784, 0, 0.1], [523, 0.09, 0.18, 'triangle', 0.05]]),
+  const SFX = { shoot: () => beep([[880, 0, 0.07], [1320, 0.04, 0.08]]), scatter: () => beep([[1245, 0, 0.05, 'sine', 0.045], [988, 0.05, 0.05, 'sine', 0.045], [784, 0.1, 0.05, 'sine', 0.045], [587, 0.15, 0.06, 'sine', 0.045], [440, 0.21, 0.1, 'triangle', 0.05]]), cheer: lv => { const f = 587 * Math.pow(2, lv * 3 / 12); beep([[f, 0, 0.09], [f * 1.26, 0.07, 0.1], [f * 1.5, 0.14, 0.14], [f * 2, 0.21, 0.22, 'sine', 0.06]]); }, block: () => beep([[220, 0, 0.06, 'square', 0.05], [110, 0.05, 0.22, 'triangle', 0.06]]), win: () => beep([[523, 0, 0.12], [659, 0.1, 0.12], [784, 0.2, 0.12], [1047, 0.3, 0.35]]), lose: () => beep([[300, 0, 0.2, 'triangle'], [220, 0.2, 0.35, 'triangle']]), taken: () => beep([[784, 0, 0.1], [523, 0.09, 0.18, 'triangle', 0.05]]),
     // the room: a tap on anything, somebody arriving, somebody going, the last seconds, and the off
     tap: () => beep([[520, 0, 0.03, 'sine', 0.03], [760, 0.018, 0.035, 'sine', 0.022]]),
     join: () => beep([[523, 0, 0.08], [784, 0.07, 0.13]]),
@@ -2096,7 +2096,7 @@
     e: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12s3.5-6.5 9.5-6.5 9.5 6.5 9.5 6.5-3.5 6.5-9.5 6.5S2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></svg>',
   };
   const TRAIN_ROUNDS = [
-    { id: 'r', name: 'Restore the Canvas', blurb: 'A painting in pieces. Put it back together.', how: ['A painting is cut into pieces and the frame is empty.', 'Drag a piece from the tray into the frame, to the place it belongs. Drop it on another piece and they swap; drag a piece out of the frame to take it back.', 'Every piece home wins the round. Wrong tries and slow time cost points. Higher levels cut the painting into more pieces.'] },
+    { id: 'r', name: 'Restore the Canvas', blurb: 'A painting in pieces. Put it back together.', how: ['The painting hangs whole for four seconds, then falls into pieces.', 'Drag a piece from the tray into the frame, to the place it belongs. Drop it on another piece and they swap; drag a piece out of the frame to take it back.', 'Every piece home wins the round. Wrong tries and slow time cost points. Higher levels cut the painting into more pieces.'] },
     { id: 'f', name: 'The Forgery', blurb: 'Things are wrong in the copy. Find them.', how: ['The original and a forged copy, side by side or one above the other.', 'Patches of the copy are wrong: mirrored, recoloured, or from elsewhere in the painting.', 'Tap them in the copy. A tap on nothing costs points; slow time does too. Higher levels hide more, smaller, subtler patches.'] },
     { id: 'g', name: 'Gallery Memory', blurb: 'Paintings on a wall for a moment. Hang them back in order.', how: ['The paintings hang in a row, numbered, for a few seconds.', 'Then they come down, shuffled, with the numbered places empty.', 'Drag each painting back to the number it hung at. Once every place is filled, the wrong ones are marked: move them. Every wrong placing costs points. Higher levels hang more paintings for less time.'] },
     { id: 'e', name: 'The Curator\u2019s Eye', blurb: 'One painting, then: which detail was in it?', how: ['One painting, for a few seconds. Look at the corners as well as the middle.', 'Then, several times, four close-ups: one is from that painting, three are from others.', 'Tap the one that is from it. Every right answer is an equal share of the score. Higher levels show the painting for less time and ask more, with smaller close-ups.'] },
@@ -2301,6 +2301,7 @@
   // not shown again (`trainHow:<id>`); the text version stays behind the ? in the round's bar.
   const TRAIN_COACH = {
     r: [
+      { title: 'Look at the painting', body: 'It hangs whole for four seconds. Then it comes apart.', target: () => $('#aaCanvasSlots', el.trainBody), wait: 'play' },
       { title: 'Drag it home', body: 'Press a piece and drag it into the frame, to the place it belongs.', target: () => $('#aaCanvasTray .aa-art-piece:not([hidden])', el.trainBody), hand: () => [$('#aaCanvasTray .aa-art-piece:not([hidden])', el.trainBody), $(`[data-slot="${$('#aaCanvasTray .aa-art-piece:not([hidden])', el.trainBody)?.dataset.tile}"]`, el.trainBody)], wait: 'placed' },
       { title: 'Now the rest', body: 'Every piece home wins the round. A wrong try costs a little, so does time over 90 seconds. Hint puts one piece home for you.', target: () => $('#aaCanvasSlots', el.trainBody) },
     ],
@@ -2472,20 +2473,57 @@
     const rnd = mulberry32(hashStr('aa-canvas-deal-' + dayKey() + '-' + train.serial));
     const tray = Array.from({ length: n * n }, (_, i) => i); for (let i = tray.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [tray[i], tray[j]] = [tray[j], tray[i]]; }
     const tile = i => `<span class="aa-art-tile" style="background-image:url('${w.file}');background-size:${n * 100}% ${n * 100}%;background-position:${(100 * (i % n) / (n - 1)).toFixed(2)}% ${(100 * Math.floor(i / n) / (n - 1)).toFixed(2)}%"></span>`;
-    train.game = { kind: 'r', w, n, allow, tile, slots: Array(n * n).fill(null), wrong: 0, t0: performance.now(), locked: new Set(), hint() {
+    train.game = { kind: 'r', w, n, allow, tile, slots: Array(n * n).fill(null), wrong: 0, t0: performance.now(), phase: 'show', locked: new Set(), hint() {
       // the first piece out of place goes home and stays there
-      const g = train.game; if (!g) return;
+      const g = train.game; if (!g || g.phase !== 'play') return;
       const k = g.slots.findIndex((t, i) => t !== i && !g.locked.has(i)); if (k < 0) return;
       const from = g.slots.indexOf(k); if (from >= 0) g.slots[from] = null;
       g.slots[k] = k; g.locked.add(k); canvasDraw(); canvasCheck();
     } };
-    box.innerHTML = `<div class="aa-train-hud"><span>Restore the Canvas ${levelChip('r')}</span><span id="aaCanvasTime">0:00</span>${hintBtnHtml()}</div>
-      <p class="aa-train-sub">Drag each piece to where it belongs. Drag one out to take it back.</p>
-      <div class="aa-art-slots" id="aaCanvasSlots" style="aspect-ratio:${w.w}/${w.h};grid-template-columns:repeat(${n}, 1fr)">${tray.map((_, i) => `<button type="button" class="aa-art-slot" data-slot="${i}" aria-label="Place ${i + 1}"></button>`).join('')}</div>
-      <div class="aa-art-tray" id="aaCanvasTray">${tray.map(i => `<button type="button" class="aa-art-piece" data-tile="${i}" aria-label="Piece" style="aspect-ratio:${w.w}/${w.h}">${tile(i)}</button>`).join('')}</div>`;
-    train.timer = setInterval(() => { const g = train.game; if (!g || g.kind !== 'r') return; const t = $('#aaCanvasTime', box); if (t) t.textContent = fmtTime(performance.now() - g.t0); }, 500);
+    // the painting hangs whole in the frame first, every piece where it belongs, for a few seconds; then it
+    // comes apart and the pieces tumble down into the tray, shuffled
+    box.innerHTML = `<div class="aa-train-hud"><span>Restore the Canvas ${levelChip('r')}</span><span id="aaCanvasTime">${CANVAS_LOOK}</span>${hintBtnHtml()}</div>
+      <p class="aa-train-sub" id="aaCanvasLine">Look at the painting. Remember where things are.</p>
+      <div class="aa-art-slots" id="aaCanvasSlots" style="aspect-ratio:${w.w}/${w.h};grid-template-columns:repeat(${n}, 1fr)">${tray.map((_, i) => `<button type="button" class="aa-art-slot" data-slot="${i}" aria-label="Place ${i + 1}"><span class="aa-art-piece is-placed" data-tile="${i}">${tile(i)}</span></button>`).join('')}</div>
+      <div class="aa-art-tray" id="aaCanvasTray">${tray.map(i => `<button type="button" class="aa-art-piece" data-tile="${i}" aria-label="Piece" style="aspect-ratio:${w.w}/${w.h}" hidden>${tile(i)}</button>`).join('')}</div>`;
+    const showUntil = performance.now() + CANVAS_LOOK * 1000;
+    train.timer = setInterval(() => {
+      const g = train.game; if (!g || g.kind !== 'r') return; const t = $('#aaCanvasTime', box);
+      if (g.phase === 'show') { const rem = Math.ceil((showUntil - performance.now()) / 1000); if (t) t.textContent = String(Math.max(0, rem)); if (rem <= 0) canvasScatter(box); return; }
+      if (t) t.textContent = fmtTime(performance.now() - g.t0);
+    }, 500);
     canvasDragWire(box);
     trainCoachStart('r');
+  }
+  const CANVAS_LOOK = 4;   // seconds the painting hangs whole before it comes apart
+  function canvasScatter(box) {
+    const g = train.game; if (!g || g.kind !== 'r' || g.phase !== 'show') return;
+    const from = new Map($$('#aaCanvasSlots .aa-art-piece', box).map(p => [+p.dataset.tile, p.getBoundingClientRect()]));
+    g.phase = 'play'; g.t0 = performance.now();
+    canvasDraw();   // the frame empties, the tray fills; each piece then flies from where it hung to where it lies
+    const line = $('#aaCanvasLine', box); if (line) line.textContent = 'Drag each piece to where it belongs. Drag one out to take it back.';
+    const t = $('#aaCanvasTime', box); if (t) t.textContent = '0:00';
+    SFX.scatter(); vibe(15);
+    trainFly($$('#aaCanvasTray .aa-art-piece:not([hidden])', box).map(el => ({ el, from: from.get(+el.dataset.tile) })), { tumble: 12 }).then(() => { if (train.game === g) trainCoachEvent('play'); });
+  }
+  // Pieces on the move: each element flies from where it was (its `from` rect) to where it is now, one after
+  // another, with a little tumble, and the promise lands with the last of them. Under reduced motion they
+  // are simply there. The scatter of the canvas and the paintings coming off the gallery wall are both this.
+  function trainFly(list, { tumble = 0, dur = 320, stagger = 30 } = {}) {
+    if (calmer()) return Promise.resolve();
+    const fin = [];
+    list.forEach(({ el, from }, i) => {
+      const to = el.getBoundingClientRect(); if (!from || !from.width || !to.width || !el.animate) return;
+      const dx = from.left - to.left, dy = from.top - to.top, sc = from.width / to.width;
+      el.classList.add('is-flying');
+      const a = el.animate([
+        { transform: `translate(${dx}px, ${dy}px) scale(${sc})` },
+        { transform: `translate(${dx * 0.5}px, ${dy * 0.5 - 14}px) scale(${(1 + sc) / 2}) rotate(${tumble ? (i % 2 ? tumble : -tumble) : 0}deg)`, offset: 0.55 },
+        { transform: 'none' },
+      ], { duration: dur, delay: i * stagger, easing: 'cubic-bezier(.2,.7,.3,1)', fill: 'backwards' });
+      fin.push(a.finished.catch(() => {}).then(() => el.classList.remove('is-flying')));
+    });
+    return Promise.all(fin);
   }
   /**
    * Drag and drop, with pointer events so a finger and a mouse are the same thing: press a piece, carry a
@@ -2502,7 +2540,7 @@
     let d = null;
     const over = (x, y) => { const sl = document.elementFromPoint(x, y)?.closest?.(o.slot); $$(o.slot + '.is-over', box).forEach(n => { if (n !== sl) n.classList.remove('is-over'); }); if (sl && !o.locked(+sl.dataset.slot)) sl.classList.add('is-over'); return sl; };
     box.addEventListener('pointerdown', e => {
-      const g = train.game; if (!g || g.kind !== o.kind || e.button) return;
+      const g = train.game; if (!g || g.kind !== o.kind || e.button || (g.phase && g.phase !== 'play')) return;
       const piece = e.target.closest(o.piece); if (!piece) return;
       const slot = piece.closest(o.slot); const from = slot ? +slot.dataset.slot : -1;
       if (from >= 0 && o.locked(from)) return;
@@ -2622,14 +2660,15 @@
       const g = train.game; if (!g || g.kind !== 'g' || g.phase !== 'show') return;
       left--; const t = $('#aaGalleryTime', box); if (t) t.textContent = String(Math.max(0, left));
       if (left <= 0) {
-        clearInterval(train.timer); train.timer = 0; g.phase = 'play'; g.t0 = performance.now();
-        const row = $('#aaGalleryRow', box);
+        clearInterval(train.timer); train.timer = 0;
+        const row = $('#aaGalleryRow', box), wall = $$('#aaGalleryRow .aa-gallery-pick', box).map(e => e.getBoundingClientRect());
         if (row) row.outerHTML = `<div class="aa-gal-slots" id="aaGallerySlots" style="grid-template-columns:repeat(${Math.min(n, 5)}, 1fr)">${picks.map((_, i) => `<span class="aa-gal-slot" data-slot="${i}" aria-label="Place ${i + 1}"><small>${i + 1}</small></span>`).join('')}</div>
           <div class="aa-gal-tray" id="aaGalleryTray" style="grid-template-columns:repeat(${Math.min(n, 5)}, 1fr)">${g.deal.map(i => `<span class="aa-gal-piece" data-pick="${i}" aria-label="Painting">${artThumb(g.picks[i])}</span>`).join('')}</div>`;
         const line = $('#aaGalleryLine', box); if (line) line.textContent = 'Now drag each painting back to the number it hung at.';
         if (t) t.textContent = `0 of ${n}`;
         galleryDragWire(box);
-        trainCoachEvent('play');
+        SFX.scatter(); vibe(15);
+        trainFly($$('#aaGalleryTray .aa-gal-piece', box).map(el => ({ el, from: wall[+el.dataset.pick] })), { tumble: 8 }).then(() => { if (train.game !== g) return; g.phase = 'play'; g.t0 = performance.now(); trainCoachEvent('play'); });
       }
     }, 1000);
     trainCoachStart('g');
