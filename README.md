@@ -949,10 +949,16 @@ links.
   green one — and **lit arrows keep moving** (`aabrainflow`: a small step along each arrow's own direction
   and back, each on its own beat, off under `prefers-reduced-motion`).
 - **Daily Brain Training** (`TRAIN_ROUNDS`, `openTrain`, `trainSave`, `#aaTrainSheet`, `.aa-train-*`): an icon
-  in the top bar (`#aaTrainBtn`) with a pill (`0/5` today, or the day's score in green). Five rounds a day,
-  each scored 0-100, the day's **Brain Score** their mean. The **Arrow board** is today's daily board
-  (`dailyPick`, the same country for everybody), scored by `focusOf` on a clear and by half the share cleared
-  on a loss; its result card carries "Back to training" while `train.on`. The other four are **gallery
+  in the top bar (`#aaTrainBtn`) with a pill (`0/4` today, or the day's score in green). Four rounds a day,
+  each scored 0-100, the day's **Brain Score** their mean. (The arrow board was a fifth round for a while and
+  is not any more: the daily board is its own thing.) **The first round of the day is free** (`TRAIN_FREE_PLAYS`,
+  `train:<day>.p`, counted when a round starts); every round after it, and every replay, is an advertisement
+  the player chooses (`adOffer('trainplay')`, free where advertising is off) — the Play button says `Play · AD`
+  once the free round is spent. A round is played **full screen** (`trainScreen`: the sheet takes
+  `aa-sheet--page`, the lobby is gone, the board music comes on with `musicBegin` and goes with the round).
+  Every round carries a **long game**: a 30-day and then a 90-day challenge (`TRAIN_GOALS`, `trainRun`:
+  consecutive days that round was played, ending today or yesterday), a bar under the round in the list. The
+  painting's credit after a round sits behind a `?` (`data-train-info`). All four are **gallery
   rounds** on real paintings: forty-five works from The Metropolitan Museum of Art's Open Access collection
   (CC0, public domain, every one in colour), listed with title, painter, date and source in `games/data/art.json` (fetched once,
   `ART_VERSION`, `loadArt`) and kept resized (≤ 800 px, ~2.4 MB in all) in `images/art/`, cached forever by
@@ -964,13 +970,14 @@ links.
   work and under it for a wide one. **Gallery Memory**
   (`galleryStart`) hangs five paintings for five seconds, then asks for the same five in that order.
   **The Curator's Eye** (`curatorStart`) shows one painting for six seconds, then three times four details
-  — which is from it? Every round ends with the work's credit (`artCredit`). Every round has a **Hint**
+  — which is from it? Every round ends with the work's credit (`artCredit`, behind the `?`). Every round has a **Hint**
   (`trainHint`): one free a day (`TRAIN_FREE_HINTS`, `train:<day>.h`), then an advertisement the player
   chooses (`adOffer('trainhint')`, free where advertising is off); a hint costs ten points of that round
   (a piece put home and locked, a lie circled, the next painting marked, one more short look). Kept per day
-  as `train:<day>` (best of the day per round), pushed in the state blob as `train` and merged by the
-  better score per round (`adoptTour`); the sheet shows the score, seven days of bars and the streak of
-  days done. The page's title, description and keywords say brain training first.
+  as `train:<day>` (best of the day per round, `h` hints used, `p` rounds played), pushed in the state blob
+  as `train` and merged by the better score per round and the larger `h`/`p` (`adoptTour`), so a second
+  device gets no second free round; the sheet shows the score, seven days of bars and the streak of days
+  done. The page's title, description and keywords say brain training first.
 - **A sweep for dead and doubled code** (September 2026): gone from `js/puzzle.js` are three icons nothing
   drew, `MODES`, `RUSH_SECONDS`, a second copy of `freeAtStart` (the test has its own), four `el.*` entries
   nothing read, and the `lastRun` record nothing read back; the six fetch wrappers (`authApi`,
