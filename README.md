@@ -979,10 +979,13 @@ links.
   advertising is off (the site) Play next is simply free and nothing says AD. Before a round is scored its
   card has one chip, Play (`trainCardState`, `.aa-train-cta`, `chipAgain`/`chipNext`); the card itself is a
   div with role button, the chips are buttons inside it carrying `data-train-mode`. The line above the list
-  is "Four rounds, free every day · more with AD", then "Done for today · 3 days in a row", then "All four
-  done"; with a streak alive and nothing played yet it says "3 days in a row · play today" in rose. **Done
-  for today** is one round scored (`trainDone`), the streak counts such days, `trainAll` is the bonus of all
-  four; the per-round bar counts days that round was played, in all (`trainRun`: cumulative). The home pill is
+  (`trainTally`) is "Four rounds, free every day", then "2 of 4 done today · 3 days in a row" -- never "done
+  for today" while a round is still to play -- and with all four "Congratulations! Today's brain training is
+  done. You can keep training by watching an ad." (on the site, where Play next is free: "…with Play next");
+  the result says the same in short ("✓ 1 of 4 done today", "✓ Congratulations! Today's brain training is
+  done."), and "Brain Score today" once there are two. With a streak alive and nothing played yet it says "3
+  days in a row · play today" in rose. The streak counts a day with one round scored (`trainDone`); `trainAll`
+  is the bonus of all four; the per-round bar counts days that round was played, in all (`trainRun`: cumulative). The home pill is
   a dot until something is scored, then the day's Brain Score. In a round and on its result the corner button
   is ← back to the list (`trainScreen`, a capture-phase handler before `closeSheets`; the phone's back button
   does the same in `backPressed`); on the list it is ✕. **The round marks
@@ -1015,15 +1018,25 @@ links.
   through the same `trainDragWire` as the canvas; a piece dropped on a full place swaps with it, one dragged
   out goes back to the tray). When every place is filled the wrong ones are outlined (`.is-wrong`,
   `galleryCheck`, ten points each) and the round goes on until all hang right; the hint hangs the first
-  wrong one where it belongs and locks it. **The Curator's Eye** (`curatorStart`) shows one painting for a
+  wrong one where it belongs and locks it. **Leaving a round is asked about** (`trainBack`, from the corner
+  arrow and the app's Back): "Leave this round? It is not scored, and it starts again from the beginning next
+  time." -- Leave the round / Keep playing, the game's own `ask` dialog, as leaving a board is; the round's
+  clock does not count the time the question was open; from a result there is no question. **The Curator's Eye** (`curatorStart`) shows one painting for a
   few seconds, then, several times, four details — which is from it? **Every round gets harder the way the
-  board does** (`TRAIN_TIERS`, `trainTier`, `TIER_OF_ROUND`, `tierParams`): five levels per round, shown as
-  a chip in the list and the round's bar (`levelChip`, `.aa-train-lv`); a day scored 85 or more takes the
-  round up a level, a day under 50 takes it down, read off the days before today so the level holds still
-  within a day and every device with the same history agrees. Level 1 → 5: the canvas 3×3 → 5×5 pieces
+  board does** (`TRAIN_TIERS`, `trainTier`, `TIER_OF_ROUND`, `tierParams`): five difficulty steps per round,
+  not shown -- a player plays for levels, and those are the main count's, below; a day scored 85 or more takes
+  the round up a step, a day under 50 takes it down, read off the days before today so the step holds still
+  within a day and every device with the same history agrees. Step 1 → 5: the canvas 3×3 → 5×5 pieces
   (allowance 90 s → 200 s), the forgery 3 → 5 patches, smaller and closer in colour, the gallery 5 → 8
   paintings shown for 5 → 4 seconds, the curator 3 → 5 questions with smaller details after 6 → 4 seconds.
-  The result says "Level up tomorrow." or "A little easier tomorrow." when the day's score moved it. Every round ends with the work's credit (`artCredit`, behind the `?`). Every round has a **Hint**
+  **Every training puzzle finished is a level on the main count** -- the same count as the home card's "Level
+  N" and the boards' numbers (`levelNo`): a puzzle is a round's serial of the day (0 the free one, then each
+  Play next), its first finish is kept with its time (`train:<day>.cl`, round → serial → when; `trainSave`,
+  `trainCleared`) and takes its place among the boards by that time (`trainClearTimes`); Play again replays the
+  same serial, so it is never a second level. A round scored before clears were kept counts its free puzzle,
+  at the day's last save. The round's bar shows the level finishing it will be (`levelChip`, `.aa-train-lv`,
+  nothing on a replay), the result the level it was. The clears sync with the rest of the day (the server keeps
+  the union, the earliest time of each: `cleanTrainDay`, `mergeTrainDay`). Every round ends with the work's credit (`artCredit`, behind the `?`). Every round has a **Hint**
   (`trainHint`): one free a day (`TRAIN_FREE_HINTS`, `train:<day>.h`), then an advertisement the player
   chooses (`adOffer('trainhint')`, free where advertising is off); a hint costs ten points of that round
   (a piece put home and locked, a lie circled, the next painting marked, one more short look). Kept per day
