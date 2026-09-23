@@ -765,8 +765,28 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-train-bar i{ display:block; width:100%; background:var(--accent2); border-radius:5px; }
 .aa-train-bar.is-none i{ background:color-mix(in srgb, var(--muted) 25%, transparent); }
 .aa-train-bar.is-today i{ background:linear-gradient(180deg, color-mix(in srgb, var(--accent2) 62%, var(--accent)), var(--accent2)); }
-.aa-train-line{ margin:0 0 14px; font-size:14px; font-weight:800; color:var(--muted); }
-.aa-train-row .aa-row-ico{ font-size:22px; }
+.aa-train-line{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin:0 0 14px; font-size:14px; font-weight:800; color:var(--muted); }
+.aa-train-about{ margin:-6px 0 14px; }
+/* the four rounds: a card each, a drawn icon in the brain's colour, the score or Play at the end */
+.aa-train-rounds{ display:grid; gap:10px; margin:0 0 14px; }
+.aa-train-card{ display:flex; align-items:center; gap:14px; width:100%; padding:14px 14px 14px 12px; border:none; border-radius:20px; background:var(--card); color:var(--ink); text-align:left; font:inherit; cursor:pointer; box-shadow:0 2px 10px rgba(0,0,0,.05); transition:transform .1s; }
+.aa-train-card:active{ transform:scale(.99); }
+.aa-train-name{ display:block; font-size:18px; font-weight:800; line-height:1.15; margin-bottom:2px; }
+.aa-train-ico2{ flex:none; display:inline-flex; align-items:center; justify-content:center; width:46px; height:46px; border-radius:15px; background:color-mix(in srgb, var(--accent2) 12%, transparent); }
+.aa-train-ico2 svg{ width:26px; height:26px; fill:none; stroke:var(--accent2); stroke-width:1.9; stroke-linecap:round; stroke-linejoin:round; }
+.aa-train-ico2--big{ width:72px; height:72px; border-radius:22px; margin:6px auto 12px; }
+.aa-train-ico2--big svg{ width:40px; height:40px; }
+.aa-train-intro{ text-align:center; padding:8px 0 4px; }
+.aa-train-intro h3{ margin:0 0 12px; font-size:26px; font-weight:900; }
+.aa-train-how{ margin:0 0 18px; padding:0 0 0 22px; text-align:left; font-size:15px; line-height:1.45; color:var(--ink); }
+.aa-train-how li{ margin:0 0 8px; padding-left:4px; }
+.aa-train-how li::marker{ color:var(--accent2); font-weight:900; }
+.aa-train-howcard{ position:fixed; inset:0; z-index:70; display:flex; align-items:flex-end; justify-content:center; background:rgba(40,25,20,.45); padding:16px; }
+.aa-train-howcard-in{ width:100%; max-width:440px; background:var(--card); color:var(--ink); border-radius:20px; padding:18px 18px 16px; box-shadow:var(--shadow); margin-bottom:env(safe-area-inset-bottom, 0px); }
+.aa-train-howcard-in h3{ margin:0 0 10px; font-size:20px; font-weight:900; }
+.aa-train-howcard-in .aa-btn{ width:100%; }
+.aa-train-hud .aa-train-info{ margin-left:auto; }
+.aa-train-hud .aa-train-info + .aa-train-hint{ margin-left:0; }
 .aa-train-got{ min-width:48px; text-align:center; padding:6px 10px; border-radius:12px; font-size:13px; font-weight:900; background:color-mix(in srgb, var(--accent2) 12%, transparent); color:var(--accent2); }
 .aa-train-got.is-done{ background:color-mix(in srgb, var(--good) 14%, transparent); color:var(--good); }
 .aa-train-run{ display:flex !important; align-items:center; gap:8px; margin-top:6px; font-size:11px !important; font-weight:800 !important; color:var(--muted); }

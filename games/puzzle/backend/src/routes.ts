@@ -364,13 +364,16 @@ const H = {
     const seats = await R.room(pool, m.code);
     if (!seats.some(p => p.user_id === me.user!.id)) { await noStore(res).code(403).send({ error: 'not_yours' }); return; }
     if (seats.some(p => p.user_id === to)) { await noStore(res).code(409).send({ error: 'already_in' }); return; }
+    // A full room has no seat to invite into; saying so here beats a join that fails a minute later.
+    if (seats.length >= config.game.seats) { await noStore(res).code(409).send({ error: 'room_full' }); return; }
     if (!(await havePlayedTogether(pool, me.user.id, to))) { await noStore(res).code(403).send({ error: 'not_played_together' }); return; }
+    // Muted: the invitation goes nowhere, and the sender is told what they would be told about somebody who
+    // is not online. Whether they were muted is the muter's business and not the sender's -- which is why this
+    // comes before the racing check: a muted sender must not learn that the muter is on a board.
+    if (await isMuted(pool, to, me.user.id)) { await noStore(res).send({ ok: true, delivered: false, reach: 'none' }); return; }
     // And not while they are racing. A challenge landing on a board somebody is being timed on is the one
     // notification this game must never send; it can be sent again in a minute, when their board is over.
     if (await isRacing(pool, to)) { await noStore(res).code(409).send({ error: 'in_a_match' }); return; }
-    // Muted: the invitation goes nowhere, and the sender is told what they would be told about somebody who
-    // is not online. Whether they were muted is the muter's business and not the sender's.
-    if (await isMuted(pool, to, me.user.id)) { await noStore(res).send({ ok: true, delivered: false, reach: 'none' }); return; }
 
     await publishToUser(to, 'invited', {
       code: m.code, stake: m.stake, from: me.user.name, from_id: me.user.id, pic: me.user.pic ?? '',

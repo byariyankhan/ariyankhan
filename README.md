@@ -958,7 +958,17 @@ links.
   `aa-sheet--page`, the lobby is gone, the board music comes on with `musicBegin` and goes with the round).
   Every round carries a **long game**: a 30-day and then a 90-day challenge (`TRAIN_GOALS`, `trainRun`:
   consecutive days that round was played, ending today or yesterday), a bar under the round in the list. The
-  painting's credit after a round sits behind a `?` (`data-train-info`). All four are **gallery
+  painting's credit after a round sits behind a `?` (`data-train-info`), and so does the sheet's own
+  explanation (`data-train-about`). The rounds are cards with **drawn icons** (`TRAIN_ICON`: line marks in the
+  brain's colour, no emoji). **Every round has instructions** (`how`, three steps): shown full screen the first
+  time a round is opened (`trainIntro`, `trainHow:<id>`; Start is the play) and behind the `?` in the round's
+  own bar afterwards (`trainHowCard`). **The very first day gives two free rounds** (`trainFirstDay`,
+  `trainFreePlays`), so a newcomer meets two rounds with their instructions before an advertisement is asked
+  for. **The gallery starts where the player is** (`artRanked`, `TRAD_OF`, `trainDays`): every work carries
+  its country (`cc`) and tradition (`trad`: is / hb / ea / we); works are ranked home country → home
+  tradition, nearest first → same continent → the rest by distance, and each day draws from a window at the
+  top of that list that widens by seven works a training day, so a player in Dhaka begins with Mughal and
+  Bengal and reaches Paris in a few weeks. Same home country, same day, same paintings. All four are **gallery
   rounds** on real paintings: 146 works from The Metropolitan Museum of Art's Open Access collection
   (CC0, public domain, every one in colour; European, American and East Asian painting, nothing unclothed), listed with title, painter, date and source in `games/data/art.json` (fetched once,
   `ART_VERSION`, `loadArt`) and kept resized (≤ 800 px, ~8 MB in all, fetched a painting at a time) in `images/art/`, cached forever by
@@ -1000,6 +1010,21 @@ links.
   The welcome screen shows the brain mark instead of the old arrows, and **the app asks for notifications the
   moment Accept is tapped** (`notifyFirstAsk` waits for `welcomed`, signed in or not: `notifyInitApp` no
   longer needs an account).
+- **The invite flow, audited** (September 2026). Fixed: signing in from a challenge link now brings the
+  lobby socket up too (`signedIn` calls `authLoad(true)` on both paths), so later invitations reach that
+  player; the challenge link survives the app's browser sign-in, which comes back as a fresh page
+  (`store 'pendingCode'`, `pendingLink`, good for an hour); the invitation sheet keeps its own `state.invite`
+  instead of sharing `state.pendingMatch` with the room the player sits in (whose poll overwrote it, so
+  Confirm joined their own room and Mute muted nobody); a player waiting in a room of their own is offered
+  "Leave and join" instead of an error; people picked on the dashboard are always invited into a room of
+  their own (`open_to_all:false` when there are picks — a public room can be walked into, moved or voided
+  within minutes); the lobby socket keeps reconnecting with a backoff up to 30 s while it is wanted instead
+  of giving up after four tries; `goldError` and `invitePlayer` name `room_full`, `no_match`,
+  `rate_limited`, `not_yours` and `try_later`. Server: `room_full` at the invitation, mute checked before
+  racing, and "played together" means a match that started (`players.ts`). Still open, by design or for
+  later: repeat invitations do re-ring a phone (the suite asserts it; the 20-a-minute limit bounds it), an
+  open desktop tab counts as "online" so the phone is not rung, and `reach:'push'` is reported before the
+  push is known to have gone.
 - **The evening nudge needs no account.** Notifications are offered signed out too (`renderNotify` no
   longer waits for `auth.user`); a token or subscription is posted with no user, with the device's own
   nudge answer (`remindOn()`, `reminder` in the post, `store 'remind'`), and the 7 pm sweep reaches those

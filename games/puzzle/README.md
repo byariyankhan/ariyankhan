@@ -194,7 +194,11 @@ An invitation is not limited on the asking. The answer to being asked too often 
 (`POST /players/mute`, `/players/unmute`, `GET /players/muted`): a muted player's invitations reach nobody,
 on any device, and they leave the muter's list of people to ask; the sender is told only what they would be
 told about somebody who is not online. The invite reply says where it went — `reach` is `live` (on their
-screen), `push` (their phone or browser will ring) or `none` (send the link).
+screen), `push` (their phone or browser will ring) or `none` (send the link). The mute is checked before
+"are they racing", so a muted sender cannot learn that the muter is on a board; a full room answers
+`room_full` at the invitation rather than at the join; and "played together" (`havePlayedTogether`,
+`recentPlayers`) means a match that actually **started** — a room somebody sat in for a minute, or one the
+sweeper voided, gives nobody the right to ring a phone.
 
 ## Public URLs
 
