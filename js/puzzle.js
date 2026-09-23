@@ -2121,7 +2121,9 @@
   }
   function trainStreak() { let n = 0; while (trainDone(trainDay(dayKeyBack(n + 1)))) n++; if (trainDone(trainDay())) n++; return n; }
   // what a round's Play button says: the score once played today, else Play, marked AD once the free round is spent
-  const playLabel = (t, id) => typeof t[id] === 'number' ? String(t[id]) : trainFree(id) || !ads.on() ? 'Play' : 'Play \u00b7 AD';
+  // "AD" only where an advertisement is what will actually be shown (ads.isAd): the free stand-in the site
+  // runs until the network approves it is not one, and must not be called one
+  const playLabel = (t, id) => typeof t[id] === 'number' ? String(t[id]) : trainFree(id) || !ads.isAd() ? 'Play' : 'Play \u00b7 AD';
   const runLine = id => {
     const run = trainRun(id), goal = TRAIN_GOALS.find(g => run < g);
     if (!goal) return `<span class="aa-train-goal is-done"><i style="width:100%"></i></span><em>${TRAIN_GOALS[TRAIN_GOALS.length - 1]}-day challenge done \u2713 \u00b7 ${run} days</em>`;
@@ -2161,7 +2163,7 @@
         <div class="aa-train-week" role="img" aria-label="Last seven days">${bars}</div>
       </div>
       <p class="aa-train-line"><span>${done ? `Done for today. ${streak} day${streak === 1 ? '' : 's'} in a row.` : streak ? `${streak} day${streak === 1 ? '' : 's'} in a row · keep it going.` : 'Four rounds. Five minutes. Every day.'}</span><button type="button" class="aa-train-info" data-train-about aria-label="How Daily Training works" aria-expanded="false">?</button></p>
-      <p class="aa-sheet-note aa-train-about" id="aaTrainAbout" hidden>Each round is scored out of 100 and is free once a day; after that it is locked for the day, and playing it again is an advertisement you choose (the better score stays). So is every hint after the first. Every round also keeps a 30-day and a 90-day challenge: consecutive days you played it.</p>
+      <p class="aa-sheet-note aa-train-about" id="aaTrainAbout" hidden>Each round is scored out of 100 and is free once a day; after that it is locked for the day, and playing it again ${ads.isAd() ? 'is an advertisement you choose' : 'is a tap, for now'} (the better score stays). So is every hint after the first. Every round also keeps a 30-day and a 90-day challenge: consecutive days you played it.</p>
       <div class="aa-train-rounds">
         ${TRAIN_ROUNDS.map(r => `<button type="button" class="aa-train-card" data-train="${r.id}"><span class="aa-train-ico2">${TRAIN_ICON[r.id]}</span><span class="aa-row-label"><span class="aa-train-name">${r.name}</span><small class="aa-row-sub">${r.blurb}</small><small class="aa-train-run">${runLine(r.id)}</small></span><span class="aa-train-got${typeof t[r.id] === 'number' ? ' is-done' : ''}">${playLabel(t, r.id)}</span></button>`).join('')}
       </div>
@@ -2188,7 +2190,7 @@
     if (detail && train.game?.kind === 'e') curatorAnswer(+detail.dataset.detail);
   });
   // The hint button of the round in hand: free once a day, then an advertisement the player chooses.
-  const hintLabel = () => `\u{1F4A1} Hint${trainHintsLeft() > 0 ? '' : ads.on() ? ' \u00b7 AD' : ''}`;
+  const hintLabel = () => `\u{1F4A1} Hint${trainHintsLeft() > 0 ? '' : ads.isAd() ? ' \u00b7 AD' : ''}`;
   const hintBtnHtml = () => `${howBtnHtml()}<button type="button" class="aa-train-hint" data-train-hint>${hintLabel()}</button>`;
   async function trainHint() {
     const g = train.game; if (!g || !g.hint || g.hintBusy) return;
@@ -2320,7 +2322,7 @@
       <p class="aa-train-sub">${lines}</p>
       ${credit.replace('<p class="aa-art-credit">', '<p class="aa-art-credit" hidden>')}
       ${all ? `<p class="aa-train-sub"><b>Brain Score today: ${trainScore(t)}</b></p>` : ''}
-      <div class="aa-actions aa-actions--stack"><button type="button" class="aa-btn aa-btn--primary" data-train-back>Back to training</button><button type="button" class="aa-btn aa-btn--soft" data-train="${kind}">${ICON_AGAIN}Play again${!ads.on() ? '' : ' \u00b7 AD'}</button></div>
+      <div class="aa-actions aa-actions--stack"><button type="button" class="aa-btn aa-btn--primary" data-train-back>Back to training</button><button type="button" class="aa-btn aa-btn--soft" data-train="${kind}">${ICON_AGAIN}Play again${ads.isAd() ? ' \u00b7 AD' : ''}</button></div>
     </div>`;
     SFX.win(); vibe(20);
   }
