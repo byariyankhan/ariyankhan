@@ -753,3 +753,42 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .faq-a p{ padding:0 14px 14px; margin:0; }
 
 @media(prefers-reduced-motion:reduce){ .aa-piece.is-shake .aa-track, .aa-piece.is-shake .aa-head, .aa-piece.is-hint .aa-track, .aa-sheet-panel, .aa-lives.is-last .is-on{ animation:none; } }
+
+/* ── Daily Brain Training ── */
+.aa-train-pill{ display:inline-flex; align-items:center; justify-content:center; min-width:34px; height:26px; padding:0 8px; border-radius:13px; background:color-mix(in srgb, var(--accent2) 14%, transparent); color:var(--accent2); font-size:12px; font-weight:900; letter-spacing:.3px; font-variant-numeric:tabular-nums; }
+.aa-train-pill.is-done{ background:color-mix(in srgb, var(--good) 16%, transparent); color:var(--good); }
+.aa-play--train .aa-play-ico{ color:var(--accent2); }
+.aa-train-top{ display:flex; align-items:flex-end; justify-content:space-between; gap:16px; margin:4px 0 8px; }
+.aa-train-score{ display:flex; flex-direction:column; align-items:flex-start; }
+.aa-train-score b{ font-size:52px; font-weight:900; line-height:1; color:var(--ink); letter-spacing:-1px; font-variant-numeric:tabular-nums; }
+.aa-train-score span{ font-size:12px; font-weight:900; letter-spacing:1px; text-transform:uppercase; color:var(--muted); margin-top:4px; }
+.aa-train-week{ display:flex; align-items:flex-end; gap:5px; height:56px; padding-bottom:2px; }
+.aa-train-bar{ width:14px; height:100%; display:flex; align-items:flex-end; border-radius:5px; background:color-mix(in srgb, var(--muted) 10%, transparent); overflow:hidden; }
+.aa-train-bar i{ display:block; width:100%; background:var(--accent2); border-radius:5px; }
+.aa-train-bar.is-none i{ background:color-mix(in srgb, var(--muted) 25%, transparent); }
+.aa-train-bar.is-today i{ background:linear-gradient(180deg, color-mix(in srgb, var(--accent2) 62%, var(--accent)), var(--accent2)); }
+.aa-train-line{ margin:0 0 14px; font-size:14px; font-weight:800; color:var(--muted); }
+.aa-train-row .aa-row-ico{ font-size:22px; }
+.aa-train-got{ min-width:48px; text-align:center; padding:6px 10px; border-radius:12px; font-size:13px; font-weight:900; background:color-mix(in srgb, var(--accent2) 12%, transparent); color:var(--accent2); }
+.aa-train-got.is-done{ background:color-mix(in srgb, var(--good) 14%, transparent); color:var(--good); }
+.aa-train-hud{ display:flex; justify-content:space-between; align-items:center; font-size:14px; font-weight:900; color:var(--muted); margin:0 0 12px; font-variant-numeric:tabular-nums; }
+.aa-train-hud span:first-child{ color:var(--ink); }
+.aa-flags{ display:grid; grid-template-columns:repeat(4, 1fr); gap:8px; margin:0 0 12px; }
+.aa-flag{ aspect-ratio:1; border-radius:14px; border:none; cursor:pointer; background:linear-gradient(120deg, var(--accent2), color-mix(in srgb, var(--accent2) 62%, var(--accent))); box-shadow:0 3px 0 rgba(0,0,0,.12); display:flex; align-items:center; justify-content:center; padding:0; transition:transform .15s, background .2s; }
+.aa-flag-face{ font-size:34px; line-height:1; opacity:0; transform:scale(.6); transition:opacity .15s, transform .15s; }
+.aa-flag.is-up{ background:var(--card); box-shadow:0 3px 0 var(--line-soft); }
+.aa-flag.is-up .aa-flag-face{ opacity:1; transform:scale(1); }
+.aa-flag.is-done{ background:color-mix(in srgb, var(--good) 14%, var(--card)); box-shadow:none; }
+.aa-flag:active:not(:disabled){ transform:translateY(2px); }
+.aa-sprint-q{ margin:6px 0 14px; font-size:20px; font-weight:800; color:var(--ink); text-align:center; }
+.aa-sprint-q b{ font-weight:900; }
+.aa-sprint-flag{ display:block; font-size:46px; line-height:1.1; margin-bottom:6px; }
+.aa-sprint-opts{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:0 0 8px; }
+.aa-sprint-opt{ width:100%; min-width:0; white-space:normal; padding:14px 8px; }
+.aa-sprint-opt.is-right{ background:color-mix(in srgb, var(--good) 18%, var(--card)) !important; color:var(--good) !important; }
+.aa-sprint-opt.is-wrong{ background:color-mix(in srgb, var(--bad) 16%, var(--card)) !important; color:var(--bad) !important; }
+.aa-train-res{ text-align:center; padding:6px 0 2px; }
+.aa-train-big{ margin:4px 0; font-size:64px; font-weight:900; line-height:1; color:var(--accent2); font-variant-numeric:tabular-nums; }
+.aa-train-sub{ margin:6px 0; font-size:15px; font-weight:800; color:var(--muted); }
+.aa-train-sub b{ color:var(--ink); }
+

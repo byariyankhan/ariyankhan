@@ -948,6 +948,16 @@ links.
   Discover does). **The home brain's arrows are always the rose** — GOAT is the whole brain lit, not a
   green one — and **lit arrows keep moving** (`aabrainflow`: a small step along each arrow's own direction
   and back, each on its own beat, off under `prefers-reduced-motion`).
+- **Daily Brain Training** (`TRAIN_ROUNDS`, `openTrain`, `trainSave`, `#aaTrainSheet`, `.aa-train-*`): a third
+  home button, "Daily Training", with a pill (`0/3` today, or the day's score in green). Three rounds a day,
+  each scored 0-100, the day's **Brain Score** their mean: the **Arrow board** is today's daily board
+  (`dailyPick`, the same country for everybody), scored by `focusOf` on a clear and by half the share cleared
+  on a loss, and its result card carries "Back to training" while `train.on`; **Flag match** is eight pairs of
+  flags (regional-indicator emoji from `a2`), the same eight for everybody that day (`trainPicks`), scored on
+  moves over eight and time over 45 s; **Capital sprint** is 45 seconds of four-choice capitals, +8 right, −4
+  wrong. Kept per day as `train:<day>` (best of the day per round), pushed in the state blob as `train` and
+  merged by the better score per round (`adoptTour`); the sheet shows the score, seven days of bars and the
+  streak of days done. The page's title, description and keywords say brain training first.
 - **A sweep for dead and doubled code** (September 2026): gone from `js/puzzle.js` are three icons nothing
   drew, `MODES`, `RUSH_SECONDS`, a second copy of `freeAtStart` (the test has its own), four `el.*` entries
   nothing read, and the `lastRun` record nothing read back; the six fetch wrappers (`authApi`,
