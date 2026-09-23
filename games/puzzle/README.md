@@ -120,9 +120,32 @@ one `ON CONFLICT` clause rather than read-modify-written by the service:
   time. An old phone opened after a month uploads a worse run and moves nothing.
 
 `users.state` carries the small things a device needs before it can draw the right tour at all — the home
-country, the difficulty ladder, the daily boards — shallow-merged for the same reason, so a device that has
-never heard of a key cannot delete it by pushing without it. The client keeps playing out of its own storage
-and syncs around it: a push that fails costs freshness, not progress.
+country, the difficulty ladder — and the records of play that are not boards: the daily boards, the daily
+training, the streaks, and what each device took off the rank. A key a device does not send is left alone. A
+key it does send is merged by its own rule, never simply replaced (`combineState` in `progress.ts`, read and
+written under the row's lock inside the push's transaction):
+
+* `train` — per day, each round's best score; hints used, rounds played and the per-round counts the larger;
+* `daily` — per day, the better run (more stars, then the faster time), the quiz answered if either answered it;
+* `loss` — per device, the larger count;
+* `playStreak`, `dailyStreak` — the later day; on the same day the longer count; two runs that meet (one ends
+  the day before the other's last day) are one run;
+* anything else (home, the difficulty ladder) — the last device to say it.
+
+Every one of those is commutative and idempotent, like the boards. It used to be a one-level merge
+(`state || incoming`), which replaced the whole `train` map, the whole `daily` map and the streaks with the
+pushing device's copy and handed that copy straight back, so the phone and the website each saw only their own
+training and their own streak. The account keeps 400 days of daily boards and training (`STATE_KEEP_DAYS`); a
+device sends its last 120 (`STATE_SEND_DAYS`), so a push stays about 30 KB of state however long somebody has
+played. A push may be up to 256 KB (a whole tour of 600 boards with its counts is about 115 KB) and its state
+up to 128 KB; each of the records is cleaned field by field and trimmed to the window, the other settings are
+kept only while small.
+
+The client keeps playing out of its own storage and syncs around it: a push that fails costs freshness, not
+progress. That is also why a failure here goes unseen, so it is worth knowing the one that happened: the tier
+check on `progress` said 0..3 after the ladder grew a fifth step, Master (4), and every push carrying a Master
+board failed whole, from that device, every time, until `018_master_tier.sql` widened it. Nothing was lost —
+each device had kept everything — and the next push after the fix brought it all.
 
 One rule lives in the client rather than the server, and only because the server cannot know it: a home
 country **guessed** from the connection is not the player's answer, so it never travels. Only one chosen in

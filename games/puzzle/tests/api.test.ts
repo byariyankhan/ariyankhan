@@ -238,6 +238,32 @@ section('The tour syncs over the wire, and only for the signed in');
   eq(((after.json.levels as Record<string, { stars: number }>).bd)?.stars, 3, 'a worse run sent afterwards does not win');
 }
 
+section('Two devices on one account: a Master board, the training and the streak all reach both');
+{
+  // What production saw: one Master board in a push and the whole push failed, from that device, every time.
+  const p = await mint('apiTwoDevices', 1_000);
+  const day = new Date().toISOString().slice(0, 10);
+  const prev = (() => { const d = new Date(); d.setUTCDate(d.getUTCDate() - 1); return d.toISOString().slice(0, 10); })();
+  const tour: Record<string, unknown> = {};
+  for (let i = 0; i < 450; i++) tour['c' + i] = { cleared: true, stars: 3, ms: 60_000 + i, tier: i % 5, arrows: 110, quiz: true };
+  const stats: Record<string, unknown> = {};
+  for (let i = 0; i < 450; i++) stats['c' + i] = { p: 3, c: 1, f: 2, h: 1, l: 4, ms: 312_456 };
+  // the phone: a whole tour of 450 boards, Master ones among them -- a body past the old 64 KB limit
+  const phone = await call('/progress', { token: p.token, body: { levels: tour, stats, device: 'phoneDev01', state: { train: { [day]: { e: 100, p: 1, pp: { e: 1 } } }, playStreak: { count: 2, last: prev } } } });
+  eq(phone.status, 200, 'the phone’s push, Master boards and all, is accepted');
+  eq(Object.keys(phone.json.levels as object).length, 450, 'every board of it is on the account');
+  // the website: one board and the Forgery, later the same day
+  const web = await call('/progress', { token: p.token, body: { levels: { w1: { cleared: true, stars: 2, ms: 50_000, tier: 4 } }, device: 'webDev0001', state: { train: { [day]: { f: 39, p: 1, pp: { f: 1 } } }, playStreak: { count: 1, last: day } } } });
+  eq(web.status, 200, 'the website’s push is accepted');
+  const st = web.json.state as Record<string, any>;
+  eq(Object.keys(web.json.levels as object).length, 451, 'and it gets the phone’s boards back');
+  eq([st.train?.[day]?.e, st.train?.[day]?.f], [100, 39], 'and both rounds of the day');
+  eq([st.playStreak?.count, st.playStreak?.last], [3, day], 'and the streak joined: two days on the phone and today on the website');
+  // the phone asks again and sees the same
+  const again = await call('/progress', { token: p.token });
+  eq((again.json.state as Record<string, any>).train?.[day]?.f, 39, 'the phone reads the website’s round');
+}
+
 section('A link cannot delete somebody\u2019s account');
 {
   // Reported by a review bot on PR #82, and it was real: the compatibility shim mounted every action for GET

@@ -3588,6 +3588,7 @@
   // already in local storage and goes up with the next sync.
   const progressApi = body => apiCall(`${API_V1}/progress`, body);
 
+  const STATE_SEND_DAYS = 120;   // days of daily boards and training each push carries (the server's STATE_SEND_DAYS)
   const STATE_KEYS = ['home', 'form', 'dailyStreak', 'playStreak'];   // what a new device needs before it can show the right tour
 
   /** Everything this device has played, in the shape the server stores. */
@@ -3618,23 +3619,35 @@
     // Only a home they picked in Settings is worth telling the account about.
     if (store.get('homeAuto', false)) delete out.home;
     const loss = lossMap(); if (Object.keys(loss).length) out.loss = loss;
-    const daily = {};
-    try {
-      for (const k of Object.keys(localStorage)) {
-        if (!k.startsWith(STORE + 'daily:')) continue;
-        const key = k.slice(STORE.length); const v = store.get(key); if (v) daily[key.slice(6)] = v;
-      }
-    } catch { /* as above */ }
-    if (Object.keys(daily).length) out.daily = daily;
-    const trainDays = {};
-    try {
-      for (const k of Object.keys(localStorage)) {
-        if (!k.startsWith(STORE + 'train:')) continue;
-        const key = k.slice(STORE.length); const v = store.get(key); if (v) trainDays[key.slice(6)] = v;
-      }
-    } catch { /* as above */ }
-    if (Object.keys(trainDays).length) out.train = trainDays;
+    // the daily boards and the training of the last STATE_SEND_DAYS days: the account keeps the older ones, and a
+    // push that carried every day ever played would grow by a few hundred bytes a day, every five minutes
+    const since = dayKeyBack(STATE_SEND_DAYS);
+    const days = prefix => {
+      const m = {};
+      try {
+        for (const k of Object.keys(localStorage)) {
+          if (!k.startsWith(STORE + prefix)) continue;
+          const key = k.slice(STORE.length), day = key.slice(prefix.length); if (day < since) continue;
+          const v = store.get(key); if (v) m[day] = v;
+        }
+      } catch { /* as above */ }
+      return m;
+    };
+    const daily = days('daily:'); if (Object.keys(daily).length) out.daily = daily;
+    const trainDays = days('train:'); if (Object.keys(trainDays).length) out.train = trainDays;
     return out;
+  }
+  // Two devices' streaks as one, the rule the server applies too: the later day wins, the longer count on the
+  // same day, and two runs that meet (one ends the day before the other's last) are one run.
+  const okStreak = v => v && typeof v === 'object' && typeof v.last === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v.last) && Number.isFinite(Number(v.count)) && Number(v.count) >= 0;
+  const dayAfter = day => { const [y, m, d] = day.split('-').map(Number); return dayKeyOf(new Date(y, m - 1, d + 1)); };
+  function mergeStreak(a, b) {
+    if (!okStreak(a)) return okStreak(b) ? { count: Math.floor(Number(b.count)), last: b.last } : null;
+    if (!okStreak(b)) return { count: Math.floor(Number(a.count)), last: a.last };
+    const ca = Math.floor(Number(a.count)), cb = Math.floor(Number(b.count));
+    if (a.last === b.last) return { count: Math.max(ca, cb), last: a.last };
+    const [later, cl, earlier, ce] = a.last > b.last ? [a, ca, b, cb] : [b, cb, a, ca];
+    return { count: dayAfter(earlier.last) === later.last ? Math.max(cl, ce + 1) : cl, last: later.last };
   }
 
   // The same rule the server applies, applied here too — not for the server's benefit but for the race: a board
@@ -3652,7 +3665,13 @@
       if (r.skipped && !store.get('skip:' + id)) { store.set('skip:' + id, true); changed = true; }
     }
     const st = server?.state || {};
-    for (const k of STATE_KEYS) if (st[k] !== undefined && JSON.stringify(st[k]) !== JSON.stringify(store.get(k, null))) { store.set(k, st[k]); changed = true; }
+    for (const k of STATE_KEYS) {
+      if (st[k] === undefined) continue;
+      // a streak is joined with this device's own rather than replaced by the account's: a board cleared here
+      // while the push was in the air must not be taken back by an answer that predates it
+      const v = k === 'playStreak' || k === 'dailyStreak' ? mergeStreak(store.get(k, null), st[k]) : st[k];
+      if (v != null && JSON.stringify(v) !== JSON.stringify(store.get(k, null))) { store.set(k, v); changed = true; }
+    }
     if (st.home !== undefined) store.set('homeAuto', false);   // the account's home is a choice, however this device came by its own
     // What each device took off the rank, merged by the larger per device: a device's own count only grows.
     if (st.loss && typeof st.loss === 'object' && !Array.isArray(st.loss)) {

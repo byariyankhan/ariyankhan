@@ -1,7 +1,7 @@
 // A player's tour, and the one property that makes syncing it safe: nothing a device pushes can ever take
 // something away. Two phones, opened in any order, converge on the better of what each has seen.
 import { pool, query } from '../backend/src/db.js';
-import { cleanDevice, cleanLevels, cleanState, cleanStats, difficulty, mergeLevels, mergeState, mergeStats, readAll, readLevels, readState } from '../backend/src/progress.js';
+import { cleanDevice, cleanLevels, cleanState, cleanStats, combineState, difficulty, mergeLevels, mergeState, mergeStats, mergeStreak, nextDay, readAll, readLevels, readState } from '../backend/src/progress.js';
 import { deleteUser } from '../backend/src/auth.js';
 import { releasePlayer } from '../backend/src/rooms.js';
 import { eq, finish, ok, player, reset, section } from './helpers.js';
@@ -150,9 +150,99 @@ section('What a client sends is not what gets stored');
 
 section('The settings blob cannot become a filing cabinet');
 {
-  eq(cleanState({ a: 'x'.repeat(20_000) }), null, 'an oversized blob is refused');
+  eq(cleanState({ a: 'x'.repeat(200_000) }), null, 'a blob far past anything a client sends is refused');
   eq(cleanState('not an object'), null, 'and so is something that is not an object');
   ok(!!cleanState({ home: 'bd' }), 'an ordinary one is fine');
+  eq(cleanState({ home: 'bd', junk: 'x'.repeat(20_000) }), { home: 'bd' }, 'one oversized setting is dropped, not the whole blob');
+}
+
+// ── Two devices, one account: the records of play are merged, not overwritten ──
+const today = new Date().toISOString().slice(0, 10);
+// PostgreSQL keeps a jsonb object's keys in its own order, so these compare what a record holds, not its key order
+const canon = (v: unknown): unknown => Array.isArray(v) ? v.map(canon) : v && typeof v === 'object'
+  ? Object.fromEntries(Object.keys(v as object).sort().map(k => [k, canon((v as Record<string, unknown>)[k])])) : v;
+const same = (got: unknown, want: unknown, what: string) => eq(canon(got), canon(want), what);
+const back = (n: number) => { const d = new Date(); d.setUTCDate(d.getUTCDate() - n); return d.toISOString().slice(0, 10); };
+
+section('A Master board is stored');
+{
+  // The fifth tier broke every push that carried one: the table said 0..3 and the whole batch failed.
+  const p = await player('progMaster');
+  const moved = await mergeLevels(pool, p.id, cleanLevels({ it: rec({ stars: 3, tier: 4 }), fr: rec({ tier: 2 }) }));
+  eq(moved, 2, 'both boards of a batch that holds a Master board go up');
+  eq((await readLevels(pool, p.id)).it?.tier, 4, 'and the Master board keeps its tier');
+}
+
+section('Daily training played on two devices is on both');
+{
+  const p = await player('progTrain');
+  // the website played the Forgery, the phone the Curator's Eye, the same day
+  await mergeState(pool, p.id, { train: { [today]: { f: 39, p: 1, pp: { f: 1 }, at: 1 } } });
+  await mergeState(pool, p.id, { train: { [today]: { e: 100, p: 1, pp: { e: 1 }, nx: { e: 1 }, at: 2 } } });
+  const st = await readState(pool, p.id) as Record<string, any>;
+  eq(st.train?.[today]?.f, 39, 'the website’s round is still there after the phone pushed');
+  eq(st.train?.[today]?.e, 100, 'and the phone’s is there too');
+  same(st.train?.[today]?.pp, { f: 1, e: 1 }, 'each round’s plays are kept');
+  eq(st.train?.[today]?.nx, { e: 1 }, 'and the new puzzles asked for');
+  // the same round on both: the better score stands, whichever pushes last
+  await mergeState(pool, p.id, { train: { [today]: { f: 20 } } });
+  eq(((await readState(pool, p.id)) as Record<string, any>).train?.[today]?.f, 39, 'a worse score pushed later takes nothing away');
+}
+
+section('Streaks from two devices join up');
+{
+  eq(nextDay('2026-02-28'), '2026-03-01', 'the day after is a calendar day');
+  eq(nextDay('2028-02-28'), '2028-02-29', 'leap years included');
+  const s = (count: number, last: string) => ({ count, last });
+  eq(mergeStreak(s(2, '2026-09-22'), s(1, '2026-09-23')), s(3, '2026-09-23'), 'the phone played two days, the website the next: three in a row');
+  eq(mergeStreak(s(1, '2026-09-23'), s(2, '2026-09-22')), s(3, '2026-09-23'), 'in either order');
+  eq(mergeStreak(s(3, '2026-09-23'), s(1, '2026-09-23')), s(3, '2026-09-23'), 'the same day: the longer count');
+  eq(mergeStreak(s(5, '2026-09-18'), s(1, '2026-09-23')), s(1, '2026-09-23'), 'a gap between them: the later run alone');
+  eq(mergeStreak(mergeStreak(s(2, '2026-09-22'), s(1, '2026-09-23')), s(2, '2026-09-22')), s(3, '2026-09-23'), 'merging again changes nothing');
+  const p = await player('progStreak');
+  await mergeState(pool, p.id, { playStreak: s(2, back(1)) });
+  await mergeState(pool, p.id, { playStreak: s(1, today) });
+  same(((await readState(pool, p.id)) as Record<string, any>).playStreak, s(3, today), 'on the account as well');
+}
+
+section('The daily board, the rank and the settings merge by their own rules');
+{
+  const p = await player('progDaily');
+  await mergeState(pool, p.id, { daily: { [today]: { t: 90_000, stars: 2, quiz: true, tier: 2, arrows: 80, at: 1 } }, loss: { phone1: 40 }, home: 'bd' });
+  await mergeState(pool, p.id, { daily: { [today]: { t: 60_000, stars: 2, quiz: false, tier: 2, arrows: 80, at: 2 }, [back(1)]: { t: 70_000, stars: 3, tier: 1, arrows: 60, at: 3 } }, loss: { web1: 12, phone1: 10 }, home: 'in' });
+  const st = await readState(pool, p.id) as Record<string, any>;
+  eq(st.daily?.[today]?.t, 60_000, 'the faster run of two with the same stars');
+  eq(st.daily?.[today]?.quiz, true, 'and the quiz stays answered');
+  eq(st.daily?.[back(1)]?.stars, 3, 'a day only one device played arrives');
+  same(st.loss, { phone1: 40, web1: 12 }, 'each device’s count kept, the larger of two for the same device');
+  eq(st.home, 'in', 'a setting: the last device to say it wins');
+}
+
+section('Two devices land on the same account whichever pushes first');
+{
+  const a = { train: { [today]: { r: 88, h: 1, p: 2, pp: { r: 2 } } }, playStreak: { count: 4, last: back(1) }, loss: { dev1: 5 }, daily: { [today]: { t: 50_000, stars: 1, at: 1 } } };
+  const b = { train: { [today]: { r: 70, g: 90, p: 1, pp: { g: 1 } }, [back(2)]: { e: 55 } }, playStreak: { count: 1, last: today }, loss: { dev2: 9 }, daily: { [today]: { t: 80_000, stars: 3, at: 2 } } };
+  const ab = combineState(combineState({}, a), b), ba = combineState(combineState({}, b), a);
+  same(ab, ba, 'A then B is B then A');
+  same(combineState(ab, a), ab, 'and pushing A again changes nothing');
+  eq((ab as any).train[today], { r: 88, g: 90, h: 1, p: 2, pp: { r: 2, g: 1 } }, 'the day holds the best of both');
+  eq((ab as any).playStreak, { count: 5, last: today }, 'the streaks joined');
+  eq((ab as any).daily[today].stars, 3, 'the three-star daily run, though slower');
+}
+
+section('What the account keeps is cleaned and kept in bounds');
+{
+  const st = cleanState({
+    train: { '1999-01-01': { r: 90 }, 'not-a-day': { r: 90 }, [today]: { r: 250, f: 'x', g: 70, pp: { g: -3, e: 2 } } },
+    daily: { [today]: { stars: 3 } },
+    playStreak: { count: -1, last: today }, dailyStreak: { count: 2, last: 'yesterday' },
+    loss: { 'a b': 5, ok1: 7, neg: -2 },
+  }) as Record<string, any>;
+  eq(Object.keys(st.train), [today], 'a day from long ago or no day at all is dropped');
+  eq(st.train[today], { g: 70, pp: { e: 2 } }, 'an impossible score or count is dropped, the rest of the day kept');
+  ok(!('daily' in st), 'a daily board with no time is not a run');
+  ok(!('playStreak' in st) && !('dailyStreak' in st), 'a streak with a negative count or no date is dropped');
+  eq(st.loss, { ok1: 7 }, 'and only a real device with a real count stays in the rank');
 }
 
 section('Deleting the account takes the tour with it');

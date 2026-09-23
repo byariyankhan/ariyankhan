@@ -22,7 +22,7 @@ import { trust } from './proxies.js';
 const app = Fastify({
   logger: false,                          // we write our own structured lines, with redaction
   trustProxy: trust,                       // nginx and Cloudflare are in front; req.ip must be the player, not either of them
-  bodyLimit: 64 * 1024,
+  bodyLimit: 256 * 1024,                 // a whole tour of 600 boards with its counts is about 100 KB
 });
 
 // ── Cross-origin ──
