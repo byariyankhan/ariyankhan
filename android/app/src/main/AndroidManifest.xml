@@ -14,6 +14,9 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Declared here, not left to the ads SDK's manifest merge: Play checks every active artifact for it once the
+         advertising-ID declaration says the app uses one, and a build from before the SDK had none. -->
+    <uses-permission android:name="com.google.android.gms.permission.AD_ID" />
 
     <!-- appCategory="game" is load-bearing. Android 16 ignores android:screenOrientation on any display
          600dp wide or over, so a tablet or an unfolded foldable would hand the game a landscape window
