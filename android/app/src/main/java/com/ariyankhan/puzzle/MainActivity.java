@@ -29,6 +29,8 @@ import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.browser.customtabs.CustomTabsClient;
+import androidx.browser.customtabs.CustomTabsIntent;
 import androidx.core.content.ContextCompat;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
@@ -333,7 +335,24 @@ public final class MainActivity extends ComponentActivity {
     private String deepLink(@Nullable Intent intent) {
         if (intent == null || !Intent.ACTION_VIEW.equals(intent.getAction())) return null;
         Uri data = intent.getData();
-        return data != null && ours(data) ? data.toString() : null;
+        if (data == null) return null;
+        String handoff = handoffLink(data);
+        if (handoff != null) return handoff;
+        return ours(data) ? data.toString() : null;
+    }
+
+    /**
+     * The browser handing a sign-in back: {@code puzzle://signin?code=…} becomes the game's own URL with
+     * {@code #handoff=<code>}, which the page trades, together with the nonce it kept, for a session. The code
+     * is checked for shape only; whether it is worth anything is the server's to say. Loading the game's URL
+     * with a new fragment is a hash change to a page already showing, and a fresh load otherwise.
+     */
+    @Nullable
+    private String handoffLink(Uri data) {
+        if (!"puzzle".equalsIgnoreCase(data.getScheme()) || !"signin".equalsIgnoreCase(data.getHost())) return null;
+        String code = data.getQueryParameter("code");
+        if (code == null || !code.matches("[a-f0-9]{64}")) return null;
+        return getString(R.string.launch_url) + "#handoff=" + code;
     }
 
     /**
@@ -564,6 +583,7 @@ public final class MainActivity extends ComponentActivity {
                     else if ("pushOn".equals(cmd)) pushOn(reply);
                     else if ("pushOff".equals(cmd)) pushOff(reply);
                     else if ("hello".equals(cmd)) answer(reply, hello());
+                    else if (cmd.startsWith("open ")) openInBrowser(reply, cmd.substring(5));
                 });
     }
 
@@ -625,6 +645,48 @@ public final class MainActivity extends ComponentActivity {
             // A phone without Play services cannot do this at all, and saying so beats hanging.
             answer(reply, fail("unavailable"));
         }
+    }
+
+    /**
+     * Open a page of the game in the phone's browser, as a Custom Tab.
+     *
+     * <p>This is the sign-in for when the native one cannot work: Google answers "no credentials" to a build
+     * whose certificate it has not been told about, and it says the same thing to a phone with no account, so
+     * the page does not try to tell them apart — it asks for the browser, where Google's own button runs, and
+     * the browser hands the account back through {@code puzzle://signin} (see {@link #handoffLink}).
+     *
+     * <p>Only the game's own origin, over https: the page asks for a tab of itself and nothing else. The
+     * browser is named explicitly, because a plain ACTION_VIEW on {@code /puzzle/} would resolve to the one
+     * app whose manifest claims that path — this one — and the page would open in the WebView it is trying
+     * to leave.
+     */
+    private void openInBrowser(JavaScriptReplyProxy reply, String raw) {
+        Uri u = Uri.parse(raw == null ? "" : raw.trim());
+        if (!"https".equalsIgnoreCase(u.getScheme()) || !getString(R.string.host).equalsIgnoreCase(u.getHost())) {
+            answer(reply, fail("refused"));
+            return;
+        }
+        try {
+            String browser = CustomTabsClient.getPackageName(this, null);
+            if (browser == null) browser = defaultBrowser();
+            if (browser == null) { answer(reply, fail("no_browser")); return; }
+            CustomTabsIntent tab = new CustomTabsIntent.Builder().setShowTitle(false).build();
+            tab.intent.setPackage(browser);
+            tab.launchUrl(this, u);
+            answer(reply, ok("opened", true));
+        } catch (RuntimeException nothingOpens) {
+            answer(reply, fail("no_browser"));
+        }
+    }
+
+    /** Whatever opens https on this phone, unless that is us. */
+    @Nullable
+    private String defaultBrowser() {
+        Intent probe = new Intent(Intent.ACTION_VIEW, Uri.parse("https://example.com/"));
+        android.content.pm.ResolveInfo r = getPackageManager().resolveActivity(probe, PackageManager.MATCH_DEFAULT_ONLY);
+        if (r == null || r.activityInfo == null) return null;
+        String pkg = r.activityInfo.packageName;
+        return getPackageName().equals(pkg) ? null : pkg;
     }
 
     /**
@@ -724,6 +786,7 @@ public final class MainActivity extends ComponentActivity {
         JSONObject o = ok("signIn", true);
         try {
             o.put("push", firebaseReady());
+            o.put("open", true);   // this build can open the browser for a sign-in
         } catch (JSONException impossible) {
             // A literal key and a boolean.
         }

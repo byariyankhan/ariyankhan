@@ -215,6 +215,8 @@ in the path.
 |---|---|---|
 | GET | `/auth/me` | who am I, and which sign-in providers work |
 | POST | `/auth/google` | sign in with a Google ID token |
+| POST | `/auth/handoff` | signed in here (a browser): a code the app can trade for a session, bound to the app's `nonce`; five minutes, one use |
+| POST | `/auth/handoff/redeem` | `code` + `nonce` → a session (cookie, or a token for a Bearer client); limited like a sign-in, and a wrong nonce burns the code |
 | POST | `/auth/name` | rename |
 | POST | `/auth/logout` | end this session |
 | POST | `/auth/delete` | delete the account and everything attached |

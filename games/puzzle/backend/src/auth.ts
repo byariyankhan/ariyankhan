@@ -11,6 +11,7 @@ import { pool, query, tx } from './db.js';
 import { config } from './config.js';
 import { give, idem } from './gold.js';
 import { log } from './log.js';
+import { k, redis, soft } from './redis.js';
 
 export interface User { id: number; name: string; provider: string; pic: string; gold: number; reminder: boolean; }
 export interface GoogleClaims { sub: string; name: string; pic: string; }
@@ -110,6 +111,41 @@ export async function upsertUser(c: PoolClient, provider: string, claims: Google
   }
   const row = await query<User>(c, 'SELECT id, name, provider, pic, gold, reminder FROM users WHERE id = $1', [id]);
   return { user: row.rows[0]!, created };
+}
+
+/**
+ * Sign-in handed from a browser to the app.
+ *
+ * Google will not sign a WebView in, and the native way needs every certificate the app is ever signed with
+ * registered with Google beforehand. When that fails — a key Play rotated, a phone whose Play services
+ * disagree — the app opens the game in the phone's browser, where Google's own button works, and the browser
+ * hands the account back: the app makes a nonce and opens /puzzle/?handoff=<nonce>; the browser, signed in,
+ * posts the nonce to handoffStart and gets a code; it opens puzzle://signin?code=<code>, which is the app;
+ * the app posts code and nonce to handoffRedeem and gets a session of its own.
+ *
+ * A code is one account, five minutes, one use, and spendable only with the nonce that asked for it. The
+ * nonce never leaves the app's own storage and the browser's address bar, so an app that hijacked the
+ * puzzle: scheme would hold a code it cannot spend. Both are kept hashed, the way session tokens are.
+ */
+export const HANDOFF_SECONDS = 300;
+export const validNonce = (n: string): boolean => /^[A-Za-z0-9_-]{16,64}$/.test(n);
+export const validCode = (c: string): boolean => /^[a-f0-9]{64}$/.test(c);
+export async function handoffStart(userId: number, nonce: string): Promise<string | null> {
+  const code = newToken();
+  const ok = await soft(() => redis.set(k('handoff', hashToken(code)), JSON.stringify({ user: userId, nonce: hashToken(nonce) }), 'EX', HANDOFF_SECONDS, 'NX'), null);
+  return ok === 'OK' ? code : null;
+}
+export async function handoffRedeem(code: string, nonce: string): Promise<User | null> {
+  // GETDEL: read and burn in one step, so two redeems of one code cannot both win
+  const raw = await soft(() => redis.getdel(k('handoff', hashToken(code))), null);
+  if (!raw) return null;
+  let rec: { user?: unknown; nonce?: unknown };
+  try { rec = JSON.parse(raw) as { user?: unknown; nonce?: unknown }; } catch { return null; }
+  if (typeof rec.user !== 'number' || typeof rec.nonce !== 'string') return null;
+  const want = Buffer.from(rec.nonce, 'hex'), got = Buffer.from(hashToken(nonce), 'hex');
+  if (want.length !== got.length || !timingSafeEqual(want, got)) return null;
+  const r = await query<User>(pool, 'SELECT id, name, provider, pic, gold, reminder FROM users WHERE id = $1', [rec.user]);
+  return r.rows[0] ?? null;
 }
 
 export async function startSession(c: PoolClient, userId: number, client: 'web' | 'app'): Promise<string> {

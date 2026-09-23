@@ -980,6 +980,17 @@ links.
   options). A scan of every `${…}` in HTML found names and messages escaped or set as text; the session
   cookie is HttpOnly + SameSite=Lax and JSON bodies need a CORS preflight, so cross-site posts do not
   carry it. "Get a free life" is a button like the others now: the brain's colour.
+- **Sign-in handed from the browser to the app** (`handoff*` in `js/puzzle.js`, `handoffStart`/`handoffRedeem`
+  in the backend's `auth.ts`, `openInBrowser`/`handoffLink` in `MainActivity`): when the app's native Google
+  sign-in fails for anything but a cancel — Google says "no credentials" for a build it has not been told
+  about, and the same for a phone with no account — the app opens the game in a Custom Tab with
+  `?handoff=<nonce>`; signed in there, the page gets a one-use, five-minute code (`POST /auth/handoff`) and
+  opens `puzzle://signin?code=…`, which is the app; the app lands on `#handoff=<code>` and trades code and
+  nonce for a session (`POST /auth/handoff/redeem`). The nonce never leaves the app, so the code is worth
+  nothing to anything else answering the scheme. "Sign in in your browser instead" is the same path by hand.
+  The welcome screen shows the brain mark instead of the old arrows, and **the app asks for notifications the
+  moment Accept is tapped** (`notifyFirstAsk` waits for `welcomed`, signed in or not: `notifyInitApp` no
+  longer needs an account).
 - **The evening nudge needs no account.** Notifications are offered signed out too (`renderNotify` no
   longer waits for `auth.user`); a token or subscription is posted with no user, with the device's own
   nudge answer (`remindOn()`, `reminder` in the post, `store 'remind'`), and the 7 pm sweep reaches those

@@ -78,8 +78,9 @@ The protocol is one string in, one JSON object out:
 
 | the page posts | the shell replies |
 |---|---|
-| `hello` | `{"ok":true,"signIn":true}` |
+| `hello` | `{"ok":true,"signIn":true,"push":…,"open":true}` |
 | `signIn` | `{"ok":true,"idToken":"…"}` or `{"ok":false,"error":"cancelled"\|"no_account"\|"unavailable"\|"failed"}` |
+| `open <https url on our host>` | `{"ok":true,"opened":true}` or `{"ok":false,"error":"refused"\|"no_browser"}` — a Custom Tab of the game's own page, for the sign-in above |
 
 Where `WebViewFeature.WEB_MESSAGE_LISTENER` is missing — a System WebView older than about 2021 — no bridge is
 installed, nothing throws, and the page goes on saying sign-in is not in the app, which is then true.
@@ -122,6 +123,22 @@ owns `google-services.json` (`puzzle-e3f5d`, 634738912422): a fingerprint added 
 in the wrong project and changes nothing. And the build Play installs is signed with the **Play App Signing
 key**, not the upload key that signed the bundle, so the upload key's fingerprint alone does not cover what a
 tester's phone runs. Nothing needs rebuilding after a client is added; Google applies it within minutes.
+
+### When the native way fails: the browser hands the account back
+
+A build Google has not been told about, a key Play rotated, a phone whose Play services keep an old answer —
+the page cannot tell these from "no account on this phone", and a player should not have to. So when
+Credential Manager fails for anything but a cancel, the page asks the shell to `open` its own URL with a
+nonce it just made (`?handoff=<nonce>`, the nonce kept in the page's storage). The shell opens it as a
+**Custom Tab** in the phone's browser (`openInBrowser`: the browser named explicitly, because a plain
+ACTION_VIEW on `/puzzle/` resolves to the one app that claims that path — this one), where Google's own
+button works. Signed in there, the page posts the nonce to `POST /auth/handoff` and gets a code; it opens
+`puzzle://signin?code=<code>`, which the manifest claims, and `handoffLink` turns into the game's URL with
+`#handoff=<code>`. The page trades code and nonce at `POST /auth/handoff/redeem` for a session of its own.
+A code is one account, five minutes, one use, and worth nothing without the nonce — which never left the
+app — so an app that hijacked the `puzzle:` scheme would hold a code it cannot spend. Nothing about how the
+app is signed matters to any of it. "Sign in in your browser instead" under the Google button is the same
+path, chosen by hand.
 
 ## Digital Asset Links — what it is still for
 

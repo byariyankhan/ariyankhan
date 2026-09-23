@@ -74,6 +74,37 @@ const a = await mint('apiAnn'), b = await mint('apiBen');
   eq(anon.headers.get('cache-control'), 'no-store', 'no answer from this API may be cached');
 }
 
+section('A sign-in handed from the browser to the app');
+{
+  const nonce = 'app-nonce-0123456789abcdef';
+  const off = await call('/auth/handoff', { body: { nonce } });
+  eq(off.status, 401, 'a browser that is not signed in gets no code');
+  const bad = await call('/auth/handoff', { cookie: `${config.auth.cookie}=${a.token}`, body: { nonce: 'short' } });
+  eq(bad.status, 400, 'a nonce that is not the shape the app makes is refused');
+  const start = await call('/auth/handoff', { cookie: `${config.auth.cookie}=${a.token}`, body: { nonce } });
+  eq(start.status, 200, 'a signed-in browser gets a code');
+  const code = String(start.json.code);
+  eq(/^[a-f0-9]{64}$/.test(code), true, 'of the same shape as a session token');
+  const wrong = await call('/auth/handoff/redeem', { body: { code, nonce: 'someone-elses-nonce-000000' } });
+  eq(wrong.status, 404, 'the code is worth nothing without the nonce that asked for it');
+  const again = await call('/auth/handoff/redeem', { body: { code, nonce } });
+  eq(again.status, 404, 'and a wrong guess burns it');
+  const start2 = await call('/auth/handoff', { cookie: `${config.auth.cookie}=${a.token}`, body: { nonce } });
+  const code2 = String(start2.json.code);
+  const web = await call('/auth/handoff/redeem', { body: { code: code2, nonce } });
+  eq(web.status, 200, 'code and nonce together sign the app in');
+  eq((web.json.user as { id: number }).id, a.id, 'as the account the browser held');
+  eq(String(web.headers.get('set-cookie')).includes(config.auth.cookie), true, 'with a session cookie, the way the WebView keeps one');
+  eq(web.json.token, undefined, 'and no token in the body for a cookie client');
+  const twice = await call('/auth/handoff/redeem', { body: { code: code2, nonce } });
+  eq(twice.status, 404, 'a code spent is a code gone');
+  const start3 = await call('/auth/handoff', { cookie: `${config.auth.cookie}=${a.token}`, body: { nonce } });
+  const bearer = await call('/auth/handoff/redeem', { body: { code: String(start3.json.code), nonce, client: 'app' } });
+  eq(typeof bearer.json.token, 'string', 'a client that asks for the token gets it in the body');
+  const who = await call('/auth/me', { token: String(bearer.json.token) });
+  eq((who.json.user as { id: number }).id, a.id, 'and that token is a session');
+}
+
 section('Signed out means signed out');
 {
   const r = await call('/matches', { body: { stake: 500 } });
