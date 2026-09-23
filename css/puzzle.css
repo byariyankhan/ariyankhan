@@ -158,9 +158,10 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 @keyframes aa-next{ from{ filter:brightness(1); } to{ filter:brightness(1.25); } }
 @media(prefers-reduced-motion:reduce){ .aa-world-land path.is-next{ animation:none; } }
 .aa-hero{ text-align:center; margin:0; padding:0; }
-.aa-home .aa-play:not(.aa-play--ghost){ margin-top:auto; }   /* the two buttons are the floor of this screen: the space above them is the first one's, not shared between them */
+.aa-home .aa-play--train{ margin-top:auto; }   /* the buttons are the floor of this screen: the space above them is the first one's, and the first is Daily Training */
+.aa-home .aa-play:not(.aa-play--ghost){ margin-top:10px; }   /* the two buttons are the floor of this screen: the space above them is the first one's, not shared between them */
 .aa-title{ font-size:clamp(28px,7.5vw,40px); font-weight:900; margin:0; letter-spacing:-.5px; color:var(--line); }
-.aa-tagline{ margin:6px 0 0; color:var(--muted); font-size:15px; }
+.aa-tagline{ display:inline-block; margin:0 0 0 12px; color:var(--muted); font-size:15px; font-weight:700; letter-spacing:0; vertical-align:baseline; }
 /* compact secondary actions under the map: daily board and the level list */
 /* the country picker gets a line of its own: squeezed beside the label it wrapped into five lines */
 .aa-row-label small{ display:block; font-size:12px; font-weight:600; color:var(--muted); }
@@ -758,6 +759,7 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-train-pill{ display:inline-flex; align-items:center; justify-content:center; min-width:34px; height:26px; padding:0 8px; border-radius:13px; background:color-mix(in srgb, var(--accent2) 14%, transparent); color:var(--accent2); font-size:12px; font-weight:900; letter-spacing:.3px; font-variant-numeric:tabular-nums; }
 .aa-train-pill.is-done{ background:color-mix(in srgb, var(--good) 16%, transparent); color:var(--good); }
 .aa-play--train .aa-play-ico{ color:var(--accent2); }
+.aa-play-mark{ width:32px; height:32px; display:block; }
 .aa-train-top{ display:flex; align-items:flex-end; justify-content:space-between; gap:16px; margin:4px 0 8px; }
 .aa-train-score{ display:flex; flex-direction:column; align-items:flex-start; }
 .aa-train-score b{ font-size:52px; font-weight:900; line-height:1; color:var(--ink); letter-spacing:-1px; font-variant-numeric:tabular-nums; }
