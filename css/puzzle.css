@@ -369,9 +369,12 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 /* ── Game ── */
 .aa-gamescreen{ gap:6px; }
 .aa-gbar{ display:flex; align-items:center; gap:6px; padding-bottom:8px; border-bottom:2px solid var(--bg2); }
-.aa-gtitle{ flex:1; display:flex; flex-direction:column; align-items:center; line-height:1.05; }
-.aa-glevel{ font-size:26px; font-weight:900; color:var(--accent); white-space:nowrap; }
-.aa-hud-diff{ font-size:15px; font-weight:900; color:var(--muted); }
+.aa-gtitle{ flex:1; min-width:0; display:flex; flex-direction:column; align-items:center; line-height:1.05; }
+.aa-glevel{ font-size:26px; font-weight:900; color:var(--accent); white-space:nowrap; max-width:100%; overflow:hidden; text-overflow:ellipsis; }
+.aa-hud-diff{ font-size:15px; font-weight:900; color:var(--muted); display:flex; max-width:100%; white-space:nowrap; }
+/* a scene's or a replay's name, before the difficulty: a long one gives way, the difficulty never does */
+.aa-hud-name{ min-width:0; overflow:hidden; text-overflow:ellipsis; color:var(--ink); }
+.aa-hud-tier{ flex:none; }
 .aa-hud-diff--hard{ color:var(--hard); }
 .aa-hud-diff--expert{ color:var(--expert); }
 .aa-hud-diff--master{ color:var(--master); }

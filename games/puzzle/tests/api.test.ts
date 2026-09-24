@@ -490,6 +490,8 @@ section('How a cleared board went, against everybody else who cleared it');
   const bad = await call(`/boards/pace?level_id=&tier=0&ms=1000`);
   eq(bad.status, 400, 'a board nobody named is refused');
   eq((await call('/boards/pace?level_id=050&tier=9&ms=1000')).status, 400, 'so is a difficulty that does not exist');
+  eq((await call('/boards/pace?level_id=050&tier=5&ms=1000')).status, 400, 'one past Master too');
+  eq((await call('/boards/pace?level_id=pace-board&tier=4&ms=30000')).status, 200, 'and Master itself is compared: five tiers, Master is 4');
   eq((await call('/boards/pace?level_id=050&tier=0&ms=0')).status, 400, 'and a time of nothing');
 
   const quiet = await call('/boards/pace?level_id=pace-board&tier=1&ms=30000');

@@ -81,6 +81,7 @@
   const store = {
     get(k, fb) { try { const v = localStorage.getItem(STORE + k); return v == null ? fb : JSON.parse(v); } catch { return fb; } },
     set(k, v) { try { localStorage.setItem(STORE + k, JSON.stringify(v)); } catch { /* ignore */ } },
+    del(k) { try { localStorage.removeItem(STORE + k); } catch { /* ignore */ } },
   };
   const LIVES = 4;                 // Classic and Rush; One Life has 1, Deep Focus none
   const DIFF_OF = tier => ['Easy', 'Normal', 'Hard', 'Expert', 'Master'][tier];
@@ -179,6 +180,7 @@
     idx: -1, level: null, tier: 0, mask: null, pieces: [], occ: null, W: 0, H: 0, left: 0,
     lives: LIVES, livesMax: LIVES, startedAt: 0, raceBase: 0, elapsed: 0, timerId: 0, finished: false, hintsUsed: 0, checksUsed: 0, checksMax: CHECKS_PER_LEVEL, wrong: 0, fails: 0, seedBump: 0, busy: false, potGone: false,
     combo: 0, bestCombo: 0, lastShot: 0, cheerHold: 0, shown: new Set(), daily: null,
+    seed: 0, replay: false, resultTimer: 0, lossHeld: 0,
   };
 
   // ── Helpers ──
@@ -213,6 +215,10 @@
   // progress is keyed by country id (not by level number: the tour order is the player's own, home country first)
   const progressKey = i => 'lv:' + DATA.levels[i].id;
   const skipKey = i => 'skip:' + DATA.levels[i].id;
+  // A scene board comes round again every twelve scenes, and each lap is a board of its own with its own record
+  // (`s:tower`, then `s:tower~2`, `s:tower~3`, ...). The shape, the stats and a shared link are the board's
+  // whatever the lap, so anything that looks the board up drops the lap; anything that records a clear keeps it.
+  const baseId = id => String(id).replace(/~\d+$/, '');
 
   // ── What each board costs, counted here ──
   // The tour's record of a board is its best run. It cannot say how many tries that took, how many hearts
@@ -246,6 +252,11 @@
   }
   const cleared = i => store.get(progressKey(i));
   const unlocked = i => i === 0 || !!cleared(i - 1) || !!store.get(skipKey(i));
+  // The frontier: the slot after the last one cleared. The next board is dealt from there. An open board behind
+  // it -- a scene that went into the tour after the player had passed that point -- is a hole, and Play is not
+  // to walk a player on level 150 back through the holes one at a time; they wait until nothing is left ahead.
+  const frontierOf = (levels, done) => { for (let j = levels.length - 1; j >= 0; j--) if (done(levels[j])) return j + 1; return 0; };
+  const frontierIdx = () => frontierOf(DATA.levels, L => !!store.get('lv:' + L.id));
   const dayKeyOf = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   const dayKey = () => dayKeyOf(new Date());
   const dayKeyBack = n => { const d = new Date(); d.setDate(d.getDate() - n); return dayKeyOf(d); };
@@ -263,16 +274,20 @@
   // count is everything the player has cleared; i < 0 asks for the next level, whatever is played for it.
   let numCache = null;
   const forgetNums = () => { numCache = null; };
+  // Each board is counted once, by its id: a board the list holds twice is still one clear.
   function levelNo(i) {
     if (!numCache) {
-      const done = DATA.levels.map((_, j) => ({ j, rec: cleared(j) })).filter(x => x.rec).map(x => ({ j: x.j, at: x.rec.at || 0 }));
-      for (const at of trainClearTimes()) done.push({ j: -1, at });
+      const seen = new Set(), done = [];
+      DATA.levels.forEach((L, j) => { if (seen.has(L.id)) return; seen.add(L.id); const rec = cleared(j); if (rec) done.push({ id: L.id, j, at: rec.at || 0 }); });
+      for (const at of trainClearTimes()) done.push({ id: null, j: -1, at });
       done.sort((a, b) => (a.at - b.at) || (a.j - b.j));
-      const of = new Map(); done.forEach((x, k) => { if (x.j >= 0) of.set(x.j, k + 1); });
+      const of = new Map(); done.forEach((x, k) => { if (x.id) of.set(x.id, k + 1); });
       numCache = { n: done.length, of };
     }
-    return (i >= 0 && numCache.of.get(i)) || numCache.n + 1;
+    return (i >= 0 && DATA.levels[i] && numCache.of.get(DATA.levels[i].id)) || numCache.n + 1;
   }
+  /** The boards cleared, each id once. */
+  const clearedLevels = () => { const seen = new Set(); return DATA.levels.filter((L, i) => !seen.has(L.id) && seen.add(L.id) && cleared(i)); };
 
   // ── Sound ──
   let audio = null;
@@ -702,15 +717,17 @@
     const tour = orderFor(d, home).flatMap((C, k) => [C, discLevelFor(C), (k + 1) % SCENE_EVERY === 0 ? sceneLevelFor(nth++) : null].filter(Boolean));
     // discovery clears were briefly kept under dv:<id> before the boards became levels of their own
     for (const L of tour) if (L.disc && !store.get('lv:' + L.id)) { const v = store.get('dv:' + L.country.id); if (v) store.set('lv:' + L.id, v); }
-    // The focus boards go in at the frontier — in front of the first board the player has not cleared. For a new
-    // player that is the very start, which is the point: the game is called Train Your Brain and the first thing
-    // it hands you is a brain. For a player who has already cleared a hundred countries it is the board they were
-    // about to play, so the new boards are the next thing they meet rather than never (appending would be never)
-    // and rather than a wall (putting them first would lock the country they were on until all of these were done).
+    // The focus boards go in at the frontier — right after the last board the player has cleared (frontierOf).
+    // For a new player that is the very start, which is the point: the game is called Train Your Brain and the
+    // first thing it hands you is a brain. For a player who has already cleared a hundred countries it is the board
+    // they were about to play, so the new boards are the next thing they meet rather than never (appending would
+    // be never) and rather than a wall (putting them first would lock the country they were on until all of these
+    // were done). Not in front of the first board without a record: a scene added behind the frontier is such a
+    // board, and the whole block used to land in that hole, a hundred levels back.
     const focus = focusLevels();
     if (!focus.length) return tour;
-    const at = tour.findIndex(L => !store.get('lv:' + L.id));
-    return at < 0 ? tour.concat(focus) : tour.slice(0, at).concat(focus, tour.slice(at));
+    const at = frontierOf(tour, L => !!store.get('lv:' + L.id));
+    return tour.slice(0, at).concat(focus, tour.slice(at));
   }
   // ── Home country: the tour starts at the player's own country and spreads out from there ──
   // Cloudflare tells the server which country a connection comes from (games/geo.php passes on the two-letter code,
@@ -769,7 +786,7 @@
     }
     labels.innerHTML = '';
     const n = DATA.levels.filter(isCountry).length, done = DATA.levels.filter((L, i) => isCountry(L) && cleared(i)).length;
-    const nextIdx = DATA.levels.findIndex((_, j) => !cleared(j) && unlocked(j)), nextL = DATA.levels[nextIdx];
+    const nextIdx = nextOpen(), nextL = DATA.levels[nextIdx];
     const nextId = nextL ? (nextL.disc ? nextL.country.id : nextL.id) : null;
     for (const c of MAP.countries) {
       const i = byId.get(c.id); if (i == null) continue;
@@ -817,9 +834,29 @@
   const lossMap = () => { const m = store.get('loss', {}); return m && typeof m === 'object' && !Array.isArray(m) ? m : {}; };
   const lossTotal = m => Object.values(m).reduce((a, v) => a + (Number(v) > 0 ? Math.floor(Number(v)) : 0), 0);
   function loseArrows(n) {
+    n = Math.min(Math.floor(n), arrowsShot());   // a loss past zero would be a debt the next clears pay off unseen
     if (!(n > 0)) return;
-    const m = lossMap(); m[DEVICE] = (Number(m[DEVICE]) > 0 ? Math.floor(Number(m[DEVICE])) : 0) + Math.floor(n);
+    const m = lossMap(); m[DEVICE] = (Number(m[DEVICE]) > 0 ? Math.floor(Number(m[DEVICE])) : 0) + n;
     store.set('loss', m);
+  }
+  // What a lost board takes off the rank. Only the first loss since the board was started fresh: the retries of a
+  // board being fought for are persistence, and charging each of them punished the player at the very moment
+  // they were closest to giving up, while the board pays only once. Nothing on a board already cleared, where a
+  // replay has nothing at stake. At most half the board, and never more than the rank holds. (The daily board
+  // and races take nothing; the caller leaves them out.)
+  const lossFor = ({ fails, done, left, arrows, rank }) => fails !== 1 || done ? 0 : Math.max(0, Math.min(left, Math.floor(arrows / 2), rank));
+  // Those arrows are held while the card still offers a free life, which carries the board on and gives them
+  // back; they are taken once the player moves on -- Try again, another board, home -- or at the next start if
+  // the app was closed on the card. Taking them at once and handing them back would not hold: a device's loss
+  // count only ever grows when devices merge (lossMap), so a sync in between would take them a second time.
+  function holdLoss(n) { state.lossHeld = n; store.set('lossHeld', n); }
+  function forgiveLoss() { const n = state.lossHeld | 0; state.lossHeld = 0; store.del('lossHeld'); return n; }
+  function settleLoss() {
+    const n = Math.max(state.lossHeld | 0, Math.floor(Number(store.get('lossHeld', 0))) || 0);
+    if (n <= 0) return;
+    state.lossHeld = 0; store.del('lossHeld');
+    loseArrows(n);
+    syncOwed = true; syncTour({}).catch(() => {});
   }
   function arrowsShot() {
     let n = 0;
@@ -905,7 +942,7 @@
   // with a hundred boards behind them, and three zeroes would be a lie about their own game.
   function renderHomeStats() {
     if (!DATA || !el.statBoards) return;
-    const cleared_ = DATA.levels.filter((_, i) => cleared(i));
+    const cleared_ = clearedLevels();
     el.statBoards.textContent = String(cleared_.length);
     el.statCountries.textContent = String(cleared_.filter(isCountry).length);
     // Days played in a row, and nothing decays the stored record, so it counts only while it is still alive:
@@ -1018,7 +1055,7 @@
     deckStart();
     const n = DATA.levels.length;
     renderPurse(); renderTrainPill();
-    const nextIdx = DATA.levels.findIndex((_, j) => !cleared(j) && unlocked(j));
+    const nextIdx = nextOpen();
     el.play.dataset.level = nextIdx < 0 ? 0 : nextIdx;
     // one button, one label: Play & Discover (no level number or tier: the game picks the next country and its difficulty)
     renderHome();
@@ -1137,29 +1174,52 @@
   }
   const sceneCache = new Map();
   const SCENE_EVERY = 4;
+  // There are fewer scenes than scene slots, so the list comes round again. Every lap is a board of its own:
+  // one id shared by four slots made one clear count as four levels, and after the first lap every scene slot
+  // was already cleared. The first lap keeps the bare id, so the clears already made stay where they are.
   function sceneLevelFor(n) {
     const list = Array.isArray(SCENES?.boards) ? SCENES.boards : [];
     if (!list.length) return null;
-    const b = list[n % list.length];
-    if (!sceneCache.has(b.id)) sceneCache.set(b.id, { id: 's:' + b.id, name: b.name, d: b.d, k: b.k, scene: true });
-    return sceneCache.get(b.id);
+    const b = list[n % list.length], lap = Math.floor(n / list.length), id = 's:' + b.id + (lap ? '~' + (lap + 1) : '');
+    if (!sceneCache.has(id)) sceneCache.set(id, { id, name: b.name, d: b.d, k: b.k, scene: true });
+    return sceneCache.get(id);
   }
 
-  // the next board to play after i: the first open one further down the list (cleared boards are skipped, so Next
-  // never lands on a replay), else the first open one anywhere, else nothing (-1)
-  function nextOpen(i) {
-    const open = j => !cleared(j) && unlocked(j);
-    for (let j = i + 1; j < DATA.levels.length; j++) if (open(j)) return j;
-    for (let j = 0; j <= i && j < DATA.levels.length; j++) if (open(j)) return j;
+  // The next board to play: the first open one at or after the frontier (cleared boards are passed over, so Next
+  // never lands on a replay), else -- nothing is left ahead -- the first open one anywhere, else nothing (-1).
+  // Play & Discover, the map's marker and the card's Next all ask this. `skip` is a board to pass over: the one
+  // being skipped, whose next slot the skip has just opened.
+  function nextOpen(skip = -1) {
+    const n = DATA.levels.length, f = frontierIdx(), open = j => j !== skip && !cleared(j) && unlocked(j);
+    for (let j = f; j < n; j++) if (open(j)) return j;
+    for (let j = 0; j < Math.min(f, n); j++) if (open(j)) return j;
     return -1;
   }
-  const hudLabel = () => {
-    if (state.daily?.race) { const R = state.daily; return R.boards && R.boards.length > 1 ? `Board ${(R.bi | 0) + 1} of ${R.boards.length}` : 'Challenge'; }
-    if (state.daily) return 'Daily';
-    return `Level ${levelNo(state.idx)}${state.level?.scene ? ' · ' + state.level.name : ''}`;
+  // The tier a tour board is dealt at: the player's own, and one step up on a scene board -- the long game. The
+  // card's Next button names it, so it has to be the same rule startLevel deals by.
+  const tierFor = i => DATA.levels[i]?.scene ? clampTier(TIER_OF() + 1) : TIER_OF();
+  // What the header calls the board: where it stands in the count, and its name where the header gives one.
+  const hudParts = () => {
+    if (state.daily?.race) { const R = state.daily; return { head: R.boards && R.boards.length > 1 ? `Board ${(R.bi | 0) + 1} of ${R.boards.length}` : 'Challenge', name: '' }; }
+    if (state.daily) return { head: 'Daily', name: '' };
+    // A board cleared before is a replay and says so. The number it was cleared at is history, and a header
+    // reading "Level 149" while home and the training chip count to 165 looks like the level went backwards.
+    if (state.replay) return { head: 'Replay', name: state.level?.name ?? '' };
+    return { head: `Level ${levelNo(state.idx)}`, name: state.level?.scene ? state.level.name : '' };
   };
+  const hudLabel = () => { const { head, name } = hudParts(); return name ? `${head} · ${name}` : head; };
+  // The header's two lines: the count in the big type, and under it the name, where there is one, before the
+  // difficulty. The name used to ride on the first line, and "Level 149 · The Diamond" in that type is wider
+  // than a phone: the page scrolled sideways. On the second line a long name gives way (an ellipsis), the
+  // difficulty never does.
+  function renderTitle() {
+    const { head, name } = hudParts(), diff = state.diff || DIFF_OF(state.tier);
+    el.hudLevel.textContent = head;
+    el.hudDiff.className = 'aa-hud-diff aa-hud-diff--' + diff.toLowerCase().replace(' ', '-');
+    el.hudDiff.innerHTML = name ? `<span class="aa-hud-name">${escapeHtml(name)}</span><span class="aa-hud-tier">&nbsp;· ${escapeHtml(diff)}</span>` : escapeHtml(diff);
+  }
   const maskFor = (L, tier) => {
-    const key = L.id + ':' + tier;
+    const key = baseId(L.id) + ':' + tier;   // every lap of a scene is the same shape
     if (!maskCache.has(key)) {
       const k = L.k[tier];
       let scale = KSCALE_OF[tier];   // the finer grid of the top tiers, on the tour and the focus and scene boards alike
@@ -1417,6 +1477,27 @@
     }
     return best;
   }
+  // The last board drawn is kept. Try again deals the same board, tier and seed, and drawing a Master board costs
+  // a phone a second or more on the main thread, right after a loss. Every deal is a copy: a board is played by
+  // marking its pieces gone and emptying their cells, and the kept one has to stay whole for the next deal.
+  let lastDeal = null;
+  const copyBoard = g => ({ W: g.W, H: g.H, land: g.land, occ: g.occ.map(r => r.slice()), pieces: g.pieces.map(p => ({ ...p, cells: p.cells.map(c => c.slice()) })) });
+  function dealBoard(L, tier, seed) {
+    const key = `${L.id}:${tier}:${seed}`;
+    if (lastDeal?.key !== key) { const mask = maskFor(L, tier); lastDeal = { key, mask, gen: bestBoard(mask, tier, seed) }; }
+    return { mask: lastDeal.mask, gen: copyBoard(lastDeal.gen) };
+  }
+  // The generator gives up after sixty tries (and a bad outline can throw earlier), which left the board blank
+  // under "Drawing the board…" with every tap ignored. So a board that cannot be drawn is drawn from the next
+  // seed, then one tier down, and only then is the player told. Deterministic, so a race falls back the same
+  // way on every device in it.
+  function dealSafe(L, tier, seed) {
+    const tries = [[tier, seed], [tier, seed + 1]].concat(tier > 0 ? [[tier - 1, seed]] : []);
+    for (const [t, sd] of tries) {
+      try { return { tier: t, seed: sd, ...dealBoard(L, t, sd) }; } catch (err) { console.warn('puzzle: board not drawn', L.id, t, sd, err); }
+    }
+    return null;
+  }
 
   // ── Board rendering ──
   const ARROW = { r: 0, d: 90, l: 180, u: 270 };
@@ -1543,6 +1624,41 @@
   /** A run that came back from the server is ahead of this board if it has seen more moves than this board. */
   const runAhead = r => !!r && Number.isInteger(r.moves) && (r.moves > (state.moves | 0) || (Number.isInteger(r.bi) && r.bi > (state.daily?.bi | 0)));
 
+  // ── A tour board, kept as it is played ──
+  // A tour board used to live only in memory. Leaving it -- or Android killing the app in the background --
+  // dealt it again from nothing with every heart back, so leaving on the last heart was a free refill, and an
+  // honest player lost four minutes of a Master board to a phone call. Now every move keeps the run on the
+  // device (`run:<id>`: the tier and seed it was dealt at, the arrows gone, the hearts, hints and checks, the
+  // clock, the retries), and dealing the same board at the same tier and seed carries on from there. The
+  // daily board is not kept, and a race keeps its run on the server; a replay has nothing at stake.
+  const runKey = id => 'run:' + id;
+  const dropRun = id => store.del(runKey(id));
+  function keepRun() {
+    // busy: a board being dealt, when state.level is already the next board and the pieces are still the last one's
+    if (state.daily || state.replay || !state.level || state.finished || state.busy || !state.pieces.length || state.left <= 0 || state.lives <= 0) return;
+    store.set(runKey(state.level.id), { tier: state.tier, seed: state.seed, fails: state.fails, ms: Math.round(currentElapsed()), combo: state.bestCombo,
+      armed: [...(state.armed || [])].map(p => p.idx), ...runSnapshot() });
+  }
+  // Put the kept run back on the board just drawn, if it is this very board. Anything else -- another tier or
+  // seed (the ladder moved, the tour was reordered), a board cleared since, a run with nothing left to play --
+  // is stale and goes.
+  function resumeRun() {
+    const id = state.level.id, r = store.get(runKey(id), null);
+    if (!r) return false;
+    const n = state.pieces.length;
+    const fits = !state.replay && r.tier === state.tier && r.seed === state.seed && Array.isArray(r.gone) && r.gone.length < n
+      && r.gone.every(k => Number.isInteger(k) && k >= 0 && k < n) && Number.isInteger(r.lives) && r.lives > 0;
+    if (!fits) { dropRun(id); return false; }
+    applyRun(r);
+    state.fails = Math.max(state.fails, r.fails | 0);
+    state.elapsed = Math.max(0, Math.min(86_400_000, Number(r.ms) || 0));
+    state.bestCombo = Math.max(state.bestCombo, r.combo | 0);
+    for (const k of Array.isArray(r.armed) ? r.armed : []) { const p = state.pieces[k]; if (p && !p.gone) arm(p); }
+    const pct = Math.round(((n - state.left) / n) * 100);
+    for (const m of MILESTONES) if (pct >= m) state.shown.add(m);   // "Nice start. 25% cleared." at 60% would be news from the last visit
+    return true;
+  }
+
   function updateReveal() {
     const total = state.pieces.length;
     const done = total - state.left;
@@ -1553,8 +1669,10 @@
   // ── Game lifecycle ──
   async function startLevel(i, bumpSeed = false, daily = null, keepTier = -1) {
     try { await loadData(); el.error.hidden = true; } catch (err) { el.error.textContent = `Could not load the levels (${err.message}). Check your connection and tap Play again.`; el.error.hidden = false; return; }
+    settleLoss();   // the last board's lost arrows, held while a free life was on offer: the player has moved on
+    clearTimeout(state.resultTimer); state.resultTimer = 0;   // a card still waiting on the last board's confetti is not this board's
     if (i < 0 || i >= DATA.levels.length) i = 0;
-    if (!daily && !unlocked(i)) i = DATA.levels.findIndex((_, j) => !cleared(j) && unlocked(j));
+    if (!daily && !unlocked(i)) i = nextOpen();
     if (i < 0) i = 0;
     stopTimer(); stopProgressPoll(); heartbeatStop(); deckStop();
     if (el.ranks) el.ranks.hidden = true;
@@ -1562,15 +1680,16 @@
     else if (bumpSeed) state.seedBump++; else if (state.idx !== i || !!daily !== !!state.daily) { state.seedBump = 0; state.fails = 0; }
     state.daily = daily; state.level = DATA.levels[i]; state.disc = state.level.disc ? state.level : null;
     // A scene board is one tier harder than the player's own: it is the long game, and the tier is the pace.
-    state.idx = i; state.tier = daily ? daily.tier : keepTier >= 0 ? keepTier : state.level.scene ? clampTier(TIER_OF() + 1) : TIER_OF();
-    if (!daily) countBoard(state.level.id, { p: 1 });   // a tour board started; a race or a daily is not the tour's
+    state.idx = i; state.tier = daily ? daily.tier : keepTier >= 0 ? keepTier : tierFor(i); state.diff = DIFF_OF(state.tier);
+    state.replay = !daily && !!cleared(i);   // a board cleared before: the header says so, and it is not kept mid-play
     state.busy = true; el.select.hidden = true; el.game.hidden = false; el.overlay.hidden = true; el.board.innerHTML = '';
-    el.hudLevel.textContent = hudLabel(); el.hudLeft.textContent = 'Drawing the board…';
+    renderTitle(); el.hudLeft.textContent = 'Drawing the board…';
     el.btnLevels.setAttribute('aria-label', daily?.race ? 'Leave the challenge' : 'Back to home');
     await new Promise(r => setTimeout(r, 20));   // let the game screen paint before the (up to ~1 s on phones) generation
-    state.maskInfo = maskFor(state.level, state.tier);
-    const seed = (daily ? daily.seed : (i + 1) * 1000) + state.seedBump;
-    const gen = bestBoard(state.maskInfo, state.tier, seed);
+    const deal = dealSafe(state.level, state.tier, (daily ? daily.seed : (i + 1) * 1000) + state.seedBump);
+    if (!deal) { boardFailed(); return; }
+    const { gen } = deal;
+    state.maskInfo = deal.mask; state.tier = deal.tier; state.seed = deal.seed;
     const livesMax = livesFor(state.tier);
     Object.assign(state, { W: gen.W, H: gen.H, pieces: gen.pieces, occ: gen.occ, land: gen.land, left: gen.pieces.length, hintsMax: hintsFor(state.tier), checksUsed: 0, checksMax: CHECKS_PER_LEVEL, lives: livesMax, livesMax, elapsed: 0, startedAt: 0, raceBase: 0, finished: false, hintsUsed: 0, wrong: 0, moves: 0, busy: false, potGone: false, combo: 0, bestCombo: 0, lastShot: 0, cheerHold: 0, shown: new Set(), armed: new Set(), raceReading: null });
     if (daily?.race) state.moves = daily.moves | 0;   // a later board of the same match carries the count on, so the server's monotonic guard still holds
@@ -1579,7 +1698,10 @@
     scrollToGame();
     const diff = DIFF_OF(state.tier);
     state.diff = diff;
-    resetZoom(); renderBoard(); renderHud();
+    resetZoom(); renderBoard();
+    const resumed = !daily && resumeRun();
+    if (!daily && !resumed) countBoard(baseId(state.level.id), { p: 1 });   // a tour board started; a race or a daily is not the tour's, and a board carried on is not a new start
+    renderHud();
     // Back on a race board is back in the match, on the match's own clock -- and on the board as it was left,
     // wherever it was left: the run the server holds is put back before anybody is told the board is ready.
     if (daily?.race && daily.match) { applyRun(daily.run || daily.match.your_run); renderRanks(daily.match.players); syncRaceClock(daily.match); startProgressPoll(); }
@@ -1588,14 +1710,23 @@
     // across the board that asks the question. The one line still said here is the only one that is not a
     // reading of the screen: what to do, once, to somebody who has never played.
     if (!daily && coachStart()) { /* the tutorial says it all, one thing at a time */ }
+    else if (resumed) toast('Carrying on where you left it.', 'good', 1800);
     else if (i === 0 && !cleared(0) && !daily) teach('tap', 'Tap an arrow to shoot it off the board. If another arrow is in its way, you lose a heart.');
+  }
+  // Nothing could be drawn at all, not even a tier down. The card says so and leads home, rather than a blank
+  // board under "Drawing the board…" that ignores every tap.
+  function boardFailed() {
+    Object.assign(state, { pieces: [], left: 0, lives: 0, livesMax: 0, busy: false, finished: true });
+    renderHud();
+    el.card.innerHTML = `<h3>This board could not be drawn</h3>
+      <p class="aa-card-lead">Something went wrong while drawing it. Go back and play another board; this one can be tried again later.</p>
+      <div class="aa-actions aa-actions--stack"><button type="button" class="aa-btn aa-btn--primary" data-act="levels">${ICON_BACK}Back</button></div>`;
+    showCard();
+    $('[data-act]', el.card)?.focus({ preventScroll: true });
   }
 
   function renderHud() {
-    el.hudLevel.textContent = hudLabel();
-    const diffLabel = state.diff || DIFF_OF(state.tier);
-    el.hudDiff.textContent = diffLabel;
-    el.hudDiff.className = 'aa-hud-diff aa-hud-diff--' + diffLabel.toLowerCase().replace(' ', '-');
+    renderTitle();
     // An empty counter is not the end of the sentence any more. Where an advertisement can still be offered for
     // one, the number becomes a plus and the button stays live: the plus IS the offer, which is why the lamp is
     // no longer switched off at zero -- a disabled button cannot be asked for anything, and that is exactly what
@@ -1722,7 +1853,7 @@
       toast(`No ${CHECK_WORD}s left on this level.`, 'bad'); vibe(20); return;
     }
     state.checksUsed++; state.moves++;
-    renderHud(); musicMoved();
+    renderHud(); musicMoved(); keepRun();
     clearPeek();
     const free = !blockerOf(p);
     p.el.classList.add(free ? 'is-peek-free' : 'is-peek-blocked');
@@ -1769,7 +1900,7 @@
     SFX.shoot(); vibe(12); musicRight();
     const now = performance.now();
     state.combo = now - state.lastShot < COMBO_WINDOW_MS ? state.combo + 1 : 1; state.lastShot = now; state.bestCombo = Math.max(state.bestCombo, state.combo);
-    updateReveal(); renderHud();
+    updateReveal(); renderHud(); keepRun();
     if (auto) { if (state.left === 0) winLevel(); return; }   // no combo or milestone chatter for arrows that went on their own
     const pct = Math.round(((state.pieces.length - state.left) / state.pieces.length) * 100);
     const m = MILESTONES.find(x => pct >= x && !state.shown.has(x));
@@ -1790,7 +1921,7 @@
     bounce(p);
     blocker.el.classList.add('is-blocker');
     setTimeout(() => blocker.el.classList.remove('is-blocker'), 600);
-    renderHud(); heartLost();
+    renderHud(); heartLost(); keepRun();
     if (state.lives <= 0) failLevel('Out of hearts.');
     else {
       // The explanation is taught. The warning is not: being down to one heart is news every single time.
@@ -1818,15 +1949,20 @@
     // are left gets said every time, because that is the part that changes.
     const hintsLeft = (state.hintsMax ?? HINTS_PER_LEVEL) - state.hintsUsed;
     if (!teach('hint', `Hint: the glowing arrow is free. ${hintsLeft} left.`, 'hint')) toast(`${hintsLeft} hint${hintsLeft === 1 ? '' : 's'} left.`, 'hint', 1600);
-    renderHud();
+    renderHud(); keepRun();
   }
 
   // ── End of level ──
-  // Move the player's form on the finished board (tour levels only; the daily board has a fixed tier).
-  function learnFrom(won) {
-    if (state.daily) return null;
-    const run = { firstTry: won && state.fails === 0, heartsLost: state.livesMax - state.lives, hints: state.hintsUsed, secPerArrow: state.elapsed / 1000 / Math.max(1, state.pieces.length) };
-    const before = formNow(), after = nextForm(before, won, run), points = won ? clearPoints(run) : 0;
+  // Move the player's form on the finished board (tour levels only; the daily board has a fixed tier). It reads
+  // the run it is handed and never the live board, which can be emptied under a card still on its way.
+  function learnFrom(won, run) {
+    if (run.daily) return null;
+    const before = formNow();
+    // A replay never moves the ladder up: a board already cleared is known, often by heart, and a quick clean
+    // clear of it says nothing about the next new one. Two taps of Play again used to take Easy to Hard.
+    if (won && run.replay) return { before, after: before, points: 0 };
+    const r = { firstTry: won && run.fails === 0, heartsLost: run.lost, hints: run.hints, secPerArrow: run.t / 1000 / Math.max(1, run.arrows) };
+    const after = nextForm(before, won, r), points = won ? clearPoints(r) : 0;
     store.set('form', after);
     return { before, after, points };
   }
@@ -1916,6 +2052,7 @@
   function showCard() { cardShownAt = performance.now(); el.overlay.hidden = false; }
 
   function winLevel() {
+    if (state.finished) return;
     coachEnd();
     stopTimer(); state.finished = true; state.busy = true;
     music.spike = 0; musicRace(0); heartbeatStop();   // it is done: whatever was leaning on the player stops leaning
@@ -1925,66 +2062,100 @@
     // which country it was, three names to choose from — a test at the end of a puzzle, which is a thing to
     // get wrong in a game nobody is being marked in. The discovery boards never asked, and they read better
     // for it.
-    setTimeout(() => showResult(), 700);
+    //
+    // Everything the win means is kept now, while the board is still the board; only the card waits for the
+    // confetti. In those 700 ms the corner arrow or Android's Back can take the board away (goToLevels empties
+    // the run), and a card that read the live board then saved a clear of 0 seconds, three stars and no arrows,
+    // stepped the ladder up for it, and never sent a race's time. Leaving now only cancels the card.
+    const run = keepWin();
+    clearTimeout(state.resultTimer);
+    state.resultTimer = setTimeout(() => { state.resultTimer = 0; showResult(run); }, 700);
   }
-  function showResult() {
-    const L = state.level, i = state.idx, D = state.disc, C = D ? D.country : L;
-    const t = Math.round(state.elapsed), s = stars();
-    const learn = learnFrom(true);
-    const R = state.daily?.race ? state.daily : null;
-    const prev = R ? null : state.daily ? store.get(`daily:${state.daily.key}`) : store.get('lv:' + state.level.id);   // by id: the tour may have been reordered under this board
-    const isBest = !prev || t < prev.t;
-    // `quiz` is what a board's record used to say about the question at the end. There is no question now, so
-    // every cleared board carries it: the name is on the card either way, and a row saved today should not
-    // read as poorer than one saved last week.
-    const rec = { t: isBest ? t : prev.t, stars: Math.max(s, prev?.stars || 0), quiz: true, tier: state.tier, arrows: state.pieces.length, at: Date.now() };
-    const arrowsWas = R ? 0 : arrowsShot();   // the rank before this board is saved, so the card can say if it moved
+  // A board is a milestone when the count passes a multiple of ten, not when it lands on one: a count that jumps
+  // (clears arriving from another device) would otherwise step over the tenth and never say so.
+  const crossedTen = (before, after) => Math.floor(before / 10) < Math.floor(after / 10);
+  // A board's record is its best run and everything it has ever been worth. The best run -- more stars, then the
+  // faster time, the rule the server merges by -- gives the time, the stars and the tier they were earned at; the
+  // arrows are the most it has paid (a replay at a lower tier must not take rank away); `at` is the first clear,
+  // because that is where the board sits in the level count, and a replay must not move it to the end. `quiz` is
+  // what a record used to say about the question at the end; there is no question now, so every clear carries it.
+  function recordFor(prev, run) {
+    const best = betterRun(run, prev) ? run : prev;
+    return { t: best.t, stars: best.stars || 0, quiz: true, tier: best.tier || 0, arrows: Math.max(recArrows(prev), run.arrows || 0), at: prev?.at || run.at };
+  }
+  /** Keep a win, all of it, and hand back what the card needs to say about it. */
+  function keepWin() {
+    const R = state.daily?.race ? state.daily : null, daily = state.daily, L = state.level, i = state.idx;
+    const run = { level: L, idx: i, disc: state.disc, daily, race: R, tier: state.tier, t: Math.round(state.elapsed), stars: stars(),
+      lost: state.livesMax - state.lives, hints: state.hintsUsed, arrows: state.pieces.length, combo: state.bestCombo, fails: state.fails, mode: state.mode };
+    if (R) {
+      // How the run went is the player's either way, so the reading goes with them onto the result sheet: the
+      // stars, what the board cost, and the focus bar, exactly as a tour board draws them. A race is not part of
+      // the tour: nothing is saved and the difficulty ladder does not move.
+      state.raceReading = { code: R.match?.code, stars: run.stars, lost: run.lost, hints: run.hints, combo: run.combo, focus: focusOf(run.t, run.arrows, run.lost, run.hints) };
+      // A match is a run of boards: this one cleared, the next comes up on its own, hearts and hints back,
+      // the clock still running. Only the last board ends the race, and its time goes now, not after the card.
+      const nb = (R.bi | 0) + 1;
+      if (R.boards && nb < R.boards.length) {
+        const next = raceFor(R.match, R.boards, nb, (state.moves | 0) + 1, null, (R.elapsedBase || 0) + run.t), j = matchBoardIndex(next.board);
+        if (j >= 0) { Object.assign(run, { next, nextIdx: j, nb }); return run; }
+      }
+      run.sending = true;
+      finishMatch(true, (R.elapsedBase || 0) + run.t).finally(() => { run.sending = false; });
+      return run;
+    }
+    run.arrowsWas = arrowsShot();   // the rank before this board is saved, so the card can say if it moved
+    const before = levelNo(-1) - 1;
     // The streak on the home screen is a streak of days this player played. It used to be the daily board's own
     // streak, which is a board most people never open, so somebody who had cleared a hundred boards — several of
     // them that morning — was told their streak was zero. Any cleared board keeps it alive; a day missed ends it.
-    if (!R) {
-      const ps = store.get('playStreak', { count: 0, last: '' }), today = dayKey();
-      if (ps.last !== today) store.set('playStreak', { count: ps.last === dayKeyBack(1) ? (ps.count || 0) + 1 : 1, last: today });
-    }
-    if (R) { /* a race is not part of the tour: nothing is saved and the difficulty ladder does not move */ }
-    else if (state.daily) {
-      store.set(`daily:${state.daily.key}`, rec);
+    const ps = store.get('playStreak', { count: 0, last: '' }), today = dayKey();
+    if (ps.last !== today) store.set('playStreak', { count: ps.last === dayKeyBack(1) ? (ps.count || 0) + 1 : 1, last: today });
+    const now = { t: run.t, stars: run.stars, tier: run.tier, arrows: run.arrows, at: Date.now() };
+    if (daily) {
+      store.set(`daily:${daily.key}`, recordFor(store.get(`daily:${daily.key}`), now));
       const ds = store.get('dailyStreak', { count: 0, last: '' });
-      if (ds.last !== state.daily.key) store.set('dailyStreak', { count: ds.last === dayKeyBack(1) ? ds.count + 1 : 1, last: state.daily.key });
+      if (ds.last !== daily.key) store.set('dailyStreak', { count: ds.last === dayKeyBack(1) ? ds.count + 1 : 1, last: daily.key });
       syncTour({});   // the daily board lives in the state blob, which every push carries
+      setHash(-1);    // a relaunch goes home rather than into the daily board just cleared
     } else {
-      const lid = state.level.id;
-      countBoard(lid, { c: 1, h: state.hintsUsed, l: state.livesMax - state.lives, ms: t });
-      store.set('lv:' + lid, rec); forgetNums(); pushOne(lid, rec); showBrainNext = true;
-    }
-    if (R) {
-      // How the run went is the player's either way, so the reading goes with them onto the result sheet: the
-      // stars, what the board cost, and the focus bar, exactly as a tour board draws them. It is kept here
-      // rather than drawn here because the sheet is a second away and two cards in a row is one too many.
-      //
-      // No number here on purpose: the one that counts is the race time the server works out, and it is on the
-      // sheet a second later. Two different times on two screens in a row is how a race stops making sense.
-      state.raceReading = { code: R.match?.code, stars: s, lost: state.livesMax - state.lives, hints: state.hintsUsed,
-        combo: state.bestCombo, focus: focusOf(t, state.pieces.length, state.livesMax - state.lives, state.hintsUsed) };
-      // A match is a run of boards: this one cleared, the next comes up on its own, hearts and hints back,
-      // the clock still running. Only the last board ends the race.
-      const nb = (R.bi | 0) + 1;
-      if (R.boards && nb < R.boards.length) {
-        el.card.innerHTML = `<h3>Board ${nb} of ${R.boards.length} cleared!</h3><p class="aa-card-lead">The next one is coming up…</p>`;
-        showCard();
-        const next = raceFor(R.match, R.boards, nb, (state.moves | 0) + 1, null, (R.elapsedBase || 0) + t);
-        const j = matchBoardIndex(next.board);
-        if (j >= 0) { setTimeout(() => startLevel(j, false, next, R.tier), 1100); return; }
-      }
-      el.card.innerHTML = '<h3>Board cleared!</h3><p class="aa-card-lead">Sending your time…</p>';
-      showCard();
-      finishMatch(true, (R.elapsedBase || 0) + t);
-      return;
+      const lid = L.id, prev = store.get('lv:' + lid);   // by id: the tour may have been reordered under this board
+      run.replay = !!prev;
+      run.learn = learnFrom(true, run);
+      countBoard(baseId(lid), { c: 1, h: run.hints, l: run.lost, ms: run.t });
+      const rec = recordFor(prev, now);
+      store.set('lv:' + lid, rec); dropRun(lid); forgetNums(); pushOne(lid, rec); showBrainNext = true;
+      // The address moves on with the player: the app reloads the page it was on after Android has killed it,
+      // and reopening the board just cleared, as a replay, is not where anybody left the game.
+      setHash(nextOpen(i));
     }
     // The streak is still counted and still reset by a loss — it is a record of this device's play and throwing
     // it away would throw away every player's, permanently. It is simply not announced on the card any more.
     store.set('streak', store.get('streak', 0) + 1);
-    const n = levelNo(i), milestone = !state.daily && n % 10 === 0;
+    run.n = levelNo(i); run.milestone = !daily && crossedTen(before, levelNo(-1) - 1);
+    run.arrowsNow = arrowsShot();
+    return run;
+  }
+  // The card, drawn from the kept run: nothing here reads the board, which may be gone by now.
+  function showResult(run) {
+    if (el.game.hidden) return;
+    const { level: L, idx: i, disc: D, race: R, t, stars: s } = run, C = D ? D.country : L;
+    if (R) {
+      if (run.next) {
+        el.card.innerHTML = `<h3>Board ${run.nb} of ${R.boards.length} cleared!</h3><p class="aa-card-lead">The next one is coming up…</p>`;
+        showCard();
+        state.resultTimer = setTimeout(() => { state.resultTimer = 0; startLevel(run.nextIdx, false, run.next, R.tier); }, 1100);
+        return;
+      }
+      // No number here on purpose: the one that counts is the race time the server works out, and it is on the
+      // sheet a second later. Two different times on two screens in a row is how a race stops making sense.
+      // If the server has answered already, its answer is on screen and this card has nothing to add.
+      if (!run.sending) return;
+      el.card.innerHTML = '<h3>Board cleared!</h3><p class="aa-card-lead">Sending your time…</p>';
+      showCard();
+      return;
+    }
+    const n = run.n, milestone = run.milestone;
     // What the card has to say about the board, where there is anything to say. A country has its capital,
     // its size and its region; a discovery board has what the find is to that country; a focus board is a brain
     // or a lightbulb and has nothing of the kind, so it is given nothing and the line is left out altogether.
@@ -1992,24 +2163,21 @@
     const nj = nextOpen(i), last = nj < 0;
     // The reading. It is shown, not described: a bar under a caption, with the comparison against everybody
     // else added underneath only when the server has enough players to make it true.
-    const focus = focusOf(t, state.pieces.length, state.livesMax - state.lives, state.hintsUsed);
+    const focus = focusOf(t, run.arrows, run.lost, run.hints);
     const band = focusBand(focus);
     // The rank line: what this board added and where that leaves the player. A new rank is the card's news; a
-    // board cleared again adds nothing and says so by saying only the rank. A race is not the tour and has none.
-    let rankLine = '';
-    if (!R) {
-      const now = arrowsShot(), rk = rankOf(now), gain = now - arrowsWas;
-      const toNext = rk.top ? '' : ` · ${fmtN(rk.hi - now)} to ${rk.next}`;
-      rankLine = rk.i > rankOf(arrowsWas).i ? `<p class="aa-card-rank is-up">New rank: <b>${rk.name}</b> · ${fmtN(now)} arrows</p>`
-        : gain > 0 ? `<p class="aa-card-rank">+${fmtN(gain)} arrows · <b>${rk.name}</b>${toNext}</p>`
-        : `<p class="aa-card-rank"><b>${rk.name}</b> · ${fmtN(now)} arrows${toNext}</p>`;
-    }
+    // board cleared again adds nothing and says so by saying only the rank.
+    const was = run.arrowsWas, now = run.arrowsNow, rk = rankOf(now), gain = now - was;
+    const toNext = rk.top ? '' : ` · ${fmtN(rk.hi - now)} to ${rk.next}`;
+    const rankLine = rk.i > rankOf(was).i ? `<p class="aa-card-rank is-up">New rank: <b>${rk.name}</b> · ${fmtN(now)} arrows</p>`
+      : gain > 0 ? `<p class="aa-card-rank">+${fmtN(gain)} arrows · <b>${rk.name}</b>${toNext}</p>`
+      : `<p class="aa-card-rank"><b>${rk.name}</b> · ${fmtN(now)} arrows${toNext}</p>`;
     el.card.innerHTML = `
       <p class="aa-card-kicker">${milestone ? `Milestone · level ${n} · ` : ''}You cleared</p>
       <h3>${escapeHtml(L.name)}</h3>
       ${facts ? `<p class="aa-facts">${facts}</p>` : ''}
       <p class="aa-stars" aria-label="${s} of 3 stars">${'★'.repeat(s)}${'☆'.repeat(3 - s)}</p>
-      <div class="aa-stats"><span><b>${fmtTime(t, true)}</b>time</span><span><b>${state.livesMax - state.lives}</b>hearts lost</span><span><b>${state.hintsUsed}</b>hints</span><span><b>x${state.bestCombo}</b>best combo</span></div>
+      <div class="aa-stats"><span><b>${fmtTime(t, true)}</b>time</span><span><b>${run.lost}</b>hearts lost</span><span><b>${run.hints}</b>hints</span><span><b>x${run.combo}</b>best combo</span></div>
       ${rankLine}
       <div class="aa-focus" id="aaFocus" role="img" aria-label="Focus ${focus} out of 100 — ${band.name}">
         <p class="aa-focus-cap">Your focus level<b class="aa-focus-num">0</b></p>
@@ -2020,7 +2188,7 @@
         <p class="aa-focus-vs" id="aaFocusVs"></p>
       </div>
       <div class="aa-actions aa-actions--stack">
-        ${last || state.daily ? '' : `<button type="button" class="aa-btn aa-btn--primary" data-act="next">Next: Level ${levelNo(nj)} · ${DIFF_OF(TIER_OF())}${ICON_NEXT}</button>`}
+        ${last || run.daily ? '' : `<button type="button" class="aa-btn aa-btn--primary" data-act="next">Next: Level ${levelNo(nj)} · ${DIFF_OF(tierFor(nj))}${ICON_NEXT}</button>`}
         <button type="button" class="aa-btn" data-act="again">${ICON_AGAIN}Play again</button>
         <button type="button" class="aa-btn" data-act="share">${ICON_SHARE}Share</button>
       </div>
@@ -2029,8 +2197,8 @@
     showCard();
     $('[data-act]', el.card)?.focus({ preventScroll: true });
     runFocusBar(focus);
-    showPace(DATA.levels[i].id, state.tier, t);
-    if (typeof gtag === 'function') gtag('event', 'level_complete', { game: 'puzzle', level: n, disc: D ? 1 : 0, mode: state.mode, tier: state.tier, arrows: state.pieces.length, time_ms: t, stars: s, tier_next: learn?.after.tier ?? state.tier });
+    showPace(baseId(L.id), run.tier, t);
+    if (typeof gtag === 'function') gtag('event', 'level_complete', { game: 'puzzle', level: n, disc: D ? 1 : 0, mode: run.mode, tier: run.tier, arrows: run.arrows, time_ms: t, stars: s, tier_next: run.learn?.after.tier ?? run.tier });
   }
   // Everybody else who has cleared this board at this difficulty. The server answers with a percentage only
   // once there are enough of them to mean something; until then the line stays empty and the bar speaks for
@@ -2054,19 +2222,20 @@
     stopTimer(); state.finished = true; state.busy = true; state.fails++;
     music.spike = 0; musicRace(0); heartbeatStop();
     store.set('streak', 0);
-    if (!state.daily) countBoard(state.level.id, { f: 1 });
+    // the run is over: what comes after it is a free life (which keeps it again) or a fresh start
+    if (!state.daily) { countBoard(baseId(state.level.id), { f: 1 }); dropRun(state.level.id); }
     SFX.lose(); renderHud();
-    learnFrom(false);   // the form moves on a loss, whether or not the card says so
-    // The rank: the arrows still on the board come off it. A race is not the tour and costs none.
+    learnFrom(false, { daily: state.daily });   // the form moves on a loss, whether or not the card says so
+    // The rank: some of the arrows still on the board come off it (lossFor), held until the player moves on.
+    // The daily board and a race are not the tour and cost none.
+    const take = state.daily ? 0 : lossFor({ fails: state.fails, done: !!store.get('lv:' + state.level.id), left: state.left, arrows: state.pieces.length, rank: arrowsShot() });
     let rankLine = '';
-    if (!state.daily?.race && state.left > 0) {
-      const was = rankOf(arrowsShot());
-      loseArrows(state.left);
-      const now = arrowsShot(), rk = rankOf(now);
-      rankLine = rk.i < was.i ? `<p class="aa-card-rank is-down">Rank down: <b>${rk.name}</b> · ${fmtN(now)} arrows</p>`
-        : `<p class="aa-card-rank">−${fmtN(state.left)} arrows · <b>${rk.name}</b></p>`;
+    if (take > 0) {
+      const was = arrowsShot(), now = was - take, rk = rankOf(now);
+      holdLoss(take);
+      rankLine = rk.i < rankOf(was).i ? `<p class="aa-card-rank is-down">Rank down: <b>${rk.name}</b> · ${fmtN(now)} arrows</p>`
+        : `<p class="aa-card-rank">−${fmtN(take)} arrows · <b>${rk.name}</b></p>`;
       showBrainNext = true;
-      syncOwed = true; syncTour({}).catch(() => {});
     }
     el.card.innerHTML = `
       <p class="aa-card-kicker">${state.daily ? (state.daily.race ? `Gold match · ${gpurse(state.daily.match?.stake || 0)}` : 'Daily board') : hudLabel()} · ${DIFF_OF(state.tier)}</p>
@@ -2914,7 +3083,7 @@
     const act = e.target.closest('[data-act]')?.dataset.act; if (!act) return;
     if (act === 'adheart') { adOffer('heart'); return; }
     if (act === 'next') { const j = nextOpen(state.idx); if (j < 0) goToLevels(); else startLevel(j); }
-    else if (act === 'again' || act === 'retry') { if (state.daily?.race) state.daily.moves = (state.moves | 0) + 1; startLevel(state.idx, false, state.daily, state.tier); }
+    else if (act === 'again' || act === 'retry') { if (state.daily?.race) state.daily.moves = (state.moves | 0) + 1; else if (!state.daily) dropRun(state.level.id); startLevel(state.idx, false, state.daily, state.tier); }
     else if (act === 'shuffle') startLevel(state.idx, true, state.daily);
     else if (act === 'skip') { const id = DATA.levels[state.idx + 1]?.id; store.set(skipKey(state.idx + 1), true); if (id && !isLocalOnly(id)) syncTour({ [id]: { cleared: false, skipped: true } }); startLevel(nextOpen(state.idx)); }
     // Out of hearts is not the end of a challenge — giving up is, and it cannot be taken back: the loss goes
@@ -2943,6 +3112,7 @@
   // and the hints of the last match sat over the next room while it waited for players to join, which reads
   // like a game already in progress and is simply somebody else's board's leftovers.
   function clearRun() {
+    clearTimeout(state.resultTimer); state.resultTimer = 0;   // a card still on its way belongs to the board being left
     stopTimer(); heartbeatStop();
     state.pieces = []; state.occ = null; state.mask = null; state.left = 0; state.W = 0; state.H = 0;
     state.lives = LIVES; state.livesMax = LIVES;
@@ -2951,13 +3121,15 @@
     state.checksUsed = 0; state.checksMax = CHECKS_PER_LEVEL;   // the same two lines as the hints, for the same reason
     state.finished = false; state.wrong = 0; state.fails = 0; state.potGone = false;
     state.combo = 0; state.bestCombo = 0; state.lastShot = 0; state.shown = new Set();
-    state.daily = null; state.disc = null;
+    state.daily = null; state.disc = null; state.replay = false;
     el.board.innerHTML = '';
     if (el.ranks) el.ranks.hidden = true;
     renderHud();
   }
   function goToLevels() {
     coachEnd();
+    keepRun();      // a tour board left mid-play: its clock as it stands now, not as at the last tap
+    settleLoss();   // walking away from a lost board is moving on
     stopTimer(); stopMatchPoll(); stopProgressPoll(); stopResultWatch(); musicStop();
     live.leaveFeed();   // back in the lobby: nothing to watch, but the socket is how invitations arrive
     clearRun();
@@ -2967,10 +3139,10 @@
     if (waiting && Date.now() - waiting.at < INVITE_KEEP_MS) setTimeout(() => onInvite({ data: waiting }), 400);
   }
   async function share() {
-    const n = DATA.levels.length, done = DATA.levels.filter((_, i) => cleared(i)).length;
+    const n = new Set(DATA.levels.map(L => L.id)).size, done = clearedLevels().length;
     const D = state.disc, rec = state.daily ? store.get(`daily:${state.daily.key}`) : cleared(state.idx);
     const what = D ? `${D.country.name}'s ${KIND_WORD[D.kind]}, the ${state.level.name}` : state.level.name;
-    const text = `Puzzle – Train Your Brain: I cleared ${what} (${state.daily ? 'daily board ' + state.daily.key : 'level ' + levelNo(state.idx)}) in ${fmtTime(rec?.t ?? state.elapsed, true)} ${'★'.repeat(rec?.stars || stars())} and ${done}/${n} boards so far. Rank: ${rankOf(arrowsShot()).name} (${fmtN(arrowsShot())} arrows).\nYour turn: https://ariyankhan.com/puzzle/${state.daily ? '#daily' : '#b-' + state.level.id}`;
+    const text = `Puzzle – Train Your Brain: I cleared ${what} (${state.daily ? 'daily board ' + state.daily.key : 'level ' + levelNo(state.idx)}) in ${fmtTime(rec?.t ?? state.elapsed, true)} ${'★'.repeat(rec?.stars || stars())} and ${done}/${n} boards so far. Rank: ${rankOf(arrowsShot()).name} (${fmtN(arrowsShot())} arrows).\nYour turn: https://ariyankhan.com/puzzle/${state.daily ? '#daily' : '#b-' + baseId(state.level.id)}`;
     const flash = $('.aa-flash', el.card);
     try {
       if (shell.on && shell.bridge() && (await shell.ask('share ' + text, 8000)).ok) return;   // the phone's own share sheet
@@ -3301,7 +3473,8 @@
     heart: {
       earn: 'Watch this through and the board carries on where it stopped, with one heart.',
       board: true,
-      grant() { state.lives = 1; state.moves++; state.finished = false; state.busy = false; el.overlay.hidden = true; renderHud(); startTimer(); heartLost(); toast('One heart. Make it count.', 'good'); },
+      // The board carries on, so the loss it ended in is undone: the arrows it was about to take are given back.
+      grant() { state.lives = 1; state.moves++; state.finished = false; state.busy = false; el.overlay.hidden = true; renderHud(); startTimer(); heartLost(); const back = forgiveLoss(); keepRun(); toast(back ? `One heart, and your ${fmtN(back)} arrows back. Make it count.` : 'One heart. Make it count.', 'good'); },
     },
     trainhint: {
       earn: 'Watch this through for a hint in this round.',
@@ -3316,12 +3489,12 @@
     hint: {
       earn: 'Watch this through for one more hint on this board.',
       board: true,
-      grant(quiet) { state.hintsMax = (state.hintsMax ?? HINTS_PER_LEVEL) + 1; state.moves++; renderHud(); if (!quiet) toast('One more hint.', 'good'); },
+      grant(quiet) { state.hintsMax = (state.hintsMax ?? HINTS_PER_LEVEL) + 1; state.moves++; renderHud(); keepRun(); if (!quiet) toast('One more hint.', 'good'); },
     },
     check: {
       earn: `Watch this through for one more ${CHECK_WORD} on this board.`,
       board: true,
-      grant() { state.checksMax = (state.checksMax ?? CHECKS_PER_LEVEL) + 1; state.moves++; renderHud(); toast(`One more ${CHECK_WORD}.`, 'good'); },
+      grant() { state.checksMax = (state.checksMax ?? CHECKS_PER_LEVEL) + 1; state.moves++; renderHud(); keepRun(); toast(`One more ${CHECK_WORD}.`, 'good'); },
     },
     gold: {
       earn: 'Watch this through and the gold goes to your purse.',
@@ -3761,13 +3934,23 @@
   // cleared while the request was in the air must not be undone by an answer that predates it.
   const betterRun = (a, b) => !b ? true : (a.stars || 0) !== (b.stars || 0) ? (a.stars || 0) > (b.stars || 0)
     : typeof a.t === 'number' && typeof b.t === 'number' ? a.t < b.t : typeof a.t === 'number';
+  // Two records of one board as one, by the rule a clear is saved by (recordFor): the better run's time, stars and
+  // tier, the most arrows either has paid (the server keeps the greatest too), and the earlier first clear -- the
+  // server stamps a row whenever it improves, and that is not when the board was first cleared.
+  function mergeRec(mine, theirs) {
+    if (!mine || typeof mine !== 'object') return theirs;
+    const best = betterRun(theirs, mine) ? theirs : mine, arrows = Math.max(mine.arrows || 0, theirs.arrows || 0);
+    const at = Math.min(mine.at || Infinity, theirs.at || Infinity);
+    return { ...best, quiz: !!(mine.quiz || theirs.quiz), ...(arrows ? { arrows } : {}), ...(at < Infinity ? { at } : {}) };
+  }
 
   function adoptTour(server, sent = null) {
     let changed = false;
     for (const [id, r] of Object.entries(server?.levels || {})) {
       if (r.cleared) {
         const next = { t: r.ms ?? 0, stars: r.stars || 0, quiz: !!r.quiz, tier: r.tier || 0, arrows: r.arrows || 0, at: r.at || Date.now() };
-        if (betterRun(next, store.get('lv:' + id))) { store.set('lv:' + id, next); changed = true; }
+        const mine = store.get('lv:' + id), merged = mergeRec(mine, next);
+        if (JSON.stringify(merged) !== JSON.stringify(mine)) { store.set('lv:' + id, merged); changed = true; }
       }
       if (r.skipped && !store.get('skip:' + id)) { store.set('skip:' + id, true); changed = true; }
     }
@@ -3816,6 +3999,15 @@
     // The home country may have moved, which reorders the whole tour, so rebuild it rather than only repainting.
     DATA.levels = tourFor(DATA, store.get('home', null));
     maskCache.clear(); forgetNums();
+    // The board in hand keeps its place in the new list -- a home country, or the focus boards following the
+    // frontier, can move it -- or Play again deals a different board and the header names another one's level.
+    // And the header is read again: its number counts what the other device cleared too (training included),
+    // and it used to keep the old one until the next tap, while the training chip already had the new one.
+    if (state.level) { const j = DATA.levels.indexOf(state.level); if (j >= 0) state.idx = j; }
+    if (!el.game.hidden && state.pieces.length) {
+      if (!state.daily && !state.finished && !state.replay && cleared(state.idx)) { state.replay = true; dropRun(state.level.id); }   // cleared on the other device meanwhile
+      renderHud();
+    }
     if (!el.select.hidden) renderSelect();
     return true;
   }
@@ -5823,8 +6015,10 @@
   // something on a hard one — took one tap and said nothing.
   el.btnLevels.addEventListener('click', async () => {
     if (state.daily?.race && state.daily.match && !state.finished) { leaveMatch(); return; }
+    // A tour board is kept as it stands (keepRun); the daily board and a replay start again.
     if (state.pieces.length && !state.finished && !await ask({
-      title: 'Leave this board?', body: 'It starts again from the beginning next time, with your hearts back.',
+      title: 'Leave this board?', body: state.daily || state.replay ? 'It starts again from the beginning next time, with your hearts back.'
+        : 'Your progress is kept: the board, and the hearts you have left, wait for you here.',
       ok: 'Leave the board', cancel: 'Keep playing' })) return;
     goToLevels();
   });
@@ -5862,7 +6056,7 @@
   document.addEventListener('pointerdown', () => { try { if (music.on && audio?.state === 'suspended') audio.resume(); } catch { /* ignore */ } }, { passive: true });
   document.addEventListener('visibilitychange', () => {
     live.away(document.hidden);   // an invitation while hidden rings the phone instead of landing on a tab nobody sees
-    if (document.hidden) { musicStop(); heartbeatStop(); deckStop(); return; }
+    if (document.hidden) { keepRun(); musicStop(); heartbeatStop(); deckStop(); return; }   // the clock too: Android may not bring the page back
     syncIfStale();                        // what another device cleared meanwhile, and what this one owes
     if (!el.select.hidden) deckStart();   // the home deck turns while somebody is looking at it, and not otherwise
     // Back on a board that was left mid-play. Nothing else restarts it now that music begins with a board
@@ -5964,6 +6158,7 @@
   const authEarly = authLoad();
   loadData().then(() => {
     el.loading.hidden = true;
+    settleLoss();   // the app was closed on a lost board's card: the player did not take the free life
     renderSelect();
     // the purse and the account row from the first paint, not only once Play with Friends has been tapped, and
     // a time from last time that never got through goes now
@@ -5979,12 +6174,14 @@
     }).catch(() => {});
     // the league chip, and the clock that keeps its countdown honest
     loadLeague().then(startLeagueTick).catch(() => {});
-    const m = /^#level-(\d+)$/.exec(location.hash), mb = /^#b-([\w:]+)$/.exec(location.hash), mm = matchHash();
+    const m = /^#level-(\d+)$/.exec(location.hash), mb = /^#b-([\w:~]+)$/.exec(location.hash), mm = matchHash();
     if (mm) openMatchLink(mm);
     else if (mb) {
       // A link to a country somebody has not reached yet opens their own next board instead — which it did
       // silently, and looked like the link was broken. It says so now.
-      const j = DATA.levels.findIndex(L => L.id === mb[1]);
+      // a lap of a scene this tour does not have (an older link, other data) opens the scene itself
+      let j = DATA.levels.findIndex(L => L.id === mb[1]);
+      if (j < 0) j = DATA.levels.findIndex(L => L.id === baseId(mb[1]));
       if (j >= 0 && !unlocked(j)) toast(`${DATA.levels[j].name} is not open yet — it comes as your tour reaches it. Here is your next board.`, 'hint', 5000);
       startLevel(j < 0 ? 0 : j);
     }
