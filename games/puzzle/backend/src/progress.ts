@@ -479,12 +479,14 @@ export async function mergeLevels(c: Sql, userId: number, levels: Levels): Promi
       tier    = CASE WHEN EXCLUDED.stars > progress.stars
                        OR (EXCLUDED.stars = progress.stars AND progress.ms IS NOT NULL AND EXCLUDED.ms IS NOT NULL AND EXCLUDED.ms < progress.ms)
                      THEN EXCLUDED.tier ELSE progress.tier END,
-      arrows  = CASE WHEN progress.arrows = 0 THEN EXCLUDED.arrows ELSE progress.arrows END,
+      -- the most the board has ever paid, whichever run it was: a replay at a lower tier, or a device that only
+      -- saw that replay, must not take arrows off the rank (the rank is the sum of these)
+      arrows  = GREATEST(progress.arrows, EXCLUDED.arrows),
       at      = now()
-    WHERE (progress.cleared, progress.skipped, progress.quiz, progress.stars, progress.ms)
+    WHERE (progress.cleared, progress.skipped, progress.quiz, progress.stars, progress.arrows, progress.ms)
        IS DISTINCT FROM
           (progress.cleared OR EXCLUDED.cleared, progress.skipped OR EXCLUDED.skipped, progress.quiz OR EXCLUDED.quiz,
-           GREATEST(progress.stars, EXCLUDED.stars),
+           GREATEST(progress.stars, EXCLUDED.stars), GREATEST(progress.arrows, EXCLUDED.arrows),
            CASE
              WHEN EXCLUDED.ms IS NULL THEN progress.ms
              WHEN progress.ms IS NULL THEN EXCLUDED.ms

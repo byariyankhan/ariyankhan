@@ -681,13 +681,23 @@ links.
   rank is, the brain itself shows, and the card after a board says what it added
   or cost. The rank is the headline and it is not the level — a level says where
   a player is on the tour, a rank says what they have done. **A rank is earned
-  and lost:** a board cleared adds its arrows, a board lost (hearts gone) takes
-  the arrows still on it, never below zero. What was taken is kept per device
+  and lost:** a board cleared adds its arrows — the most it has ever paid, so a
+  replay at a lower tier takes nothing away (`recordFor`; the server keeps
+  `GREATEST(arrows)` too) — and a board lost (hearts gone) takes some of the arrows
+  still on it (`lossFor`): only on the first loss since the board was started fresh
+  (a retry of a board being fought for costs nothing more), never on a board already
+  cleared, never on the daily board or in a race, at most half the board and never
+  more than the rank holds (`loseArrows` clamps, so nobody owes arrows). The loss is
+  **held** while the card still offers a free life (`holdLoss`, `lossHeld`): "Get a
+  free life" carries the board on and gives the arrows back (`forgiveLoss`); Try
+  again, another board or home takes them (`settleLoss`, also at the next start if
+  the app was closed on the card). Held rather than taken and given back, because
+  what was taken is kept per device
   (`loss`: device id → arrows, `lossMap`/`loseArrows`) and synced in the state
   blob: a device's own count only grows, so devices merge by the larger per
   device (`adoptTour`) and the total is the sum — a single shared number could
-  not have been merged. The out-of-hearts card says `−N arrows · Rank` or
-  `Rank down: …`; a race costs nothing. Offline play counts the same and goes
+  not have been merged, and a refund would be undone by the next sync. The
+  out-of-hearts card says `−N arrows · Rank` or `Rank down: …`. Offline play counts the same and goes
   up with the next sync once the player is online and signed in. The result card
   carries a line too (`.aa-card-rank`): `+N arrows · Rank · M to Next`, or `New
   rank: …` when the board moved it; a race has none. The share text names the rank.
@@ -896,10 +906,38 @@ links.
   reference pages: a tall shape filled edge to edge with long winding arrows. In the
   game one is `{ id: 's:<id>', name, d, k, scene: true }`; `tourFor` puts one after
   every fourth country (`SCENE_EVERY`), in order, and it is played **one tier
-  harder** than the player's form (`clampTier(TIER_OF() + 1)`), so a Hard player
+  harder** than the player's form (`tierFor`: `clampTier(TIER_OF() + 1)`), so a Hard player
   meets The Tower at Expert (~140 arrows) and an Expert player Twin Towers at Master
-  (~160). The result card has no fact box and no YouTube line, as on focus boards,
-  and the HUD reads `Level N · The Tower`.
+  (~160). There are 49 scene slots and 12 scenes, so the list comes round again, and
+  **every lap is a board of its own**: the first lap keeps `s:<id>` (the clears already
+  made stay valid), later laps are `s:<id>~2`, `s:<id>~3`, … (`sceneLevelFor`). One id in
+  four slots used to count one clear as four levels and leave every scene slot after
+  country 48 already cleared. Whatever looks the board up — its shape (`maskFor`), its
+  stats (`countBoard`), the pace comparison, a shared `#b-` link — drops the lap
+  (`baseId`); the record keeps the full id, and a `#b-s:<id>~N` link a tour does not
+  have opens the scene itself. `tests/puzzle-levels.test.mjs` replays `tourFor` on the
+  data files and checks every id is unique. The result card has no fact box and no
+  YouTube line, as on focus boards, and the HUD reads `Level N` with `The Tower · Expert`
+  on the line under it (in the big type the name was wider than a phone).
+- **The board flow** (September 2026): a win is kept the moment the last arrow goes
+  (`winLevel` → `keepWin`: the record, the ladder, the stats, the streak, the sync and
+  a race's time); only the card waits the 700 ms of confetti (`showResult(run)`, drawn
+  from that snapshot, on `state.resultTimer`, which `clearRun` and `startLevel`
+  cancel). Back during the confetti used to save a 0-second, 0-arrow clear, step the
+  ladder up for it and drop a race's time. A replay never promotes the ladder
+  (`learnFrom` is told the board was cleared before). A board's record is its best
+  run's time, stars and tier, the most arrows it ever paid, and its first clear's
+  time (`recordFor`, and `mergeRec` for what a sync brings back). **A tour board is
+  kept as it is played** (`keepRun` on every move, `run:<id>`: tier, seed, arrows gone,
+  hearts, hints, checks, clock, retries): leaving it or the app being killed carries
+  on from there when the same board is dealt at the same tier and seed (`resumeRun`;
+  anything else is stale and deleted), so leaving on the last heart no longer
+  refills them; a lost board's run goes (the free life keeps it again), Try again
+  starts fresh, and the daily board, races and replays are not kept. The leave
+  question says so. A board the generator cannot draw is drawn from the next seed,
+  then a tier down, and then a card says so with a Back button (`dealSafe`,
+  `boardFailed`); the last board drawn is kept, so Try again does not draw it again
+  (`dealBoard`, a copy per deal). The pace comparison takes Master too (tier 0–4).
 - **Expert and Master are harder** than they were: snakes run to 14 and 16 cells
   (`MAXLEN_OF`), nearly every arrow points far (`FAR_OF` 0.85/0.95), runs are
   straighter and longer (`RAIL_OF`), and the country outline is rasterised on a
@@ -960,8 +998,8 @@ links.
   under it. Shown once (`coached`), never in a race or on the daily board, closed by winning, losing or
   leaving the board, and Settings → Help → "Show the tutorial again" brings it back on the next board.
 - **The brain has a rank** (`RANKS`, `arrowsShot`, `rankOf`, `loseArrows`, `.aa-card-rank`): Newbie to
-  GOAT at 6,236 arrows, fourteen steps, earned by the arrows on cleared boards and lost by the arrows left
-  on lost ones, synced with the account, and separate from the level — see "The brain on the home screen"
+  GOAT at 6,236 arrows, fourteen steps, earned by the arrows on cleared boards and lost by some of the arrows
+  left on lost ones (the first loss of a fresh start, at most half the board, given back by a free life), synced with the account, and separate from the level — see "The brain on the home screen"
   above. Under the brain: the rank and `Level n`, nothing else.
 - **The home corner is the player** (`renderHomeCorner`, `.aa-home-face`): signed in, the settings button
   in the top-right corner shows the player's own picture (their initial without one) and still opens
@@ -1160,7 +1198,9 @@ links.
   grid afterwards, so the split is there at every size, the home screen's outline
   included. In the game one is `{ id:
   'f:<id>', name, d, k, focus: true }`. `tourFor` puts the whole block at the
-  **frontier**, in front of the first board the player has not cleared: a new
+  **frontier**, right after the last board the player has cleared (`frontierOf`;
+  not in front of the first board without a record, which for a player who had
+  passed the scene slots added behind them was a hole a hundred levels back): a new
   player's level 1 is the brain, and a player who has already cleared a hundred
   countries meets them next rather than never (appending) or behind a wall
   (putting them first would lock the country they were on). Their progress stays
@@ -1169,22 +1209,34 @@ links.
   "N countries discovered" on the map, and the win card gives them **no facts
   line and no YouTube line** — a country has something to tell you when you clear
   it and a lightbulb has not. **Level numbers are the player's own progress**
-  (`levelNo`): cleared boards ranked by clear time, then the board in hand is
-  cleared-count + 1. The list only decides what comes next; a player who cleared
+  (`levelNo`): cleared boards ranked by the time of their first clear (a replay
+  keeps it), each id counted once, then the board in hand is cleared-count + 1.
+  The list only decides what comes next; a player who cleared
   63 countries before the discovery boards existed is on level 65, not back on
-  level 4 because Bhutan's animal sits fourth in their list. Milestones (every
-  10th) and the share text use that number; `#level-n` (position in the list)
-  is still read for old links. The win card is deliberately short: kicker, name,
+  level 4 because Bhutan's animal sits fourth in their list. A board already
+  cleared reads **`Replay`** in the header, with its name under it, never the number
+  it was cleared at; a new board reads `Level N` with N the same number as the home
+  screen and the training chip (`levelNo(-1)`). A sync that brings clears from
+  another device (training included) re-maps the board in hand in the rebuilt list
+  and redraws the header at once (`adoptTour`). A board is a milestone when the count
+  passes a multiple of ten (`crossedTen`), and the share text uses the number;
+  `#level-n` (position in the list) is still read for old links. The win card is deliberately short: kicker, name,
   the subtitle under it (what the find is, or capital, population and region for
   a country, and nothing at all on a focus board), stars, the four stats, the fact box on discovery boards, then Next,
   Play again and Share. No World Tour button: the back arrow in the HUD already
   leads there. The best-time line and
   the paragraph explaining what the player's form did to the next tier were both
   dropped as noise; the record is still kept and the tier still shows on the
-  Next button. The result card's Next button and Skip go to the
-  next *open* board (`nextOpen`: first uncleared, unlocked level further down
-  the list, else from the top), never to a replay of a cleared one. The boards file is loaded with the level
-  data, not in the background. The HUD says only `Level n`; the start toast
+  Next button, which names the tier the next board is really dealt at (`tierFor`,
+  the rule `startLevel` deals by). Play & Discover, the map's marker and the result
+  card's Next all go to the next *open* board **forward from the frontier**
+  (`nextOpen`: the first uncleared, unlocked board at or after the slot after the
+  last clear, and only when nothing is left ahead the first open one anywhere),
+  never to a replay of a cleared one; open boards behind the frontier (scene slots
+  added after the player passed them) wait until then. After a win the address
+  moves to that next board, so an Android relaunch does not reopen the board just
+  cleared. The boards file is loaded with the level
+  data, not in the background. The HUD says only `Level n` (or `Replay`); the start toast
   ("Bangladesh's animal · 104 arrows · what is it?") is the one hint. No quiz after a
   discovery board (a quiz after every board wears thin, and guessing "Karabakh
   horse" from a horse silhouette is unfair): the card says what it was and why

@@ -164,6 +164,43 @@ const canon = (v: unknown): unknown => Array.isArray(v) ? v.map(canon) : v && ty
 const same = (got: unknown, want: unknown, what: string) => eq(canon(got), canon(want), what);
 const back = (n: number) => { const d = new Date(); d.setUTCDate(d.getUTCDate() - n); return d.toISOString().slice(0, 10); };
 
+section('A board keeps the most arrows it has ever paid');
+{
+  // The rank is the sum of these. Cleared at Master on the phone (145 arrows), replayed faster at Easy on the
+  // tablet (22): the replay is the better run and wins the time and the tier, and the arrows stay at 145.
+  const p = await player('progArrows');
+  await mergeLevels(pool, p.id, cleanLevels({ br: rec({ stars: 3, ms: 90_000, tier: 4, arrows: 145 }) }));
+  const moved = await mergeLevels(pool, p.id, cleanLevels({ br: rec({ stars: 3, ms: 30_000, tier: 0, arrows: 22 }) }));
+  const got = (await readLevels(pool, p.id)).br;
+  eq(moved, 1, 'the faster replay is a better run and moves the row');
+  eq(got?.ms, 30_000, 'its time is kept');
+  eq(got?.tier, 0, 'with the tier it was cleared at');
+  eq(got?.arrows, 145, 'and the arrows stay at the most the board ever paid');
+
+  // The other way round: a worse run that paid more still raises the arrows, and only the arrows.
+  const q = await player('progArrowsUp');
+  await mergeLevels(pool, q.id, cleanLevels({ ar: rec({ stars: 3, ms: 20_000, tier: 0, arrows: 22 }) }));
+  const up = await mergeLevels(pool, q.id, cleanLevels({ ar: rec({ stars: 1, ms: 200_000, tier: 4, arrows: 150 }) }));
+  const after = (await readLevels(pool, q.id)).ar;
+  eq(up, 1, 'a worse run that paid more arrows moves the row');
+  eq(after?.arrows, 150, 'to the greater arrows');
+  eq(after?.stars, 3, 'while the better run keeps its stars');
+  eq(after?.ms, 20_000, 'its time');
+  eq(after?.tier, 0, 'and its tier');
+  eq(await mergeLevels(pool, q.id, cleanLevels({ ar: rec({ stars: 1, ms: 200_000, tier: 4, arrows: 150 }) })), 0, 'the same push again moves nothing');
+  eq(await mergeLevels(pool, q.id, cleanLevels({ ar: rec({ stars: 3, ms: 20_000, tier: 0, arrows: 22 }) })), 0, 'nor does the first run pushed again');
+
+  // Whichever order two devices sync in, they land on the same record.
+  const a = await player('progArrowsA'), b = await player('progArrowsB');
+  const hi = { x: rec({ stars: 2, ms: 60_000, arrows: 120 }) }, lo = { x: rec({ stars: 3, ms: 50_000, arrows: 40 }) };
+  await mergeLevels(pool, a.id, cleanLevels(hi)); await mergeLevels(pool, a.id, cleanLevels(lo));
+  await mergeLevels(pool, b.id, cleanLevels(lo)); await mergeLevels(pool, b.id, cleanLevels(hi));
+  const ra = (await readLevels(pool, a.id)).x, rb = (await readLevels(pool, b.id)).x;
+  ok(JSON.stringify({ ...ra, at: 0 }) === JSON.stringify({ ...rb, at: 0 }), 'both orders land on the same record');
+  eq(ra?.arrows, 120, 'with the greater arrows');
+  eq(ra?.stars, 3, 'and the better run');
+}
+
 section('A Master board is stored');
 {
   // The fifth tier broke every push that carried one: the table said 0..3 and the whole batch failed.

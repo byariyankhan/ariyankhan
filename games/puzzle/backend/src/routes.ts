@@ -249,7 +249,7 @@ const H = {
     const levelId = String(q.level_id ?? '').slice(0, 64);
     const tier = Number(q.tier ?? NaN);
     const ms = Number(q.ms ?? NaN);
-    if (!levelId || !Number.isInteger(tier) || tier < 0 || tier > 3
+    if (!levelId || !Number.isInteger(tier) || tier < 0 || tier > 4   // five tiers: Master is 4
         || !Number.isFinite(ms) || ms <= 0 || ms > 86_400_000) {
       await noStore(res).code(400).send({ error: 'bad_board' });
       return;
