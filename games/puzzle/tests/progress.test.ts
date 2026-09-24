@@ -248,6 +248,24 @@ section('Training puzzles finished on two devices are all on the account, each w
   same(((await readState(pool, p.id)) as Record<string, any>).train?.[today]?.cl, { r: { '0': 1000, '1': 2000 }, f: { '0': 1500 } }, 'on the account as well');
 }
 
+section('Each round’s first score of the day is kept, the lower of two devices’');
+{
+  // the difficulty step reads the first finish of the free puzzle, so a replay learned by heart cannot climb it
+  const a = { train: { [today]: { r: 95, f1: { r: 40, f: 90 } } } };
+  const b = { train: { [today]: { r: 70, f1: { r: 70, g: 30 } } } };
+  const ab = combineState(combineState({}, a), b) as Record<string, any>, ba = combineState(combineState({}, b), a);
+  same(ab.train[today].f1, { r: 40, f: 90, g: 30 }, 'per round, the lower of the two');
+  eq(ab.train[today].r, 95, 'while the day’s best is still the higher');
+  same(ab, ba, 'in either order');
+  same(combineState(ab, b), ab, 'and again changes nothing');
+  const dirty = cleanState({ train: { [today]: { f1: { r: 49.6, f: 250, g: -1, e: 'x', z: 5 } } } }) as Record<string, any>;
+  same(dirty.train[today], { f1: { r: 50 } }, 'a score that is not a score, and a round that is not a round, are dropped; a day with only a first score is still a day');
+  eq((cleanState({ train: { [today]: { f1: 'x', r: 60 } } }) as Record<string, any>).train[today].f1, undefined, 'a first score that is not a map is dropped');
+  const p = await player('progFirstScore');
+  await mergeState(pool, p.id, a); await mergeState(pool, p.id, b);
+  same(((await readState(pool, p.id)) as Record<string, any>).train?.[today]?.f1, { r: 40, f: 90, g: 30 }, 'on the account as well');
+}
+
 section('Streaks from two devices join up');
 {
   eq(nextDay('2026-02-28'), '2026-03-01', 'the day after is a calendar day');

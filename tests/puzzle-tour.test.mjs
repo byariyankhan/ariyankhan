@@ -128,7 +128,7 @@ test('Back and Escape close a tutorial card first: the home tour, the board\'s, 
   assert.deepEqual(log, ['tour:skip', 'board:skip', 'round:true'], 'each closes as its Skip does');
   const back = grab(/function backPressed\(\) \{[\s\S]*?\n  \}\n/);
   assert.ok(back.indexOf('askClose()') < back.indexOf('closeTutorial()') && back.indexOf('closeTutorial()') < back.indexOf('el.homeSheet') && back.indexOf('closeTutorial()') < back.indexOf('el.btnLevels.click()'), 'Back: a question first, then a tutorial card, then sheets and the board');
-  const esc = grab(/if \(e\.key !== 'Escape'\) return;\n[^\n]+\n[^\n]+/);
+  const esc = grab(/if \(e\.key !== 'Escape'\) return;\n(?:[^\n]+\n){2}[^\n]+/);   // the tutorial, the round's rules card, the round
   assert.ok(esc.indexOf('closeTutorial()') > 0 && esc.indexOf('closeTutorial()') < esc.indexOf('trainBack'), 'Escape: a tutorial card before the round\'s "Leave this round?"');
 });
 

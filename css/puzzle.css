@@ -253,7 +253,9 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-ranks--card{ position:static; justify-content:center; margin:0 0 10px; }
 .aa-wait{ display:flex; align-items:center; justify-content:center; gap:10px; margin:0 0 14px; font-weight:800; color:var(--muted); }
 .aa-wait::before{ content:''; width:18px; height:18px; border-radius:50%; border:3px solid var(--line-soft); border-top-color:var(--accent); animation:aaspin 1s linear infinite; }
-.aa-wait b{ color:var(--ink); font-variant-numeric:tabular-nums; }
+.aa-wait b{ display:inline-block; color:var(--ink); font-variant-numeric:tabular-nums; }
+.aa-wait b.is-pop{ animation:aapop .45s ease-out; }   /* each of the last three, as it ticks */
+@media(prefers-reduced-motion:reduce){ .aa-wait b.is-pop{ animation:none; } }
 @keyframes aaspin{ to{ transform:rotate(360deg); } }
 /* the three stakes side by side, each its own coin */
 /* Five tables now, so the row wraps rather than squeezing: three across a phone, all five on a wide panel. */
@@ -851,8 +853,6 @@ html.is-first .aa-splash.is-terms .aa-splash-terms{ visibility:visible; opacity:
 .aa-train-howcard-in{ width:100%; max-width:440px; background:var(--card); color:var(--ink); border-radius:20px; padding:18px 18px 16px; box-shadow:var(--shadow); margin-bottom:env(safe-area-inset-bottom, 0px); }
 .aa-train-howcard-in h3{ margin:0 0 10px; font-size:20px; font-weight:900; }
 .aa-train-howcard-in .aa-btn{ width:100%; }
-.aa-train-hud .aa-train-info{ margin-left:auto; }
-.aa-train-hud .aa-train-info + .aa-train-hint{ margin-left:0; }
 /* the chip at the end of a card: filled rose = do this one, rose with the video mark = a short advertisement,
    green with the tick above = done today, play again free; grey never, every card is tappable */
 .aa-train-got{ flex:none; display:inline-flex; align-items:center; justify-content:center; gap:5px; min-width:48px; padding:7px 10px; border-radius:12px; font-size:13px; font-weight:900; white-space:nowrap; background:color-mix(in srgb, var(--accent2) 12%, transparent); color:var(--accent2); }
@@ -889,18 +889,47 @@ html.is-first .aa-splash.is-terms .aa-splash-terms{ visibility:visible; opacity:
 /* a round is a game: the whole screen, the lobby gone, the way out in the corner */
 .aa-sheet.is-playing .aa-sheet-panel{ padding-bottom:calc(32px + env(safe-area-inset-bottom, 0px)); }
 .aa-sheet.is-playing .aa-sheet-head h2{ font-size:18px; color:var(--muted); }
+/* in a round the head is the round's name, then the ? with its rules; a long name gives way before the ? does */
+.aa-sheet.is-playing .aa-sheet-head h2.is-round{ min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; color:var(--ink); }
+.aa-sheet-head [data-train-how]{ flex:none; margin-left:0; }
 .aa-train-info{ display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; margin-left:6px; border:none; border-radius:50%; background:color-mix(in srgb, var(--accent2) 14%, transparent); color:var(--accent2); font:inherit; font-size:13px; font-weight:900; vertical-align:middle; cursor:pointer; }
 .aa-train-info[aria-expanded="true"]{ background:var(--accent2); color:#fff; }
-.aa-train-hud{ display:flex; justify-content:space-between; align-items:center; gap:12px; font-size:14px; font-weight:900; color:var(--muted); margin:0 0 12px; font-variant-numeric:tabular-nums; }
+.aa-train-hud{ position:relative; display:flex; justify-content:space-between; align-items:center; gap:10px; font-size:14px; font-weight:900; color:var(--muted); margin:0 0 12px; font-variant-numeric:tabular-nums; }
+/* what is happening now, with its mark: the look's seconds, the clock against its allowance, how far along */
+.aa-train-stat{ display:inline-flex; align-items:center; gap:5px; min-width:0; white-space:nowrap; color:var(--muted); }
+.aa-train-hud .aa-train-stat > span{ color:var(--muted); }
+.aa-train-stat b{ color:var(--ink); }
+.aa-train-stat .aa-bi{ flex:none; width:16px; height:16px; color:var(--accent2); }
+/* the look, draining: a thin bar under the row, gone once the look is */
+.aa-train-drain{ position:absolute; left:0; right:0; bottom:-7px; height:3px; border-radius:2px; overflow:hidden; background:color-mix(in srgb, var(--muted) 18%, transparent); }
+.aa-train-drain i{ display:block; height:100%; width:100%; border-radius:2px; background:var(--accent2); transition:width .2s linear; }
+@media(prefers-reduced-motion:reduce){ .aa-train-drain i{ transition:none; } }
+/* 3, 2, 1, Go: an opaque veil over the round's box only (the painting and the hint under it, the head's ← and ?
+   above it), the number popping as it ticks. Also "Paused" when the app comes back from the background. */
+#aaTrainGame{ position:relative; }
+.aa-train-count{ position:absolute; inset:-6px -2px 0; z-index:6; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; min-height:280px; padding:24px 12px; background:var(--bg); text-align:center; }
+.aa-train-count-n{ display:block; min-height:1em; font-size:clamp(76px, 26vw, 132px); font-weight:900; line-height:1; color:var(--accent2); font-variant-numeric:tabular-nums; }
+.aa-train-count-n.is-word{ font-size:clamp(40px, 13vw, 64px); }
+.aa-train-count-n.is-pop{ animation:aapop .45s ease-out; }
+.aa-train-count-t{ font-size:12px; font-weight:900; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); }
+.aa-train-count-cue{ max-width:300px; margin:6px 0 0; font-size:15px; font-weight:800; line-height:1.4; color:var(--ink); }
+.aa-train-count-cue:empty{ display:none; }
+.aa-train-count.is-out{ animation:aa-out .3s ease-in forwards; }
+@media(prefers-reduced-motion:reduce){ .aa-train-count-n.is-pop, .aa-train-count.is-out{ animation:none; } }
 .aa-train-hud span:first-child{ color:var(--ink); }
 .aa-train-res{ text-align:center; padding:6px 0 2px; }
 .aa-train-big{ margin:4px 0; font-size:64px; font-weight:900; line-height:1; color:var(--accent2); font-variant-numeric:tabular-nums; }
 .aa-train-sub{ margin:6px 0; font-size:15px; font-weight:800; color:var(--muted); }
 .aa-train-sub b{ color:var(--ink); }
+/* a round finished under the pass: kept, not cleared, and the way on said plainly */
+.aa-train-big.is-short{ color:var(--muted); }
+.aa-train-short{ color:var(--ink); }
 
 /* the hint button every round carries */
 .aa-train-hud .aa-train-hint{ margin-left:auto; border:none; background:color-mix(in srgb, var(--accent2) 12%, transparent); color:var(--accent2); font:inherit; font-size:13px; font-weight:900; padding:6px 10px; border-radius:12px; cursor:pointer; }
 .aa-train-hud .aa-train-hint:active{ transform:scale(.96); }
+.aa-train-hud .aa-train-hint[aria-disabled="true"]{ opacity:.45; cursor:default; }   /* nothing a hint could do yet */
+.aa-train-hud .aa-train-hint[aria-disabled="true"]:active{ transform:none; }
 /* the gallery rounds: real paintings, each drawn as a background so a piece, a patch or a whole work is one box */
 /* what a round draws is sized to the room under its line (trainFit sets the widths); what it shrinks sits centred */
 .aa-art{ display:block; width:100%; margin:0 auto; border-radius:14px; background:var(--bg2) center/cover no-repeat; overflow:hidden; }
@@ -916,9 +945,17 @@ html.is-first .aa-splash.is-terms .aa-splash-terms{ visibility:visible; opacity:
 .aa-art-piece.is-ghost{ opacity:.25; }
 .aa-art-piece.is-flying, .aa-gal-piece.is-flying{ position:relative; z-index:3; pointer-events:none; }
 .aa-art-slot.is-over{ border-color:var(--accent2); border-style:solid; background:color-mix(in srgb, var(--accent2) 16%, var(--card)); }
+/* a full frame with pieces out of place: those are marked, as the gallery marks its own */
+.aa-art-slot.is-wrong{ border-color:var(--bad); border-style:solid; animation:aashake .3s; }
+.aa-art-slot.is-wrong .aa-art-piece{ outline:2px solid var(--bad); outline-offset:-2px; }
+@media(prefers-reduced-motion:reduce){ .aa-art-slot.is-wrong{ animation:none; } }
 .aa-art-drag{ position:fixed; left:0; top:0; z-index:120; pointer-events:none; border-radius:8px; overflow:hidden; box-shadow:0 12px 28px rgba(0,0,0,.35); will-change:transform; }
 /* the rounds' coach: the same spotlight and card as the board's, and a hand that shows the move */
 .aa-train-coach{ z-index:115; }
+/* the card goes to the top when what it points at is at the bottom; and a piece being carried sees through it */
+.aa-train-coach .aa-coach-card.is-top{ top:calc(16px + env(safe-area-inset-top, 0px)); bottom:auto; }
+.aa-train-coach .aa-coach-step[hidden], .aa-train-coach [data-tc][hidden]{ display:none; }   /* one step; a step that waits for the move */
+body.aa-dragging .aa-train-coach .aa-coach-card{ pointer-events:none; opacity:.35; }
 .aa-hand{ position:absolute; left:0; top:0; width:40px; height:40px; pointer-events:none; will-change:transform; }
 .aa-hand svg{ width:40px; height:40px; fill:none; stroke:#fff; stroke-width:3; }
 .aa-hand svg circle:last-child{ fill:var(--accent2); stroke:none; }
@@ -948,7 +985,7 @@ html.is-first .aa-splash.is-terms .aa-splash-terms{ visibility:visible; opacity:
 .aa-gal-piece.is-ghost{ opacity:.25; }
 .aa-gal-slots, .aa-gal-tray, .aa-gal-piece{ touch-action:none; -webkit-user-select:none; user-select:none; }
 .aa-train-lv{ display:inline-block; margin-right:6px; padding:1px 6px; border-radius:7px; font-size:11px; font-weight:900; color:var(--accent2); background:color-mix(in srgb, var(--accent2) 12%, transparent); vertical-align:middle; }
-.aa-train-hud .aa-train-lv{ margin:0 0 0 6px; }
+.aa-train-hud .aa-train-lv{ flex:none; margin:0; }
 .aa-art-thumb{ display:block; width:100%; aspect-ratio:1; border-radius:8px; background:var(--bg2) center/cover no-repeat; }
 .aa-art.is-peek{ outline:3px solid var(--accent2); outline-offset:2px; }
 .aa-curator-opts{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:0 auto; }

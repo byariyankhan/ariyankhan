@@ -680,7 +680,7 @@
   // difficulty came with the account, is not on Easy), and the lifeline is called an advertisement only where
   // one plays: on the site it is free (ads.isAd), and where the offer is off it is not mentioned at all.
   const NUM_WORDS = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
-  const numWord = n => NUM_WORDS[n] ?? String(n);
+  const numWord = (n, cap = false) => { const w = NUM_WORDS[n] ?? String(n); return cap ? w.charAt(0).toUpperCase() + w.slice(1) : w; };   // cap: at the start of a sentence
   const capFirst = t => t.charAt(0).toUpperCase() + t.slice(1);
   const perBoard = (n, one, many) => `${capFirst(numWord(n))} ${n === 1 ? one : many} on this board.`;
   const COACH_STEPS = [
@@ -2566,7 +2566,9 @@
   // Hints: one a day for nothing, the rest for an advertisement the player chooses (adOffer('trainhint');
   // free where advertising is off). A hint costs ten points of the round it is used in.
   const TRAIN_FREE_HINTS = 1;
-  const trainHintsLeft = () => Math.max(0, TRAIN_FREE_HINTS - (trainDay().h | 0));
+  // counted on the round's own day: a round started before midnight and hinted after it spends that day's
+  // free hint, not the new day's
+  const trainHintsLeft = () => Math.max(0, TRAIN_FREE_HINTS - (trainDay(train.day || dayKey()).h | 0));
   // Rounds: every round is free once a day. After it, the round's own two choices: play AGAIN, the same
   // puzzle, for nothing, as often as you like; or play NEXT, a new puzzle of the same round (a new painting,
   // a new deal), for an advertisement the player chooses, each time. `pp` counts the day's starts per round,
@@ -2577,14 +2579,17 @@
   // ── Difficulty ──
   // Each round climbs the way the board does: a good day (85 or more) takes the round up a level, a poor one
   // (under 50) takes it down, five levels in all. The level is read off the days before today, so it holds
-  // still within a day and every device that has the same history agrees on it.
+  // still within a day and every device that has the same history agrees on it; and off each day's FIRST
+  // finish of its free puzzle (`f1`, trainSave), not its best, so a puzzle replayed until it is known by heart
+  // cannot climb it. A day kept before first scores were is read by its best, as it always was.
   const TRAIN_TIERS = 5;
+  const trainFirst = (t, id) => t.f1 && typeof t.f1[id] === 'number' ? t.f1[id] : t[id];
   function trainTier(id) {
     const today = trainKey();
     let keys = [];
     try { keys = Object.keys(localStorage).filter(k => k.startsWith(STORE + 'train:') && k !== STORE + today).map(k => k.slice(STORE.length + 6)).sort(); } catch { /* none */ }
     let t = 0;
-    for (const d of keys) { const v = trainDay(d)[id]; if (typeof v !== 'number') continue; if (v >= 85) t = Math.min(TRAIN_TIERS - 1, t + 1); else if (v < 50) t = Math.max(0, t - 1); }
+    for (const d of keys) { const v = trainFirst(trainDay(d), id); if (typeof v !== 'number') continue; if (v >= 85) t = Math.min(TRAIN_TIERS - 1, t + 1); else if (v < 50) t = Math.max(0, t - 1); }
     return t;
   }
   // what each level asks of each round
@@ -2604,7 +2609,10 @@
   // free: everywhere advertising is off; the day's round; a round unlocked today; and a round scored today,
   // so "Play again" is never an advertisement, not even for a round started before midnight and finished after
   // a start costs nothing unless it asks for a NEW puzzle where advertising is on
-  const trainFree = (id, next) => !ads.isAd() || !next;
+  const trainFree = (id, next) => !ads.isAd() || !next || trainOwed(id);
+  // An advertisement watched for a new puzzle that never came -- the player went back or the sheet closed
+  // while it played, or the paintings would not load -- is owed: that round's next Play next is free (today).
+  const trainOwed = id => train.owed[id] === dayKey();
   // The long game of a round: consecutive days it was played, ending today or, if today is not played yet,
   // yesterday. 30 days is the first challenge, 90 the second.
   const TRAIN_GOALS = [30, 90];
@@ -2616,7 +2624,10 @@
     try { for (const k of Object.keys(localStorage)) if (k.startsWith(STORE + 'train:') && typeof trainDay(k.slice(STORE.length + 6))[id] === 'number') n++; } catch { /* none */ }
     return n;
   }
-  const train = { game: null, timer: 0, busy: false, serial: 0, day: '', paused: false };
+  // run: the start in hand (every await in a start checks it is still the one; stopping or leaving moves it on);
+  // holds: what the round is waiting on (paused says whether anything is, trainHold); count: the count-in in
+  // hand; drag: a piece being carried; owed: a Play next paid for and not played yet, per round; id: the round
+  const train = { game: null, timer: 0, busy: false, serial: 0, day: '', paused: false, run: 0, holds: new Set(), heldAt: 0, count: null, countTimer: 0, drag: null, owed: {}, id: '' };
   const trainKey = d => 'train:' + (d || dayKey());
   const trainDay = d => { const t = store.get(trainKey(d), null); return t && typeof t === 'object' ? t : {}; };
   // a day is done with one round scored -- the free one, or one the player chose to unlock; all four is a bonus
@@ -2627,32 +2638,52 @@
   // A round finished: its score (the day's best stands), and -- the first time this puzzle is finished -- a
   // clear, which is a level on the main count (trainClearTimes, levelNo). A puzzle is the round's serial of the
   // day: 0 the free one, 1, 2... each "Play next". Play again replays the same serial, so it is never a second
-  // level. Returns whether this finish was a new clear.
+  // level. A clear asks for a score of TRAIN_PASS: a round answered at random, tapped all over or hinted
+  // through is still played and its score kept, but it is not a level -- Play again is the way to one.
+  // Returns whether this finish was a new clear.
+  const TRAIN_PASS = 50;
   function trainSave(k, score) {
-    const day = train.day || dayKey(), t = trainDay(day); score = clamp100(score);
+    const day = train.day || dayKey(), t = trainDay(day), serial = train.serial | 0; score = clamp100(score);
     // a round scored before clears were kept has its free puzzle cleared at a fixed time (noon of its day, as
     // trainClearTimes reads it): written down now, before this save moves the day's last-save time
-    for (const r of TRAIN_ROUNDS) if (typeof t[r.id] === 'number' && !(t.cl && t.cl[r.id] && typeof t.cl[r.id] === 'object')) {
+    for (const r of TRAIN_ROUNDS) if (trainLegacy(t, r.id)) {
       t.cl = t.cl && typeof t.cl === 'object' ? t.cl : {};
       (t.cl[r.id] = t.cl[r.id] && typeof t.cl[r.id] === 'object' ? t.cl[r.id] : {})['0'] = trainLegacyAt(day);
     }
-    const fresh = !trainCleared(t, k, train.serial | 0);
+    // the first finish of the day's free puzzle, whatever it scored: what the round's difficulty reads
+    // (trainTier). It also marks the round as kept since clears asked for a score, so a score under the pass
+    // with no clear is never read as a round from before clears were kept (trainLegacy).
+    let first = false;
+    if (serial === 0 && !(t.f1 && typeof t.f1[k] === 'number')) { t.f1 = t.f1 && typeof t.f1 === 'object' ? t.f1 : {}; t.f1[k] = score; first = true; }
+    const fresh = score >= TRAIN_PASS && !trainCleared(t, k, serial);
     if (fresh) {
       t.cl = t.cl && typeof t.cl === 'object' ? t.cl : {};
       const m = t.cl[k] && typeof t.cl[k] === 'object' ? t.cl[k] : (t.cl[k] = {});
-      m[String(train.serial | 0)] = Date.now();
+      m[String(serial)] = Date.now();
       forgetNums();
     }
-    if (!fresh && typeof t[k] === 'number' && t[k] >= score) return false;
+    if (!fresh && !first && typeof t[k] === 'number' && t[k] >= score) return false;
     if (typeof t[k] !== 'number' || t[k] < score) { t[k] = score; t.at = Date.now(); }
     store.set(trainKey(day), t);
     renderTrainPill(); if (fresh) renderBrain();   // the home card's level moved
     syncOwed = true; syncTour({}).catch(() => {});
     return fresh;
   }
-  // Whether a puzzle of a round was finished that day. A round scored before clears were kept has its free
-  // puzzle (serial 0) finished: nothing else could have been played before it.
-  const trainCleared = (t, id, serial) => t.cl && t.cl[id] && typeof t.cl[id] === 'object' ? String(serial) in t.cl[id] : serial === 0 && typeof t[id] === 'number';
+  // Whether a puzzle of a round was cleared that day. A round scored before clears were kept has its free
+  // puzzle (serial 0) cleared: nothing else could have been played before it.
+  const trainCleared = (t, id, serial) => t.cl && t.cl[id] && typeof t.cl[id] === 'object' ? String(serial) in t.cl[id] : serial === 0 && trainLegacy(t, id);
+  // A round scored before clears were kept: a score, no clears, and no first score (every save since keeps one)
+  const trainLegacy = (t, id) => typeof t[id] === 'number' && !(t.cl && t.cl[id] && typeof t.cl[id] === 'object') && !(t.f1 && typeof t.f1[id] === 'number');
+  // Two devices' first scores of a day, per round: the lower, as the account keeps them (mergeTrainDay) -- the
+  // same whichever way round, and the same again if merged twice.
+  const trainMergeF1 = (a, b) => {
+    const out = {};
+    for (const r of TRAIN_ROUNDS) {
+      const v = [a, b].map(m => m && typeof m === 'object' && typeof m[r.id] === 'number' && Number.isFinite(m[r.id]) ? clamp100(m[r.id]) : null).filter(x => x !== null);
+      if (v.length) out[r.id] = Math.min(...v);
+    }
+    return out;
+  };
   // A clear kept without its time -- a round scored before clears were kept -- is put at noon of its day: the
   // same on every device, and still, where the day's last-save time would move with every save.
   const trainLegacyAt = day => Date.parse(day + 'T12:00:00') || 0;
@@ -2667,7 +2698,7 @@
         for (const r of TRAIN_ROUNDS) {
           const m = t.cl && t.cl[r.id] && typeof t.cl[r.id] === 'object' ? t.cl[r.id] : {};
           const serials = new Set(Object.keys(m).filter(x => /^(0|[1-9]\d{0,3})$/.test(x)));
-          if (typeof t[r.id] === 'number' && !serials.size) serials.add('0');   // a round scored before clears were kept
+          if (trainLegacy(t, r.id)) serials.add('0');   // a round scored before clears were kept
           for (const x of serials) { const v = Number(m[x]); out.push(Number.isFinite(v) && v > 0 ? v : dayAt); }
         }
       }
@@ -2693,7 +2724,7 @@
   // Before a round is played its card has one button: Play. Once it is scored, two: Play again (the same
   // puzzle, free) and Play next (a new one, an advertisement where advertising is on).
   const chipAgain = id => `<button type="button" class="aa-train-got is-again" data-train="${id}" data-train-mode="again">${ICON_AGAIN}Play again</button>`;
-  const chipNext = id => `<button type="button" class="aa-train-got is-next" data-train="${id}" data-train-mode="next">Play next${ads.isAd() ? ICON_AD : ICON_NEXT}</button>`;
+  const chipNext = id => `<button type="button" class="aa-train-got is-next" data-train="${id}" data-train-mode="next">Play next${ads.isAd() && !trainOwed(id) ? ICON_AD : ICON_NEXT}</button>`;
   function trainCardState(t, id) {
     if (typeof t[id] === 'number') return { cls: 'is-done', tag: `\u2713 ${t[id]}`, chips: chipAgain(id) + chipNext(id) };
     return { cls: '', tag: '', chips: `<span class="aa-train-got">${ICON_PLAY}Play</span>` };
@@ -2725,32 +2756,148 @@
     // in a round the corner button is the way back to the list, not out of the sheet
     const x = $('[data-close-sheet]', el.trainSheet); if (x) { x.innerHTML = on ? ICON_BACK : '\u2715'; x.setAttribute('aria-label', on ? 'Back to the rounds' : 'Close'); }
     if (on) musicBegin(); else if (el.game.hidden) musicStop();
+    if (!on) trainHead('');
   }
-  // stop: the round in hand ends (its result stays on the full screen); leave: back to the list, or out
-  function trainStop() { clearInterval(train.timer); train.timer = 0; train.game = null; trainCoachEnd(false); }
-  function trainLeave() { trainStop(); trainScreen(false); train.serial = 0; train.day = ''; train.paused = false; }
+  // In a round the sheet's head is the round's name, with the ? that explains it beside it (the round's own
+  // bar keeps the level, what is happening and the hint); the list and a result are the sheet's own again.
+  function trainHead(id) {
+    const h = $('.aa-sheet-head h2', el.trainSheet); if (!h) return;
+    h.dataset.base = h.dataset.base || h.textContent;
+    const r = TRAIN_ROUNDS.find(x => x.id === id);
+    h.textContent = r ? r.name : h.dataset.base; h.classList.toggle('is-round', !!r);
+    $('.aa-sheet-head [data-train-how]', el.trainSheet)?.remove();
+    if (r) h.insertAdjacentHTML('afterend', howBtnHtml());
+  }
+  // stop: the round in hand ends (its result stays on the full screen); leave: back to the list, or out. Both
+  // end whatever a start was still waiting for (the run token moves on), the count-in, the holds and a piece
+  // in the air.
+  function trainStop() {
+    train.run++;
+    clearInterval(train.timer); train.timer = 0;
+    clearTimeout(train.countTimer); train.countTimer = 0;
+    const c = train.count; train.count = null; c?.done(false);
+    train.game = null; train.holds.clear(); train.paused = false;
+    trainDragClear();
+    if (el.trainBody) $$('.aa-train-count, .aa-train-howcard', el.trainBody).forEach(n => n.remove());
+    trainCoachEnd(false);
+  }
+  function trainLeave() { trainStop(); trainScreen(false); train.serial = 0; train.day = ''; train.id = ''; }
+  // ── Holding a round ──
+  // A round holds while something else has the player: the Leave question ('leave'), the rules behind the ?
+  // ('how'), a hint's advertisement ('ad'), the app or the tab in the background ('away'), and the count-in
+  // ('count'). Its timers skip while anything holds it (train.paused), and when the last hold comes off its
+  // clocks move on by the time held -- the play clock's start and the look's end, each by the part of the hold
+  // it was running for -- so nothing is counted that was not played. The count-in keeps its own three seconds
+  // (trainCount), which wait the same way.
+  function trainHold(why) {
+    if (!train.holds.size) train.heldAt = performance.now();
+    train.holds.add(why); train.paused = true;
+    if (tcoach.box) tcoach.box.hidden = true;   // the coach is not over a question, a card or a veil
+  }
+  function trainRelease(why) {
+    if (!train.holds.delete(why) || train.holds.size) return;
+    train.paused = false;
+    const g = train.game, now = performance.now();
+    if (g) {
+      if (typeof g.t0 === 'number') g.t0 += now - Math.max(train.heldAt, g.t0);
+      if (typeof g.showUntil === 'number') g.showUntil += now - Math.max(train.heldAt, g.showFrom || 0);
+      // a hint paid for while the round was held (an advertisement that took the app away) lands now
+      if (g.hintOwed && g.canHint()) { g.hintOwed = false; g.hints = (g.hints | 0) + 1; if (g.hint()) trainHintDone(); else g.hints--; }
+    }
+    if (tcoach.box) { tcoach.box.hidden = false; trainCoachPlace(); }
+    trainHintSync();
+  }
+  // ── 3, 2, 1, Go ──
+  // In front of every round, once its paintings are in: the online room's last three seconds (SFX.tick, a
+  // buzz, the number popping) and its start (SFX.go). It stands over the round's own box -- an opaque veil, so
+  // the painting is not on show and the hint cannot be spent before Go, while the sheet's ← above it still
+  // works -- and nothing of the round runs until Go: no look, no clock. It waits while anything else holds
+  // the round, its three seconds with it. Coming back from the background runs it again, "Paused" first.
+  // Resolves true at Go, false if the round went.
+  const TRAIN_COUNT = 3, TRAIN_PAUSED_MS = 900;
+  // the veil, made once: a start's says what the round is about to ask (its cue); a comeback's ("Paused") does not
+  function trainVeil(word = '') {
+    const box = $('#aaTrainGame', el.trainBody); if (!box) return null;
+    let v = $('.aa-train-count', box);
+    if (!v) {
+      v = document.createElement('div'); v.className = 'aa-train-count'; v.setAttribute('role', 'status'); v.setAttribute('aria-live', 'assertive');
+      v.innerHTML = '<b class="aa-train-count-n"></b><small class="aa-train-count-t">Get ready</small><p class="aa-train-count-cue"></p>';
+      $('.aa-train-count-cue', v).textContent = word ? '' : train.game?.cue || '';
+      box.appendChild(v);
+    }
+    v.classList.remove('is-out');
+    if (word) { const n = $('.aa-train-count-n', v); n.textContent = word; n.classList.add('is-word'); }
+    return v;
+  }
+  function trainCount(g, resume = false) {
+    if (train.game !== g || !$('#aaTrainGame', el.trainBody)) return Promise.resolve(false);
+    if (train.count) train.count.done(false);
+    trainHold('count');
+    const veil = trainVeil(resume ? 'Paused' : ''), n = $('.aa-train-count-n', veil);
+    return new Promise(resolve => {
+      const c = train.count = { shown: resume ? 'Paused' : '', blocked: 0 };
+      c.done = ok => {
+        if (train.count === c) train.count = null;
+        clearTimeout(train.countTimer); train.countTimer = 0;
+        veil.remove();
+        if (ok) trainRelease('count');
+        resolve(ok);
+      };
+      const show = v => {
+        if (c.shown === v) return; c.shown = v;
+        n.textContent = v; n.classList.toggle('is-word', !/^\d$/.test(v));
+        if (!calmer()) { n.classList.remove('is-pop'); void n.offsetWidth; n.classList.add('is-pop'); }
+      };
+      // back from the background again while it counts: it starts over, "Paused" first
+      c.again = () => { g.countUntil = performance.now() + TRAIN_PAUSED_MS + TRAIN_COUNT * 1000; c.blocked = 0; show('Paused'); };
+      g.countUntil = performance.now() + (resume ? TRAIN_PAUSED_MS : 0) + TRAIN_COUNT * 1000;
+      const step = () => {
+        if (train.count !== c) return;
+        const now = performance.now();
+        if (document.hidden || [...train.holds].some(h => h !== 'count')) { c.blocked = c.blocked || now; train.countTimer = setTimeout(step, 100); return; }
+        if (c.blocked) { g.countUntil += now - c.blocked; c.blocked = 0; }   // it waited: so do its seconds
+        const left = Math.ceil((g.countUntil - now) / 1000);
+        if (left > TRAIN_COUNT) show('Paused');
+        else if (left > 0) { if (c.shown !== String(left)) { show(String(left)); SFX.tick(); vibe(12); } }
+        else {
+          show('Go'); SFX.go(); vibe([0, 30, 60, 70]);
+          veil.classList.add('is-out');
+          train.countTimer = setTimeout(() => { if (train.count === c) c.done(true); }, calmer() ? 150 : 320);
+          return;
+        }
+        train.countTimer = setTimeout(step, 50);
+      };
+      step();
+    });
+  }
+  // Back from the background: the round was held and hidden the moment it went (trainHold 'away', the veil),
+  // and it comes back through the count-in rather than straight into the clock. One hold is swapped for the
+  // other, so the clocks do not move in between; the music, stopped when the page went, comes back at Go.
+  async function trainResume(g) {
+    trainHold('count'); trainRelease('away');
+    if (await trainCount(g, true) && el.trainSheet.classList.contains('is-playing')) musicBegin();
+  }
+  document.addEventListener('visibilitychange', () => {
+    const g = train.game, playing = !!el.trainSheet && !el.trainSheet.hidden && el.trainSheet.classList.contains('is-playing');
+    if (!g) { if (!document.hidden && playing) musicBegin(); return; }   // a result on the screen: its music, as it was
+    if (document.hidden) { trainHold('away'); trainVeil('Paused'); return; }
+    if (!train.holds.has('away')) return;
+    if (train.count) { train.count.again(); trainRelease('away'); return; }
+    void trainResume(g);
+  });
   // Back out of a round (the corner arrow, the app's Back): asked about while a round is being played, the way
   // leaving a board is, since what was done on it is not kept; from a result it just goes back to the list.
-  // The round's clock does not count the time the question was open.
+  // The round holds while the question is open (trainHold), so its clock does not count it.
   async function trainBack() {
     const g = train.game;
     if (g) {
-      if (train.paused) return;   // the question is already open: a second press is not a second question
-      const asked = performance.now();
-      train.paused = true;        // the round's timers hold (the look, the countdowns) while it is open
+      if (train.holds.has('leave')) return;   // the question is already open: a second press is not a second question
+      trainHold('leave');
       let leave = false;
       try { leave = await ask({ title: 'Leave this round?', body: 'It is not scored, and it starts again from the beginning next time.', ok: 'Leave the round', cancel: 'Keep playing' }); }
-      finally { train.paused = false; }
+      finally { trainRelease('leave'); }
       // the round ended under the question (its last move landed as it opened): its result stays on screen
-      if (train.game !== g) return;
-      if (!leave) {
-        const held = performance.now() - asked;
-        // the clock: whatever of the question it counted is taken back -- all of it since the question opened,
-        // or since the clock started, if it started while the question was open
-        if (typeof g.t0 === 'number') g.t0 += performance.now() - Math.max(asked, g.t0);
-        if (typeof g.showUntil === 'number') g.showUntil += held;   // the canvas's look runs on from where it stood
-        return;
-      }
+      if (train.game !== g || !leave) return;
     }
     trainLeave(); renderTrain();
   }
@@ -2783,6 +2930,9 @@
     return `<span class="aa-train-ico2 aa-train-art aa-train-art--${id}" aria-hidden="true">${inner}</span>`;
   }
   el.trainBtn?.addEventListener('click', openTrain);
+  // a round's card is a div with the role of a button: Enter and Space press it, as they would a button
+  el.trainBody?.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.classList?.contains('aa-train-card')) { e.preventDefault(); e.target.click(); } });
+  $('.aa-sheet-head', el.trainSheet)?.addEventListener('click', e => { if (e.target.closest('[data-train-how]')) trainHowCard(); });
   // ← in a round or on its result: back to the list. ✕ on the list: out, as on every sheet.
   $('[data-close-sheet]', el.trainSheet)?.addEventListener('click', e => { if (el.trainSheet.classList.contains('is-playing')) { e.stopImmediatePropagation(); void trainBack(); } }, true);
   el.trainBody?.addEventListener('click', e => {
@@ -2797,24 +2947,41 @@
     // a drag that just ended is not a tap on whatever it ended over
     if (train.game?.dragEnd && performance.now() - train.game.dragEnd < 400) return;
     if ((train.game?.kind === 'r' || train.game?.kind === 'g') && e.target.closest('.aa-art-piece, .aa-art-slot, .aa-gal-piece, .aa-gal-slot')) return;   // pieces move by dragging, and by nothing else
-    if (e.target.closest('[data-train-howclose]')) { $('.aa-train-howcard', el.trainBody)?.remove(); return; }
+    if (e.target.closest('[data-train-howclose]') || e.target.classList.contains('aa-train-howcard')) { trainHowClose(); return; }
     if (e.target.closest('[data-train-hint]')) { void trainHint(); return; }
     const detail = e.target.closest('[data-detail]');
     if (detail && train.game?.kind === 'e') curatorAnswer(+detail.dataset.detail);
   });
   // The hint button of the round in hand: free once a day, then an advertisement the player chooses.
   const hintLabel = () => `\u{1F4A1} Hint${trainHintsLeft() > 0 ? '' : ads.isAd() ? ICON_AD : ''}`;
-  const hintBtnHtml = () => `${howBtnHtml()}<button type="button" class="aa-train-hint" data-train-hint>${hintLabel()}</button>`;
+  const hintBtnHtml = () => `<button type="button" class="aa-train-hint" data-train-hint aria-disabled="true">${hintLabel()}</button>`;
+  // The hint only when it would do something: never before Go, in a look, on hold, in the Curator's answer or
+  // after its one peek, or with nothing left to show -- the button says so (aria-disabled), and a press then
+  // spends nothing: not the day's free hint, not an advertisement, not the ten points.
+  function trainHintSync() {
+    const g = train.game, can = !!(g && g.canHint && g.canHint());
+    if (el.trainBody) $$('[data-train-hint]', el.trainBody).forEach(b => b.setAttribute('aria-disabled', String(!can)));
+  }
+  function trainHintDone() { if (el.trainBody) $$('[data-train-hint]', el.trainBody).forEach(b => { b.innerHTML = hintLabel(); }); trainHintSync(); }
   async function trainHint() {
     const g = train.game; if (!g || !g.hint || g.hintBusy) return;
+    if (!g.canHint()) { trainHintSync(); return; }
     if (trainHintsLeft() > 0) {
-      const t = trainDay(); t.h = (t.h | 0) + 1; store.set(trainKey(), t);
-      g.hints = (g.hints | 0) + 1; g.hint(); $$('[data-train-hint]', el.trainBody).forEach(b => { b.innerHTML = hintLabel(); });
+      // counted before it acts: a hint that finishes the round is in that round's score
+      g.hints = (g.hints | 0) + 1;
+      if (!g.hint()) { g.hints--; return; }
+      const day = train.day || dayKey(), t = trainDay(day); t.h = (t.h | 0) + 1; store.set(trainKey(day), t);
+      trainHintDone();
       return;
     }
-    g.hintBusy = true;
-    try { const got = await adOffer('trainhint', null, true); if (got && train.game === g) { g.hints = (g.hints | 0) + 1; g.hint(); } }
-    finally { if (train.game === g) g.hintBusy = false; }
+    // the advertisement: the round holds while it plays, and its hint lands after it (or at the end of the
+    // count-in, if the advertisement took the app into the background)
+    g.hintBusy = true; trainHold('ad');
+    let got = false;
+    try { got = await adOffer('trainhint', null, true); }
+    finally { g.hintBusy = false; if (got && train.game === g) g.hintOwed = true; trainRelease('ad'); }
+    if (train.game !== g) return;
+    if (el.trainSheet.classList.contains('is-playing')) musicBegin();   // the advertisement stopped the music, not the round
   }
   // Play: the day's free round, a round already unlocked today, or an advertisement first. The round counts
   // as played when it starts, not when it ends, so leaving one halfway is not a way round it.
@@ -2826,17 +2993,33 @@
     // Play next, and after midnight that is the new day's free puzzle -- no advertisement, and serial 0
     next = next && typeof trainDay()[id] === 'number';
     if (!trainFree(id, next)) {
+      const run = train.run;
       train.busy = true;
       try { const got = await adOffer('trainplay', null, true); if (!got) return; }
       finally { train.busy = false; }
+      train.owed[id] = dayKey();   // paid for: owed until the new puzzle is on the screen (trainBegun)
+      // watched through, but the player went meanwhile -- back to the list, or out of the sheet: no round starts
+      // behind their back (in a closed sheet, with its music and its coach), and the next Play next is free
+      if (el.trainSheet.hidden || train.run !== run) { if (!el.trainSheet.hidden && !el.trainSheet.classList.contains('is-playing')) renderTrain(); return; }
     }
     train.day = dayKey();   // the day this round belongs to, finished before midnight or after
-    const t = trainDay(); t.pp = t.pp && typeof t.pp === 'object' ? t.pp : {}; t.pp[id] = (t.pp[id] | 0) + 1; t.p = (t.p | 0) + 1;
-    if (next) { t.nx = t.nx && typeof t.nx === 'object' ? t.nx : {}; t.nx[id] = (t.nx[id] | 0) + 1; }
-    store.set(trainKey(), t);
-    train.serial = trainSerial(t, id);
-    trainStart(id);
+    train.serial = trainSerial(trainDay(train.day), id) + (next ? 1 : 0);   // a new puzzle is the next serial
+    trainStart(id, next);
   }
+  // A start counts once the round is on the screen -- not when it was asked for, so a round whose paintings
+  // would not come, or one left while they loaded, is not a round played: pp and p (from here on, leaving is not
+  // a way round anything), and for a new puzzle the round's serial (nx), settling the advertisement it was
+  // owed for.
+  function trainBegun(id, next) {
+    const day = train.day || dayKey(), t = trainDay(day);
+    t.pp = t.pp && typeof t.pp === 'object' ? t.pp : {}; t.pp[id] = (t.pp[id] | 0) + 1; t.p = (t.p | 0) + 1;
+    if (next) { t.nx = t.nx && typeof t.nx === 'object' ? t.nx : {}; t.nx[id] = Math.max(t.nx[id] | 0, train.serial | 0); delete train.owed[id]; }
+    store.set(trainKey(day), t);
+  }
+  // A replay deals its puzzle anew: the same painting (the same serial, so never a second level), a new deal --
+  // a new shuffle, new lies, new options, a new order on the wall -- salted with how many times the round has
+  // been started that day. The day's first start is unsalted, the same deal as everybody's.
+  const trainSalt = id => { const n = (trainDay(train.day || dayKey()).pp?.[id]) | 0; return n ? '-a' + n : ''; };
   const howHtml = id => { const r = TRAIN_ROUNDS.find(x => x.id === id); return `<ol class="aa-train-how">${r.how.map(h => `<li>${h}</li>`).join('')}</ol>`; };
   const howBtnHtml = () => '<button type="button" class="aa-train-info" data-train-how aria-label="How to play">?</button>';
 
@@ -2844,29 +3027,30 @@
   // The first time a round is opened it is taught the way the arrow board is: not a page of text but a
   // spotlight on the thing to touch, a card of one sentence, and -- where the move is a drag -- a hand that
   // makes the move over and over until the player makes it. The card never blocks the round; each step
-  // clears itself when the move it asked for is made (`wait`), or on Next. Once through, or skipped, it is
-  // not shown again (`trainHow:<id>`); the text version stays behind the ? in the round's bar.
+  // clears itself when the move it asked for is made (`wait`: such a step has no Next, only Skip), or on Next.
+  // It starts when the round's play does -- after Go, and after the look, which is the round's own and is not
+  // spent reading (the count-in says what the look is for) -- and a round played to its end has been learned,
+  // whatever card was showing. Once through, or skipped, it is not shown again (`trainHow:<id>`); the text
+  // version stays behind the ? beside the round's name. Its numbers are the round's own, read off its level
+  // (`p`, tierParams): three patches or five, 1:30 or 3:20.
   const TRAIN_COACH = {
     r: [
-      { title: 'Look at the painting', body: 'It hangs whole for four seconds. Then it comes apart.', target: () => $('#aaCanvasSlots', el.trainBody), wait: 'play' },
-      { title: 'Drag it home', body: 'Press a piece and drag it into the frame, to the place it belongs.', target: () => $('#aaCanvasTray .aa-art-piece:not([hidden])', el.trainBody), hand: () => [$('#aaCanvasTray .aa-art-piece:not([hidden])', el.trainBody), $(`[data-slot="${$('#aaCanvasTray .aa-art-piece:not([hidden])', el.trainBody)?.dataset.tile}"]`, el.trainBody)], wait: 'placed' },
-      { title: 'Now the rest', body: 'Every piece home wins the round. A wrong try costs a little, so does time over 90 seconds. Hint puts one piece home for you.', target: () => $('#aaCanvasSlots', el.trainBody) },
+      { title: 'Drag it home', body: 'Press a piece and drag it into the frame, to the place it belongs.', target: () => $('#aaCanvasTray .aa-art-piece:not([hidden])', el.trainBody), keep: () => $('#aaCanvasTray', el.trainBody), hand: () => [$('#aaCanvasTray .aa-art-piece:not([hidden])', el.trainBody), $(`[data-slot="${$('#aaCanvasTray .aa-art-piece:not([hidden])', el.trainBody)?.dataset.tile}"]`, el.trainBody)], wait: 'placed' },
+      { title: 'Now the rest', body: p => `Every piece home wins the round. A piece in the wrong place costs a little, so does time past ${fmtTime(p.allow * 1000)}. Hint puts one piece home for you.`, target: () => $('#aaCanvasSlots', el.trainBody), keep: () => $('#aaCanvasTray', el.trainBody) },
     ],
     f: [
-      { title: 'Find what is wrong', body: 'Three patches of this copy are not in the original: one mirrored, one recoloured, one from elsewhere. Tap the first one you spot.', target: () => $('#aaForgeCopy', el.trainBody), wait: 'found' },
-      { title: 'Two more', body: 'A tap on nothing costs a little. Hint circles one for you.', target: () => $('.aa-train-hud', el.trainBody) },
+      { title: 'Find what is wrong', body: p => `${numWord(p.lies, true)} patches of this copy are not in the original: mirrored, recoloured, or from elsewhere in the painting. Tap the first one you spot.`, target: () => $('#aaForgeCopy', el.trainBody), wait: 'found' },
+      { title: p => `${numWord(p.lies - 1, true)} more`, body: 'A tap on nothing costs a little. Hint circles one for you.', target: () => $('.aa-train-hud', el.trainBody) },
     ],
     g: [
-      { title: 'Remember the order', body: 'The paintings hang here for a few seconds, numbered. Remember which is first, second, third…', target: () => $('#aaGalleryRow', el.trainBody), wait: 'play' },
-      { title: 'Hang them back', body: 'Drag each painting to the number it hung at. When every place is filled, the wrong ones are marked: move them.', target: () => $('#aaGalleryTray', el.trainBody), hand: () => [$('#aaGalleryTray .aa-gal-piece[data-pick="0"]', el.trainBody), $('.aa-gal-slot[data-slot="0"]', el.trainBody)], wait: 'placed' },
+      { title: 'Hang them back', body: 'Drag each painting to the number it hung at. When every place is filled, the wrong ones are marked: move them.', target: () => $('#aaGalleryTray', el.trainBody), keep: () => $('#aaGallerySlots', el.trainBody), hand: () => [$('#aaGalleryTray .aa-gal-piece[data-pick="0"]', el.trainBody), $('.aa-gal-slot[data-slot="0"]', el.trainBody)], wait: 'placed' },
     ],
     e: [
-      { title: 'Look closely', body: 'Six seconds. The corners as much as the middle.', target: () => $('#aaCurator', el.trainBody), wait: 'ask' },
-      { title: 'Which is from it?', body: 'One of these four is a detail of that painting. Tap it. Three times over.', target: () => $('.aa-curator-opts', el.trainBody) },
+      { title: 'Which is from it?', body: p => `One of these four is a detail of the painting you just saw. Tap it. ${numWord(p.q, true)} times over.`, target: () => $('.aa-curator-opts', el.trainBody), wait: 'answer' },
     ],
   };
-  const tcoach = { on: false, id: '', step: 0, box: null, anim: null };
-  function trainCoachStart(id) {
+  const tcoach = { on: false, id: '', step: 0, box: null, anim: null, p: null };
+  function trainCoachStart(id, p) {
     if (store.get('trainHow:' + id) || !TRAIN_COACH[id] || !el.trainSheet) return;
     trainCoachEnd(false);
     const box = document.createElement('div'); box.className = 'aa-coach aa-train-coach';
@@ -2874,28 +3058,41 @@
       <div class="aa-coach-card" role="dialog" aria-modal="false"><p class="aa-coach-step"></p><h3></h3><p class="aa-coach-body"></p>
       <div class="aa-coach-actions"><button type="button" class="aa-linkbtn" data-tc="skip">Skip</button><button type="button" class="aa-btn aa-btn--primary" data-tc="next">Next</button></div></div>`;
     box.addEventListener('click', e => { const a = e.target.closest('[data-tc]')?.dataset.tc; if (a === 'skip') trainCoachEnd(true); else if (a === 'next') trainCoachShow(tcoach.step + 1); });
+    box.hidden = train.paused;   // a round on hold shows its coach when it comes back
     document.body.appendChild(box);
-    Object.assign(tcoach, { on: true, id, step: 0, box });
+    Object.assign(tcoach, { on: true, id, step: 0, box, p: p || tierParams(id) });
     trainCoachShow(0);
   }
   function trainCoachShow(n) {
     const steps = TRAIN_COACH[tcoach.id]; if (!tcoach.on || !steps) return;
     if (n >= steps.length) { trainCoachEnd(true); return; }
-    tcoach.step = n; const st = steps[n], box = tcoach.box;
-    $('.aa-coach-step', box).textContent = `Step ${n + 1} of ${steps.length}`;
-    $('h3', box).textContent = st.title; $('.aa-coach-body', box).textContent = st.body;
-    $('[data-tc="next"]', box).textContent = n === steps.length - 1 ? 'Got it' : 'Next';
+    tcoach.step = n; const st = steps[n], box = tcoach.box, say = v => typeof v === 'function' ? v(tcoach.p) : v;
+    const stepLine = $('.aa-coach-step', box); stepLine.textContent = `Step ${n + 1} of ${steps.length}`; stepLine.hidden = steps.length < 2;
+    $('h3', box).textContent = say(st.title); $('.aa-coach-body', box).textContent = say(st.body);
+    // a step waiting for a move has no Next: the move is the way on (Skip is still there)
+    const next = $('[data-tc="next"]', box); next.textContent = n === steps.length - 1 ? 'Got it' : 'Next'; next.hidden = !!st.wait;
     trainCoachPlace();
   }
   function trainCoachPlace() {
     const steps = TRAIN_COACH[tcoach.id]; if (!tcoach.on || !steps) return;
     const st = steps[tcoach.step], box = tcoach.box, spot = $('.aa-coach-spot', box), hand = $('.aa-hand', box);
-    const t = st.target?.(), r = t?.getBoundingClientRect?.();
+    // measured in the page's own coordinates (rectOf): a phone browser held sideways turns the page, not the glass
+    const t = st.target?.(), r = t ? rectOf(t) : null;
     if (!r || !r.width) spot.classList.add('is-none');
     else { spot.classList.remove('is-none'); const pad = 10; spot.style.left = `${r.left - pad}px`; spot.style.top = `${r.top - pad}px`; spot.style.width = `${r.width + pad * 2}px`; spot.style.height = `${r.height + pad * 2}px`; }
+    // The card sits at the bottom unless it would cover what it points at (and what the step keeps clear, where
+    // the move is made: the tray, the numbered places); then at the top if it covers less of it there -- just
+    // under the sheet's head, so the ← to leave the round is never under it. A small screen has room for
+    // neither, and gets the lesser overlap; a piece carried under the card sees through it (body.aa-dragging).
+    const H = turn.dir ? document.body.offsetHeight : window.innerHeight, card = $('.aa-coach-card', box), cardH = card.offsetHeight || 170;
+    const head = el.trainSheet && $('.aa-sheet-head', el.trainSheet), headB = head ? rectOf(head).bottom : 0;
+    const k = st.keep?.(), kr = k ? rectOf(k) : null, keepT = Math.min(r?.width ? r.top : Infinity, kr?.width ? kr.top : Infinity), keepB = Math.max(r?.width ? r.bottom : -Infinity, kr?.width ? kr.bottom : -Infinity);
+    const overBottom = keepB + 16 + cardH - H, overTop = headB + 6 + cardH - keepT;
+    const top = Number.isFinite(keepT) && overBottom > 0 && overTop < overBottom;
+    card.classList.toggle('is-top', top); card.style.top = top ? `${Math.round(headB + 6)}px` : '';
     // the hand: from the thing to press to the place it goes, again and again, until the player does it
     if (tcoach.anim) { tcoach.anim.cancel(); tcoach.anim = null; }
-    const pair = st.hand?.(), a = pair?.[0]?.getBoundingClientRect?.(), b = pair?.[1]?.getBoundingClientRect?.();
+    const pair = st.hand?.(), a = pair?.[0] ? rectOf(pair[0]) : null, b = pair?.[1] ? rectOf(pair[1]) : null;
     if (!a || !b || !a.width || !b.width || calmer()) { hand.hidden = true; return; }
     hand.hidden = false;
     const from = [a.left + a.width / 2 - 20, a.top + a.height / 2 - 20], to = [b.left + b.width / 2 - 20, b.top + b.height / 2 - 20];
@@ -2908,13 +3105,19 @@
       { transform: `translate(${to[0]}px, ${to[1]}px) scale(1)`, opacity: 0, offset: 1 },
     ], { duration: 2200, iterations: Infinity, easing: 'ease-in-out' });
   }
-  // a round reporting a move: the step that was waiting for it clears
-  function trainCoachEvent(kind) { const st = TRAIN_COACH[tcoach.id]?.[tcoach.step]; if (tcoach.on && st?.wait === kind) trainCoachShow(tcoach.step + 1); }
+  // a round reporting a move: the step that was waiting for it clears; the last card, which waits for nothing,
+  // goes with the next move (the player is playing, not reading); any other step follows what moved, so the
+  // spotlight is never on a piece that has gone
+  function trainCoachEvent(kind) {
+    if (!tcoach.on) return;
+    const steps = TRAIN_COACH[tcoach.id], st = steps?.[tcoach.step];
+    if (st?.wait === kind || (st && !st.wait && tcoach.step === steps.length - 1)) trainCoachShow(tcoach.step + 1); else trainCoachPlace();
+  }
   function trainCoachEnd(done) {
     if (tcoach.anim) { tcoach.anim.cancel(); tcoach.anim = null; }
     if (tcoach.box) tcoach.box.remove();
     if (done && tcoach.id) store.set('trainHow:' + tcoach.id, 1);
-    Object.assign(tcoach, { on: false, id: '', step: 0, box: null });
+    Object.assign(tcoach, { on: false, id: '', step: 0, box: null, p: null });
   }
   window.addEventListener('resize', () => { if (tcoach.on) trainCoachPlace(); });
   // A round fits the screen. Whatever a round draws under its line gets the room left below it and no more:
@@ -2949,7 +3152,7 @@
     } else if (g.kind === 'r') {
       const slots = $('#aaCanvasSlots', box), tray = $('#aaCanvasTray', box); if (!slots || !tray) return;
       // measured under the line the round will carry once the pieces are down, which is the longer one
-      const line = $('#aaCanvasLine', box), look = g.phase === 'show' ? line?.textContent : null;
+      const line = $('#aaCanvasLine', box), look = g.phase !== 'play' ? line?.textContent : null;
       if (look != null && line) line.textContent = CANVAS_PLAY_LINE;
       const W = box.clientWidth, r = room(slots), N = g.n * g.n, MIN = 30, FMIN = Math.min(W, g.n * 36 + (g.n - 1) * 2 + 4);   // a place under 36 px is too small to drop on
       if (look != null && line) line.textContent = look;
@@ -2982,38 +3185,60 @@
   function trainRefit() { if (!train.game) return; trainFit(); if (tcoach.on) trainCoachPlace(); }
   window.addEventListener('resize', () => requestAnimationFrame(trainRefit));
   document.fonts?.ready?.then?.(trainRefit);
+  // The rules of the round in hand, over it (from the ? beside its name); the round holds while they are read.
+  // It hangs off the sheet's body, not the round's box, which the round redraws while its paintings come in.
   function trainHowCard() {
-    const g = train.game; if (!g) return;
-    $('.aa-train-howcard', el.trainBody)?.remove();
-    const card = document.createElement('div'); card.className = 'aa-train-howcard';
-    card.innerHTML = `<div class="aa-train-howcard-in"><h3>${TRAIN_ROUNDS.find(x => x.id === g.kind).name}</h3>${howHtml(g.kind)}<button type="button" class="aa-btn aa-btn--primary" data-train-howclose>Got it</button></div>`;
-    $('#aaTrainGame', el.trainBody)?.appendChild(card);
+    const id = train.game?.kind || train.id, r = TRAIN_ROUNDS.find(x => x.id === id), box = el.trainBody;
+    if (!r || !box || !$('#aaTrainGame', box)) return;
+    trainHowClose();
+    const card = document.createElement('div'); card.className = 'aa-train-howcard'; card.setAttribute('role', 'dialog'); card.setAttribute('aria-label', r.name);
+    card.innerHTML = `<div class="aa-train-howcard-in"><h3>${r.name}</h3>${howHtml(id)}<button type="button" class="aa-btn aa-btn--primary" data-train-howclose>Got it</button></div>`;
+    box.appendChild(card); trainHold('how');
+    $('[data-train-howclose]', card)?.focus({ preventScroll: true });
   }
-  function trainStart(id) {
+  // the rules card, closed; whether one was open (Back and Escape close it before anything else)
+  function trainHowClose() {
+    const c = el.trainBody && $('.aa-train-howcard', el.trainBody); if (!c) return false;
+    c.remove(); trainRelease('how'); return true;
+  }
+  // A round begins: whatever was running stops, the list goes, the sheet is the whole screen with the round's
+  // name at its head, and the round's own start runs with a fresh token (train.run), which every await in it
+  // checks -- a round left while its paintings loaded, and another one started, never runs twice.
+  function trainStart(id, next = false) {
+    if (!el.trainSheet || el.trainSheet.hidden) return;   // the sheet went while an advertisement played
+    trainStop();
     if (!$('#aaTrainGame', el.trainBody)) renderTrain();
     const box = $('#aaTrainGame', el.trainBody); if (!box) return;
     $$('.aa-train-top, .aa-train-line, .aa-train-rounds, .aa-sheet-note', el.trainBody).forEach(n => { n.hidden = true; });
     box.hidden = false;
-    trainScreen(true);
-    if (id === 'r') void canvasStart(box); else if (id === 'f') void (async () => { if (await needArt(box) && el.trainSheet.classList.contains('is-playing')) forgeryStart(box); })(); else if (id === 'g') void galleryStart(box); else if (id === 'e') void curatorStart(box);
+    train.id = id; trainScreen(true); trainHead(id);
+    const run = ++train.run;
+    void ({ r: canvasStart, f: forgeryStart, g: galleryStart, e: curatorStart })[id](box, run, next);
   }
   const hintCost = g => (g.hints | 0) * 10;
+  const dayWord = day => day === dayKey() ? 'today' : day === dayKeyBack(1) ? 'yesterday' : 'on ' + day;
   function trainFinish(kind, score, lines, work = null, works = null) {
-    trainStop(); const fresh = trainSave(kind, score);
+    if (tcoach.on && tcoach.id === kind) trainCoachEnd(true);   // played to its end: learned, whatever card was up
+    trainStop(); const pass = clamp100(score) >= TRAIN_PASS, fresh = trainSave(kind, score);
+    trainHead('');
     const lvl = fresh ? levelNo(-1) - 1 : 0;   // the level this clear was: the latest on the main count
     const box = $('#aaTrainGame', el.trainBody); if (!box) return;
-    const t = trainDay(train.day || dayKey());   // the round's own day, if it was finished after midnight
+    const day = train.day || dayKey(), t = trainDay(day);   // the round's own day, if it was finished after midnight
+    // under the pass the way on is the same puzzle again, dealt anew: that button leads
+    const nextBtn = `<button type="button" class="aa-btn ${pass ? 'aa-btn--primary' : 'aa-btn--soft'}${ads.isAd() ? ' aa-btn--ad' : ''}" data-train="${kind}" data-train-mode="next">Play next${ads.isAd() && !trainOwed(kind) ? ICON_AD : ICON_NEXT}</button>`;
+    const againBtn = `<button type="button" class="aa-btn ${pass ? 'aa-btn--soft' : 'aa-btn--primary'}" data-train="${kind}" data-train-mode="again">${ICON_AGAIN}Play again</button>`;
     // the painting's name, painter and source sit behind a ? -- there for whoever wants them, in nobody's way
     const credit = work ? artCredit(work) : works ? `<p class="aa-art-credit">${works.map((w, i) => `${i + 1}. <b>${escapeHtml(w.title)}</b> \u2014 ${escapeHtml(w.artist)}`).join('<br>')}<br>The Met, public domain</p>` : '';
     box.innerHTML = `<div class="aa-train-res">
       <p class="aa-card-kicker">${TRAIN_ROUNDS.find(r => r.id === kind).name}${lvl ? ` <b class="aa-train-lv">Level ${lvl}</b>` : ''}${credit ? ' <button type="button" class="aa-train-info" data-train-info aria-label="About the painting" aria-expanded="false">?</button>' : ''}</p>
-      <p class="aa-train-big">${clamp100(score)}</p>
+      <p class="aa-train-big${pass ? '' : ' is-short'}">${clamp100(score)}</p>
       <p class="aa-train-sub">${lines}</p>
+      ${pass ? '' : `<p class="aa-train-sub aa-train-short">Score ${TRAIN_PASS} or more to clear this puzzle. Play it again: it is dealt anew.</p>`}
       ${credit.replace('<p class="aa-art-credit">', '<p class="aa-art-credit" hidden>')}
-      ${(() => { const n = TRAIN_ROUNDS.filter(r => typeof t[r.id] === 'number').length; return (n > 1 ? `<p class="aa-train-sub"><b>Brain Score today: ${trainScore(t)}</b></p>` : '') + `<p class="aa-train-sub aa-train-ok">\u2713 ${trainTally(t, trainStreak(), true)}</p>`; })()}
-      <div class="aa-actions aa-actions--stack"><button type="button" class="aa-btn aa-btn--primary${ads.isAd() ? ' aa-btn--ad' : ''}" data-train="${kind}" data-train-mode="next">Play next${ads.isAd() ? ICON_AD : ICON_NEXT}</button><button type="button" class="aa-btn aa-btn--soft" data-train="${kind}" data-train-mode="again">${ICON_AGAIN}Play again</button></div>
+      ${(() => { const n = TRAIN_ROUNDS.filter(r => typeof t[r.id] === 'number').length; return (n > 1 ? `<p class="aa-train-sub"><b>Brain Score ${dayWord(day)}: ${trainScore(t)}</b></p>` : '') + `<p class="aa-train-sub aa-train-ok">\u2713 ${trainTally(t, trainStreak(), true)}</p>`; })()}
+      <div class="aa-actions aa-actions--stack">${pass ? nextBtn + againBtn : againBtn + nextBtn}</div>
     </div>`;
-    SFX.win(); vibe(20);
+    if (pass) { SFX.win(); vibe(20); } else { SFX.lose(); vibe([0, 40, 60, 40]); }
   }
 
   // ── The gallery rounds: real paintings, public domain ──
@@ -3030,6 +3255,105 @@
     if (ART) return true;
     box.innerHTML = '<p class="aa-sheet-note">Opening the gallery…</p>';
     try { await loadArt(); return true; } catch { box.innerHTML = '<p class="aa-sheet-note">The gallery could not be loaded. Check the connection and try again.</p><div class="aa-actions aa-actions--stack"><button type="button" class="aa-btn aa-btn--soft" data-train-back>Back</button></div>'; return false; }
+  }
+  // The paintings of a round, fetched and decoded before it starts (new Image, decode): the count-in, the look
+  // and the clock never run over an empty frame, and the Curator's four details all arrive before its painting
+  // is shown -- on a slow line the right one, already here from the look, used to be the first to appear. A
+  // painting still not in after ART_WAIT_MS is waited for no longer: the round starts and it fills in when it
+  // comes. The box says what the wait is, after a moment, so paintings already here do not flash a line.
+  // Answers each work's image (null for one that did not come), or null if the round went meanwhile.
+  const ART_WAIT_MS = 7000;
+  async function artReady(box, run, works) {
+    const slow = setTimeout(() => { if (train.run === run) box.innerHTML = '<p class="aa-sheet-note">Hanging the paintings\u2026</p>'; }, 200);
+    const imgs = works.map(w => { const i = new Image(); i.decoding = 'async'; i.src = w.file; return i; });
+    const one = i => (i.decode ? i.decode() : new Promise((ok, no) => { i.onload = ok; i.onerror = no; })).catch(() => {});
+    await Promise.race([Promise.all(imgs.map(one)), new Promise(r => setTimeout(r, ART_WAIT_MS))]);
+    clearTimeout(slow);
+    if (train.run !== run) return null;
+    return new Map(works.map((w, k) => [w, imgs[k].complete && imgs[k].naturalWidth ? imgs[k] : null]));
+  }
+  // ── Where a lie can be seen ──
+  // A painting read small (48 px across) once it is in, so a patch can be judged before it is used: a mirrored
+  // patch of plain sky, a recoloured patch of brown shadow, or a patch "from elsewhere" that looks like the
+  // spot it covers is a lie nobody can find, and a close-up of nothing is a question nobody can answer. The
+  // works are this site's own, so the canvas can be read; where it cannot, every spot will do, as before.
+  function artSample(img) {
+    if (!img || !img.naturalWidth) return null;
+    try {
+      const W = 48, H = Math.max(8, Math.round(W * img.naturalHeight / img.naturalWidth));
+      const c = document.createElement('canvas'); c.width = W; c.height = H;
+      const x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(img, 0, 0, W, H);
+      return { W, H, d: x.getImageData(0, 0, W, H).data };
+    } catch { return null; }
+  }
+  // a patch (px, py, s wide, sy tall, in fractions of the whole) as a grid of colours, mirrored if asked
+  function patchPix(S, px, py, s, sy = s, flip = false) {
+    const n = 6, out = [];
+    for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
+      const fx = px + ((flip ? n - 1 - i : i) + 0.5) / n * s, fy = py + (j + 0.5) / n * sy;
+      const x = Math.max(0, Math.min(S.W - 1, Math.floor(fx * S.W))), y = Math.max(0, Math.min(S.H - 1, Math.floor(fy * S.H))), k = (y * S.W + x) * 4;
+      out.push([S.d[k], S.d[k + 1], S.d[k + 2]]);
+    }
+    return out;
+  }
+  // how much there is to see in a patch: the spread of its light (0-255)
+  const patchSd = P => { const L = P.map(([r, g, b]) => 0.299 * r + 0.587 * g + 0.114 * b), m = L.reduce((a, v) => a + v, 0) / L.length; return Math.sqrt(L.reduce((a, v) => a + (v - m) * (v - m), 0) / L.length); };
+  // how different two patches look: the mean difference of a colour channel (0-255)
+  const patchDiff = (A, B) => A.reduce((a, p, k) => a + Math.abs(p[0] - B[k][0]) + Math.abs(p[1] - B[k][1]) + Math.abs(p[2] - B[k][2]), 0) / (3 * A.length);
+  // a patch through the recolouring lie's own filter (hue-rotate, then saturate 1.25, the CSS matrices)
+  function patchHue(P, deg) {
+    const c = Math.cos(deg * Math.PI / 180), s = Math.sin(deg * Math.PI / 180), k = 1.25;
+    const h = [0.213 + c * 0.787 - s * 0.213, 0.715 - c * 0.715 - s * 0.715, 0.072 - c * 0.072 + s * 0.928, 0.213 - c * 0.213 + s * 0.143, 0.715 + c * 0.285 + s * 0.140, 0.072 - c * 0.072 - s * 0.283, 0.213 - c * 0.213 - s * 0.787, 0.715 - c * 0.715 + s * 0.715, 0.072 + c * 0.928 + s * 0.072];
+    const t = [0.213 + 0.787 * k, 0.715 - 0.715 * k, 0.072 - 0.072 * k, 0.213 - 0.213 * k, 0.715 + 0.285 * k, 0.072 - 0.072 * k, 0.213 - 0.213 * k, 0.715 - 0.715 * k, 0.072 + 0.928 * k];
+    const mul = (m, [r, g, b]) => [m[0] * r + m[1] * g + m[2] * b, m[3] * r + m[4] * g + m[5] * b, m[6] * r + m[7] * g + m[8] * b].map(v => Math.max(0, Math.min(255, v)));
+    return P.map(p => mul(t, mul(h, p)));
+  }
+  // How plainly a lie shows: how different the copy looks from the original at its spot. The three kinds, in
+  // turn: 0 mirrored, 1 recoloured, 2 taken from elsewhere (q.from).
+  function lieSeen(S, q, kind, s, hue) {
+    const P = patchPix(S, q.px, q.py, s);
+    if (kind === 0) return patchDiff(P, patchPix(S, q.px, q.py, s, s, true));
+    if (kind === 1) return patchDiff(P, patchHue(P, hue));
+    return patchDiff(P, patchPix(S, q.from.px, q.from.py, s));
+  }
+  // The copy's lies: n spots apart from each other (1.2 patches, as before), each a lie that shows: at least
+  // LIE_SEEN[kind] (else the plainest of LIE_TRIES spots). The bars are set on the gallery itself, at about the
+  // flattest fifth of random spots of each kind (mirrored, recoloured, from elsewhere), so only the lies
+  // nobody could see are refused and a subtle one is still subtle. A patch "from elsewhere" comes from at least
+  // 1.5 patches away, so it never half covers its own spot.
+  const LIE_SEEN = [8, 6, 16], LIE_TRIES = 60;
+  function forgeLies(S, rnd, n, s, hue) {
+    const at = () => 0.05 + rnd() * (0.9 - s), spots = [];
+    const apart = q => spots.every(o => Math.abs(o.px - q.px) > s * 1.2 || Math.abs(o.py - q.py) > s * 1.2);
+    for (let i = 0; i < n; i++) {
+      const kind = i % 3; let best = null;
+      for (let k = 0; k < LIE_TRIES; k++) {
+        const q = { px: at(), py: at() }; if (!apart(q)) continue;
+        if (kind === 2) { for (let m = 0; m < 30 && !q.from; m++) { const f = { px: at(), py: at() }; if (Math.hypot(f.px - q.px, f.py - q.py) >= 1.5 * s) q.from = f; } if (!q.from) continue; }
+        q.seen = S ? lieSeen(S, q, kind, s, hue) : Infinity;
+        if (!best || q.seen > best.seen) best = q;
+        if (q.seen >= LIE_SEEN[kind]) break;
+      }
+      if (best) spots.push(best);
+    }
+    // the three kinds of lie, round and round: a fourth lie is mirrored again, a fifth recoloured again
+    return spots.map((q, i) => i % 3 === 0 ? { px: q.px, py: q.py, extra: 'transform:scaleX(-1)' } : i % 3 === 1 ? { px: q.px, py: q.py, extra: `filter:hue-rotate(${hue}deg) saturate(1.25)` } : { px: q.px, py: q.py, from: q.from });
+  }
+  // A close-up for the Curator: a square of the painting as it hangs (s of its width, as much of its height as
+  // makes a square: sy), somewhere with something in it (a spread of light of DETAIL_SEEN or more, which
+  // refuses about the flattest eighth of the gallery's details; else the busiest of DETAIL_TRIES).
+  const DETAIL_SEEN = 10, DETAIL_TRIES = 24;
+  function curatorPatch(w, s, rnd, S) {
+    let sx = s, sy = s * w.w / w.h;
+    if (sy > 0.9) { sx = s * 0.9 / sy; sy = 0.9; }   // a very wide painting: a smaller square, still square
+    let best = null;
+    for (let k = 0; k < DETAIL_TRIES; k++) {
+      const c = { w, s: sx, sy, px: 0.05 + rnd() * (0.9 - sx), py: 0.05 + rnd() * Math.max(0, 0.9 - sy) };
+      c.seen = S ? patchSd(patchPix(S, c.px, c.py, sx, sy)) : Infinity;
+      if (!best || c.seen > best.seen) best = c;
+      if (c.seen >= DETAIL_SEEN) break;
+    }
+    return best;
   }
   // ── Which paintings, for whom ──
   // The gallery starts where the player is, the way the tour does. Every work carries the country it comes
@@ -3058,11 +3382,45 @@
     const km = w => { const C = at(w.cc); return C ? kmBetween(H.c, C.c) : 20000; };
     return ART.works.map(w => ({ w, t: tier(w), d: km(w) })).sort((a, b) => a.t - b.t || a.d - b.d).map(x => x.w);
   }
-  // how many training days this device has seen, today included: the window of the gallery open to it
+  // how many training days this device has seen, today included whether or not it is played yet (a round is
+  // counted once it is on the screen, and the window must not move between a first play and its replay): the
+  // window of the gallery open to it
   function trainDays() {
-    let n = 0;
-    try { for (const k of Object.keys(localStorage)) if (k.startsWith(STORE + 'train:')) n++; } catch { /* none */ }
-    return Math.max(1, n);
+    const today = STORE + trainKey(train.day || dayKey()); let n = 0;
+    try { for (const k of Object.keys(localStorage)) if (k.startsWith(STORE + 'train:') && k !== today) n++; } catch { /* none */ }
+    return n + 1;
+  }
+  const shuffleBy = (a, rnd) => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+  // ── The day's paintings ──
+  // No painting hangs twice in a day while the gallery has one not yet seen. The day has one order of works:
+  // the player's window (above) shuffled by the day, then the works past it, nearest first. Each puzzle of the
+  // day (a serial: 0 the free one, then each Play next) takes the next of them in a fixed order -- the canvas,
+  // the forgery, the curator's painting, then the gallery's wall -- so a puzzle hangs the same paintings
+  // whenever it is played, on every device with the same history, and its replays deal those same paintings
+  // anew (trainSalt). The window itself holds still all day (trainDays); later puzzles reach past it.
+  let artDayMemo = null;
+  function artDay(day) {
+    const home = store.get('home', null) || '', ranked = artRanked(), win = Math.min(ranked.length, 14 + 7 * (trainDays() - 1));
+    const key = [day, home, win, ranked.length].join('|');
+    if (artDayMemo?.key === key) return artDayMemo;
+    const seq = shuffleBy(ranked.slice(0, win), mulberry32(hashStr('aa-art-day-' + home + '-' + day))).concat(ranked.slice(win));
+    return (artDayMemo = { key, seq, win });
+  }
+  // the works shown whole in a puzzle of the day: one each for the canvas, the forgery and the curator, then
+  // the gallery's wall (as many as its level hangs)
+  function artMains(day, serial) {
+    const { seq } = artDay(day), n = tierParams('g').n, at = k => seq[k % seq.length], o = serial * (3 + n);
+    return { r: at(o), f: at(o + 1), e: at(o + 2), g: Array.from({ length: n }, (_, i) => at(o + 3 + i)) };
+  }
+  // the Curator's other paintings, whose details stand beside the right one: none of the day's works shown
+  // whole so far, the window's first (shuffled by the puzzle and its replay), then the nearest past it
+  function artOthers(day, serial, n, main, salt = '') {
+    const { seq, win } = artDay(day), seen = new Set([main]);
+    for (let s = 0; s <= serial; s++) { const m = artMains(day, s); [m.r, m.f, m.e, ...m.g].forEach(w => seen.add(w)); }
+    const near = shuffleBy(seq.slice(0, win).filter(w => !seen.has(w)), mulberry32(hashStr('aa-art-others-' + day + '-' + serial + salt)));
+    const out = near.concat(seq.slice(win).filter(w => !seen.has(w))).slice(0, n);
+    for (const w of seq) { if (out.length >= n) break; if (w !== main && !out.includes(w)) out.push(w); }   // a gallery all but seen
+    return out;
   }
   function artPicks(n, salt) {
     const home = store.get('home', null) || '';
@@ -3075,59 +3433,92 @@
   const artCredit = w => `<p class="aa-art-credit"><b>${escapeHtml(w.title)}</b><br>${escapeHtml(w.artist)}${w.date ? ', ' + escapeHtml(w.date) : ''} · The Met, public domain</p>`;
   // a whole painting, at its own proportions
   const artFrame = (w, cls = '', inner = '', attrs = '') => `<div class="aa-art ${cls}" style="aspect-ratio:${w.w}/${w.h};background-image:url('${w.file}')" ${attrs}>${inner}</div>`;
-  // one patch of a painting: the square (px, py, s) of it, in fractions of the whole, drawn at any size
-  const artPatch = (w, px, py, s, cls = '', extra = '', attrs = '') => `<span class="aa-art-patch ${cls}" style="background-image:url('${w.file}');background-size:${(100 / s).toFixed(2)}% ${(100 / s).toFixed(2)}%;background-position:${(100 * px / (1 - s)).toFixed(2)}% ${(100 * py / (1 - s)).toFixed(2)}%;${extra}" ${attrs}></span>`;
+  // one patch of a painting: (px, py) and s of its width, sy of its height (s unless given), in fractions of
+  // the whole, drawn at any size. The Forgery's patches keep s both ways (its box has the painting's shape);
+  // the Curator's square close-ups pass the sy that makes the patch square on the painting, so a detail is
+  // not squashed or stretched by a wide or a tall work.
+  const artPatch = (w, px, py, s, cls = '', extra = '', attrs = '', sy = s) => `<span class="aa-art-patch ${cls}" style="background-image:url('${w.file}');background-size:${(100 / s).toFixed(2)}% ${(100 / sy).toFixed(2)}%;background-position:${(100 * px / (1 - s)).toFixed(2)}% ${(100 * py / (1 - sy)).toFixed(2)}%;${extra}" ${attrs}></span>`;
 
-  // Restore the Canvas: a painting in nine pieces. Tap a piece, tap where it goes.
-  async function canvasStart(box) {
-    if (!(await needArt(box)) || !el.trainSheet.classList.contains('is-playing')) return;   // left while the paintings loaded
-    const w = artPicks(1, 'canvas')[0], { n, allow } = tierParams('r');
-    const rnd = mulberry32(hashStr('aa-canvas-deal-' + dayKey() + '-' + train.serial));
-    const tray = Array.from({ length: n * n }, (_, i) => i); for (let i = tray.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [tray[i], tray[j]] = [tray[j], tray[i]]; }
+  // ── A round's bar ──
+  // The level finishing this puzzle will be, then what is happening now, in words and with a mark -- never a
+  // bare number beside the level: the look (an eye, "Look 3s", and a bar under the row draining with it), the
+  // clock against the round's allowance ("0:12 / 1:30": how long before time costs anything), or how far along
+  // the round is ("2 of 5 placed", "Question 1 of 3") -- and the hint. The round's name, and the ? with its
+  // rules, are the sheet's head (trainHead). Every round ticks at TRAIN_TICK and skips while it is on hold.
+  const TRAIN_TICK = 200;
+  const ICON_EYE = ICO('<path d="M2.5 12s3.5-6.5 9.5-6.5 9.5 6.5 9.5 6.5-3.5 6.5-9.5 6.5S2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/>');
+  const ICON_CLOCK = ICO('<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>');
+  const trainHud = id => `<div class="aa-train-hud">${levelChip(id)}<span class="aa-train-stat" id="aaTrainStat"></span><span class="aa-train-drain" hidden><i></i></span>${hintBtnHtml()}</div>`;
+  function trainStat(html) { const s = el.trainBody && $('#aaTrainStat', el.trainBody); if (s && s.dataset.v !== html) { s.dataset.v = html; s.innerHTML = html; } }
+  // the look: its seconds, and the bar draining with them; answers what is left of it (ms)
+  function trainLook(g) {
+    const left = Math.max(0, g.showUntil - performance.now());
+    trainStat(`${ICON_EYE}<span>Look <b>${Math.ceil(left / 1000)}s</b></span>`);
+    const d = $('.aa-train-drain', el.trainBody); if (d) { d.hidden = false; d.firstElementChild.style.width = `${(100 * left / g.look).toFixed(1)}%`; }
+    return left;
+  }
+  const trainLookEnd = () => { const d = el.trainBody && $('.aa-train-drain', el.trainBody); if (d) d.hidden = true; };
+  const trainClock = g => trainStat(`${ICON_CLOCK}<span><b>${fmtTime(performance.now() - g.t0)}</b> / ${fmtTime(g.allow * 1000)}</span>`);
+
+  // Restore the Canvas: a painting in pieces. It hangs whole for a moment, then falls into the tray; drag each
+  // piece home. Every round starts the same way: the gallery, then its paintings in (artReady), the round
+  // drawn under the count-in's veil, and only at Go its look or its clock -- with a check after every wait
+  // that this is still the round the player asked for (run).
+  async function canvasStart(box, run, next) {
+    if (!(await needArt(box)) || train.run !== run) return;   // left while the gallery loaded
+    const p = tierParams('r'), { n, allow } = p, w = artMains(train.day, train.serial).r;
+    if (!(await artReady(box, run, [w]))) return;              // left while the painting came in
+    const rnd = mulberry32(hashStr('aa-canvas-deal-' + train.day + '-' + train.serial + trainSalt('r')));
+    const tray = shuffleBy(Array.from({ length: n * n }, (_, i) => i), rnd);
     const tile = i => `<span class="aa-art-tile" style="background-image:url('${w.file}');background-size:${n * 100}% ${n * 100}%;background-position:${(100 * (i % n) / (n - 1)).toFixed(2)}% ${(100 * Math.floor(i / n) / (n - 1)).toFixed(2)}%"></span>`;
-    train.game = { kind: 'r', w, n, allow, tile, slots: Array(n * n).fill(null), wrong: 0, t0: performance.now(), phase: 'show', locked: new Set(), hint() {
-      // the first piece out of place goes home and stays there
-      const g = train.game; if (!g || g.phase !== 'play') return;
-      const k = g.slots.findIndex((t, i) => t !== i && !g.locked.has(i)); if (k < 0) return;
-      const from = g.slots.indexOf(k); if (from >= 0) g.slots[from] = null;
-      g.slots[k] = k; g.locked.add(k); canvasDraw(); canvasCheck();
-    } };
+    const g = train.game = { kind: 'r', p, w, n, allow, tile, slots: Array(n * n).fill(null), wrong: 0, charged: new Set(), phase: 'count', locked: new Set(), look: CANVAS_LOOK * 1000,
+      cue: `Remember where everything is. It hangs whole for ${CANVAS_LOOK} seconds, then comes apart.`,
+      canHint: () => !train.paused && g.phase === 'play' && g.slots.some((t, i) => t !== i && !g.locked.has(i)),
+      hint() {
+        // the first piece out of place goes home and stays there
+        if (train.game !== g || g.phase !== 'play') return false;
+        const k = g.slots.findIndex((t, i) => t !== i && !g.locked.has(i)); if (k < 0) return false;
+        const from = g.slots.indexOf(k); if (from >= 0) g.slots[from] = null;
+        g.slots[k] = k; g.locked.add(k); canvasDraw(); canvasCheck(); return true;
+      } };
     // the painting hangs whole in the frame first, every piece where it belongs, for a few seconds; then it
     // comes apart and the pieces tumble down into the tray, shuffled
-    box.innerHTML = `<div class="aa-train-hud"><span>Restore the Canvas ${levelChip('r')}</span><span id="aaCanvasTime">${CANVAS_LOOK}</span>${hintBtnHtml()}</div>
+    box.innerHTML = `${trainHud('r')}
       <p class="aa-train-sub" id="aaCanvasLine">Look at the painting. Remember where things are.</p>
       <div class="aa-art-slots" id="aaCanvasSlots" style="aspect-ratio:${w.w}/${w.h};grid-template-columns:repeat(${n}, 1fr)">${tray.map((_, i) => `<button type="button" class="aa-art-slot" data-slot="${i}" aria-label="Place ${i + 1}"><span class="aa-art-piece is-placed" data-tile="${i}">${tile(i)}</span></button>`).join('')}</div>
       <div class="aa-art-tray" id="aaCanvasTray">${tray.map(i => `<button type="button" class="aa-art-piece" data-tile="${i}" aria-label="Piece" style="aspect-ratio:${w.w}/${w.h}" hidden>${tile(i)}</button>`).join('')}</div>`;
-    trainFit();
-    train.game.showUntil = performance.now() + CANVAS_LOOK * 1000;
+    trainFit(); trainBegun('r', next);
+    if (!(await trainCount(g))) return;
+    g.phase = 'show'; g.showFrom = performance.now(); g.showUntil = g.showFrom + g.look; trainLook(g);
+    clearInterval(train.timer);
     train.timer = setInterval(() => {
-      const g = train.game; if (!g || g.kind !== 'r' || train.paused) return; const t = $('#aaCanvasTime', box);
-      if (g.phase === 'show') { const rem = Math.ceil((g.showUntil - performance.now()) / 1000); if (t) t.textContent = String(Math.max(0, rem)); if (rem <= 0) canvasScatter(box); return; }
-      if (t) t.textContent = fmtTime(performance.now() - g.t0);
-    }, 500);
+      if (train.game !== g || train.paused) return;
+      if (g.phase === 'show') { if (trainLook(g) <= 0) canvasScatter(box); }
+      else if (g.phase === 'play') trainClock(g);
+    }, TRAIN_TICK);
     canvasDragWire(box);
-    trainCoachStart('r');
   }
   const CANVAS_LOOK = 4;   // seconds the painting hangs whole before it comes apart
   const CANVAS_PLAY_LINE = 'Drag each piece to where it belongs. Drag one out to take it back.';
   function canvasScatter(box) {
     const g = train.game; if (!g || g.kind !== 'r' || g.phase !== 'show') return;
-    const from = new Map($$('#aaCanvasSlots .aa-art-piece', box).map(p => [+p.dataset.tile, p.getBoundingClientRect()]));
+    const from = new Map($$('#aaCanvasSlots .aa-art-piece', box).map(p => [+p.dataset.tile, rectOf(p)]));
     g.phase = 'play'; g.t0 = performance.now();
     canvasDraw();   // the frame empties, the tray fills; each piece then flies from where it hung to where it lies
     const line = $('#aaCanvasLine', box); if (line) line.textContent = CANVAS_PLAY_LINE;
-    const t = $('#aaCanvasTime', box); if (t) t.textContent = '0:00';
+    trainLookEnd(); trainClock(g); trainHintSync();
     SFX.scatter(); vibe(15);
-    trainFly($$('#aaCanvasTray .aa-art-piece:not([hidden])', box).map(el => ({ el, from: from.get(+el.dataset.tile) })), { tumble: 12 }).then(() => { if (train.game === g) trainCoachEvent('play'); });
+    trainFly($$('#aaCanvasTray .aa-art-piece:not([hidden])', box).map(el => ({ el, from: from.get(+el.dataset.tile) })), { tumble: 12 }).then(() => { if (train.game === g) trainCoachStart('r', g.p); });
   }
   // Pieces on the move: each element flies from where it was (its `from` rect) to where it is now, one after
   // another, with a little tumble, and the promise lands with the last of them. Under reduced motion they
   // are simply there. The scatter of the canvas and the paintings coming off the gallery wall are both this.
+  // Rects are the page's own (rectOf), so the flight is right on a page turned for a sideways phone.
   function trainFly(list, { tumble = 0, dur = 320, stagger = 30 } = {}) {
     if (calmer()) return Promise.resolve();
     const fin = [];
     list.forEach(({ el, from }, i) => {
-      const to = el.getBoundingClientRect(); if (!from || !from.width || !to.width || !el.animate) return;
+      const to = rectOf(el); if (!from || !from.width || !to.width || !el.animate) return;
       const dx = from.left - to.left, dy = from.top - to.top, sc = from.width / to.width;
       el.classList.add('is-flying');
       const a = el.animate([
@@ -3146,48 +3537,68 @@
    * carried copy, `o.drop(key, from, to)` and `o.out(key, from)` are what a drop means. Dragging is the only
    * way a piece moves: a tap does nothing, so there is one thing to learn. The pointer is captured once the
    * press moves (captured from the press, the buttons above would lose a tap that slid). The sheet does not
-   * scroll from a piece (touch-action) so a drag never turns into a scroll halfway.
+   * scroll from a piece (touch-action) so a drag never turns into a scroll halfway. One piece at a time
+   * (train.drag): a second finger or a palm while one is carried is not a second drag; and a drag that loses
+   * its pointer, or a round that stops under it, leaves no carried copy behind (trainDragClear).
    */
   function trainDragWire(box, o) {
     // the game box lives on between rounds: wire each kind once, or a replay would answer every drop twice
     if (box.dataset['wired' + o.kind]) return; box.dataset['wired' + o.kind] = '1';
-    let d = null;
     const over = (x, y) => { const sl = document.elementFromPoint(x, y)?.closest?.(o.slot); $$(o.slot + '.is-over', box).forEach(n => { if (n !== sl) n.classList.remove('is-over'); }); if (sl && !o.locked(+sl.dataset.slot)) sl.classList.add('is-over'); return sl; };
     box.addEventListener('pointerdown', e => {
-      const g = train.game; if (!g || g.kind !== o.kind || e.button || (g.phase && g.phase !== 'play')) return;
+      const g = train.game; if (!g || g.kind !== o.kind || e.button || g.phase !== 'play' || train.paused) return;
+      if (train.drag?.moved) return;
       const piece = e.target.closest(o.piece); if (!piece) return;
       const slot = piece.closest(o.slot); const from = slot ? +slot.dataset.slot : -1;
       if (from >= 0 && o.locked(from)) return;
-      const r = piece.getBoundingClientRect();
-      d = { id: e.pointerId, key: +piece.dataset[o.key], from, piece, x0: e.clientX, y0: e.clientY, dx: e.clientX - r.left, dy: e.clientY - r.top, w: r.width, h: r.height, moved: false, ghost: null };
+      // the copy is carried in the page's own coordinates (ptOf, rectOf): a phone browser held sideways turns
+      // the page, and a finger read off the glass would move the copy at right angles to itself
+      const r = rectOf(piece), pt = ptOf(e);
+      train.drag = { kind: o.kind, id: e.pointerId, key: +piece.dataset[o.key], from, piece, x0: e.clientX, y0: e.clientY, dx: pt.x - r.left, dy: pt.y - r.top, w: r.width, h: r.height, moved: false, ghost: null };
     });
     box.addEventListener('pointermove', e => {
-      const g = train.game; if (!d || e.pointerId !== d.id || !g) return;
+      const d = train.drag; if (!d || d.kind !== o.kind || e.pointerId !== d.id || !train.game) return;
       if (!d.moved) {
         if (Math.hypot(e.clientX - d.x0, e.clientY - d.y0) < 6) return;
         d.moved = true;
         try { box.setPointerCapture(e.pointerId); } catch { /* fine without */ }
         d.ghost = document.createElement('div'); d.ghost.className = 'aa-art-drag'; d.ghost.style.width = `${d.w}px`; d.ghost.style.height = `${d.h}px`; d.ghost.innerHTML = o.ghost(d.key);
-        document.body.appendChild(d.ghost); d.piece.classList.add('is-ghost');
+        document.body.appendChild(d.ghost); d.piece.classList.add('is-ghost'); document.body.classList.add('aa-dragging');
       }
-      d.ghost.style.transform = `translate(${e.clientX - d.dx}px, ${e.clientY - d.dy}px)`;
+      const pt = ptOf(e);
+      d.ghost.style.transform = `translate(${pt.x - d.dx}px, ${pt.y - d.dy}px)`;
       over(e.clientX, e.clientY);
     });
+    // up, cancelled, or the capture lost (the element went, the browser took the pointer back): put down
     const end = e => {
-      if (!d || e.pointerId !== d.id) return;
-      const g = train.game, was = d; d = null;
-      if (!was.moved) return;   // a press that went nowhere
-      was.ghost?.remove(); was.piece.classList.remove('is-ghost');
-      $$(o.slot + '.is-over', box).forEach(n => n.classList.remove('is-over'));
+      const d = train.drag; if (!d || d.kind !== o.kind || e.pointerId !== d.id) return;
+      const g = train.game; train.drag = null;
+      if (!d.moved) return;   // a press that went nowhere
+      // where it lands is read before the tidy: until then a coach card over the frame lets the drop through
+      const drop = e.type === 'pointerup';
+      const sl = drop ? document.elementFromPoint(e.clientX, e.clientY)?.closest?.(o.slot) : null;
+      trainDragTidy(d);
       if (!g || g.kind !== o.kind) return;
       g.dragEnd = performance.now();
-      const sl = e.type === 'pointercancel' ? null : document.elementFromPoint(e.clientX, e.clientY)?.closest?.(o.slot);
-      if (sl) o.drop(was.key, was.from, +sl.dataset.slot);
-      else if (was.from >= 0 && e.type !== 'pointercancel') o.out(was.key, was.from);   // out of the frame: back to the tray
+      if (sl) o.drop(d.key, d.from, +sl.dataset.slot);
+      else if (d.from >= 0 && drop) o.out(d.key, d.from);   // out of the frame: back to the tray
       else o.redraw();
     };
     box.addEventListener('pointerup', end);
     box.addEventListener('pointercancel', end);
+    box.addEventListener('lostpointercapture', end);
+  }
+  // a carried piece put down: its copy gone, the piece whole again, no place lit
+  function trainDragTidy(d) {
+    d?.ghost?.remove(); d?.piece?.classList.remove('is-ghost');
+    if (el.trainBody) $$('.is-over', el.trainBody).forEach(n => n.classList.remove('is-over'));
+    document.body.classList.remove('aa-dragging');
+  }
+  // and a round stopping under a drag (Back, the sheet closed): whatever was carried, wherever it got to
+  function trainDragClear() {
+    const d = train.drag; train.drag = null; trainDragTidy(d);
+    $$('.aa-art-drag').forEach(n => n.remove());
+    if (el.trainBody) $$('.is-ghost', el.trainBody).forEach(n => n.classList.remove('is-ghost'));
   }
   const canvasDragWire = box => trainDragWire(box, { kind: 'r', piece: '.aa-art-piece', slot: '.aa-art-slot', key: 'tile', locked: k => !!train.game?.locked.has(k), ghost: k => train.game.tile(k), drop: canvasDrop, out: (k, from) => { const g = train.game; if (g) { g.slots[from] = null; canvasDraw(); } }, redraw: canvasDraw });
   function canvasDrop(tile, from, k) {
@@ -3200,93 +3611,117 @@
   function canvasDraw() {
     const g = train.game; if (!g) return;
     const slots = $('#aaCanvasSlots', el.trainBody), tray = $('#aaCanvasTray', el.trainBody); if (!slots || !tray) return;
-    $$('.aa-art-slot', slots).forEach((sl, k) => { const t = g.slots[k]; sl.innerHTML = t == null ? '' : `<span class="aa-art-piece is-placed${g.locked.has(k) ? ' is-locked' : ''}" data-tile="${t}">${g.tile(t)}</span>`; });
+    $$('.aa-art-slot', slots).forEach((sl, k) => { const t = g.slots[k]; sl.innerHTML = t == null ? '' : `<span class="aa-art-piece is-placed${g.locked.has(k) ? ' is-locked' : ''}" data-tile="${t}">${g.tile(t)}</span>`; sl.classList.remove('is-wrong'); });
     $$('.aa-art-piece', tray).forEach(b => { b.hidden = g.slots.includes(+b.dataset.tile); });
+  }
+  // A full frame with pieces out of place: they are marked, the way the gallery marks its wrong ones, and each
+  // wrong placing is charged once, the first time the frame is full with it -- finding the wrong ones costs
+  // nothing more, and swapping two back and forth is not a new mistake each time.
+  function trainCharge(g, wrongNow) {
+    for (const i of wrongNow) { const key = i + ':' + g.slots[i]; if (!g.charged.has(key)) { g.charged.add(key); g.wrong++; } }
   }
   function canvasCheck() {
     const g = train.game; if (!g || g.slots.some(t => t == null)) return;
-    const wrongNow = g.slots.filter((t, i) => t !== i).length;
-    if (wrongNow) { g.wrong++; toast(`${wrongNow} piece${wrongNow === 1 ? ' is' : 's are'} in the wrong place.`, 'hint', 1800); SFX.block(); return; }
+    const wrongNow = g.slots.map((t, i) => t !== i ? i : -1).filter(i => i >= 0);
+    if (wrongNow.length) {
+      trainCharge(g, wrongNow);
+      wrongNow.forEach(i => $(`.aa-art-slot[data-slot="${i}"]`, el.trainBody)?.classList.add('is-wrong'));
+      toast(`${wrongNow.length} piece${wrongNow.length === 1 ? ' is' : 's are'} in the wrong place. Move ${wrongNow.length === 1 ? 'it' : 'them'}.`, 'hint', 1800); SFX.block(); vibe(30);
+      return;
+    }
     const secs = (performance.now() - g.t0) / 1000;
     trainFinish('r', 100 - g.wrong * 8 - Math.max(0, secs - g.allow) * 0.5 - hintCost(g), `${fmtTime(secs * 1000)} · ${g.wrong} wrong tr${g.wrong === 1 ? 'y' : 'ies'}`, g.w);
   }
 
-  // The Forgery: the painting and a copy with three things wrong in it. Tap the copy where it lies.
-  function forgeryStart(box) {
-    const w = artPicks(1, 'forgery')[0], { lies: nLies, s, hue, allow } = tierParams('f');
-    const rnd = mulberry32(hashStr('aa-forgery-' + dayKey() + '-' + train.serial));
-    const spots = []; let guard = 0;
-    while (spots.length < nLies && guard++ < 400) {
-      const px = 0.05 + rnd() * (0.9 - s), py = 0.05 + rnd() * (0.9 - s);
-      if (spots.every(q => Math.abs(q.px - px) > s * 1.2 || Math.abs(q.py - py) > s * 1.2)) spots.push({ px, py });
-    }
-    // three kinds of lie: a patch mirrored, a patch recoloured, a patch taken from elsewhere in the painting
-    // the three kinds of lie, round and round: a fourth lie is mirrored again, a fifth recoloured again
-    const lies = spots.map((q, i) => i % 3 === 0 ? { ...q, extra: 'transform:scaleX(-1)' } : i % 3 === 1 ? { ...q, extra: `filter:hue-rotate(${hue}deg) saturate(1.25)` } : { ...q, from: { px: 0.05 + rnd() * (0.9 - s), py: 0.05 + rnd() * (0.9 - s) } });
+  // The Forgery: the painting and a copy with things wrong in it. Tap the copy where it lies. No look: the
+  // clock starts at Go, and the copy answers nothing before it.
+  const forgeLeft = (n, all) => all ? `${numWord(n, true)} thing${n === 1 ? ' is' : 's are'} wrong` : `${numWord(n, true)} more ${n === 1 ? 'is' : 'are'} wrong`;
+  async function forgeryStart(box, run, next) {
+    if (!(await needArt(box)) || train.run !== run) return;
+    const p = tierParams('f'), { lies: nLies, s, hue, allow } = p, w = artMains(train.day, train.serial).f;
+    const imgs = await artReady(box, run, [w]); if (!imgs) return;
+    const rnd = mulberry32(hashStr('aa-forgery-' + train.day + '-' + train.serial + trainSalt('f')));
+    const lies = forgeLies(artSample(imgs.get(w)), rnd, nLies, s, hue);
     const patches = lies.map((q, i) => { const src = q.from || q; return artPatch(w, src.px, src.py, s, 'aa-forge-lie', `left:${(100 * q.px).toFixed(2)}%;top:${(100 * q.py).toFixed(2)}%;width:${100 * s}%;height:${100 * s}%;${q.extra || ''}`, `data-lie="${i}"`); }).join('');
-    train.game = { kind: 'f', w, lies, allow, found: new Set(), wrong: 0, t0: performance.now(), hint() {
-      const g = train.game; if (!g) return; const k = g.lies.findIndex((_, i) => !g.found.has(i)); if (k < 0) return; forgeryFound(k, true);
-    } };
-    box.innerHTML = `<div class="aa-train-hud"><span>The Forgery ${levelChip('f')}</span><span id="aaForgeLeft">${nLies} to find</span><span id="aaForgeTime">0:00</span>${hintBtnHtml()}</div>
-      <p class="aa-train-sub">${['Three', 'Four', 'Five'][nLies - 3]} things are wrong in the copy <span id="aaForgeWhere">${w.h > w.w ? 'beside' : 'below'}</span> the original. Tap them there.</p>
+    const g = train.game = { kind: 'f', p, w, lies, allow, found: new Set(), wrong: 0, combo: 0, phase: 'count',
+      cue: `${numWord(lies.length, true)} things are wrong in the copy. Find them, fast.`,
+      canHint: () => !train.paused && g.phase === 'play' && g.found.size < g.lies.length,
+      hint() { if (train.game !== g || g.phase !== 'play') return false; const k = g.lies.findIndex((_, i) => !g.found.has(i)); if (k < 0) return false; forgeryFound(k, true); return true; } };
+    box.innerHTML = `${trainHud('f')}
+      <p class="aa-train-sub"><b id="aaForgeLeft">${forgeLeft(lies.length, true)}</b> in the copy <span id="aaForgeWhere">${w.h > w.w ? 'beside' : 'below'}</span> the original. Tap them there.</p>
       <div class="aa-forge-pair${w.h > w.w ? ' is-side' : ''}">${artFrame(w, 'aa-forge-orig')}${artFrame(w, 'aa-forge-copy', patches, 'id="aaForgeCopy" role="img" aria-label="The copy"')}</div>`;
-    trainFit();
+    trainFit(); trainBegun('f', next);
     $('#aaForgeCopy', box)?.addEventListener('click', e => {
-      const g = train.game; if (!g || g.kind !== 'f') return;
+      if (train.game !== g || g.phase !== 'play' || train.paused) return;   // nothing counts before Go, or on hold
       const lie = e.target.closest('[data-lie]');
       if (lie) { const i = +lie.dataset.lie; if (!g.found.has(i)) forgeryFound(i, false); return; }
-      g.wrong++; SFX.block(); vibe(30); toast('Not there.', 'hint', 900);
+      g.wrong++; g.combo = 0; SFX.block(); vibe(30); toast('Not there.', 'hint', 900);
     });
-    train.timer = setInterval(() => { const g = train.game; if (!g || g.kind !== 'f') return; const t = $('#aaForgeTime', box); if (t) t.textContent = fmtTime(performance.now() - g.t0); }, 500);
-    trainCoachStart('f');
+    if (!(await trainCount(g))) return;
+    g.phase = 'play'; g.t0 = performance.now(); trainClock(g); trainHintSync();
+    clearInterval(train.timer);
+    train.timer = setInterval(() => { if (train.game === g && !train.paused) trainClock(g); }, TRAIN_TICK);
+    trainCoachStart('f', p);
   }
   function forgeryFound(i, byHint) {
-    const g = train.game; if (!g) return;
-    g.found.add(i); if (!byHint) SFX.shoot(); trainCoachEvent('found');
+    const g = train.game; if (!g || g.kind !== 'f') return;
+    g.found.add(i);
+    // finds in a row climb: the second cheers, and each after it a little higher (a wrong tap ends the run)
+    if (!byHint) { g.combo = (g.combo | 0) + 1; if (g.combo >= 2) SFX.cheer(Math.min(4, g.combo - 2)); else SFX.shoot(); }
+    trainCoachEvent('found');
     const p = $(`[data-lie="${i}"]`, el.trainBody); if (p) p.classList.add('is-found');
     const left = g.lies.length - g.found.size;
-    const el2 = $('#aaForgeLeft', el.trainBody); if (el2) el2.textContent = left ? `${left} to find` : 'Found';
+    const el2 = $('#aaForgeLeft', el.trainBody); if (el2) el2.textContent = left ? forgeLeft(left, false) : 'Nothing more is wrong';
+    trainHintSync();
     if (left === 0) {
       const secs = (performance.now() - g.t0) / 1000;
       trainFinish('f', 100 - g.wrong * 10 - Math.max(0, secs - g.allow) * 0.5 - hintCost(g), `${fmtTime(secs * 1000)} · ${g.wrong} wrong tap${g.wrong === 1 ? '' : 's'}`, g.w);
     }
   }
 
-  // Gallery Memory: five paintings on the wall for five seconds, then the same five out of order.
+  // Gallery Memory: paintings on the wall for a few seconds, then the same ones out of order.
   const artThumb = (w, attrs = '') => `<span class="aa-art-thumb" style="background-image:url('${w.file}')" ${attrs}></span>`;
-  async function galleryStart(box) {
-    if (!(await needArt(box)) || !el.trainSheet.classList.contains('is-playing')) return;   // left while the paintings loaded
-    const { n, secs } = tierParams('g');
-    const picks = artPicks(n, 'gallery');
-    const rnd = mulberry32(hashStr('aa-gallery-deal-' + dayKey() + '-' + train.serial));
-    const deal = picks.map((_, i) => i); for (let i = deal.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [deal[i], deal[j]] = [deal[j], deal[i]]; }
-    train.game = { kind: 'g', picks, deal, n, slots: Array(n).fill(null), locked: new Set(), wrong: 0, phase: 'show', hint() {
-      // the first painting out of place goes to its number and stays there
-      const g = train.game; if (!g || g.phase !== 'play') return;
-      const k = g.slots.findIndex((p, i) => p !== i && !g.locked.has(i)); if (k < 0) return;
-      const from = g.slots.indexOf(k); if (from >= 0) g.slots[from] = null;
-      g.slots[k] = k; g.locked.add(k); galleryDraw(); galleryCheck();
-    } };
-    box.innerHTML = `<div class="aa-train-hud"><span>Gallery Memory ${levelChip('g')}</span><span id="aaGalleryTime">${secs}</span>${hintBtnHtml()}</div>
+  async function galleryStart(box, run, next) {
+    if (!(await needArt(box)) || train.run !== run) return;
+    const p = tierParams('g'), { n, secs } = p, salt = trainSalt('g'), picks = artMains(train.day, train.serial).g.slice(0, n);
+    if (!(await artReady(box, run, picks))) return;
+    const rnd = mulberry32(hashStr('aa-gallery-deal-' + train.day + '-' + train.serial + salt));
+    if (salt) shuffleBy(picks, rnd);   // a replay hangs the same paintings in a new order: the order is what is remembered
+    const deal = shuffleBy(picks.map((_, i) => i), rnd);
+    const g = train.game = { kind: 'g', p, picks, deal, n, slots: Array(n).fill(null), locked: new Set(), charged: new Set(), wrong: 0, phase: 'count', look: secs * 1000,
+      cue: `${numWord(n, true)} paintings, ${secs} seconds. Remember the order they hang in.`,
+      canHint: () => !train.paused && g.phase === 'play' && g.slots.some((q, i) => q !== i && !g.locked.has(i)),
+      hint() {
+        // the first painting out of place goes to its number and stays there
+        if (train.game !== g || g.phase !== 'play') return false;
+        const k = g.slots.findIndex((q, i) => q !== i && !g.locked.has(i)); if (k < 0) return false;
+        const from = g.slots.indexOf(k); if (from >= 0) g.slots[from] = null;
+        g.slots[k] = k; g.locked.add(k); galleryDraw(); galleryCheck(); return true;
+      } };
+    box.innerHTML = `${trainHud('g')}
       <p class="aa-train-sub" id="aaGalleryLine">Remember the order they hang in.</p>
       <div class="aa-gallery-row" id="aaGalleryRow" style="grid-template-columns:repeat(${Math.min(n, 5)}, 1fr)">${picks.map((w, i) => `<span class="aa-gallery-pick" data-c="${w.id}">${artThumb(w)}<small>${i + 1}</small></span>`).join('')}</div>`;
-    let left = secs;
+    trainBegun('g', next);
+    if (!(await trainCount(g))) return;
+    g.phase = 'show'; g.showFrom = performance.now(); g.showUntil = g.showFrom + g.look; trainLook(g);
+    clearInterval(train.timer);
     train.timer = setInterval(() => {
-      const g = train.game; if (!g || g.kind !== 'g' || g.phase !== 'show' || train.paused) return;
-      left--; const t = $('#aaGalleryTime', box); if (t) t.textContent = String(Math.max(0, left));
-      if (left <= 0) {
-        clearInterval(train.timer); train.timer = 0;
-        const row = $('#aaGalleryRow', box), wall = $$('#aaGalleryRow .aa-gallery-pick', box).map(e => e.getBoundingClientRect());
-        if (row) row.outerHTML = `<div class="aa-gal-slots" id="aaGallerySlots" style="grid-template-columns:repeat(${Math.min(n, 5)}, 1fr)">${picks.map((_, i) => `<span class="aa-gal-slot" data-slot="${i}" aria-label="Place ${i + 1}"><small>${i + 1}</small></span>`).join('')}</div>
-          <div class="aa-gal-tray" id="aaGalleryTray" style="grid-template-columns:repeat(${Math.min(n, 5)}, 1fr)">${g.deal.map(i => `<span class="aa-gal-piece" data-pick="${i}" aria-label="Painting">${artThumb(g.picks[i])}</span>`).join('')}</div>`;
-        const line = $('#aaGalleryLine', box); if (line) line.textContent = 'Now drag each painting back to the number it hung at.';
-        if (t) t.textContent = `0 of ${n}`;
-        galleryDragWire(box);
-        SFX.scatter(); vibe(15);
-        trainFly($$('#aaGalleryTray .aa-gal-piece', box).map(el => ({ el, from: wall[+el.dataset.pick] })), { tumble: 8 }).then(() => { if (train.game !== g) return; g.phase = 'play'; g.t0 = performance.now(); trainCoachEvent('play'); });
-      }
-    }, 1000);
-    trainCoachStart('g');
+      if (train.game !== g || train.paused || g.phase !== 'show' || trainLook(g) > 0) return;
+      clearInterval(train.timer); train.timer = 0;
+      galleryTakeDown(box, g);
+    }, TRAIN_TICK);
+  }
+  // the wall comes down: numbered places where the paintings hung, and the paintings falling into a tray
+  function galleryTakeDown(box, g) {
+    const n = g.n, row = $('#aaGalleryRow', box), wall = $$('#aaGalleryRow .aa-gallery-pick', box).map(e => rectOf(e));
+    g.phase = 'fly';
+    if (row) row.outerHTML = `<div class="aa-gal-slots" id="aaGallerySlots" style="grid-template-columns:repeat(${Math.min(n, 5)}, 1fr)">${g.picks.map((_, i) => `<span class="aa-gal-slot" data-slot="${i}" aria-label="Place ${i + 1}"><small>${i + 1}</small></span>`).join('')}</div>
+      <div class="aa-gal-tray" id="aaGalleryTray" style="grid-template-columns:repeat(${Math.min(n, 5)}, 1fr)">${g.deal.map(i => `<span class="aa-gal-piece" data-pick="${i}" aria-label="Painting">${artThumb(g.picks[i])}</span>`).join('')}</div>`;
+    const line = $('#aaGalleryLine', box); if (line) line.textContent = 'Now drag each painting back to the number it hung at.';
+    trainLookEnd(); galleryDraw();
+    galleryDragWire(box);
+    SFX.scatter(); vibe(15);
+    trainFly($$('#aaGalleryTray .aa-gal-piece', box).map(el => ({ el, from: wall[+el.dataset.pick] })), { tumble: 8 }).then(() => { if (train.game !== g) return; g.phase = 'play'; g.t0 = performance.now(); trainHintSync(); trainCoachStart('g', g.p); });
   }
   const galleryDragWire = box => trainDragWire(box, { kind: 'g', piece: '.aa-gal-piece', slot: '.aa-gal-slot', key: 'pick', locked: k => !!train.game?.locked.has(k), ghost: k => artThumb(train.game.picks[k]), drop: galleryDrop, out: (k, from) => { const g = train.game; if (g) { g.slots[from] = null; galleryDraw(); } }, redraw: galleryDraw });
   function galleryDrop(pick, from, k) {
@@ -3300,13 +3735,13 @@
     const slots = $('#aaGallerySlots', el.trainBody), tray = $('#aaGalleryTray', el.trainBody); if (!slots || !tray) return;
     $$('.aa-gal-slot', slots).forEach((sl, k) => { const p = g.slots[k]; sl.innerHTML = `<small>${k + 1}</small>${p == null ? '' : `<span class="aa-gal-piece is-placed${g.locked.has(k) ? ' is-locked' : ''}" data-pick="${p}">${artThumb(g.picks[p])}</span>`}`; sl.classList.remove('is-wrong'); });
     $$('.aa-gal-piece', tray).forEach(b => { b.hidden = g.slots.includes(+b.dataset.pick); });
-    const t = $('#aaGalleryTime', el.trainBody); if (t) t.textContent = `${g.slots.filter(p => p != null).length} of ${g.n}`;
+    trainStat(`<span><b>${g.slots.filter(p => p != null).length}</b> of ${g.n} placed</span>`);
   }
   function galleryCheck() {
     const g = train.game; if (!g || g.slots.some(p => p == null)) return;
     const wrongNow = g.slots.map((p, i) => p !== i ? i : -1).filter(i => i >= 0);
     if (wrongNow.length) {
-      g.wrong += wrongNow.length; SFX.block(); vibe(30);
+      trainCharge(g, wrongNow); SFX.block(); vibe(30);
       wrongNow.forEach(i => $(`.aa-gal-slot[data-slot="${i}"]`, el.trainBody)?.classList.add('is-wrong'));
       toast(`${wrongNow.length} ${wrongNow.length === 1 ? 'is' : 'are'} in the wrong place. Move them.`, 'hint', 1800);
       return;
@@ -3314,50 +3749,56 @@
     trainFinish('g', 100 - g.wrong * 10 - hintCost(g), `${g.wrong} in the wrong place along the way`, null, g.picks);
   }
 
-  // The Curator's Eye: one painting for six seconds; then, three times, four details -- which one is from it?
-  async function curatorStart(box) {
-    if (!(await needArt(box)) || !el.trainSheet.classList.contains('is-playing')) return;   // left while the paintings loaded
-    const { secs, q: nQ, s } = tierParams('e');
-    const [w, ...others] = artPicks(1 + 3 * nQ, 'curator');
-    const rnd = mulberry32(hashStr('aa-curator-' + dayKey() + '-' + train.serial));
-    const ask = Array.from({ length: nQ }, (_, q) => {
-      const truth = { w, px: 0.05 + rnd() * (0.9 - s), py: 0.05 + rnd() * (0.9 - s) };
-      const opts = [truth, ...others.slice(q * 3, q * 3 + 3).map(o => ({ w: o, px: 0.05 + rnd() * (0.9 - s), py: 0.05 + rnd() * (0.9 - s) }))];
-      for (let i = opts.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [opts[i], opts[j]] = [opts[j], opts[i]]; }
-      return opts;
-    });
-    train.game = { kind: 'e', w, s, ask, q: 0, right: 0, phase: 'show', hint() {
-      // one more look, a short one
-      const g = train.game; if (!g || g.phase !== 'ask' || g.peeked || g.lock) return; g.peeked = true;
-      const box2 = $('#aaCurator', el.trainBody); if (!box2) return;
-      const keep = box2.innerHTML; box2.innerHTML = artFrame(g.w, 'is-peek'); trainFit(); setTimeout(() => { if (train.game === g) { box2.innerHTML = keep; trainFit(); } }, 1500);
-    } };
-    box.innerHTML = `<div class="aa-train-hud"><span>The Curator’s Eye ${levelChip('e')}</span><span id="aaCuratorTime">${secs}</span>${hintBtnHtml()}</div>
+  // The Curator's Eye: one painting for a few seconds; then, several times, four details -- which one is from it?
+  async function curatorStart(box, run, next) {
+    if (!(await needArt(box)) || train.run !== run) return;
+    const p = tierParams('e'), { secs, q: nQ, s } = p, salt = trainSalt('e');
+    const w = artMains(train.day, train.serial).e, others = artOthers(train.day, train.serial, 3 * nQ, w, salt);
+    const imgs = await artReady(box, run, [w, ...others]); if (!imgs) return;   // every detail it will ask about, in before the painting shows
+    const rnd = mulberry32(hashStr('aa-curator-' + train.day + '-' + train.serial + salt));
+    const seen = new Map(), sample = o => { if (!seen.has(o)) seen.set(o, artSample(imgs.get(o))); return seen.get(o); };
+    const ask = Array.from({ length: nQ }, (_, q) => shuffleBy([w, ...others.slice(q * 3, q * 3 + 3)].map(o => curatorPatch(o, s, rnd, sample(o))), rnd));
+    const g = train.game = { kind: 'e', p, w, ask, q: 0, right: 0, combo: 0, phase: 'count', look: secs * 1000,
+      cue: `One painting, ${secs} seconds. Then: which detail is from it? The corners as much as the middle.`,
+      canHint: () => !train.paused && g.phase === 'ask' && !g.peeked && !g.lock,
+      hint() {
+        // one more look, a short one
+        if (train.game !== g || g.phase !== 'ask' || g.peeked || g.lock) return false;
+        const box2 = $('#aaCurator', el.trainBody); if (!box2) return false;
+        g.peeked = true;
+        const keep = box2.innerHTML; box2.innerHTML = artFrame(g.w, 'is-peek'); trainFit();
+        setTimeout(() => { if (train.game === g) { box2.innerHTML = keep; trainFit(); trainCoachPlace(); } }, 1500);
+        return true;
+      } };
+    box.innerHTML = `${trainHud('e')}
       <p class="aa-train-sub" id="aaCuratorLine">Look closely. You will be asked about the details.</p>
       <div id="aaCurator">${artFrame(w)}</div>`;
-    trainFit();
-    let left = secs;
+    trainFit(); trainBegun('e', next);
+    if (!(await trainCount(g))) return;
+    g.phase = 'show'; g.showFrom = performance.now(); g.showUntil = g.showFrom + g.look; trainLook(g);
+    clearInterval(train.timer);
     train.timer = setInterval(() => {
-      const g = train.game; if (!g || g.kind !== 'e' || g.phase !== 'show' || train.paused) return;
-      left--; const t = $('#aaCuratorTime', box); if (t) t.textContent = String(Math.max(0, left));
-      if (left <= 0) { clearInterval(train.timer); train.timer = 0; g.phase = 'ask'; curatorAsk(); trainCoachEvent('ask'); }
-    }, 1000);
-    trainCoachStart('e');
+      if (train.game !== g || train.paused || g.phase !== 'show' || trainLook(g) > 0) return;
+      clearInterval(train.timer); train.timer = 0;
+      g.phase = 'ask'; trainLookEnd(); curatorAsk(); trainCoachStart('e', p);
+    }, TRAIN_TICK);
   }
   function curatorAsk() {
     const g = train.game; if (!g) return;
     const opts = g.ask[g.q]; const box = $('#aaCurator', el.trainBody); if (!box || !opts) return;
-    const t = $('#aaCuratorTime', el.trainBody); if (t) t.textContent = `${g.q + 1} of ${g.ask.length}`;
+    trainStat(`<span>Question <b>${g.q + 1}</b> of ${g.ask.length}</span>`);
     const line = $('#aaCuratorLine', el.trainBody); if (line) line.textContent = 'Which detail is from the painting you saw?';
-    box.innerHTML = `<div class="aa-curator-opts">${opts.map((o, i) => `<button type="button" class="aa-curator-opt" data-detail="${i}" aria-label="Detail ${i + 1}">${artPatch(o.w, o.px, o.py, g.s)}</button>`).join('')}</div>`;
-    trainFit();
+    box.innerHTML = `<div class="aa-curator-opts">${opts.map((o, i) => `<button type="button" class="aa-curator-opt" data-detail="${i}" aria-label="Detail ${i + 1}">${artPatch(o.w, o.px, o.py, o.s, '', '', '', o.sy)}</button>`).join('')}</div>`;
+    trainFit(); trainHintSync();
   }
   function curatorAnswer(i) {
-    const g = train.game; if (!g || g.phase !== 'ask' || g.lock) return;
-    const opts = g.ask[g.q]; const ok = opts[i].w === g.w; g.lock = true;
-    if (ok) { g.right++; SFX.shoot(); } else { SFX.block(); vibe(30); }
+    const g = train.game; if (!g || g.phase !== 'ask' || g.lock || train.paused) return;
+    const opts = g.ask[g.q]; if (!opts?.[i]) return;
+    const ok = opts[i].w === g.w; g.lock = true; trainHintSync();
+    // right answers in a row climb, the way the Forgery's finds do
+    if (ok) { g.right++; g.combo = (g.combo | 0) + 1; if (g.combo >= 2) SFX.cheer(Math.min(4, g.combo - 2)); else SFX.shoot(); } else { g.combo = 0; SFX.block(); vibe(30); }
     $$('.aa-curator-opt', el.trainBody).forEach((b, k) => { b.disabled = true; if (opts[k].w === g.w) b.classList.add('is-right'); else if (k === i) b.classList.add('is-wrong'); });
-    g.q++;
+    g.q++; trainCoachEvent('answer');
     setTimeout(() => {
       if (train.game !== g) return; g.lock = false;
       if (g.q < g.ask.length) curatorAsk();
@@ -3773,6 +4214,9 @@
     },
     trainplay: {
       earn: 'Watch this through for a new one of this round.',
+      // what an advertisement that did not come, or was not watched through, leaves: the same puzzle is free
+      none: 'No advertisement right now. Play again is free.',
+      dismissed: 'The advertisement was not watched to the end, so there is no new puzzle. Play again is free.',
       board: false,
       grant() { /* trainPlay starts the round once this resolves */ },
     },
@@ -3884,8 +4328,8 @@
         // The reason rides along only on a device where somebody turned the switch on. A player is owed a
         // plain sentence about their heart; a developer is owed "frequencyCapped".
         const why = ads.dev && ads.last?.why ? ` (${ads.last.why})` : '';
-        toast(how === 'dismissed' ? 'The advertisement was not watched through, so nothing was added.'
-          : `No advertisement was available, so nothing was added.${why} Try again in a moment.`, 'hint', 4200);
+        toast(how === 'dismissed' ? (R.dismissed || 'The advertisement was not watched through, so nothing was added.')
+          : R.none ? R.none + why : `No advertisement was available, so nothing was added.${why} Try again in a moment.`, 'hint', 4200);
         return;
       }
       // adShow gave the lock back when its panel came down, and the reward has not been handed over yet —
@@ -4330,6 +4774,8 @@
       for (const k of ['h', 'p']) { const v = Math.floor(Number(rec[k])); if (v > 0 && v > (mine[k] | 0)) { mine[k] = v; grew = true; } }
       if (rec.pp && typeof rec.pp === 'object') for (const r of TRAIN_ROUNDS) { const v = Math.floor(Number(rec.pp[r.id])); if (v > 0 && v > ((mine.pp && mine.pp[r.id]) | 0)) { mine.pp = mine.pp || {}; mine.pp[r.id] = v; grew = true; } }
       if (rec.nx && typeof rec.nx === 'object') for (const r of TRAIN_ROUNDS) { const v = Math.floor(Number(rec.nx[r.id])); if (v > 0 && v > ((mine.nx && mine.nx[r.id]) | 0)) { mine.nx = mine.nx || {}; mine.nx[r.id] = v; grew = true; } }
+      // the first score of each round's free puzzle, what its difficulty reads: the lower of the two devices'
+      if (rec.f1 && typeof rec.f1 === 'object') { const f1 = trainMergeF1(mine.f1, rec.f1); if (JSON.stringify(f1) !== JSON.stringify(mine.f1 && typeof mine.f1 === 'object' ? mine.f1 : {})) { mine.f1 = f1; grew = true; } }
       // the puzzles finished, each with the first time it was: every one is a level, on every device
       if (rec.cl && typeof rec.cl === 'object') for (const r of TRAIN_ROUNDS) {
         const theirs = rec.cl[r.id]; if (!theirs || typeof theirs !== 'object') continue;
@@ -5065,6 +5511,7 @@
   const faces = players => (players || []).map(p => `<span class="aa-rank${p.you ? ' is-you' : ''}${faceClass(p)}" title="${escapeHtml(p.name)}">${faceInner(p)}</span>`).join('');
   function showRoom(m) {
     state.pendingMatch = m;
+    state.ticked = null;              // a new room's last three seconds tick afresh (fillShow)
     state.roomInfo = false;           // a new room starts with the note folded away, as every room does
     closeSheets();
     clearRun();                       // the waiting room shows this match's nothing, not the last one's ending
@@ -5118,15 +5565,31 @@
   // The crown can change hands while you are looking at the room, so say so rather than letting a Start button
   // appear out of nowhere.
   const noteHandover = (before, m) => { if (before && before.you === 'guest' && m.you === 'host') toast('You are the leader now.', 'good'); };
+  // The room's number, from either clock: the one counted here between polls, and the server's own
+  // (countdown_tick, which stops the one here). The last three each tick once, whichever clock got there first
+  // (state.ticked: one number never ticks twice), and pop; at nought the room is being started on the
+  // server's next sweep and says so, rather than sitting on a 0. False when there is no count on the card.
+  function fillShow(v) {
+    const span = $('.aa-wait > span', el.card); if (!span) return false;
+    v = Math.max(0, Math.floor(Number(v) || 0));
+    if (v > 3) state.ticked = null;   // the count went back up (the room changed): its last three are new
+    if (v === 0) { span.textContent = 'Get ready\u2026'; return true; }
+    let n = $('#aaFillIn', span);
+    if (!n) { span.innerHTML = 'Starting in <b id="aaFillIn"></b>s'; n = $('#aaFillIn', span); }
+    if (n.textContent === String(v)) return true;
+    n.textContent = String(v);
+    if (v <= 3 && !(state.ticked ||= new Set()).has(v)) {
+      state.ticked.add(v); SFX.tick();   // the last three: here it comes
+      if (!calmer()) { n.classList.remove('is-pop'); void n.offsetWidth; n.classList.add('is-pop'); }
+    }
+    return true;
+  }
   function tickFill(secs) {
     clearInterval(state.fillTick); state.fillTick = 0;
     if (typeof secs !== 'number') return;
     let left = secs;
     state.fillTick = setInterval(() => {
-      const n = $('#aaFillIn', el.card);
-      if (!n) { clearInterval(state.fillTick); state.fillTick = 0; return; }
-      n.textContent = Math.max(0, --left);
-      if (left > 0 && left <= 3) SFX.tick();   // the last three: here it comes
+      if (!fillShow(--left) || left <= 0) { clearInterval(state.fillTick); state.fillTick = 0; }
     }, 1000);
   }
   function startRoomPoll(code) {
@@ -5170,8 +5633,7 @@
         // the countdown belongs to the server: stop counting locally and show the number it sent, so every
         // player in the room sees the same one and a backgrounded tab cannot drift
         clearInterval(state.fillTick); state.fillTick = 0;
-        const n = $('#aaFillIn', el.card);
-        if (n) n.textContent = Math.max(0, Number(ev.data?.fills_in ?? 0));
+        fillShow(ev.data?.fills_in ?? 0);
         return;
       }
       refresh();   // somebody joined, left, or the match began: ask for the truth rather than patching a guess
@@ -5462,8 +5924,10 @@
     closeSheets();
     state.pendingMatch = null;
     stopMatchPoll();
+    // GO is a race starting, not a player coming back onto one already run (a reload, another device, a poll)
+    const back = Number(m.your_run?.moves) > 0 || Number(m.your_run?.bi) > 0 || Number(m.age_ms) > 20000;
     startLevel(i, false, raceFor(m, boards, bi, Number(m.your_run?.moves) | 0, m.your_run || null), m.tier)
-      .then(() => { SFX.go(); vibe([0, 30, 60, 70]); });   // startLevel puts the line-up and the poll back
+      .then(() => { if (!back) { SFX.go(); vibe([0, 30, 60, 70]); } });   // startLevel puts the line-up and the poll back
     if (typeof gtag === 'function') gtag('event', 'match_play', { game: 'puzzle', stake: m.stake });
   }
 
@@ -6254,10 +6718,13 @@
     if (box) { box.hidden = !box.hidden; el.leagueInfo.setAttribute('aria-expanded', String(!box.hidden)); }
   });
   $$('[data-close-sheet]').forEach(b => b.addEventListener('click', closeSheets));
-  $$('.aa-sheet').forEach(sh => sh.addEventListener('click', e => { if (e.target === sh) closeSheets(); }));
+  // a tap on the backdrop closes a sheet; beside a round (the margins of a wide screen) it is the round's ←,
+  // which asks before a round is left
+  $$('.aa-sheet').forEach(sh => sh.addEventListener('click', e => { if (e.target !== sh) return; if (sh === el.trainSheet && sh.classList.contains('is-playing')) { void trainBack(); return; } closeSheets(); }));
   document.addEventListener('keydown', e => {
     if (e.key !== 'Escape') return;
     if (closeTutorial()) return;   // a tutorial card is the top layer
+    if (el.trainSheet && !el.trainSheet.hidden && trainHowClose()) return;   // then a round's rules card
     if (el.trainSheet && !el.trainSheet.hidden && el.trainSheet.classList.contains('is-playing')) { void trainBack(); return; }   // a round in play asks first
     closeSheets();
   });
@@ -6404,7 +6871,7 @@
     if (askClose) { askClose(); return; }
     if (closeTutorial()) return;   // a tutorial card first, the way Skip closes it: not "Leave this board?" under it
     if (el.homeSheet && !el.homeSheet.hidden) { closeHomePage(); return; }
-    if (el.trainSheet && !el.trainSheet.hidden) { if (el.trainSheet.classList.contains('is-playing')) void trainBack(); else closeSheets(); return; }
+    if (el.trainSheet && !el.trainSheet.hidden) { if (trainHowClose()) return; if (el.trainSheet.classList.contains('is-playing')) void trainBack(); else closeSheets(); return; }
     if ([el.sheet, el.signInSheet, el.matchSheet, el.leagueSheet].some(s => s && !s.hidden)) { closeSheets(); return; }
     if (!el.game.hidden) { el.btnLevels.click(); return; }
     shell.ask('leave', 2000);

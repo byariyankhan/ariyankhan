@@ -201,8 +201,9 @@ export async function difficulty(c: Sql, minPlayers = 1): Promise<Difficulty[]> 
 // and the website each saw only their own training and their own streak, forever. So the keys that are records
 // of play are merged here the way the boards are: commutative, idempotent, never taking anything away.
 //
-//   train   day -> { r, f, g, e, h, p, pp, nx, cl, at }  each round's best score; plays, hints and counts the
-//           larger; cl, the puzzles finished (round -> serial -> when), the union with the earliest time of each
+//   train   day -> { r, f, g, e, h, p, pp, nx, cl, f1, at }  each round's best score; plays, hints and counts
+//           the larger; cl, the puzzles cleared (round -> serial -> when), the union with the earliest time of
+//           each; f1, each round's first score of its free puzzle (what its difficulty reads), the lower
 //   daily   day -> { t, stars, quiz, tier, arrows, at } the better run: more stars, then the faster time
 //   loss    device -> arrows                            the larger per device (each device's count only grows)
 //   playStreak, dailyStreak  { count, last }           the later day; two runs that meet are joined
@@ -288,6 +289,13 @@ function cleanTrainDay(raw: unknown): Rec | undefined {
     }
     if (Object.keys(cl).length) out.cl = cl;
   }
+  // the first finish of each round's free puzzle that day, whatever it scored: the client's difficulty step
+  // reads it (trainTier) instead of the day's best, which replays can push up
+  if (isObj(raw.f1)) {
+    const f1: Rec = {};
+    for (const id of TRAIN_IDS) { const v = num((raw.f1 as Rec)[id], 0, 100); if (v !== undefined) f1[id] = Math.round(v); }
+    if (Object.keys(f1).length) out.f1 = f1;
+  }
   const at = num(raw.at, 0, EPOCH_MAX); if (at !== undefined) out.at = Math.floor(at);
   return Object.keys(out).some(k => k !== 'at') ? out : undefined;
 }
@@ -311,6 +319,10 @@ function mergeTrainDay(a: Rec | undefined, b: Rec | undefined): Rec | undefined 
     if (keep.length) cl[id] = Object.fromEntries(keep.map(x => [x, o[x]!]));
   }
   if (Object.keys(cl).length) out.cl = cl;
+  // the first scores: the lower of the two, per round -- the same whichever way round, and again if merged twice
+  const fa = (a.f1 as Rec | undefined) ?? {}, fb = (b.f1 as Rec | undefined) ?? {}, f1: Rec = {};
+  for (const id of TRAIN_IDS) { const x = fa[id] as number | undefined, y = fb[id] as number | undefined; if (x !== undefined || y !== undefined) f1[id] = Math.min(x ?? 101, y ?? 101); }
+  if (Object.keys(f1).length) out.f1 = f1;
   return out;
 }
 
