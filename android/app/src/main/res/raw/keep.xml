@@ -17,4 +17,4 @@
      icon through the same kind of meta-data that lost the splash. Code names it too, which the shrinker does
      see, but a notification that arrives with no icon is a crash in the shipped build and nowhere else. -->
 <resources xmlns:tools="http://schemas.android.com/tools"
-    tools:keep="@drawable/splash_mark,@drawable/splash_mark_night,@drawable/splash_mark_mint,@drawable/ic_stat_puzzle,@color/paper,@color/ink,@color/paper_night,@color/ink_night,@color/paper_mint,@color/ink_mint" />
+    tools:keep="@style/Theme.App.Starting,@style/Theme.App.Starting.Night,@style/Theme.App.Starting.Mint,@drawable/splash_mark,@drawable/splash_mark_night,@drawable/splash_mark_mint,@drawable/ic_stat_puzzle,@color/paper,@color/ink,@color/paper_night,@color/ink_night,@color/paper_mint,@color/ink_mint" />
