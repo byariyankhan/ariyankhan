@@ -159,7 +159,7 @@
     select: $('#aaSelect'), trainBtn: $('#aaTrainBtn'), trainPill: $('#aaTrainPill'), trainSheet: $('#aaTrainSheet'), trainBody: $('#aaTrainBody'), homeRow: $('#aaHomeRow'), homeNow: $('#aaHomeNow'), homeSheet: $('#aaHomeSheet'), homeBack: $('#aaHomeBack'), homeSearch: $('#aaHomeSearch'), homeList: $('#aaHomeList'), purse: $('#aaPurse'), purseNo: $('#aaPurseNo'), goldAd: $('#aaGoldAd'), hudDiff: $('#aaHudDiff'), play: $('#aaPlay'), path: $('#aaPath'), btnVibe: $('#aaVibe'), btnGuides: $('#aaGuides'), btnMusic: $('#aaMusic'),
     sheet: $('#aaSheet'), friends: $('#aaFriends'), signInSheet: $('#aaSignInSheet'), googleBtn: $('#aaGoogleBtn'), signInNote: $('#aaSignInNote'), ranks: $('#aaRanks'), league: $('#aaLeague'), leagueEnds: $('#aaLeagueEnds'), leagueSheet: $('#aaLeagueSheet'), leagueBody: $('#aaLeagueBody'), leagueInfo: $('#aaLeagueInfo'), matchSheet: $('#aaMatchSheet'), matchBody: $('#aaMatchBody'), matchTitle: $('#aaMatchTitle'), accountGroup: $('#aaAccountGroup'), accountCap: $('#aaAccountCap'), accountRow: $('#aaAccountRow'), accountName: $('#aaAccountName'), accountWho: $('#aaAccountWho'), accountGold: $('#aaAccountGold'), accountFace: $('#aaAccountFace'), sessionGroup: $('#aaSessionGroup'), sessionCap: $('#aaSessionCap'), signOutBtn: $('#aaSignOut'), deleteAccBtn: $('#aaDeleteAcc'), settingsBtns: $$('#aaSettings, #aaSettingsG'), themeBtn: $('#aaTheme'), themes: $('#aaThemes'), build: $('#aaBuild'), devCap: $('#aaDevCap'), devGroup: $('#aaDevGroup'), devAds: $('#aaDevAds'), devAdsNote: $('#aaDevAdsNote'), devLast: $('#aaDevLast'), devTools: $('#aaDevTools'), devHide: $('#aaDevHide'),
     game: $('#aaGame'), boardWrap: $('#aaBoardWrap'), board: $('#aaBoard'), toast: $('#aaToast'), confetti: $('#aaConfetti'),
-    coach: $('#aaCoach'), coachSpot: $('#aaCoachSpot'), coachStep: $('#aaCoachStep'), coachTitle: $('#aaCoachTitle'), coachBody: $('#aaCoachBody'), coachNext: $('#aaCoachNext'), coachSkip: $('#aaCoachSkip'), coachAgain: $('#aaCoachAgain'), hudLives: $('#aaHudLives'),
+    coach: $('#aaCoach'), coachSpot: $('#aaCoachSpot'), coachStep: $('#aaCoachStep'), coachTitle: $('#aaCoachTitle'), coachBody: $('#aaCoachBody'), coachNext: $('#aaCoachNext'), coachSkip: $('#aaCoachSkip'), coachAgain: $('#aaCoachAgain'), tourAgain: $('#aaTourAgain'), tipsAgain: $('#aaTipsAgain'), hudLives: $('#aaHudLives'),
     hudLevel: $('#aaHudLevel'), hudTime: $('#aaHudTime'), hudLeft: $('#aaHudLeft'), hudLives: $('#aaHudLives'), hudPct: $('#aaHudPct'), boardBar: $('#aaBoardBar'),
     btnHint: $('#aaHint'), btnCheck: $('#aaCheck'), hintVal: $('#aaHintVal'), checkVal: $('#aaCheckVal'), btnLevels: $('#aaBackToLevels'), btnSound: $('#aaSound'),
     overlay: $('#aaOverlay'), card: $('#aaCard'),
@@ -621,12 +621,20 @@
   // the tap), what a blocked arrow costs, the lamp, the press-and-hold check, and what clearing the board
   // does. A spotlight on each, a card under it, Skip on every step. Shown once (`coached`), and again from
   // Settings for anyone who wants it back; a race or the daily board never shows it.
+  //
+  // The numbers are this board's, read from the tier it was dealt at (a replay from Settings, or a player whose
+  // difficulty came with the account, is not on Easy), and the lifeline is called an advertisement only where
+  // one plays: on the site it is free (ads.isAd), and where the offer is off it is not mentioned at all.
+  const NUM_WORDS = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
+  const numWord = n => NUM_WORDS[n] ?? String(n);
+  const capFirst = t => t.charAt(0).toUpperCase() + t.slice(1);
+  const perBoard = (n, one, many) => `${capFirst(numWord(n))} ${n === 1 ? one : many} on this board.`;
   const COACH_STEPS = [
-    { title: 'Tap a free arrow', body: 'The glowing arrow has a clear path ahead of it. Tap it and it flies off the board.', target: () => coach.piece?.el, wait: 'shot' },
-    { title: 'Blocked arrows cost a heart', body: 'If another arrow is in the way, the tap fails and you lose a heart. The arrow turns red and goes by itself once its path clears. Four hearts per board.', target: () => el.hudLives },
-    { title: 'Stuck? Use a hint', body: 'The lamp lights up an arrow that can go right now. Three per board.', target: () => el.btnHint },
-    { title: 'Check a path first', body: 'Press and hold any arrow: green means it can go, red means it is blocked. Four checks per board.', target: () => el.btnCheck },
-    { title: 'Clear the board', body: 'Shoot every arrow and the shape reveals itself. Out of hearts? Try again, or watch a short ad for one more.', target: () => null, last: true },
+    { title: 'Tap a free arrow', body: () => 'The glowing arrow has a clear path ahead of it. Tap it and it flies off the board.', target: () => coach.piece?.el, wait: 'shot' },
+    { title: 'Blocked arrows cost a heart', body: () => `If another arrow is in the way, the tap fails and you lose a heart. The arrow turns red and goes by itself once its path clears. ${perBoard(livesFor(state.tier), 'heart', 'hearts')}`, target: () => el.hudLives },
+    { title: 'Stuck? Use a hint', body: () => `The lamp lights up an arrow that can go right now. ${perBoard(hintsFor(state.tier), 'hint', 'hints')}`, target: () => el.btnHint },
+    { title: 'Check a path first', body: () => `Press and hold any arrow: green means it can go, red means it is blocked. ${perBoard(CHECKS_PER_LEVEL, CHECK_WORD, CHECK_WORD + 's')}`, target: () => el.btnCheck },
+    { title: 'Clear the board', body: () => `Shoot every arrow and the shape reveals itself. Out of hearts? ${!adCanOffer('heart') ? 'Try again.' : ads.isAd() ? 'Try again, or watch a short ad for one more life.' : 'Try again, or take a free life and carry on.'}`, target: () => null, last: true },
   ];
   const coach = { on: false, step: -1, piece: null };
   function coachStart() {
@@ -635,48 +643,289 @@
     return true;
   }
   function coachShow(n) {
-    const s = COACH_STEPS[n]; if (!s) { coachEnd(true); return; }
+    const s = COACH_STEPS[n]; if (!s) { coachEnd('done'); return; }
     coach.step = n;
     if (coach.piece) { coach.piece.el?.classList.remove('is-coach'); coach.piece = null; }
-    if (s.wait === 'shot') { coach.piece = state.pieces.find(q => !q.gone && !blockerOf(q)) || null; if (!coach.piece) { coachShow(n + 1); return; } coach.piece.el.classList.add('is-coach'); }
     el.coachStep.textContent = `Step ${n + 1} of ${COACH_STEPS.length}`;
-    el.coachTitle.textContent = s.title; el.coachBody.textContent = s.body;
+    el.coachTitle.textContent = s.title; el.coachBody.textContent = s.body();
     el.coachNext.hidden = s.wait === 'shot';
     el.coachNext.textContent = s.last ? "Let's play" : 'Next';
     el.coachSkip.hidden = !!s.last;
     el.coach.hidden = false;
+    // the arrow is chosen with the card already on the screen, so that it can be one the card is not covering
+    if (s.wait === 'shot') { coach.piece = coachPick(); if (!coach.piece) { coachShow(n + 1); return; } coach.piece.el.classList.add('is-coach'); }
     coachPlace();
+    // the keyboard lands on the way on; a step that waits for a tap on the board leaves it where it is
+    if (!el.coachNext.hidden) el.coachNext.focus({ preventScroll: true, focusVisible: false });
+  }
+  // Step one's arrow has to be one the player can see, and the step has no Next: an arrow under the card
+  // left Skip, or a guess, as the only ways on. So it is a free arrow clear of the card where the card sits,
+  // and failing that one clear of the card at the top (which is where spotOn then puts it), and only failing
+  // both the first free arrow on the board.
+  function coachPick() {
+    const free = state.pieces.filter(q => !q.gone && q.el && !blockerOf(q));
+    if (free.length < 2) return free[0] || null;
+    const card = $('.aa-coach-card', el.coach), view = el.boardWrap ? rectOf(el.boardWrap) : null, pad = 14;
+    const clearOf = top => {
+      el.coach.classList.toggle('is-top', top);
+      const c = rectOf(card);
+      return free.find(q => {
+        const r = pieceRect(q);
+        if (view && (r.top < view.top || r.bottom > view.bottom || r.left < view.left || r.right > view.right)) return false;
+        return r.right + pad <= c.left || r.left - pad >= c.right || r.bottom + pad <= c.top || r.top - pad >= c.bottom;
+      });
+    };
+    return clearOf(false) || clearOf(true) || free[0];
+  }
+  // An arrow's own cells. Its element also holds the lane it flies out along -- drawn, hidden until it is shot
+  // -- so the element's box runs on to the edge of the board, and a spotlight round that is mostly empty board.
+  function pieceRect(q) {
+    const cells = $$('.aa-hit', q.el).map(rectOf);
+    if (!cells.length) return rectOf(q.el);
+    const left = Math.min(...cells.map(r => r.left)), top = Math.min(...cells.map(r => r.top)), right = Math.max(...cells.map(r => r.right)), bottom = Math.max(...cells.map(r => r.bottom));
+    return { left, top, right, bottom, width: right - left, height: bottom - top };
   }
   function coachPlace() {
-    if (!coach.on || el.coach.hidden) return;
-    const t = COACH_STEPS[coach.step]?.target?.();
-    const r = t?.getBoundingClientRect?.();
-    if (!r || !r.width) { el.coachSpot.classList.add('is-none'); return; }
-    el.coachSpot.classList.remove('is-none');
-    const pad = t === el.hudLives || t === el.btnHint || t === el.btnCheck ? 8 : 14;
-    el.coachSpot.style.left = `${r.left - pad}px`; el.coachSpot.style.top = `${r.top - pad}px`;
-    el.coachSpot.style.width = `${r.width + pad * 2}px`; el.coachSpot.style.height = `${r.height + pad * 2}px`;
+    if (!coach.on || !el.coach || el.coach.hidden) return;
+    const t = COACH_STEPS[coach.step]?.target?.(), piece = coach.piece && t === coach.piece.el ? coach.piece : null;
+    spotOn(el.coach, t, t === el.hudLives || t === el.btnHint || t === el.btnCheck ? 8 : 14, piece ? () => pieceRect(piece) : rectOf);
   }
+  // A pinch or a pan moves the glowing arrow on every pointer move: the spotlight follows once a frame.
+  let coachRaf = 0;
+  const coachReplace = () => { if (!coach.on || coachRaf) return; coachRaf = requestAnimationFrame(() => { coachRaf = 0; coachPlace(); }); };
   function coachShot() { if (coach.on && COACH_STEPS[coach.step]?.wait === 'shot') setTimeout(() => { if (coach.on && coach.step === 0) coachShow(1); }, 350); }
-  function coachEnd(done = false) {
+  // `how`: 'done' (through to the end), 'skip' (Skip, Back, Escape) and 'won' (the board cleared under it) mean
+  // it has been seen. Losing the board or leaving it is not seeing it: a player out of hearts at step two never
+  // met the lamp or the check, so the next board starts it again from the top.
+  function coachEnd(how) {
     if (!coach.on) return;
     coach.on = false; coach.step = -1;
     if (coach.piece) { coach.piece.el?.classList.remove('is-coach'); coach.piece = null; }
-    if (el.coach) el.coach.hidden = true;
-    store.set('coached', true);   // skipped or finished, it is not shown again unless asked for
-    if (done) toast('You know everything you need. Enjoy the tour.', 'good');
+    if (el.coach) { el.coach.hidden = true; el.coach.classList.remove('is-top'); }
+    if (how === 'done' || how === 'skip' || how === 'won') store.set('coached', true);   // not shown again unless asked for
+    if (how === 'done') toast('You know everything you need. Enjoy the tour.', 'good');
   }
   el.coachNext?.addEventListener('click', () => coachShow(coach.step + 1));
-  el.coachSkip?.addEventListener('click', () => coachEnd(false));
-  el.coachAgain?.addEventListener('click', () => { store.set('coached', false); closeSheets(); toast('The tutorial will show on your next board.', 'hint'); });
-  window.addEventListener('resize', coachPlace);
-  window.addEventListener('scroll', coachPlace, true);
+  el.coachSkip?.addEventListener('click', () => coachEnd('skip'));
+  el.coachAgain?.addEventListener('click', () => { store.set('coached', false); closeSheets(); toast('The arrow tutorial will show on your next board.', 'hint'); });
+  // The rounds' tips come back the same way. 0 rather than nothing: "asked for again", which a sync bringing
+  // the rounds' scores from another device leaves alone (adoptSeen) where it would fill in a key never set.
+  el.tipsAgain?.addEventListener('click', () => { for (const r of TRAIN_ROUNDS) store.set('trainHow:' + r.id, 0); closeSheets(); toast('The tips will show the next time you open each Daily Training round.', 'hint'); });
+  // After the resize has been laid out, not during it: onTurn, which turns a sideways page back upright, runs
+  // on the same event, and a spotlight measured before it lands where the thing used to be.
+  window.addEventListener('resize', () => requestAnimationFrame(() => { coachPlace(); tourPlace(); }));
+  window.addEventListener('scroll', () => { coachPlace(); tourReplace(); }, true);
+
+  // Put a tutorial's spotlight on a thing, and its card at whichever end of the screen covers less of it: the
+  // bottom, unless that is where the thing is. Everything is measured in the page's own frame (rectOf), so a
+  // phone browser held sideways -- the page turned back upright inside it -- still gets the hole on the thing,
+  // and the layer is measured too rather than assumed to start at the corner of the glass. The card is
+  // measured, not guessed: its height is the words and the width. Shared by the board tutorial and the home
+  // tour; `is-top` on the layer is also what keeps a toast clear of the card (toast).
+  function spotOn(layer, t, pad, measure = rectOf) {
+    const spot = $('.aa-coach-spot', layer), card = $('.aa-coach-card', layer);
+    if (!spot || !card) return;
+    // A page turned upright scrolls inside the body, and a fixed layer inside a turned body scrolls with it:
+    // it is held on the glass by exactly what the body has scrolled.
+    layer.style.transform = turn.dir && document.body.scrollTop ? `translateY(${document.body.scrollTop}px)` : '';
+    const r = t && t.isConnected && t.getClientRects().length ? measure(t) : null;
+    if (!r || !r.width) {
+      // no thing to point at: the whole screen dims. The hole's own place is cleared too, or the last one stays.
+      spot.classList.add('is-none'); spot.style.left = spot.style.top = spot.style.width = spot.style.height = '';
+      layer.classList.remove('is-top'); return;
+    }
+    spot.classList.remove('is-none');
+    const L = rectOf(layer), hole = { left: r.left - pad, top: r.top - pad, right: r.right + pad, bottom: r.bottom + pad };
+    spot.style.left = `${hole.left - L.left}px`; spot.style.top = `${hole.top - L.top}px`;
+    spot.style.width = `${hole.right - hole.left}px`; spot.style.height = `${hole.bottom - hole.top}px`;
+    const covers = top => {
+      layer.classList.toggle('is-top', top);
+      const c = rectOf(card);
+      return Math.max(0, Math.min(c.right, hole.right) - Math.max(c.left, hole.left)) * Math.max(0, Math.min(c.bottom, hole.bottom) - Math.max(c.top, hole.top));
+    };
+    const low = covers(false);
+    if (low > 0 && covers(true) >= low) layer.classList.remove('is-top');
+  }
+
+  // ── The home tour ──
+  // The board teaches itself on the first board and each Daily Training round on its first go; the home
+  // screen had nobody to say what is on it -- a brain, a map that turns into it, a mark in the corner that is
+  // a second game, a chip that is a league. So the first time the app is opened on a phone that has played
+  // nothing at all, it is walked round once in the same spotlight and card, one thing at a time, and its last
+  // button is the first board, where the arrow tutorial takes over. Only in the app, on its own: somebody
+  // arriving at the website came from a link to play, and is not stopped for a tour. Settings → Help replays
+  // it anywhere. Once (`homeTour: 'done'`), whether it was finished, skipped, or walked out of into a sheet or
+  // a board -- a player who has gone somewhere has found the way.
+  //
+  // It is its own layer, built here the way the training coach builds its own: #aaCoach is the board's, and
+  // its buttons are wired to the board's steps. It waits for the opening to be over (the terms, the splash,
+  // the phone's notification question, whatever a later version puts there -- 'aa:opened' says so, and a poll
+  // looks for itself in case nothing does), for the home screen to be drawn, and for nothing to be over it.
+  // Every line is checked against what the thing it points at actually does, on the site and in the app.
+  const HOME_TOUR = [
+    { id: 'brain', title: 'Your brain', body: () => `It fills with the arrows of every board you clear. Rank up from ${RANKS[0][0]} to ${RANKS[RANKS.length - 1][0]}.`, target: () => el.deckTrack?.parentElement, slide: 0 },
+    { id: 'world', title: 'Your world tour', body: () => 'Countries you clear are coloured in. Tap any you have reached to play it.', target: () => el.deckTrack?.parentElement, slide: 1 },
+    { id: 'train', title: 'Daily Training', body: () => `${capFirst(numWord(TRAIN_ROUNDS.length))} quick brain rounds, free every day. Play one and the dot becomes your Brain Score.`, target: () => el.trainBtn, pad: 6 },
+    { id: 'league', title: 'The league', body: () => `A new table every week, of the gold won in matches. The top ${numWord(league.data?.prizes?.length || 10)} are paid.`, target: () => el.league, pad: 6, when: () => !!el.league && !el.league.hidden },
+    { id: 'friends', title: 'Play with Friends', body: () => 'Race friends and people online for gold. It needs a sign-in; playing alone never does.', target: () => el.friends },
+    { id: 'settings', title: 'Settings', body: () => 'Your home country, sound, music and colours. This tour is there too, under Help.', target: () => $('#aaSettings'), pad: 6 },
+    { id: 'play', title: 'Play & Discover', body: () => store.get('coached', false) ? 'Start here: the next country on your world tour.' : 'Start here. Your first board shows you how the arrows work.', target: () => el.play, last: true },
+  ];
+  const TOUR_WAIT_MS = 30000;   // how long it looks for a free home screen once nobody is reading anything
+  const tour = { on: false, id: '', box: null, wait: 0, since: 0, again: false, obs: null, raf: 0 };
+  let homeDrawn = false;        // renderSelect has run: the brain, the map and the buttons have their contents
+  const tourSteps = () => HOME_TOUR.filter(s => !s.when || s.when());
+  // Anything played here at all -- a board cleared or skipped, a daily board, a day of training -- and the
+  // player has found their own way round. Unreadable storage counts as played: a tour that could not be
+  // remembered as done would come back on every launch.
+  function playedHere() {
+    try { return Object.keys(localStorage).some(k => k.startsWith(STORE) && /^(lv|skip|daily|train):/.test(k.slice(STORE.length))); } catch { return true; }
+  }
+  const tourDue = () => shell.on && store.get('homeTour', '') !== 'done' && !playedHere();
+  // The home screen, drawn, on the screen, and nothing over it. The explicit checks name what is known; the
+  // last one asks the page what is actually under a point of the header, which also catches whatever opening
+  // screen or panel is added later without this list being told about it.
+  function homeFree() {
+    if (!DATA || !homeDrawn || document.hidden || !el.select || el.select.hidden || !el.game.hidden) return false;
+    if ((el.gate && !el.gate.hidden) || (el.splash && !el.splash.hidden)) return false;
+    if (asking || push.asking || ads.showing || coach.on || tcoach.on) return false;
+    if ([el.sheet, el.signInSheet, el.matchSheet, el.leagueSheet, el.trainSheet, el.homeSheet].some(sh => sh && !sh.hidden)) return false;
+    if (document.querySelector('.aa-ask, .aa-adtest')) return false;
+    const probe = [el.trainBtn, el.play].map(n => n?.getBoundingClientRect()).find(r => r && r.width && r.top >= 0 && r.bottom <= innerHeight && r.left >= 0 && r.right <= innerWidth);
+    const hit = probe && document.elementFromPoint(probe.left + probe.width / 2, probe.top + probe.height / 2);
+    return !!hit && el.select.contains(hit);
+  }
+  function tourWaitStop() { clearInterval(tour.wait); tour.wait = 0; }
+  // Look for a free home screen every 400 ms, for TOUR_WAIT_MS -- a clock that stands still while somebody is
+  // reading the terms or answering the phone's question about notifications. `replay` is a player asking.
+  function tourWait(replay = false) {
+    tourWaitStop();
+    tour.since = Date.now();
+    const tick = () => {
+      if (tour.on || (!replay && !tourDue())) { tourWaitStop(); return; }
+      if ((el.gate && !el.gate.hidden) || push.asking || document.hidden) tour.since = Date.now();
+      if (homeFree()) { tourWaitStop(); tourStart(); return; }
+      if (Date.now() - tour.since > TOUR_WAIT_MS) tourWaitStop();
+    };
+    tour.wait = setInterval(tick, 400);
+    tick();
+  }
+  function tourStart() {
+    if (tour.on || !tourSteps().length) return;
+    tourWaitStop();
+    const box = document.createElement('div'); box.className = 'aa-coach aa-home-tour';
+    box.innerHTML = `<div class="aa-coach-spot"></div>
+      <div class="aa-coach-card" role="dialog" aria-modal="false" aria-labelledby="aaTourTitle" aria-describedby="aaTourBody">
+      <div class="aa-coach-text" aria-live="polite" aria-atomic="true"><p class="aa-coach-step"></p><h3 id="aaTourTitle"></h3><p class="aa-coach-body" id="aaTourBody"></p></div>
+      <div class="aa-coach-actions"><button type="button" class="aa-linkbtn" data-tour="skip">Skip</button><button type="button" class="aa-btn aa-btn--primary" data-tour="next">Next</button></div></div>`;
+    box.addEventListener('click', e => { const a = e.target.closest('[data-tour]')?.dataset.tour; if (a === 'skip') tourEnd('skip'); else if (a === 'next') tourNext(); });
+    document.body.appendChild(box);
+    Object.assign(tour, { on: true, id: '', box });
+    deckStop();   // the deck holds still: the tour turns it to the card it is talking about
+    // The header moves when the league chip, the purse or the player's face arrives, and none of that is a
+    // resize: the spotlight on the corner goes with it.
+    const head = $('.aa-home-top', el.select);
+    if (head && typeof MutationObserver === 'function') { tour.obs = new MutationObserver(tourReplace); tour.obs.observe(head, { subtree: true, childList: true, attributes: true, characterData: true }); }
+    tourShow(tourSteps()[0].id);
+  }
+  function tourShow(id) {
+    if (!tour.on) return;
+    const list = tourSteps(), n = list.findIndex(s => s.id === id), s = list[n];
+    if (!s) { tourEnd('done'); return; }
+    // a step whose thing is not on the screen just now is passed over rather than pointed at nothing
+    const t = s.target?.();
+    if (!t || !t.getClientRects().length) { if (s.last) tourEnd('done'); else tourShow(list[n + 1]?.id); return; }
+    tour.id = id;
+    if (s.slide != null) deckGo(s.slide);
+    const box = tour.box, next = $('[data-tour="next"]', box);
+    $('.aa-coach-step', box).textContent = `Step ${n + 1} of ${list.length}`;
+    $('h3', box).textContent = s.title; $('.aa-coach-body', box).textContent = s.body();
+    next.textContent = s.last ? "Let's play" : 'Next';
+    $('[data-tour="skip"]', box).hidden = !!s.last;
+    tourPlace(true);
+    next.focus({ preventScroll: true, focusVisible: false });
+  }
+  // Next goes to the step after this one in the whole list, so a league chip that turns up mid-tour is shown
+  // in its place and one that goes away is passed over, and the count follows what is on the screen.
+  function tourNext() {
+    const s = HOME_TOUR.find(x => x.id === tour.id);
+    if (s?.last) { tourEnd('done'); el.play?.click(); return; }   // the first board, and the arrow tutorial on it
+    const nx = HOME_TOUR.slice(HOME_TOUR.indexOf(s) + 1).find(x => !x.when || x.when());
+    if (nx) tourShow(nx.id); else tourEnd('done');
+  }
+  const viewH = () => turn.dir ? document.body.offsetHeight : innerHeight;
+  // what scrolls: the body on a page turned upright (it is the fixed box), the document everywhere else
+  const pageScroller = () => turn.dir ? document.body : (document.scrollingElement || document.documentElement);
+  function tourPlace(scroll = false) {
+    if (!tour.on || !tour.box) return;
+    const s = HOME_TOUR.find(x => x.id === tour.id), t = s?.target?.(), pad = s?.pad ?? 10;
+    if (scroll && t?.getClientRects().length) {
+      // On a short screen a button can be under the fold, and the card can have room at neither end without
+      // sitting on part of the thing it is about. The page is moved first -- by as little as clears the card,
+      // at whichever end that is least, and never so far that the thing leaves the screen -- and the
+      // spotlight is put where the thing then is.
+      let r = rectOf(t);
+      if (r.top < 0 || r.bottom > viewH()) { t.scrollIntoView({ block: 'nearest' }); r = rectOf(t); }
+      const card = $('.aa-coach-card', tour.box), sc = pageScroller();
+      const hole = { left: r.left - pad, top: r.top - pad, right: r.right + pad, bottom: r.bottom + pad };
+      const at = top => { tour.box.classList.toggle('is-top', top); return rectOf(card); };
+      const clash = c => c.bottom > hole.top && c.top < hole.bottom && c.right > hole.left && c.left < hole.right;
+      const lo = at(false), hi = at(true);
+      if (clash(lo) && clash(hi)) {
+        const down = sc.scrollHeight - sc.clientHeight - sc.scrollTop, up = sc.scrollTop;
+        const dyLo = hole.bottom - lo.top, dyHi = hole.top - hi.bottom;   // the page up under a low card, down under a high one
+        const okLo = dyLo <= down && hole.top - dyLo >= 0, okHi = -dyHi <= up && hole.bottom - dyHi <= viewH();
+        const dy = okLo && (!okHi || dyLo <= -dyHi) ? dyLo : okHi ? dyHi : 0;
+        if (dy) sc.scrollBy(0, dy);
+      }
+    }
+    spotOn(tour.box, t, pad);
+  }
+  function tourReplace() { if (!tour.on || tour.raf) return; tour.raf = requestAnimationFrame(() => { tour.raf = 0; tourPlace(); }); }
+  // `how` is 'done', 'skip' or 'left' (a sheet opened, a board started): each is the end of it, for good.
+  function tourEnd(how) {
+    if (!tour.on) return;
+    if (tour.raf) { cancelAnimationFrame(tour.raf); tour.raf = 0; }
+    tour.obs?.disconnect(); tour.obs = null;
+    tour.box?.remove();
+    Object.assign(tour, { on: false, id: '', box: null });
+    store.set('homeTour', 'done');
+    void how;
+    deckStart();   // the deck turns on its own again (a board that is starting stops it straight after)
+  }
+  // Somewhere else is being gone to. A board also calls off a tour still waiting for its moment: somebody who
+  // opened a board on their own does not come back to a tour of a screen they have already left.
+  function tourLeave(toBoard = false) { if (tour.on) tourEnd('left'); else if (toBoard) tourWaitStop(); }
+  // Back and Escape close a tutorial card before anything under it: the home tour, the board's, a round's.
+  // It is the card on top, and closing it is what Skip does.
+  function closeTutorial() {
+    if (tour.on) { tourEnd('skip'); return true; }
+    if (coach.on) { coachEnd('skip'); return true; }
+    if (tcoach.on) { trainCoachEnd(true); return true; }
+    return false;
+  }
+  el.tourAgain?.addEventListener('click', () => {
+    closeSheets();
+    if (!el.game.hidden) { tour.again = true; toast('The tour starts when you are back on the home screen.', 'hint'); return; }
+    tourWait(true);
+  });
+  // The opening says when it has handed over to the home screen. The poll is there for when it does not.
+  window.addEventListener('aa:opened', () => { if (tourDue()) tourWait(); });
+  setTimeout(() => { if (tourDue()) tourWait(); }, 0);   // once the rest of this file has run
   function teach(k, msg, kind = 'hint', ms = 2800) {
     if (!sayOnce(k)) return false;
     toast(msg, kind, ms);
     return true;
   }
-  function toast(msg, kind = '', ms = 2800) { el.toast.textContent = msg; el.toast.className = 'aa-toast' + (kind ? ' aa-toast--' + kind : ''); el.toast.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => { el.toast.hidden = true; }, ms); }
+  // A toast while a tutorial card is open goes over the card, and to the other end of the screen from it: the
+  // card sat on the toast's own spot, so "Hint: the glowing arrow is free", the answer to the step that had
+  // just said to try the lamp, was written underneath it. Any card: the board's, the home tour's, a round's.
+  function toast(msg, kind = '', ms = 2800) {
+    el.toast.textContent = msg; el.toast.className = 'aa-toast' + (kind ? ' aa-toast--' + kind : '');
+    const card = $$('.aa-coach').find(c => !c.hidden);
+    if (card) el.toast.classList.add(card.classList.contains('is-top') ? 'is-over-low' : 'is-over');
+    el.toast.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => { el.toast.hidden = true; }, ms);
+  }
 
   // ── Data ──
   async function loadData() {
@@ -927,7 +1176,7 @@
   const deckStop = () => { clearInterval(deck.timer); deck.timer = 0; };
   function deckStart() {
     deckStop();
-    if (!el.deckTrack || !deck.auto || document.hidden || el.select?.hidden) return;
+    if (!el.deckTrack || !deck.auto || document.hidden || el.select?.hidden || tour.on) return;   // the home tour turns it itself
     if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;   // nothing moves on its own here
     deck.timer = setInterval(() => { if (!deck.drag) deckGo(deck.i + 1); }, DECK_EVERY);   // never mid-gesture
   }
@@ -1032,6 +1281,7 @@
       el.path.appendChild(d);
     } }
     renderThemes();
+    homeDrawn = true; tourReplace();
   }
 
   // Today's Country used to be a row in Settings. The board itself is still here — dailyPick() decides it,
@@ -1556,7 +1806,7 @@
     if (i < 0 || i >= DATA.levels.length) i = 0;
     if (!daily && !unlocked(i)) i = DATA.levels.findIndex((_, j) => !cleared(j) && unlocked(j));
     if (i < 0) i = 0;
-    stopTimer(); stopProgressPoll(); heartbeatStop(); deckStop();
+    stopTimer(); stopProgressPoll(); heartbeatStop(); tourLeave(true); coachEnd(); deckStop();
     if (el.ranks) el.ranks.hidden = true;
     if (daily?.race) state.seedBump = 0;   // a race is that exact board: a stray reshuffle must not change it
     else if (bumpSeed) state.seedBump++; else if (state.idx !== i || !!daily !== !!state.daily) { state.seedBump = 0; state.fails = 0; }
@@ -1916,7 +2166,7 @@
   function showCard() { cardShownAt = performance.now(); el.overlay.hidden = false; }
 
   function winLevel() {
-    coachEnd();
+    coachEnd('won');
     stopTimer(); state.finished = true; state.busy = true;
     music.spike = 0; musicRace(0); heartbeatStop();   // it is done: whatever was leaning on the player stops leaning
     state.outlineEl?.style.setProperty('fill-opacity', '0.9');
@@ -2962,6 +3212,7 @@
     live.leaveFeed();   // back in the lobby: nothing to watch, but the socket is how invitations arrive
     clearRun();
     if (el.ranks) el.ranks.hidden = true; el.game.hidden = true; el.overlay.hidden = true; el.select.hidden = false; setHash(-1); renderSelect();
+    if (tour.again) { tour.again = false; tourWait(true); }   // asked for in Settings while on the board
     // Somebody asked for a match while this player was still on a board. Now they are not.
     const waiting = state.inviteWaiting; state.inviteWaiting = null;
     if (waiting && Date.now() - waiting.at < INVITE_KEEP_MS) setTimeout(() => onInvite({ data: waiting }), 400);
@@ -3493,6 +3744,7 @@
     return auth;
   }
   async function openFriends() {
+    tourLeave();   // at the tap, not once the account has answered and the sheet opens
     closeSheets();
     await authLoad(true);   // the purse may have changed on another device or in a match that has just settled
     renderAccountRow();
@@ -3762,7 +4014,18 @@
   const betterRun = (a, b) => !b ? true : (a.stars || 0) !== (b.stars || 0) ? (a.stars || 0) > (b.stars || 0)
     : typeof a.t === 'number' && typeof b.t === 'number' ? a.t < b.t : typeof a.t === 'number';
 
+  // A veteran on a new phone is not taught again: boards cleared on the account mean the arrow tutorial has
+  // been seen, and a round with a score means its tips have. Only where nothing was ever recorded here -- a
+  // tutorial asked for again from Settings (coached false, trainHow 0) stays asked for.
+  function adoptSeen(server) {
+    if (Object.values(server?.levels || {}).some(r => r && r.cleared) && store.get('coached', null) === null) store.set('coached', true);
+    for (const rec of Object.values(server?.state?.train || {})) {
+      if (!rec || typeof rec !== 'object') continue;
+      for (const r of TRAIN_ROUNDS) if (typeof rec[r.id] === 'number' && store.get('trainHow:' + r.id, null) === null) store.set('trainHow:' + r.id, 1);
+    }
+  }
   function adoptTour(server, sent = null) {
+    adoptSeen(server);
     let changed = false;
     for (const [id, r] of Object.entries(server?.levels || {})) {
       if (r.cleared) {
@@ -3865,7 +4128,7 @@
   // this and a server that has keys, because a notification has to be addressed to an account, and a switch
   // that cannot do anything is worse than no switch. The permission prompt is only ever raised by that switch
   // being turned on: a game that asks for notifications on the way in is a game people close.
-  const push = { key: '', on: false, busy: false, checked: false, asked: false, app: false, granted: true, blocked: false, posted: '' };
+  const push = { key: '', on: false, busy: false, checked: false, asked: false, app: false, granted: true, blocked: false, posted: '', asking: false };
   // isSecureContext rather than a list of protocols: it is the browser's own answer to the same question, and
   // it already knows that https, localhost and 127.0.0.1 all count and that a file:// page does not.
   // The shell is named here rather than left to the feature tests below it. A WebView reports no
@@ -3987,13 +4250,15 @@
     // the phone, without a dialog, and the switch in Settings is still there.
     if (!push.app || push.on) return;
     store.set('pushAsked', Date.now());
+    push.asking = true;   // the phone's dialog is up: the home tour waits for the answer rather than starting under it
     try {
       const r = await shell.ask('pushOn', 120000);
+      push.asking = false;
       if (!r?.ok || !r.token) { if (r?.error === 'denied') push.granted = false; renderNotify(); return; }
       push.granted = true;
       await pushApi('token', { token: r.token, tz: TZ, reminder: remindOn() });
       push.on = true; push.blocked = false; push.posted = r.token;
-    } catch { /* asked and not answered: the switch in Settings is still there */ }
+    } catch { /* asked and not answered: the switch in Settings is still there */ } finally { push.asking = false; }
     renderNotify();
   }
 
@@ -5444,6 +5709,7 @@
     else { zoom.x = Math.max(bw * (1 - zoom.s), Math.min(0, zoom.x)); zoom.y = Math.max(bh * (1 - zoom.s), Math.min(0, zoom.y)); }
     svg.style.transform = zoom.s === 1 ? '' : `translate(${zoom.x}px, ${zoom.y}px) scale(${zoom.s})`;
     el.zoomBtns?.forEach(b => { b.disabled = (b.dataset.zoom === 'out' || b.dataset.zoom === 'fit') ? zoom.s === 1 : zoom.s >= zoom.MAX; });
+    coachReplace();   // the tutorial's glowing arrow moved with the board
   }
   // zoom by a factor around a point (in wrap coordinates, relative to the board's unscaled top-left)
   function zoomAt(factor, px, py) {
@@ -5670,7 +5936,7 @@
   });
   el.play.addEventListener('click', () => startLevel(+el.play.dataset.level || 0));
   // Sheets
-  const openSheet = sh => { sh.hidden = false; document.body.style.overflow = 'hidden'; };
+  const openSheet = sh => { tourLeave(); sh.hidden = false; document.body.style.overflow = 'hidden'; };
   const closeSheets = () => { stopResultWatch(); if (el.trainSheet) { el.trainSheet.hidden = true; trainLeave(); } el.sheet.hidden = true; if (el.homeSheet) el.homeSheet.hidden = true; if (el.signInSheet) el.signInSheet.hidden = true; if (el.matchSheet) el.matchSheet.hidden = true; if (el.leagueSheet) el.leagueSheet.hidden = true; document.body.style.overflow = ''; };
   el.settingsBtns.forEach(b => b.addEventListener('click', () => {
     openSheet(el.sheet);
@@ -5695,6 +5961,7 @@
   $$('.aa-sheet').forEach(sh => sh.addEventListener('click', e => { if (e.target === sh) closeSheets(); }));
   document.addEventListener('keydown', e => {
     if (e.key !== 'Escape') return;
+    if (closeTutorial()) return;   // a tutorial card is the top layer
     if (el.trainSheet && !el.trainSheet.hidden && el.trainSheet.classList.contains('is-playing')) { void trainBack(); return; }   // a round in play asks first
     closeSheets();
   });
@@ -5836,6 +6103,7 @@
   // steps into the background.
   function backPressed() {
     if (askClose) { askClose(); return; }
+    if (closeTutorial()) return;   // a tutorial card first, the way Skip closes it: not "Leave this board?" under it
     if (el.homeSheet && !el.homeSheet.hidden) { closeHomePage(); return; }
     if (el.trainSheet && !el.trainSheet.hidden) { if (el.trainSheet.classList.contains('is-playing')) void trainBack(); else closeSheets(); return; }
     if ([el.sheet, el.signInSheet, el.matchSheet, el.leagueSheet].some(s => s && !s.hidden)) { closeSheets(); return; }
@@ -5907,6 +6175,7 @@
     r.toggle('is-turned-ccw', turn.dir === -90);
     r.toggle('is-turned-cw', turn.dir === 90);
     trainRefit();   // a round in hand is fitted to the page's new shape
+    requestAnimationFrame(() => { coachPlace(); tourPlace(); });   // and a spotlight follows what it is on
   }
   sideways.addEventListener?.('change', onTurn);
   screen.orientation?.addEventListener?.('change', onTurn);

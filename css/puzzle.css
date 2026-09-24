@@ -516,6 +516,19 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-coach-card p{ margin:0; font-size:15px; line-height:1.4; color:var(--muted); }
 .aa-coach-actions{ display:flex; justify-content:space-between; align-items:center; gap:10px; margin-top:12px; }
 .aa-coach-actions .aa-btn{ padding:11px 20px; }
+/* The card goes to the top when the thing it is about is at the bottom (spotOn in js/puzzle.js decides, by
+   measuring): the Play buttons on the home screen, a glowing arrow low on the board. */
+.aa-coach.is-top .aa-coach-card{ top:calc(16px + env(safe-area-inset-top, 0px)); bottom:auto; }
+/* A short screen (a 320x568 phone) has room for the card or for the brain above it, not both at full size:
+   the card gives back what it can, so the card on the home screen and the Play buttons stay clear of it.
+   The board's tutorial and the home tour; a Daily Training round fits its own coach. */
+@media (max-height:640px){
+  .aa-coach:not(.aa-train-coach) .aa-coach-card{ padding:12px 14px 10px; }
+  .aa-coach:not(.aa-train-coach) .aa-coach-card h3{ font-size:18px; margin-bottom:4px; }
+  .aa-coach:not(.aa-train-coach) .aa-coach-card p{ font-size:14px; line-height:1.35; }
+  .aa-coach:not(.aa-train-coach) .aa-coach-actions{ margin-top:8px; }
+  .aa-coach:not(.aa-train-coach) .aa-coach-actions .aa-btn{ padding:9px 18px; }
+}
 @media(prefers-reduced-motion:reduce){ .aa-coach-spot{ transition:none; } .aa-piece.is-coach .aa-track{ animation:none; } }
 .aa-piece.is-shake .aa-track, .aa-piece.is-shake .aa-head{ animation:aa-shake .3s; }
 @keyframes aa-shake{ 0%,100%{ opacity:1; } 30%,70%{ opacity:.25; } }
@@ -538,6 +551,11 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-toast--hint{ background:var(--accent); color:var(--accent-ink); }
 .aa-toast--hard{ background:var(--hard); color:#fff; font-size:16px; letter-spacing:1px; }
 .aa-toast--combo{ background:var(--accent2); color:#fff; font-size:16px; }
+/* A toast raised while a tutorial card is open (toast in js/puzzle.js): over every coach layer (the board's
+   110, a round's 115) and under a question (.aa-ask, 120), at the top when the card is at the bottom and at
+   the bottom when it is at the top. */
+.aa-toast.is-over, .aa-toast.is-over-low{ z-index:116; }
+.aa-toast.is-over{ top:calc(16px + env(safe-area-inset-top, 0px)); bottom:auto; }
 /* ── First-open gate and launch splash ── */
 .aa-gate, .aa-splash{ position:fixed; inset:0; z-index:60; background:var(--bg); display:flex; align-items:center; justify-content:center; padding:24px calc(16px + env(safe-area-inset-left, 0px)) calc(24px + env(safe-area-inset-bottom, 0px)); text-align:center; }
 .aa-gate-inner, .aa-splash-inner{ width:100%; max-width:400px; display:flex; flex-direction:column; align-items:center; }

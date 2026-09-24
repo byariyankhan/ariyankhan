@@ -934,11 +934,42 @@ links.
   home buttons carry no subtitle: the icon says it.
 - **The tutorial** (`COACH_STEPS`, `coachStart`, `#aaCoach`): on the first board somebody opens, five
   things one at a time, each under a spotlight cut out of a dark scrim by one enormous box-shadow, with a card
-  pinned to the bottom and Skip on every step. Step one glows a free arrow (`.is-coach`, the hint's glow) and
+  at the bottom and Skip on every step. Step one glows a free arrow (`.is-coach`, the hint's glow) and
   waits for the tap (`coachShot` from `shoot`); then the hearts and what a blocked arrow costs, the lamp, the
   press-and-hold check, and what clearing the board does. The layer lets taps through, so the board is playable
-  under it. Shown once (`coached`), never in a race or on the daily board, closed by winning, losing or
-  leaving the board, and Settings → Help → "Show the tutorial again" brings it back on the next board.
+  under it. The numbers are the board's own (`livesFor`/`hintsFor` of its tier, `CHECKS_PER_LEVEL`: "Two
+  hearts on this board" on Expert), and the last step calls the lifeline an ad only where one plays
+  (`ads.isAd()`: "take a free life" on the site, nothing at all where the offer is off). Step one's arrow is
+  a free one clear of the card (`coachPick`; failing that the card moves to the top), and the hole is cut round
+  the arrow's own cells, not the lane it flies out along (`pieceRect`). Shown once (`coached`), and counted as
+  seen only when it is finished, skipped (Skip, Back, Escape) or the board is cleared under it: a board lost or
+  left with it open brings it back on the next one. Never in a race or on the daily board. Settings → Help →
+  "Show the arrow tutorial again" brings it back on the next board; "Show the Daily Training tips again" sets
+  every round's `trainHow:<id>` to 0.
+- **Every tutorial card, shared rules** (`spotOn`, `closeTutorial`, `toast`): the spotlight and the card are
+  measured in the page's own frame (`rectOf`), so a phone browser held sideways — the page turned back upright
+  — gets the hole on the thing; they are placed again a frame after a resize or a turn, after a zoom or a pan
+  on the board, and after a scroll. The card is at the bottom unless that covers the thing, then at whichever
+  end covers less (`.aa-coach.is-top`), and on a short screen (under 640px) it is a little smaller. Android's
+  Back and Escape close an open card first — the home tour, the board's, a Daily Training round's — the way
+  Skip does, before any sheet, "Leave this board?" or "Leave this round?". A toast raised while a card is open
+  goes over it (`.aa-toast.is-over`, z-index 116, under a question's 120), at the other end of the screen. The
+  step text is a polite live region and Next takes the focus. A sync that brings cleared boards to a phone
+  marks the arrow tutorial seen, and a round with a score its tips (`adoptSeen`), unless they were asked for
+  again in Settings.
+- **The home tour** (`HOME_TOUR`, `tourStart`/`Show`/`Next`/`Place`/`End`, `.aa-home-tour`): the first time
+  the app is opened on a phone that has played nothing (no `lv:`, `skip:`, `daily:` or `train:` record), the
+  home screen is walked round once in the same spotlight and card: the brain, the world tour (the deck turned
+  to each, and held still meanwhile), Daily Training, the league chip when it is showing, Play with Friends,
+  Settings, and Play & Discover, whose "Let's play" starts the first board, where the arrow tutorial takes
+  over. Its own layer on `document.body`, like the training coach. Only in the app (`shell.on`) on its own;
+  Settings → Help → "Tour of the app" replays it anywhere, the website too (on a board it says it will start
+  back on the home screen, and does). It waits for the opening to be over: the `aa:opened` event, or a poll
+  every 400 ms for up to 30 s (a clock that stands still while the terms or the phone's notification
+  question, `push.asking`, are open) for a drawn home screen with nothing over it (`homeFree`, which also asks
+  the page what is under the header). Once (`homeTour: 'done'`): finished, skipped, Back, or walked out of
+  into a sheet or a board. A header that changes under it (the league chip, the purse, a face) moves the
+  spotlight (a `MutationObserver`), and on a short screen the page is scrolled by as little as clears the card.
 - **The brain has a rank** (`RANKS`, `arrowsShot`, `rankOf`, `loseArrows`, `.aa-card-rank`): Newbie to
   GOAT at 6,236 arrows, fourteen steps, earned by the arrows on cleared boards and lost by the arrows left
   on lost ones, synced with the account, and separate from the level — see "The brain on the home screen"
@@ -1429,7 +1460,8 @@ links.
 - **First open / launch**: `#aaGate` (welcome, Terms + Privacy links, Accept,
   stored in `aa:v1:welcomed`), then `#aaSplash` (logo + one line from `QUOTES`,
   rotating per launch in `aa:v1:launches`, tap or 2.4 s to dismiss, skipped for
-  `#level-N`/`#daily` deep links and once per browser session).
+  `#level-N`/`#daily` deep links and once per browser session). In the app, on a
+  phone that has played nothing, the home tour follows (see "The home tour").
 - **Data**: `games/data/puzzle.json` (112 KB for 168 countries) built by
   `games/build-puzzle-boards.mjs` from world-atlas 110m + Natural Earth 50m
   properties: per country the outline (`d`, in a 100×100 box) and five tier

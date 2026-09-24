@@ -288,9 +288,12 @@
       <div class="aa-coach" id="aaCoach" hidden>
         <div class="aa-coach-spot" id="aaCoachSpot"></div>
         <div class="aa-coach-card" role="dialog" aria-modal="false" aria-labelledby="aaCoachTitle" aria-describedby="aaCoachBody">
-          <p class="aa-coach-step" id="aaCoachStep"></p>
-          <h3 id="aaCoachTitle"></h3>
-          <p id="aaCoachBody"></p>
+          <!-- read out when a step changes: the focus is on Next, and Next says nothing about the step -->
+          <div class="aa-coach-text" aria-live="polite" aria-atomic="true">
+            <p class="aa-coach-step" id="aaCoachStep"></p>
+            <h3 id="aaCoachTitle"></h3>
+            <p id="aaCoachBody"></p>
+          </div>
           <div class="aa-coach-actions"><button type="button" class="aa-linkbtn" id="aaCoachSkip">Skip</button><button type="button" class="aa-btn aa-btn--primary" id="aaCoachNext">Next</button></div>
         </div>
       </div>
@@ -392,7 +395,11 @@
 
         <p class="aa-cap">Help</p>
         <div class="aa-group">
-          <button type="button" class="aa-row aa-row--link" id="aaCoachAgain"><span class="aa-row-ico">🎓</span><span class="aa-row-label">Show the tutorial again<small>On your next board</small></span><span class="aa-row-chev">›</span></button>
+          <!-- The home tour runs by itself once, in the app, on a phone that has played nothing; here it is for
+               anybody, on the site too. The other two bring back what a board and a round teach the first time. -->
+          <button type="button" class="aa-row aa-row--link" id="aaTourAgain"><span class="aa-row-ico">🧭</span><span class="aa-row-label">Tour of the app<small>What is where on the home screen</small></span><span class="aa-row-chev">›</span></button>
+          <button type="button" class="aa-row aa-row--link" id="aaCoachAgain"><span class="aa-row-ico">🎓</span><span class="aa-row-label">Show the arrow tutorial again<small>On your next board</small></span><span class="aa-row-chev">›</span></button>
+          <button type="button" class="aa-row aa-row--link" id="aaTipsAgain"><span class="aa-row-ico">🧠</span><span class="aa-row-label">Show the Daily Training tips again<small>The next time you open each round</small></span><span class="aa-row-chev">›</span></button>
           <a class="aa-row aa-row--link" href="/#contact"><span class="aa-row-ico">💬</span><span class="aa-row-label">Feedback</span><span class="aa-row-chev">›</span></a>
         </div>
 
