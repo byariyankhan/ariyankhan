@@ -85,7 +85,10 @@ address is the `Reply-To`, so replying to an enquiry goes to them and not to thi
 **Proxy note:** `.htaccess` forces HTTPS via `%{HTTPS}` *or*
 `X-Forwarded-Proto`, so any proxy that sets that header (all of them do) works
 without a redirect loop. `RedirectMatch 404 ^/(deploy|tests)` keeps the tooling
-directories unreachable over the web.
+directories unreachable over the web. Behind that proxy Apache only sees plain
+HTTP, so its own slash redirect for a folder (mod_dir) answers `http://`: the
+game's bare `/puzzle` therefore has a rule of its own that goes straight to
+`https://…/puzzle/`, one hop, like the old `/arrow-atlas*.html` addresses.
 
 ---
 
@@ -803,14 +806,31 @@ links.
   pinch, the confetti canvas); distances did not, because a quarter turn does not
   change one.
 
-- **SEO**: title/description/keywords around "puzzle", "train your brain", "arrow puzzle" and
-  "arrow game"; Open Graph/Twitter card `images/puzzle-og.jpg` (1200×630,
-  drawn by `games/build-puzzle-og.mjs`; the app icon by `games/build-puzzle-icon.mjs`); schema.org WebPage +
-  VideoGame/WebApplication (alternateNames, keywords, image, PlayAction) +
-  BreadcrumbList + FAQPage; the About / how-to / FAQ copy is a visible
-  `#aaAbout` section under the app (the settings "How to play" and "About"
-  rows scroll to it); the homepage has a "Games" section linking both games
-  with keyword anchor text; sitemap priority 1.0 with an image entry.
+- **SEO**: the head names what the game is today: Daily Training's four rounds by
+  their names in `TRAIN_ROUNDS` (Restore the Canvas, The Forgery, Gallery Memory,
+  The Curator's Eye) and the arrow puzzle on 197 countries. Title at most 60
+  characters, description at most 160, a short keywords list of real phrases, Open
+  Graph/Twitter card `images/puzzle-og.jpg` (1200×630, drawn by
+  `games/build-puzzle-og.mjs`; the app icon by `games/build-puzzle-icon.mjs`).
+  Every self-reference is `https://ariyankhan.com/puzzle/` **with the slash**
+  (canonical, og:url, every JSON-LD `@id`, the breadcrumb, the sitemap), and the
+  root `.htaccess` sends the bare `/puzzle` there in one https hop (mod_dir's own
+  slash redirect answered `http://` from behind the proxy). No hreflang: one language.
+  One JSON-LD block: WebPage, VideoGame + WebApplication (SinglePlayer and
+  MultiPlayer, "over 400 boards", no ratings), FAQPage and BreadcrumbList. There is
+  no MobileApplication node and no "Android app" wording until the Play listing is
+  public. The words a crawler reads are in the static HTML but nothing sits under the
+  game: Settings > About has an **"About Puzzle & FAQ"** row, a native `<details>`
+  folded shut like Credits (`#aaAboutGame`), with what Daily Training and the arrow
+  puzzle are and six questions. The FAQPage quotes those questions and answers word
+  for word, and `tests/puzzle-seo.test.mjs` fails if they drift apart, if a round is
+  renamed in `TRAIN_ROUNDS` without the page following, or if a removed round comes
+  back in the copy. A `<noscript>` line says the same in one sentence. The gate, the
+  splash, the sign-in sheet and the session and developer groups carry
+  `data-nosnippet`, so interface text is never the search snippet. The homepage has a
+  "Games" section linking both games; `llms.txt` and `llms-full.txt` describe the
+  game; sitemap priority 1.0. No hidden text, no bot-only markup, no health or
+  memory-improvement claims: the Brain Score is a game score.
 - **Scale and feel** (matched to the reference apps): boards are at most 32 cells
   across on Easy to Hard (46 tall / 38 wide for elongated shapes) and up to 36/40
   on Expert/Master (`MAX_DIM_OF`, `MAX_TALL_OF`, `MAX_WIDE_OF`; `TARGETS` 110/240/400/540/680

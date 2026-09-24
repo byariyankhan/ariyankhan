@@ -151,8 +151,6 @@ Fill out the contact form at https://ariyankhan.com/#contact with your project d
   Natural Earth (public domain, de facto boundaries; 1:110m by default, optional 1:50m with 241
   territories). Built by Ariyan Khan, who does map animation for YouTube channels professionally.
 - AI Metadata Remover: https://ariyankhan.com/ai-metadata-remover.html
-- Piece the World (geography jigsaw game): https://ariyankhan.com/piece-the-world.html
-- Puzzle – Train Your Brain (tap-away arrow puzzle on country maps): https://ariyankhan.com/puzzle/
   Free, browser-only tool that removes C2PA / JUMBF Content Credentials, XMP, IPTC, EXIF (camera, GPS,
   software), JPEG comments, PNG text chunks (Stable Diffusion "parameters", ComfyUI "prompt"/"workflow"),
   WebP EXIF/XMP/C2PA chunks and hidden trailing data from JPG, PNG and WebP images. The file container is
@@ -163,6 +161,21 @@ Fill out the contact form at https://ariyankhan.com/#contact with your project d
   Firefly, Midjourney, Stable Diffusion/ComfyUI, Microsoft Designer). Honest limits: it cannot remove
   pixel-level watermarks such as Google SynthID, cannot fool pixel-based AI detectors and handles still
   images only (no video). Built by Ariyan Khan for his own thumbnail / B-roll workflow.
+- Piece the World (geography jigsaw game): https://ariyankhan.com/piece-the-world.html
+- Puzzle – Train Your Brain (daily brain training and arrow puzzle game): https://ariyankhan.com/puzzle/
+  Free brain-training game that plays in the browser; no download, and solo play needs no account.
+  Daily Training is four short rounds every day on 247 public-domain paintings from The Metropolitan
+  Museum of Art's Open Access collection: Restore the Canvas (memorise a painting, then put its 9 to 25
+  pieces back), The Forgery (spot the patches of a forged copy that are mirrored, recoloured or moved),
+  Gallery Memory (re-hang paintings in the order they hung) and The Curator's Eye (pick which of four
+  close-ups came from the painting). Each round is scored 0-100 and gets harder or easier with your
+  scores; the day's average is the Brain Score, and playing every day builds a streak. The arrow logic
+  puzzle: tap an arrow to send it off the board if its path is clear, a blocked tap costs one of four
+  hearts. Over 400 boards shaped like all 197 countries, with animal, bird, landmark and picture boards
+  between them, make a world tour from your home country; hints, difficulty from Easy to Master that
+  follows your play, and country facts (capital, population, region) on every country cleared. Optional
+  Google sign-in adds online matches with friends and a weekly league. No in-app purchases; any
+  advertisement is optional and rewarded. Solo boards work offline once loaded.
 
 ## Blog
 Practical articles on hiring, cost, and working with a video editor.
@@ -185,7 +198,7 @@ Practical articles on hiring, cost, and working with a video editor.
 - About: https://ariyankhan.com/about.html
 - AI Metadata Remover (free tool): https://ariyankhan.com/ai-metadata-remover.html
 - Piece the World (free geography game): https://ariyankhan.com/piece-the-world.html
-- Puzzle – Train Your Brain (free geography puzzle game): https://ariyankhan.com/puzzle/
+- Puzzle – Train Your Brain (free daily brain training and arrow puzzle game): https://ariyankhan.com/puzzle/
 - Map Maker (free tool): https://ariyankhan.com/map-maker.html
 - Talking Head Video Editing: https://ariyankhan.com/talking-head-video-editing.html
 - Documentary Video Editing: https://ariyankhan.com/documentary-video-editing.html

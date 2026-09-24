@@ -47,41 +47,44 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
 
     <!-- SEO -->
-    <title>Puzzle – Train Your Brain – Daily Brain Training &amp; Puzzle Games on Real Country Maps</title>
+    <!-- Every self-reference is https://ariyankhan.com/puzzle/ with the slash: the bare /puzzle is a redirect
+         (.htaccess), and a canonical that redirects is two signals pointing different ways. The words below name
+         the four Daily Training rounds as TRAIN_ROUNDS in js/puzzle.js names them; tests/puzzle-seo.test.mjs
+         holds the two together. -->
+    <title>Puzzle – Train Your Brain: Free Daily Brain Training Games</title>
     <meta
       name="description"
-      content="Puzzle – Train Your Brain is a free brain training game on real country maps: a daily training of three short rounds with a Brain Score, arrow puzzles on 197 countries, flag memory and capital sprint. Adaptive difficulty, no sign-up to play, works offline."
+      content="Free daily brain training on real paintings: Restore the Canvas, The Forgery, Gallery Memory and The Curator’s Eye, plus arrow puzzles on 197 countries."
     />
     <meta name="author" content="Ariyan Khan" />
-    <meta name="keywords" content="brain training, daily brain training, brain score, memory game, puzzle, train your brain, brain games, arrow puzzle, arrow game, tap away arrow puzzle, arrow puzzle game online, free arrow game, geography puzzle game, country map puzzle, brain teaser, focus game" />
+    <meta name="keywords" content="brain training, daily brain training, memory game, art memory game, spot the difference, arrow puzzle, logic puzzle" />
     <meta name="application-name" content="Puzzle" />
     <meta name="robots" content="index, follow, max-image-preview:large" />
     <meta name="theme-color" content="#F4EDE0" />
-    <link rel="canonical" href="https://ariyankhan.com/puzzle" />
-    <link rel="alternate" hreflang="en-US" href="https://ariyankhan.com/puzzle" />
-    <link rel="alternate" hreflang="x-default" href="https://ariyankhan.com/puzzle" />
+    <link rel="canonical" href="https://ariyankhan.com/puzzle/" />
 
     <!-- OPEN GRAPH -->
     <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://ariyankhan.com/puzzle" />
-    <meta property="og:title" content="Puzzle – Train Your Brain – Daily Brain Training &amp; Puzzle Games on Real Country Maps" />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:url" content="https://ariyankhan.com/puzzle/" />
+    <meta property="og:title" content="Puzzle – Train Your Brain: Daily Brain Training &amp; Arrow Puzzles" />
     <meta
       property="og:description"
-      content="Tap arrows to clear a board shaped like a real country, keep your hearts and reveal the country. 197 countries, free, no sign-up to play, in your browser."
+      content="Four free brain-training rounds a day on real paintings – Restore the Canvas, The Forgery, Gallery Memory, The Curator’s Eye – plus arrow logic puzzles on 197 countries."
     />
     <meta property="og:image" content="https://ariyankhan.com/images/puzzle-og.jpg" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
-    <meta property="og:image:alt" content="Puzzle – Train Your Brain, a free arrow puzzle game on real country maps" />
+    <meta property="og:image:alt" content="Puzzle – Train Your Brain: the game’s logo, a brain drawn out of arrows, beside the line: four brain games a day on real paintings, and arrow puzzles on 197 countries" />
     <meta property="og:site_name" content="Puzzle – Train Your Brain by Ariyan Khan" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Puzzle – Train Your Brain – Daily Brain Training &amp; Puzzle Games on Real Country Maps" />
+    <meta name="twitter:title" content="Puzzle – Train Your Brain: Daily Brain Training &amp; Arrow Puzzles" />
     <meta
       name="twitter:description"
-      content="Tap arrows to clear a country-shaped board, keep your hearts and reveal the country. 197 countries, free."
+      content="Four daily brain-training rounds on real paintings, a Brain Score and a streak, plus arrow puzzles on 197 countries. Free, in your browser."
     />
     <meta name="twitter:image" content="https://ariyankhan.com/images/puzzle-og.jpg" />
-    <meta name="twitter:image:alt" content="Puzzle – Train Your Brain, a free arrow puzzle game on real country maps" />
+    <meta name="twitter:image:alt" content="Puzzle – Train Your Brain: the game’s logo, a brain drawn out of arrows, beside the line: four brain games a day on real paintings, and arrow puzzles on 197 countries" />
 
     <!-- FAVICON / PWA -->
     <!-- The game's own icon, not the site's. Installing this page put a photograph of the person who built it
@@ -111,65 +114,73 @@
       "@graph": [
         {
           "@type": "WebPage",
-          "@id": "https://ariyankhan.com/puzzle#webpage",
-          "url": "https://ariyankhan.com/puzzle",
-          "name": "Puzzle – Train Your Brain – Free Arrow Puzzle Game on Real Country Maps",
-          "primaryImageOfPage": { "@type": "ImageObject", "url": "https://ariyankhan.com/images/puzzle-og.jpg", "width": 1200, "height": 630 },
-          "description": "Free arrow puzzle game played on real country maps. Tap arrows to shoot them off the board, keep your four hearts, and see how well you focused. 197 countries on a world tour.",
+          "@id": "https://ariyankhan.com/puzzle/#webpage",
+          "url": "https://ariyankhan.com/puzzle/",
+          "name": "Puzzle – Train Your Brain: Free Daily Brain Training Games",
+          "description": "Free daily brain training on real paintings: Restore the Canvas, The Forgery, Gallery Memory and The Curator’s Eye, plus arrow puzzles on 197 countries.",
           "inLanguage": "en-US",
+          "primaryImageOfPage": { "@type": "ImageObject", "url": "https://ariyankhan.com/images/puzzle-og.jpg", "width": 1200, "height": 630 },
           "datePublished": "2026-09-15",
-          "dateModified": "2026-09-15",
+          "dateModified": "2026-09-24",
           "author": { "@id": "https://ariyankhan.com/about.html#person" },
-          "mainEntity": { "@id": "https://ariyankhan.com/puzzle#game" },
-          "breadcrumb": { "@id": "https://ariyankhan.com/puzzle#breadcrumb" }
+          "mainEntity": { "@id": "https://ariyankhan.com/puzzle/#game" },
+          "breadcrumb": { "@id": "https://ariyankhan.com/puzzle/#breadcrumb" }
         },
         {
           "@type": ["VideoGame", "WebApplication"],
-          "@id": "https://ariyankhan.com/puzzle#game",
+          "@id": "https://ariyankhan.com/puzzle/#game",
           "name": "Puzzle – Train Your Brain",
-          "alternateName": ["Puzzle Train Your Brain", "Brain puzzle game", "Arrow Puzzle on country maps", "Tap Away Arrow Puzzle", "Country Map Arrow Game"],
-          "keywords": "arrow puzzle, arrow game, tap away, arrow puzzle game, free arrow game online, geography puzzle, country map puzzle, focus game",
+          "alternateName": ["Puzzle Train Your Brain", "Arrow Atlas"],
+          "url": "https://ariyankhan.com/puzzle/",
           "image": "https://ariyankhan.com/images/puzzle-og.jpg",
-          "screenshot": "https://ariyankhan.com/images/puzzle-og.jpg",
-          "potentialAction": { "@type": "PlayAction", "target": "https://ariyankhan.com/puzzle" },
-          "url": "https://ariyankhan.com/puzzle",
-          "description": "A tap-away arrow puzzle where every board is a real country. Tap an arrow to shoot it off the board if its path is clear; a blocked tap costs one of four hearts. Clear the board to reveal the country, learn what it was, and collect it on a 197-country world tour. Difficulty ramps automatically as the tour goes on.",
-          "genre": ["Puzzle", "Casual", "Educational", "Geography", "Relaxation"],
+          "description": "A free brain-training game that plays in the browser. Daily Training is four short rounds every day on public-domain paintings: Restore the Canvas (memorise a painting, then rebuild it from its pieces), The Forgery (spot the differences in a forged copy), Gallery Memory (re-hang paintings in the order they hung) and The Curator’s Eye (pick the close-up that came from the painting you saw). Each round is scored out of 100 and the day’s Brain Score is their average. The arrow puzzle: tap an arrow to send it off the board if its path is clear; a blocked tap costs one of four hearts. Over 400 boards, the outlines of all 197 countries with picture boards between them, make a world tour whose difficulty, from Easy to Master, follows how well you play.",
+          "genre": ["Puzzle", "Brain training", "Memory game", "Logic puzzle", "Educational"],
+          "keywords": "brain training, daily brain training, memory game, art memory game, painting puzzle, spot the difference, arrow puzzle, logic puzzle, geography puzzle",
           "gamePlatform": "Web browser",
-          "playMode": "SinglePlayer",
-          "numberOfPlayers": { "@type": "QuantitativeValue", "minValue": 1, "maxValue": 1 },
           "applicationCategory": "GameApplication",
           "applicationSubCategory": "Puzzle",
-          "operatingSystem": "Any — runs in a modern web browser",
+          "operatingSystem": "Any (runs in a modern web browser)",
           "browserRequirements": "Requires JavaScript",
+          "playMode": ["SinglePlayer", "MultiPlayer"],
           "isAccessibleForFree": true,
           "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
           "featureList": [
-            "197 country boards on a world tour: every country in the world, from Italy and Bangladesh to Luxembourg and Vanuatu",
-            "Tap-away mechanic: shoot arrows off the board when their path is clear",
-            "4 hearts per level; a blocked arrow costs one",
-            "Over 450 levels: every country is followed by a board shaped like its animal, its bird or a landmark, with scene boards between them. Difficulty that follows you, not the level number: Easy, Normal, Hard, Expert and Master boards from about 20 arrows to 80 and more; a flawless, fast clear steps the boards up at once, two first-try clears in a row step them up too, two losses in a row ease them off; milestones every 10 levels; win streaks; combo counter; daily bonus board",
-            "Board clears reveal the country shape and its name",
-            "Country facts on every clear: capital, population, region",
-            "Stars, best times and tour progress saved in your browser",
-            "A tour that starts from your home country and spreads out, at a difficulty that follows your form",
-            "Works on phones and desktops, installable as an app, solo play needs no account"
+            "Daily Training: four free brain-training rounds every day, each scored 0 to 100, with a daily Brain Score, a seven-day chart and a streak",
+            "Restore the Canvas: a painting hangs whole for a few seconds, then falls into 9 to 25 pieces to put back",
+            "The Forgery: tap the patches of a forged copy that are mirrored, recoloured or taken from elsewhere in the painting",
+            "Gallery Memory: paintings hang in a numbered row for a few seconds; hang them back in the same order",
+            "The Curator’s Eye: look at one painting, then pick which of four close-ups came from it",
+            "247 public-domain paintings from The Metropolitan Museum of Art’s Open Access collection, each credited",
+            "Difficulty that follows how well you play: every training round has five steps, and the arrow boards go from Easy to Master",
+            "Arrow logic puzzle on over 400 boards: the outlines of all 197 countries, with animal, bird, landmark and picture boards between them",
+            "Four hearts per board, hints and combos",
+            "Country facts when a country is cleared: capital, population and region",
+            "Play with Friends: online matches and a weekly league, with Google sign-in",
+            "Solo play needs no account, can be added to the home screen, and its boards work offline once loaded"
           ],
-          "author": {
-            "@id": "https://ariyankhan.com/about.html#person",
-            "@type": "Person",
-            "name": "Ariyan Khan",
-            "jobTitle": "Freelance Video Editor",
-            "url": "https://ariyankhan.com/about.html",
-            "sameAs": ["https://www.youtube.com/@ariyankhan"]
-          }
+          "potentialAction": { "@type": "PlayAction", "target": "https://ariyankhan.com/puzzle/" },
+          "author": { "@id": "https://ariyankhan.com/about.html#person", "@type": "Person", "name": "Ariyan Khan" },
+          "publisher": { "@id": "https://ariyankhan.com/about.html#person" }
+        },
+        {
+          "@type": "FAQPage",
+          "@id": "https://ariyankhan.com/puzzle/#faq",
+          "isPartOf": { "@id": "https://ariyankhan.com/puzzle/#webpage" },
+          "mainEntity": [
+            { "@type": "Question", "name": "Is Puzzle – Train Your Brain free?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. The four Daily Training rounds are free every day, and the arrow puzzle tour is free to play. Nothing in the game can be bought: there are no in-app purchases, and gold is only a number in the game. Any advertisement is optional and rewarded: you choose to watch one, for an extra hint, heart, gold or a new puzzle." } },
+            { "@type": "Question", "name": "Do I need to download anything or sign up?", "acceptedAnswer": { "@type": "Answer", "text": "No. Puzzle plays in your web browser on phones, tablets and computers, and you can add it to your home screen. Playing on your own needs no account; signing in with Google is only for Play with Friends and the weekly league." } },
+            { "@type": "Question", "name": "What are the Daily Training games?", "acceptedAnswer": { "@type": "Answer", "text": "Four short rounds on real paintings: Restore the Canvas (rebuild a painting from its pieces), The Forgery (spot what is wrong in a forged copy), Gallery Memory (re-hang paintings in the order they hung) and The Curator’s Eye (pick the detail that came from the painting you saw)." } },
+            { "@type": "Question", "name": "How is the Brain Score worked out?", "acceptedAnswer": { "@type": "Answer", "text": "Each round is scored from 0 to 100, and the day’s Brain Score is the average of the rounds you played that day. Play at least one round a day to keep your streak going. A round gets harder after a day you score 85 or more in it, and easier after a day under 50." } },
+            { "@type": "Question", "name": "How does the arrow puzzle work?", "acceptedAnswer": { "@type": "Answer", "text": "Every arrow slides the way it points. Tap an arrow and, if its path is clear, it flies off the board; if another arrow blocks it, you lose one of your four hearts. Clear every arrow to finish the board. A country board then tells you which country it was, with its capital, population and region." } },
+            { "@type": "Question", "name": "Where do the paintings come from?", "acceptedAnswer": { "@type": "Answer", "text": "They are 247 public-domain works from The Metropolitan Museum of Art’s Open Access collection, and every round credits the paintings it used." } }
+          ]
         },
         {
           "@type": "BreadcrumbList",
-          "@id": "https://ariyankhan.com/puzzle#breadcrumb",
+          "@id": "https://ariyankhan.com/puzzle/#breadcrumb",
           "itemListElement": [
             { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://ariyankhan.com/" },
-            { "@type": "ListItem", "position": 2, "name": "Puzzle – Train Your Brain", "item": "https://ariyankhan.com/puzzle" }
+            { "@type": "ListItem", "position": 2, "name": "Puzzle – Train Your Brain", "item": "https://ariyankhan.com/puzzle/" }
           ]
         }
       ]
@@ -178,7 +189,7 @@
   </head>
   <body class="aa-body">
     <!-- ── FIRST OPEN: welcome and terms ── -->
-    <div class="aa-gate" id="aaGate" hidden>
+    <div class="aa-gate" id="aaGate" hidden data-nosnippet>
       <div class="aa-gate-inner">
         <h2 class="aa-gate-title">Welcome to<br />Puzzle</h2>
         <!-- The game's own mark, the brain drawn out of arrows: the same one the splash, the buttons and the icon carry. -->
@@ -188,7 +199,7 @@
       </div>
     </div>
     <!-- ── LAUNCH: logo and a line to set the mood ── -->
-    <div class="aa-splash" id="aaSplash" hidden>
+    <div class="aa-splash" id="aaSplash" hidden data-nosnippet>
       <div class="aa-splash-inner">
         <!-- The game's own mark. This used to be three coloured arrows left over from the name before this one. -->
         <div class="aa-splash-logo" aria-hidden="true">
@@ -209,8 +220,10 @@
         </header>
 
         <div class="aa-hero">
-          <h1 class="aa-title">Puzzle<span class="aa-tagline" id="aaTagline">Train your brain.</span></h1>
+          <h1 class="aa-title">Puzzle<span class="aa-tagline" id="aaTagline"> Train your brain.</span></h1>
         </div>
+        <!-- Only for a browser with script off (and a crawler that reads without running it): what the game is. -->
+        <noscript><p class="aa-loading">Puzzle needs JavaScript to play. It is a free brain-training game: four daily rounds on real paintings (Restore the Canvas, The Forgery, Gallery Memory and The Curator’s Eye) and an arrow logic puzzle on 197 countries.</p></noscript>
 
         <!-- One card at a time: the brain, then the world map. Swipe, tap a dot, or leave it alone and it
              turns itself. Two things side by side asked the player to choose what to look at; one asks nothing.
@@ -310,7 +323,7 @@
         <div id="aaTrainBody"></div>
       </div>
     </div>
-    <div class="aa-sheet" id="aaSignInSheet" hidden>
+    <div class="aa-sheet" id="aaSignInSheet" hidden data-nosnippet>
       <div class="aa-sheet-panel" role="dialog" aria-label="Sign in">
         <div class="aa-sheet-head"><h2>Sign in</h2><button type="button" class="aa-icon" data-close-sheet aria-label="Close">✕</button></div>
         <p class="aa-sheet-note">Playing with friends needs an account, so your friends know it is really you and your progress follows you to your phone, tablet and computer. Playing on your own never needs one.</p>
@@ -398,6 +411,40 @@
 
         <p class="aa-cap">About</p>
         <div class="aa-group">
+          <!-- What the game is, in words. Static HTML, so every crawler reads it without running script; folded shut
+               like Credits below, so no player scrolls past it and nothing sits under the game. The FAQPage in the
+               head quotes the Questions here word for word: change one, change the other
+               (tests/puzzle-seo.test.mjs holds them together). -->
+          <details class="aa-about-credit aa-about-game" id="aaAboutGame">
+            <summary class="aa-row aa-row--link"><span class="aa-row-ico">🧠</span><span class="aa-row-label">About Puzzle &amp; FAQ</span><span class="aa-row-chev">›</span></summary>
+            <div class="aa-about-credit-text aa-about-game-text">
+              <h3>Free daily brain training on real paintings</h3>
+              <p>Daily Training is four short games, free every day, played on public-domain paintings from The Metropolitan Museum of Art’s Open Access collection. Every round is scored out of 100, and together they make the day’s Brain Score.</p>
+              <ul>
+                <li><b>Restore the Canvas</b>: the painting hangs whole for a few seconds, then falls into pieces. Drag every piece back to its place.</li>
+                <li><b>The Forgery</b>: spot the differences. Patches of a forged copy are mirrored, recoloured or taken from elsewhere in the painting; tap them.</li>
+                <li><b>Gallery Memory</b>: paintings hang on the wall, numbered, for a moment. Hang them back in the same order.</li>
+                <li><b>The Curator’s Eye</b>: look at one painting, then, several times, pick which of four close-ups came from it.</li>
+              </ul>
+              <h3>An arrow logic puzzle on 197 countries</h3>
+              <p>Tap an arrow to send it off the board. Over 400 boards make a world tour that starts from your home country: the outlines of all 197 countries, with animal, bird, landmark and picture boards between them. Clearing a country tells you its capital, population and region, and the difficulty, from Easy to Master, follows how well you play.</p>
+              <h3>Play with friends</h3>
+              <p>Sign in with Google to race friends and other players online and to play in the weekly league. Playing on your own never needs an account.</p>
+              <h3>Questions</h3>
+              <h4>Is Puzzle – Train Your Brain free?</h4>
+              <p>Yes. The four Daily Training rounds are free every day, and the arrow puzzle tour is free to play. Nothing in the game can be bought: there are no in-app purchases, and gold is only a number in the game. Any advertisement is optional and rewarded: you choose to watch one, for an extra hint, heart, gold or a new puzzle.</p>
+              <h4>Do I need to download anything or sign up?</h4>
+              <p>No. Puzzle plays in your web browser on phones, tablets and computers, and you can add it to your home screen. Playing on your own needs no account; signing in with Google is only for Play with Friends and the weekly league.</p>
+              <h4>What are the Daily Training games?</h4>
+              <p>Four short rounds on real paintings: Restore the Canvas (rebuild a painting from its pieces), The Forgery (spot what is wrong in a forged copy), Gallery Memory (re-hang paintings in the order they hung) and The Curator’s Eye (pick the detail that came from the painting you saw).</p>
+              <h4>How is the Brain Score worked out?</h4>
+              <p>Each round is scored from 0 to 100, and the day’s Brain Score is the average of the rounds you played that day. Play at least one round a day to keep your streak going. A round gets harder after a day you score 85 or more in it, and easier after a day under 50.</p>
+              <h4>How does the arrow puzzle work?</h4>
+              <p>Every arrow slides the way it points. Tap an arrow and, if its path is clear, it flies off the board; if another arrow blocks it, you lose one of your four hearts. Clear every arrow to finish the board. A country board then tells you which country it was, with its capital, population and region.</p>
+              <h4>Where do the paintings come from?</h4>
+              <p>They are 247 public-domain works from The Metropolitan Museum of Art’s Open Access collection, and every round credits the paintings it used.</p>
+            </div>
+          </details>
           <a class="aa-row aa-row--link" href="/puzzle/privacy.html"><span class="aa-row-ico">🔒</span><span class="aa-row-label">Privacy Policy</span><span class="aa-row-chev">›</span></a>
           <a class="aa-row aa-row--link" href="/puzzle/terms.html"><span class="aa-row-ico">📄</span><span class="aa-row-label">Terms of Service</span><span class="aa-row-chev">›</span></a>
           <!-- one row like the others; the licence text opens under it when tapped (a native details, so no script) -->
@@ -412,7 +459,7 @@
         <div class="aa-group" id="aaMutedGroup" hidden></div>
 
         <p class="aa-cap" id="aaSessionCap" hidden>Leaving</p>
-        <div class="aa-group" id="aaSessionGroup" hidden>
+        <div class="aa-group" id="aaSessionGroup" hidden data-nosnippet>
           <button type="button" class="aa-row aa-row--link" id="aaSignOut"><span class="aa-row-ico">🚪</span><span class="aa-row-label">Sign out<small>Your tour and gold stay on the account</small></span><span class="aa-row-chev">›</span></button>
           <button type="button" class="aa-row aa-row--link aa-row--danger" id="aaDeleteAcc" hidden><span class="aa-row-ico">⚠️</span><span class="aa-row-label">Delete account<small>Removes it, and everything you have played, for good</small></span><span class="aa-row-chev">›</span></button>
         </div>
@@ -421,7 +468,7 @@
              that a player cannot reach by accident and, more to the point, that nobody can be sent in a link:
              the URL parameter that used to be the only way in needs an address bar, and the app has none. -->
         <p class="aa-cap" id="aaDevCap" hidden>Developer</p>
-        <div class="aa-group" id="aaDevGroup" hidden>
+        <div class="aa-group" id="aaDevGroup" hidden data-nosnippet>
           <div class="aa-row aa-row--col">
             <span class="aa-row-label">Advertisements<small class="aa-row-sub" id="aaDevAdsNote"></small></span>
             <div class="aa-dev" id="aaDevAds"></div>

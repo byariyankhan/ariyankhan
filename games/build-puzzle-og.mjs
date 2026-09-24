@@ -28,8 +28,8 @@ p{font-size:28px;line-height:1.35;margin:0;color:#8A7358;font-weight:800}
 .brand{position:absolute;left:72px;bottom:36px;font-size:20px;color:#8A7358;font-weight:800}
 </style></head><body><div class="wrap">
 <div class="left"><h1>Puzzle<span>Train Your Brain</span></h1>
-<p>Tap arrows to clear the board. Every level is a real country: 197 of them, from Italy to Vanuatu.</p>
-<div class="pill"><b>Play free</b><i>No sign-up</i><i>Works offline</i></div></div>
+<p>Four brain games a day on real paintings, and arrow puzzles on 197 countries.</p>
+<div class="pill"><b>Play free</b><i>No sign-up</i><i>No download</i></div></div>
 <div class="right">${ICON}</div>
 <div class="brand">ariyankhan.com/puzzle · by Ariyan Khan</div>
 </div></body></html>`;

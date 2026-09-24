@@ -2,7 +2,7 @@
   "id": "/puzzle/",
   "name": "Puzzle – Train Your Brain",
   "short_name": "Puzzle",
-  "description": "A free arrow puzzle that trains your focus. Tap arrows to clear a board shaped like a real country, keep your hearts, and see how well you focused. 197 countries, adaptive difficulty, works offline.",
+  "description": "Free daily brain training: four short rounds on real paintings, a Brain Score and a streak, plus arrow logic puzzles on 197 countries. Solo play needs no account.",
   "start_url": "/puzzle/?utm_source=pwa",
   "scope": "/puzzle/",
   "display": "standalone",

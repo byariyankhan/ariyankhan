@@ -173,6 +173,17 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-about-credit[open] > summary .aa-row-chev{ transform:rotate(90deg); }
 .aa-about-credit-text{ margin:-6px 0 0; padding:0 0 16px 42px; font-size:13px; font-weight:700; line-height:1.55; color:var(--muted); text-align:left; }
 .aa-about-credit-text a{ color:inherit; text-decoration:underline; text-underline-offset:3px; }
+/* Settings > About > About Puzzle & FAQ: folded like Credits, with some structure inside it. It is the first
+   row of its group, so the row after it needs the divider that .aa-row + .aa-row would have drawn. */
+.aa-about-credit + .aa-row{ border-top:1px solid var(--bg2); }
+.aa-about-game-text{ padding-right:4px; }
+.aa-about-game-text h3{ font-size:14px; font-weight:900; color:var(--ink); margin:14px 0 4px; }
+.aa-about-game-text h3:first-child{ margin-top:0; }
+.aa-about-game-text h4{ font-size:13px; font-weight:900; color:var(--ink); margin:10px 0 2px; }
+.aa-about-game-text p{ margin:0 0 6px; }
+.aa-about-game-text ul{ margin:4px 0 8px; padding-left:18px; }
+.aa-about-game-text li{ margin:0 0 4px; }
+.aa-about-game-text b{ color:var(--ink); }
 #aaHomeSheet{ z-index:51; }   /* opened from Settings, so it must paint over it */
 .aa-row-go{ color:var(--muted); font-size:24px; font-weight:900; line-height:1; padding-right:4px; }
 .aa-search{ font:inherit; font-weight:700; font-size:15px; color:var(--ink); background:var(--bg2); border:none; border-radius:14px; padding:12px 14px; width:100%; margin:0 0 12px; box-sizing:border-box; -webkit-appearance:none; appearance:none; }
