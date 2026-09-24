@@ -8,7 +8,8 @@ import { config } from '../backend/src/config.js';
 import { give, idem } from '../backend/src/gold.js';
 import { startSession } from '../backend/src/auth.js';
 import { online } from '../backend/src/presence.js';
-import { eq, finish, ok, reset, section } from './helpers.js';
+import { boardIdSet } from '../backend/src/rooms.js';
+import { begun, eq, finish, ok, reset, section } from './helpers.js';
 
 const BASE = process.env.AA_TEST_BASE ?? 'http://127.0.0.1:8760';
 const V = `${BASE}/api/puzzle/v1`;
@@ -34,6 +35,12 @@ async function call(path: string, opts: { token?: string; cookie?: string; body?
     ...(opts.body === undefined ? {} : { body: JSON.stringify(opts.body) }),
   });
   return { status: r.status, json: await r.json().catch(() => ({})) as Record<string, unknown>, headers: r.headers };
+}
+/** Start a room the way its host does, and wind its clock back past the floor on how fast it can be cleared. */
+async function start(code: string, host: string): Promise<Call> {
+  const r = await call(`/matches/${code}/start`, { token: host, body: {} });
+  await begun(code);
+  return r;
 }
 
 // Start from a clean database so this suite does not depend on what ran before it: a room another suite left
@@ -124,7 +131,7 @@ section('A result sent twice is still one pot');
   const made = await call('/matches', { token: a.token, body: { stake: 500, open_to_all: false, tier: 2 } });
   const code = (made.json.match as { code: string }).code;
   await call(`/matches/${code}/join`, { token: b.token, body: { tier: 2 } });
-  await call(`/matches/${code}/start`, { token: a.token, body: {} });
+  await start(code, a.token);
   const before = (await call('/auth/me', { token: b.token })).json.user as { gold: number };
   // the same request five times over, the way a client retrying a lost reply would send it
   for (let i = 0; i < 5; i++) await call(`/matches/${code}/result`, { token: b.token, body: { ms: 3300, cleared: true } });
@@ -173,7 +180,8 @@ section('Rate limits bite, and say so properly');
 section('Losing Redis degrades the game; it does not stop it');
 {
   // The service's own client, so this suite imports nothing the backend does not already depend on.
-  await redis.flushall();                                 // as if the cache had been restarted from nothing
+  await redis.flushdb();                                  // as if the cache had been restarted from nothing (this
+                                                          // database only: other copies of the suite may share the server)
   const me = await call('/auth/me', { token: a.token });
   eq(me.status, 200, 'signing in still works with an empty Redis');
   const host = await mint('apiRedis');
@@ -195,13 +203,28 @@ section('Gold is never for the client to claim');
   await call(`/matches/${code}/join`, { token: racer.token, body: { tier: 2 } });
   await call(`/matches/${code}/start`, { token: host.token, body: {} });
   const before = (await call('/auth/me', { token: racer.token })).json.user as { gold: number };
+  const hostBefore = (await call('/auth/me', { token: host.token })).json.user as { gold: number };
+  // "Cleared", the instant the board is dealt: the script that used to take every pot at every table.
+  const instant = await call(`/matches/${code}/result`, { token: host.token, body: { ms: 1, cleared: true } });
+  eq(instant.status, 409, 'a clear sooner than the board could be cleared is refused');
+  eq(instant.json.error, 'too_early', 'as too early, which a client knows to send again');
+  ok(Number(instant.json.retry_after) >= 1 && Number(instant.json.retry_after) <= Math.ceil(config.game.minBoardMs / 1000), `with when (${instant.json.retry_after} s)`);
+  ok(Number(instant.headers.get('retry-after')) >= 1, 'in the header too');
+  const room = await call(`/matches/${code}`, { token: host.token });
+  eq((room.json.match as { players: { you: boolean; ms: number | null }[] }).players.find(p => p.you)?.ms, null, 'and nothing was written: the host is still racing');
+  eq(((await call('/auth/me', { token: host.token })).json.user as { gold: number }).gold, hostBefore.gold, 'and nobody was paid');
   // a client claiming an impossible time, and one claiming somebody else's room
   await call(`/matches/${code}/result`, { token: racer.token, body: { ms: -5_000_000, cleared: true } });
   const outsider = await mint('apiOut');
   const stolen = await call(`/matches/${code}/result`, { token: outsider.token, body: { ms: 1, cleared: true } });
   eq(stolen.status, 403, 'a player with no seat cannot report a result');
   const after = (await call('/auth/me', { token: racer.token })).json.user as { gold: number };
-  ok(after.gold <= before.gold + 1000, 'and no claim invented gold');
+  eq(after.gold, before.gold, 'and no claim invented gold: an impossible time is a board lost, not a board won');
+  // Once the board could have been cleared, the same result counts.
+  await begun(code);
+  const later = await call(`/matches/${code}/result`, { token: host.token, body: { ms: 7_000, cleared: true } });
+  eq(later.status, 200, 'the same clear, sent again after the wait, is taken');
+  eq(((await call('/auth/me', { token: host.token })).json.user as { gold: number }).gold, hostBefore.gold + 1000, 'and wins the pot, exactly');
 }
 
 section('A purse that cannot cover the stake is told so, not charged');
@@ -218,24 +241,36 @@ section('The tour syncs over the wire, and only for the signed in');
   const out = await call('/progress', {});
   eq(out.status, 401, 'a stranger cannot read a tour');
 
+  // 050 is Bangladesh: a board of the tour. Only a board of the game is synced.
   const p = await mint('apiProgress', 1_000);
-  const push = await call('/progress', { token: p.token, body: { levels: { bd: { cleared: true, stars: 3, ms: 41_000 } }, state: { home: 'bd' }, device: 'apitestdev1', stats: { bd: { p: 3, c: 1, f: 2, h: 1, l: 2, ms: 41_000 } } } });
+  const push = await call('/progress', { token: p.token, body: { levels: { '050': { cleared: true, stars: 3, ms: 41_000 }, bd: { cleared: true, stars: 3, ms: 1 } }, state: { home: 'bd' }, device: 'apitestdev1', stats: { '050': { p: 3, c: 1, f: 2, h: 1, l: 2, ms: 41_000 }, inventedBoard: { p: 1_000 } } } });
   eq(push.status, 200, 'a push is accepted');
-  eq((await query(pool, `SELECT plays FROM level_stats WHERE user_id = $1 AND device = 'apitestdev1' AND level_id = 'bd'`, [p.id])).rows[0]?.plays, 3, 'and the counts it carried are kept per device');
+  eq((await query(pool, `SELECT plays FROM level_stats WHERE user_id = $1 AND device = 'apitestdev1' AND level_id = '050'`, [p.id])).rows[0]?.plays, 3, 'and the counts it carried are kept per device');
+  eq(Object.keys(push.json.levels as object), ['050'], 'a level id that is no board of the game is dropped, not stored');
+  eq((await query(pool, `SELECT count(*)::int AS n FROM level_stats WHERE user_id = $1 AND level_id = 'inventedBoard'`, [p.id])).rows[0]?.n, 0, 'and so are its counts');
+  // Two more players on it, and the board is a line in the public table; a board one player has counted is
+  // not, whatever is asked for. (Read once: the answer is kept for five minutes.)
+  await call('/progress', { token: p.token, body: { levels: {}, device: 'apitestdev1', stats: { '356': { p: 2, c: 1, f: 1, h: 0, l: 1, ms: 50_000 } } } });
+  for (const who of ['apiProgress2', 'apiProgress3']) {
+    const q = await mint(who, 1_000);
+    await call('/progress', { token: q.token, body: { levels: {}, device: 'apitestdev1', stats: { '050': { p: 2, c: 1, f: 1, h: 0, l: 1, ms: 50_000 } } } });
+  }
   const diff = await call('/boards/difficulty?min=1');
   eq(diff.status, 200, 'the difficulty table is public');
-  ok((diff.json.boards as { level_id: string }[]).some(b => b.level_id === 'bd'), 'and shows the board, anonymously');
-  eq(((push.json.levels as Record<string, { stars: number }>).bd)?.stars, 3, 'and answers with the merged tour');
+  const lines = diff.json.boards as { level_id: string; players: number }[];
+  eq(lines.find(b => b.level_id === '050')?.players, 3, 'and shows a board three have played, anonymously');
+  ok(!lines.some(b => b.level_id === '356'), 'but not one only one player has counted, even asked for min=1: one person is not a board');
+  eq(((push.json.levels as Record<string, { stars: number }>)['050'])?.stars, 3, 'and answers with the merged tour');
   eq((push.json.state as { home: string })?.home, 'bd', 'settings included');
 
   const read = await call('/progress', { token: p.token });
   eq(read.status, 200, 'and it can be read back');
-  eq(((read.json.levels as Record<string, { ms: number }>).bd)?.ms, 41_000, 'with the time that was sent');
+  eq(((read.json.levels as Record<string, { ms: number }>)['050'])?.ms, 41_000, 'with the time that was sent');
 
   // the merge rule, through the routes rather than through the module
-  await call('/progress', { token: p.token, body: { levels: { bd: { cleared: true, stars: 1, ms: 300_000 } } } });
+  await call('/progress', { token: p.token, body: { levels: { '050': { cleared: true, stars: 1, ms: 300_000 } } } });
   const after = await call('/progress', { token: p.token });
-  eq(((after.json.levels as Record<string, { stars: number }>).bd)?.stars, 3, 'a worse run sent afterwards does not win');
+  eq(((after.json.levels as Record<string, { stars: number }>)['050'])?.stars, 3, 'a worse run sent afterwards does not win');
 }
 
 section('Two devices on one account: a Master board, the training and the streak all reach both');
@@ -244,16 +279,19 @@ section('Two devices on one account: a Master board, the training and the streak
   const p = await mint('apiTwoDevices', 1_000);
   const day = new Date().toISOString().slice(0, 10);
   const prev = (() => { const d = new Date(); d.setUTCDate(d.getUTCDate() - 1); return d.toISOString().slice(0, 10); })();
+  // 450 real boards: every country, its discovery board, and laps round a scene board
+  const countries = [...await boardIdSet()];
+  const ids = [...countries, ...countries.map(c => 'd:' + c), ...Array.from({ length: 450 - 2 * countries.length }, (_, i) => `s:tower~${i + 1}`)];
   const tour: Record<string, unknown> = {};
-  for (let i = 0; i < 450; i++) tour['c' + i] = { cleared: true, stars: 3, ms: 60_000 + i, tier: i % 5, arrows: 110, quiz: true };
+  for (const [i, id] of ids.entries()) tour[id] = { cleared: true, stars: 3, ms: 60_000 + i, tier: i % 5, arrows: 110, quiz: true };
   const stats: Record<string, unknown> = {};
-  for (let i = 0; i < 450; i++) stats['c' + i] = { p: 3, c: 1, f: 2, h: 1, l: 4, ms: 312_456 };
+  for (const id of ids) stats[id] = { p: 3, c: 1, f: 2, h: 1, l: 4, ms: 312_456 };
   // the phone: a whole tour of 450 boards, Master ones among them -- a body past the old 64 KB limit
   const phone = await call('/progress', { token: p.token, body: { levels: tour, stats, device: 'phoneDev01', state: { train: { [day]: { e: 100, p: 1, pp: { e: 1 } } }, playStreak: { count: 2, last: prev } } } });
   eq(phone.status, 200, 'the phone’s push, Master boards and all, is accepted');
   eq(Object.keys(phone.json.levels as object).length, 450, 'every board of it is on the account');
   // the website: one board and the Forgery, later the same day
-  const web = await call('/progress', { token: p.token, body: { levels: { w1: { cleared: true, stars: 2, ms: 50_000, tier: 4 } }, device: 'webDev0001', state: { train: { [day]: { f: 39, p: 1, pp: { f: 1 } } }, playStreak: { count: 1, last: day } } } });
+  const web = await call('/progress', { token: p.token, body: { levels: { 'f:brain': { cleared: true, stars: 2, ms: 50_000, tier: 4 } }, device: 'webDev0001', state: { train: { [day]: { f: 39, p: 1, pp: { f: 1 } } }, playStreak: { count: 1, last: day } } } });
   eq(web.status, 200, 'the website’s push is accepted');
   const st = web.json.state as Record<string, any>;
   eq(Object.keys(web.json.levels as object).length, 451, 'and it gets the phone’s boards back');
@@ -266,7 +304,7 @@ section('Two devices on one account: a Master board, the training and the streak
   // both at once, each with boards the account has not seen: every insert's foreign key holds a lock on the
   // user's row, and a row lock taken the wrong way round here deadlocked two such pushes against each other
   const burst = await Promise.all(Array.from({ length: 6 }, (_, i) => call('/progress', { token: p.token, body: {
-    levels: { ['burst' + i]: { cleared: true, stars: 1, ms: 30_000, tier: 4 }, ['burstB' + i]: { cleared: true, stars: 2, ms: 31_000, tier: 3 } },
+    levels: { [`s:arena~${i + 1}`]: { cleared: true, stars: 1, ms: 30_000, tier: 4 }, [`s:cross~${i + 1}`]: { cleared: true, stars: 2, ms: 31_000, tier: 3 } },
     device: i % 2 ? 'phoneDev01' : 'webDev0001', state: { train: { [day]: { g: 50 + i } }, loss: { [i % 2 ? 'phoneDev01' : 'webDev0001']: 10 + i } } } })));
   eq(burst.map(r => r.status), [200, 200, 200, 200, 200, 200], 'six pushes from two devices at the same moment all land');
   const end = await call('/progress', { token: p.token });
@@ -358,7 +396,7 @@ section('The league is readable signed out, and knows you when you are in');
   const made = await call('/matches', { token: me.token, body: { stake: LEAGUE_STAKE, open_to_all: false } });
   const code = (made.json.match as { code: string }).code;
   await call(`/matches/${code}/join`, { token: rival.token, body: {} });
-  await call(`/matches/${code}/start`, { token: me.token, body: {} });
+  await start(code, me.token);
   await call(`/matches/${code}/result`, { token: me.token, body: { ms: 3_000, cleared: true } });
 
   const after = await call('/league', { token: me.token });
@@ -386,7 +424,7 @@ section('The people you have played with, and inviting them without a link');
   const made = await call('/matches', { token: host.token, body: { stake: config.game.stakes[0], open_to_all: false } });
   const code = (made.json.match as { code: string }).code;
   await call(`/matches/${code}/join`, { token: mate.token, body: {} });
-  await call(`/matches/${code}/start`, { token: host.token, body: {} });
+  await start(code, host.token);
   await call(`/matches/${code}/result`, { token: host.token, body: { ms: 3_000, cleared: true } });
 
   const after = await call('/players/recent', { token: host.token });
@@ -428,7 +466,7 @@ section('The people you have played with, and inviting them without a link');
   const busyCode = (busy.json.match as { code: string }).code;
   const third = await mint('inviteThird');
   await call(`/matches/${busyCode}/join`, { token: third.token, body: {} });
-  await call(`/matches/${busyCode}/start`, { token: mate.token, body: {} });
+  await start(busyCode, mate.token);
   const mid = await call(`/matches/${next}/invite`, { token: host.token, body: { user_id: mate.id } });
   eq(mid.status, 409, 'somebody in the middle of a race is not interrupted');
   eq(mid.json.error, 'in_a_match', 'and the sender is told why');
@@ -492,7 +530,7 @@ section('How a cleared board went, against everybody else who cleared it');
   eq((await call('/boards/pace?level_id=050&tier=9&ms=1000')).status, 400, 'so is a difficulty that does not exist');
   eq((await call('/boards/pace?level_id=050&tier=0&ms=0')).status, 400, 'and a time of nothing');
 
-  const quiet = await call('/boards/pace?level_id=pace-board&tier=1&ms=30000');
+  const quiet = await call('/boards/pace?level_id=036&tier=1&ms=30000');
   eq(quiet.status, 200, 'a board nobody has cleared still answers');
   eq(quiet.json.n, 0, 'with nobody in it');
   eq(quiet.json.beats_pct, undefined, 'and no percentage, because there is nothing to work one out from');
@@ -506,10 +544,10 @@ section('How a cleared board went, against everybody else who cleared it');
         `INSERT INTO users (provider, sub, name, gold) VALUES ('test', $1, $2, 0) RETURNING id`,
         [`pace-${k}-${Date.now()}-${Math.random()}`, `pacer${k}`]);
       await query(c, `INSERT INTO progress (user_id, level_id, cleared, ms, stars, tier, arrows)
-                      VALUES ($1, 'pace-board', true, $2, 3, 1, 40)`, [u.rows[0]!.id, ms]);
+                      VALUES ($1, '036', true, $2, 3, 1, 40)`, [u.rows[0]!.id, ms]);
     }
   });
-  const nearly = await call('/boards/pace?level_id=pace-board&tier=1&ms=30000', { token: me.token });
+  const nearly = await call('/boards/pace?level_id=036&tier=1&ms=30000', { token: me.token });
   eq(nearly.json.n, 19, 'nineteen clears are counted');
   eq(nearly.json.beats_pct, undefined, 'but still no percentage: a share of nineteen is a guess dressed as a fact');
 
@@ -519,24 +557,31 @@ section('How a cleared board went, against everybody else who cleared it');
       `INSERT INTO users (provider, sub, name, gold) VALUES ('test', $1, 'pacer19', 0) RETURNING id`,
       [`pace-19-${Date.now()}-${Math.random()}`]);
     await query(c, `INSERT INTO progress (user_id, level_id, cleared, ms, stars, tier, arrows)
-                    VALUES ($1, 'pace-board', true, 29000, 3, 1, 40)`, [u.rows[0]!.id]);
+                    VALUES ($1, '036', true, 29000, 3, 1, 40)`, [u.rows[0]!.id]);
   });
-  const slow = await call('/boards/pace?level_id=pace-board&tier=1&ms=40000', { token: me.token });
+  const slow = await call('/boards/pace?level_id=036&tier=1&ms=40000', { token: me.token });
   eq(slow.json.n, 20, 'twenty clears are enough');
   eq(slow.json.beats_pct, 0, 'a run slower than all of them beats none of them');
-  const quick = await call('/boards/pace?level_id=pace-board&tier=1&ms=9000', { token: me.token });
+  const quick = await call('/boards/pace?level_id=036&tier=1&ms=9000', { token: me.token });
   eq(quick.json.beats_pct, 100, 'and one faster than all of them beats them all');
-  const middling = await call('/boards/pace?level_id=pace-board&tier=1&ms=20000', { token: me.token });
+  const middling = await call('/boards/pace?level_id=036&tier=1&ms=20000', { token: me.token });
   ok((middling.json.beats_pct as number) > 40 && (middling.json.beats_pct as number) < 60,
      `a middling run lands in the middle (${middling.json.beats_pct}%)`);
 
   // The difficulty is part of the question: the same board on Master is a different board to compare against.
-  eq((await call('/boards/pace?level_id=pace-board&tier=3&ms=20000')).json.n, 0, 'another difficulty is another table');
+  eq((await call('/boards/pace?level_id=036&tier=3&ms=20000')).json.n, 0, 'another difficulty is another table');
 
   // A player is never compared with themselves.
-  await call('/progress', { token: me.token, body: { levels: { 'pace-board': { cleared: true, ms: 1, stars: 3, tier: 1, arrows: 40 } } } });
-  eq((await call('/boards/pace?level_id=pace-board&tier=1&ms=20000', { token: me.token })).json.n, 20,
+  await call('/progress', { token: me.token, body: { levels: { '036': { cleared: true, ms: 20_000, stars: 3, tier: 1, arrows: 40 } } } });
+  eq((await call('/boards/pace?level_id=036&tier=1&ms=20000', { token: me.token })).json.n, 20,
      'their own row is left out of the count');
+  eq((await call('/boards/pace?level_id=036&tier=1&ms=20000')).json.n, 21, 'and counted for everybody else');
+
+  // A time nobody could have played is not counted at all: forty arrows in a second would push every honest
+  // player's "you beat X%" down.
+  const forger = await mint('paceForger');
+  await call('/progress', { token: forger.token, body: { levels: { '036': { cleared: true, ms: 1_000, stars: 3, tier: 1, arrows: 40 } } } });
+  eq((await call('/boards/pace?level_id=036&tier=1&ms=20000')).json.n, 21, 'a clear faster than 150 ms an arrow is left out');
 }
 
 section('One match at a time, and a device that knows nothing can still find it');
@@ -642,7 +687,7 @@ section('Mute: the one answer to being asked too often');
   const first = await call('/matches', { token: host.token, body: { stake: config.game.stakes[0], open_to_all: false } });
   const firstCode = (first.json.match as { code: string }).code;
   await call(`/matches/${firstCode}/join`, { token: mate.token, body: {} });
-  await call(`/matches/${firstCode}/start`, { token: host.token, body: {} });
+  await start(firstCode, host.token);
   await call(`/matches/${firstCode}/result`, { token: host.token, body: { ms: 3_000, cleared: true } });
   await call(`/matches/${firstCode}/result`, { token: mate.token, body: { ms: 4_000, cleared: true } });
 
@@ -677,6 +722,97 @@ section('Mute: the one answer to being asked too often');
   eq(((await call('/players/unmute', { token: mate.token, body: { user_id: host.id } })).json.muted as unknown[]).length, 0, 'unmuting empties the list');
   eq((await call(`/matches/${code}/invite`, { token: host.token, body: { user_id: mate.id } })).json.reach, 'push', 'and the phone is told again');
   await query(pool, `DELETE FROM push_tokens WHERE user_id = $1`, [mate.id]);
+}
+
+section('A phone rings once in ten minutes for one sender, whatever room it is for');
+{
+  // The fault: a room costs nothing to open and leave, and a phone rang once per room -- so one sender could
+  // ring somebody twenty times a minute, opening a room, inviting, leaving and opening the next.
+  const host = await mint('ringHost'), mate = await mint('ringMate');
+  const first = await call('/matches', { token: host.token, body: { stake: config.game.stakes[0], open_to_all: false } });
+  const firstCode = (first.json.match as { code: string }).code;
+  await call(`/matches/${firstCode}/join`, { token: mate.token, body: {} });
+  await start(firstCode, host.token);
+  await call(`/matches/${firstCode}/result`, { token: host.token, body: { ms: 3_000, cleared: true } });
+  await call(`/matches/${firstCode}/result`, { token: mate.token, body: { ms: -1, cleared: false } });
+  await query(pool, `INSERT INTO push_tokens (user_id, token) VALUES ($1, $2)`, [mate.id, 'fcm:' + 'r'.repeat(40)]);
+  const day = new Date().toISOString().slice(0, 10);
+  const reaches: string[] = [];
+  for (let i = 0; i < 3; i++) {
+    const room = await call('/matches', { token: host.token, body: { stake: config.game.stakes[0], open_to_all: false } });
+    const code = (room.json.match as { code: string }).code;
+    reaches.push(String((await call(`/matches/${code}/invite`, { token: host.token, body: { user_id: mate.id } })).json.reach));
+    await call(`/matches/${code}/leave`, { token: host.token, body: {} });
+  }
+  eq(reaches, ['push', 'push', 'push'], 'three rooms opened and left to ask again: the sender is told the same each time');
+  eq(Number(await redis.get(k('invringday', host.id, mate.id, day))), 1, 'but the phone rang once');
+  ok(Number(await redis.ttl(k('invring', host.id, mate.id))) > 500, 'and will not ring for this sender again for ten minutes');
+  eq(Number(await redis.get(k('invpops', host.id, mate.id))), 3, 'the card on an open screen is counted per sender too');
+  await query(pool, `DELETE FROM push_tokens WHERE user_id = $1`, [mate.id]);
+
+  // What happens when Redis is not there to count: nothing rings and nothing pops up. A missed invitation is
+  // a link to send; a flood nobody can stop is not.
+  const { inviteRings, invitePopsUp } = await import('../backend/src/players.js');
+  eq(await invitePopsUp(host.id, mate.id, 'NEWONE'), true, 'a new room is a new card, while the sender is under the count');
+  const set = redis.set.bind(redis);
+  (redis as unknown as { set: unknown }).set = () => Promise.reject(new Error('redis is down'));
+  try {
+    eq(await inviteRings(9_001, 9_002), false, 'with Redis away, an invitation rings no phone');
+    eq(await invitePopsUp(9_001, 9_002, 'ABCDEF'), false, 'and pops up on no screen');
+  } finally { (redis as unknown as { set: unknown }).set = set; }
+}
+
+section('Gold for an advertisement needs a ticket asked for before it');
+{
+  const p = await mint('adTicket', 0);
+  const old = await call('/ads/reward', { token: p.token, body: {} });
+  eq([old.status, old.json.error], [400, 'no_ticket'], 'a claim with no ticket -- what a page from before tickets sends -- is refused with a 4xx');
+  eq((await call('/ads/start', { body: {} })).status, 401, 'a signed-out visitor has no purse to ask for');
+  const t = await call('/ads/start', { token: p.token, body: {} });
+  eq(t.status, 200, 'a ticket is handed out before the advertisement is shown');
+  eq([t.json.left, t.json.min_seconds], [config.game.adGoldPerDay, config.game.adMinSeconds], 'with how many are left today and how long an advertisement takes');
+  const ticket = String(t.json.ticket);
+  const early = await call('/ads/reward', { token: p.token, body: { ticket } });
+  eq([early.status, early.json.error], [409, 'too_early'], 'claimed at once, it is too early');
+  ok(Number(early.json.retry_after) >= 1 && Number(early.json.retry_after) <= config.game.adMinSeconds, `with when to claim it (${early.json.retry_after} s)`);
+  eq(((await call('/auth/me', { token: p.token })).json.user as { gold: number }).gold, 0, 'and nothing was paid');
+  // wind the ticket's clock back, as if the advertisement had played through
+  const key = k('adticket', p.id), rec = JSON.parse(String(await redis.get(key))) as { h: string; at: number };
+  await redis.set(key, JSON.stringify({ ...rec, at: rec.at - config.game.adMinSeconds * 1000 }), 'EX', 600);
+  const paid = await call('/ads/reward', { token: p.token, body: { ticket } });
+  eq([paid.status, paid.json.granted, paid.json.left], [200, config.game.adGold, config.game.adGoldPerDay - 1], 'after an advertisement’s length it pays');
+  const again = await call('/ads/reward', { token: p.token, body: { ticket } });
+  eq([again.status, again.json.error], [400, 'no_ticket'], 'and the same ticket does not pay twice');
+  eq((await call('/ads/reward', { token: p.token, body: { ticket: 'not a ticket at all' } })).status, 400, 'a ticket of the wrong shape is no ticket');
+
+  // The day's allowance spent: said when the ticket is asked for, before an advertisement plays for nothing.
+  await tx(async c => { for (let n = 2; n <= config.game.adGoldPerDay; n++) await give(c, p.id, 1, 'ad_reward', idem.adReward(p.id, new Date().toISOString().slice(0, 10), n)); });
+  const capped = await call('/ads/start', { token: p.token, body: {} });
+  eq([capped.status, capped.json.error], [429, 'ad_cap'], 'with the day spent, no ticket, and the reason');
+}
+
+section('The limits that guard gold keep counting when Redis does not');
+{
+  const { addressBucket, check, subjectFor, LIMITS } = await import('../backend/src/ratelimit.js');
+  eq(addressBucket('2001:db8:1:2:aaaa:bbbb:cccc:dddd'), '2001:db8:1:2::/64', 'an IPv6 address is counted by its /64');
+  eq(addressBucket('2001:db8:1:2::1'), addressBucket('2001:0db8:0001:0002:ffff::9'), 'however it is written');
+  eq(addressBucket('2001:db8::1'), '2001:db8:0:0::/64', 'with the zeros put back');
+  eq(addressBucket('::ffff:203.0.113.9'), '203.0.113.9', 'an IPv4 address written the IPv6 way is IPv4');
+  eq(addressBucket('203.0.113.9'), '203.0.113.9', 'and IPv4 is itself');
+  eq(subjectFor(LIMITS.auth_signin, '2001:db8:1:2:1::', null), subjectFor(LIMITS.auth_signin, '2001:db8:1:2:9::', null), 'so one home cannot sign in from a billion addresses');
+
+  const multi = redis.multi.bind(redis);
+  (redis as unknown as { multi: unknown }).multi = () => { throw new Error('redis is down'); };
+  try {
+    const subject = `u-test-${Date.now()}`;
+    const verdicts = [];
+    for (let i = 0; i <= LIMITS.ad_reward.limit; i++) verdicts.push((await check('ad_reward', subject)).allowed);
+    eq(verdicts.filter(Boolean).length, LIMITS.ad_reward.limit, 'a limit on gold is still counted with Redis away, in the process');
+    eq(verdicts[verdicts.length - 1], false, 'and refuses past it');
+    const reads = [];
+    for (let i = 0; i < 5; i++) reads.push((await check('lobby_read', subject)).allowed);
+    ok(reads.every(Boolean), 'while a read is let through, so an outage of the cache is not an outage of the game');
+  } finally { (redis as unknown as { multi: unknown }).multi = multi; }
 }
 
 await finish();

@@ -28,6 +28,31 @@ export type PlayerState = Record<string, unknown>;
 
 export const MAX_LEVELS_PER_PUSH = 600;   // the whole tour is 197 countries plus their discovery boards
 const MAX_LEVEL_ID = 64;
+/**
+ * Boards one account may hold: every country, its discovery board, every focus and scene board and years of
+ * laps round the scenes fit many times over. A push past it still updates the boards already held; only new
+ * ids beyond the line are dropped. Without it every push could add six hundred invented ids, every push was
+ * answered with all of them, and an account could be grown until reading it ran the server out of memory.
+ */
+export const MAX_LEVEL_ROWS = 5_000;
+/** Devices whose counts one account keeps in level_stats; a new one past this replaces the one quietest longest. */
+export const MAX_STAT_DEVICES = 16;
+
+/**
+ * Could this be a board of the game? A country from the tour's own list (the file the server deals matches
+ * from), or one of the boards that live beside the tour: a discovery board (d:<country>), a focus board
+ * (f:), a scene board (s:, with an optional ~lap when the tour has gone round the scenes again) or n:. Those
+ * are checked by shape rather than by list, because a new one ships in the client's data before this list
+ * could know it, and a board a player cleared must not be refused for being new. With no country list at all
+ * (the file could not be read) a country is three digits, which is what every one of them is.
+ */
+const SIDE_BOARD = /^(?:[fn]:[A-Za-z0-9_-]{1,40}|s:[A-Za-z0-9_-]{1,40}(?:~[1-9]\d{0,3})?)$/;
+export function levelIdOk(id: string, countries: ReadonlySet<string>): boolean {
+  if (typeof id !== 'string' || !id || id.length > MAX_LEVEL_ID) return false;
+  if (SIDE_BOARD.test(id)) return true;
+  const country = id.startsWith('d:') ? id.slice(2) : id;
+  return countries.size ? countries.has(country) : /^\d{3}$/.test(country);
+}
 // What a push may carry as its settings blob before it is refused outright. The blob is sanitised key by key
 // below, so this is only the line past which nothing a real client sends could reach -- a device sends its
 // last STATE_SEND_DAYS days of daily boards and training, a few hundred bytes a day.
@@ -75,7 +100,12 @@ export function cleanLevels(raw: unknown, known?: (id: string) => boolean): Leve
 /** What one device has counted on one board: starts, clears, hearts run out, and what the clears cost. */
 export interface LevelStat { plays: number; clears: number; fails: number; hints: number; hearts: number; ms: number }
 export type Stats = Record<string, LevelStat>;
-const MAX_STAT = 1_000_000;
+// What one device can believably have counted on one board: ten thousand starts of the same board is years of
+// doing nothing else. Anything past it is not a count, and is dropped the way a negative one is -- these rows
+// are summed into the board-tuning report, and one invented million would outweigh every honest player.
+const MAX_STAT = 10_000;
+// An hour a clear, on average, is the most time a device's clears can have cost: past that it is not a time.
+const MAX_MS_PER_CLEAR = 3_600_000;
 
 /** A device's own id, made once on the phone: letters and digits, short. */
 export function cleanDevice(raw: unknown): string {
@@ -97,8 +127,9 @@ export function cleanStats(raw: unknown, known?: (id: string) => boolean): Stats
     const s: LevelStat = {
       plays: int(r.p ?? r.plays, 0, MAX_STAT, 0), clears: int(r.c ?? r.clears, 0, MAX_STAT, 0),
       fails: int(r.f ?? r.fails, 0, MAX_STAT, 0), hints: int(r.h ?? r.hints, 0, MAX_STAT, 0),
-      hearts: int(r.l ?? r.hearts, 0, MAX_STAT, 0), ms: int(r.ms, 0, 1_000_000_000_000, 0),
+      hearts: int(r.l ?? r.hearts, 0, MAX_STAT, 0), ms: 0,
     };
+    s.ms = int(r.ms, 0, Math.max(1, s.clears) * MAX_MS_PER_CLEAR, 0);
     if (!s.plays && !s.clears && !s.fails) continue;
     out[id] = s;
     n++;
@@ -113,6 +144,16 @@ export function cleanStats(raw: unknown, known?: (id: string) => boolean): Stats
 export async function mergeStats(c: Sql, userId: number, device: string, stats: Stats): Promise<number> {
   const ids = Object.keys(stats);
   if (!ids.length || !device) return 0;
+  // A device id is whatever the phone made up, so a script could send a new one with every push and grow the
+  // account by six hundred rows a time. Past MAX_STAT_DEVICES, the device the account has heard from least
+  // recently makes room: a new phone replaces the one in a drawer, and the rows stay bounded.
+  const devs = await query<{ device: string }>(c,
+    `SELECT device FROM level_stats WHERE user_id = $1 GROUP BY device ORDER BY max(updated_at) DESC, device`, [userId]);
+  const known = devs.rows.map(d => d.device);
+  if (!known.includes(device) && known.length >= MAX_STAT_DEVICES) {
+    await query(c, `DELETE FROM level_stats WHERE user_id = $1 AND device = ANY($2::text[])`,
+      [userId, known.slice(MAX_STAT_DEVICES - 1)]);
+  }
   const r = await query<{ moved: boolean }>(c, `
     INSERT INTO level_stats (user_id, device, level_id, plays, clears, fails, hints, hearts, ms)
     SELECT $1, $2, u.level_id, u.plays, u.clears, u.fails, u.hints, u.hearts, u.ms
@@ -178,7 +219,15 @@ export const STATE_SEND_DAYS = 120;
 export const STATE_KEEP_DAYS = 1000;
 const MAX_OTHER_KEYS = 16;               // settings other than the records of play
 const MAX_OTHER_BYTES = 4 * 1024;        // each
-const MAX_SERIALS = 200;                 // puzzles of one round finished in one day
+// Puzzles of one round finished in one day. A round's puzzle takes the better part of a minute, so sixty is an
+// hour of one round, every round, in a day -- more than anybody plays, and small enough that a thousand days
+// of it cannot make the blob a burden to read.
+export const MAX_SERIALS = 60;
+// What the account keeps of the whole blob, merged. Each push is capped on the way in (MAX_STATE_BYTES), but
+// the merge takes the union of every day ever sent, and a script sending a different week each time could
+// grow it to megabytes that every push then parses and writes back. Past this the oldest days are dropped
+// first: the newest are the ones another device is missing, if any.
+export const MAX_BLOB_BYTES = 512 * 1024;
 const MAX_DEVICES = 256;                 // entries in `loss`: every browser and every install is a device, for years
 const TRAIN_IDS = ['r', 'f', 'g', 'e'] as const;
 const PLAY_KEYS = new Set(['train', 'daily', 'loss', 'playStreak', 'dailyStreak']);
@@ -391,6 +440,20 @@ export function combineState(a: PlayerState, b: PlayerState, now = new Date()): 
   for (const k of ['playStreak', 'dailyStreak'] as const) {
     const st = mergeStreak(cleanStreak(A[k], now), cleanStreak(B[k], now)); if (st) out[k] = st;
   }
+  return trimBlob(out);
+}
+
+/** The blob within MAX_BLOB_BYTES, the oldest days of training and daily boards going first. */
+function trimBlob(out: PlayerState, max = MAX_BLOB_BYTES): PlayerState {
+  let size = JSON.stringify(out).length;
+  if (size <= max) return out;
+  const train = (out.train ?? {}) as Record<string, Rec>, daily = (out.daily ?? {}) as Record<string, Rec>;
+  for (const day of [...new Set([...Object.keys(train), ...Object.keys(daily)])].sort()) {
+    if (size <= max) break;
+    for (const m of [train, daily]) if (m[day]) { size -= JSON.stringify(m[day]).length + day.length + 4; delete m[day]; }
+  }
+  if (!Object.keys(train).length) delete out.train;
+  if (!Object.keys(daily).length) delete out.daily;
   return out;
 }
 
@@ -424,6 +487,12 @@ export async function readLevels(c: Sql, userId: number): Promise<Levels> {
  * Nobody is named and nothing identifies a row: what comes back is a count and a percentage.
  */
 export const PACE_FLOOR = 20;
+/**
+ * The quickest a board can believably be cleared, per arrow. A run faster than this many milliseconds an arrow
+ * is not a run anybody played, and counting it would push every honest player's "you beat X%" down: a record
+ * says how many arrows its board had, and a time of one millisecond used to be counted like any other.
+ */
+export const PACE_MS_PER_ARROW = 150;
 
 export interface BoardPace {
   n: number;                 // recorded clears of this board at this difficulty, this player's own excluded
@@ -435,7 +504,8 @@ export async function boardPace(c: Sql, levelId: string, tier: number, ms: numbe
     SELECT count(*) AS n, count(*) FILTER (WHERE ms > $3) AS slower
       FROM progress
      WHERE level_id = $1 AND tier = $2 AND cleared AND ms IS NOT NULL
-       AND ($4::bigint IS NULL OR user_id <> $4)`, [levelId, tier, ms, exceptUser]);
+       AND arrows > 0 AND ms >= arrows * $5
+       AND ($4::bigint IS NULL OR user_id <> $4)`, [levelId, tier, ms, exceptUser, PACE_MS_PER_ARROW]);
   const n = Number(r.rows[0]?.n ?? 0);
   if (n < PACE_FLOOR) return { n };
   return { n, beats_pct: Math.round((Number(r.rows[0]!.slower) / n) * 100) };
@@ -450,8 +520,16 @@ export async function readState(c: Sql, userId: number): Promise<PlayerState> {
  * Merge a batch in. Returns how many rows the push actually moved, which is what the tests assert on: pushing
  * the same batch twice must report a change the first time and none the second.
  */
-export async function mergeLevels(c: Sql, userId: number, levels: Levels): Promise<number> {
-  const ids = Object.keys(levels);
+export async function mergeLevels(c: Sql, userId: number, levels: Levels, maxRows = MAX_LEVEL_ROWS): Promise<number> {
+  let ids = Object.keys(levels);
+  if (ids.length === 0) return 0;
+  // Boards already on the account always merge; new ones only while the account is under its line.
+  const have = await query<{ n: number; held: string[] | null }>(c,
+    `SELECT count(*)::int AS n, array_agg(level_id) FILTER (WHERE level_id = ANY($2::text[])) AS held
+       FROM progress WHERE user_id = $1`, [userId, ids]);
+  const held = new Set(have.rows[0]?.held ?? []);
+  let room = Math.max(0, maxRows - (have.rows[0]?.n ?? 0));
+  ids = ids.filter(id => held.has(id) || room-- > 0);
   if (ids.length === 0) return 0;
 
   // One statement for the whole batch: unnest turns the arrays into rows, and the ON CONFLICT decides, per

@@ -176,8 +176,8 @@ const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';   // no I, O, 0 or 1: 
 // ── Boards ──
 
 let boardIds: string[] | null = null;
-/** A country from the tour, picked by the server so no client can choose an easy one. */
-export async function pickBoard(): Promise<string | null> {
+let boardSet: ReadonlySet<string> | null = null;
+async function loadBoards(): Promise<string[]> {
   if (boardIds === null) {
     try {
       const raw = await readFile(config.game.boardsFile, 'utf8');
@@ -188,7 +188,17 @@ export async function pickBoard(): Promise<string | null> {
       boardIds = [];
     }
   }
-  return boardIds.length ? boardIds[randomInt(0, boardIds.length)]! : null;
+  return boardIds;
+}
+/** Every country board the tour has, from the same file the server deals from: what a synced level id may be. */
+export async function boardIdSet(): Promise<ReadonlySet<string>> {
+  if (boardSet === null) boardSet = new Set(await loadBoards());
+  return boardSet;
+}
+/** A country from the tour, picked by the server so no client can choose an easy one. */
+export async function pickBoard(): Promise<string | null> {
+  const ids = await loadBoards();
+  return ids.length ? ids[randomInt(0, ids.length)]! : null;
 }
 /** `n` different boards, for a match that plays them in a row. Fewer only if the tour itself has fewer. */
 export async function pickBoards(n: number): Promise<string[]> {
@@ -206,7 +216,7 @@ export async function pickBoards(n: number): Promise<string[]> {
 /** The boards of a match, in order: the list if there is one, the single board otherwise. */
 export const boardsOf = (m: { board: string; boards: string }): string[] =>
   m.boards ? m.boards.split(',').filter(Boolean) : [m.board];
-export const _resetBoardCache = () => { boardIds = null; };
+export const _resetBoardCache = () => { boardIds = null; boardSet = null; };
 
 async function freeCode(c: PoolClient): Promise<string> {
   for (let attempt = 0; attempt < 40; attempt++) {
@@ -586,17 +596,42 @@ export async function settleMatch(c: PoolClient, code: string): Promise<MatchRow
            paid_at: paid ? (m.paid_at ?? new Date()) : null };
 }
 
+/** What happened to a result: counted, or refused as too early with how long until it would be counted. */
+export type ResultVerdict = { ok: true; recorded: boolean } | { ok: false; why: 'too_early'; retryMs: number };
+
+/** The least time, on the server's clock, a match of this many boards can honestly be cleared in. */
+export const clearFloorMs = (boards: number): number => Math.max(1, boards) * Math.max(0, config.game.minBoardMs);
+
 /**
  * A player's run is over. The first result counts and the server stamps the moment it arrived, because
  * finishing first is what wins — not the shortest clock. Sending the same result again changes nothing, which
  * is what lets the client retry a request it never saw an answer to.
+ *
+ * Whether the board was cleared is the client's word, and it is the word that decides the pot. So a clear is
+ * believed only once the match has been running, by this server's own clock, for as long as the fastest
+ * honest clear of that many boards takes (clearFloorMs). Earlier, nothing is written and the answer is
+ * too_early with how long to wait: a script posting "cleared" the instant the board is dealt used to take the
+ * pot from every player at the table. The floor is on the server's clock, so a slow phone or a slow network
+ * only ever makes an honest result later, never too early -- and the client sends it again when told to.
+ * Running out of hearts or giving up is a loss, and a loss can be reported at any time.
  */
-export async function submitResult(c: PoolClient, code: string, userId: number, ms: number, cleared: boolean, gaveUp = false): Promise<void> {
+export async function submitResult(c: PoolClient, code: string, userId: number, ms: number, cleared: boolean, gaveUp = false): Promise<ResultVerdict> {
   const value = cleared && ms > 0 ? Math.min(ms, 24 * 3600 * 1000) : -1;
-  await query(c,
+  if (value > 0) {
+    // The row is held so the age is read against the same start a settlement will see.
+    const r = await query<{ age_ms: number | null; boards: string; board: string }>(c,
+      `SELECT (EXTRACT(EPOCH FROM (now() - started_at)) * 1000)::float8 AS age_ms, boards, board
+         FROM matches WHERE code = $1 FOR UPDATE`, [code]);
+    const row = r.rows[0];
+    const floor = row ? clearFloorMs(boardsOf(row).length) : 0;
+    const age = row?.age_ms ?? 0;
+    if (row && age < floor) return { ok: false, why: 'too_early', retryMs: Math.ceil(floor - age) };
+  }
+  const upd = await query(c,
     `UPDATE match_players SET ms = $3, finished_at = now(), pct = $4, gave_up = $5
       WHERE code = $1 AND user_id = $2 AND ms IS NULL`,
     [code, userId, value, value > 0 ? 100 : 0, value > 0 ? false : gaveUp]);
+  return { ok: true, recorded: (upd.rowCount ?? 0) > 0 };
 }
 
 /**

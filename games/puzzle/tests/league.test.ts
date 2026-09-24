@@ -17,22 +17,49 @@ const thisWeek = L.seasonAt(now);
 const lastWeek = L.previousSeason(thisWeek);
 
 /** A gold movement that happened at a particular moment. The balance moves now; the row is dated then. */
-async function moved(userId: number, delta: number, reason: Parameters<typeof move>[3], key: string, at: Date): Promise<void> {
+async function moved(userId: number, delta: number, reason: Parameters<typeof move>[3], key: string, at: Date, code: string | null = null): Promise<void> {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const r = await move(client, userId, delta, reason, key);
+    const r = await move(client, userId, delta, reason, key, code);
     if (!r?.applied) throw new Error(`could not move ${delta} for ${userId}`);
     await client.query('UPDATE gold_ledger SET created_at = $2 WHERE idem_key = $1', [key, at]);
     await client.query('COMMIT');
   } catch (e) { await client.query('ROLLBACK'); throw e; } finally { client.release(); }
 }
 
-/** What a week of play looks like in the ledger: a stake paid, and a pot won. */
-const played = (id: number, netGold: number, at: Date, tag: string) => Promise.all([
-  moved(id, -1_000, 'stake', `t-stake:${tag}`, at),
-  moved(id, 1_000 + netGold, 'payout', `t-payout:${tag}`, at),
-]);
+/** A room opened (and played) at `at`: the league counts a match in the week its room was opened. */
+let rooms = 0;
+async function room(at: Date, started = true): Promise<string> {
+  const code = `LG${String(++rooms).padStart(4, '0')}`;
+  await query(pool, `INSERT INTO matches (code, stake, board, tier, seed, state, created_at, started_at)
+                     VALUES ($1, 1000, '050', 2, 1, $2, $3, $4)`, [code, started ? 'done' : 'void', at, started ? at : null]);
+  return code;
+}
+
+/**
+ * A match, as the ledger records one: everybody stakes, and the winner is paid what the others lost. `losers`
+ * are who paid for it, each with what they lost, so the league can see whose gold a win was.
+ */
+async function match(winner: number, losers: [number, number][], at: Date, tag: string): Promise<void> {
+  const code = await room(at);
+  const won = losers.reduce((a, [, lost]) => a + lost, 0);
+  await moved(winner, -1_000, 'stake', `t-stake:${tag}:${winner}`, at, code);
+  await moved(winner, 1_000 + won, 'payout', `t-payout:${tag}`, at, code);
+  for (const [id, lost] of losers) if (lost > 0) await moved(id, -lost, 'stake', `t-stake:${tag}:${id}`, at, code);
+}
+
+/** Three accounts to lose to the players a test is about, with a deep purse, named so a test can leave them out. */
+const sparring = async (tag: string) => [await player(`foe-${tag}-1`, 50_000_000), await player(`foe-${tag}-2`, 50_000_000), await player(`foe-${tag}-3`, 50_000_000)];
+const notFoe = (r: { name: string }) => !r.name.startsWith('foe-');
+
+/** A week's win of `netGold`, taken from three different opponents in one room: a win the league can pay. */
+async function played(id: number, netGold: number, at: Date, tag: string, foes: { id: number }[] = FOES): Promise<void> {
+  const share = (i: number) => Math.floor(netGold / foes.length) + (i < netGold % foes.length ? 1 : 0);
+  await match(id, foes.map((f, i) => [f.id, netGold > 0 ? share(i) : 0] as [number, number]), at, tag);
+}
+// the opponents `played` takes a week's winnings from; made again after every reset() that wipes them
+let FOES = await sparring('top');
 
 section('A season is a week, and it starts on a Monday');
 {
@@ -98,6 +125,7 @@ section('The table is ordered by earning, and a tie goes to whoever got there fi
 {
   await reset();
   const mid = lastWeek.startsAt.getTime() + 24 * HOUR;
+  FOES = await sparring(String(++rooms));
   const big = await player('rank-big'), early = await player('rank-early'), late = await player('rank-late'), small = await player('rank-small');
   await played(big.id, 30_000, new Date(mid), 'r-big');
   await played(early.id, 20_000, new Date(mid), 'r-early');
@@ -108,7 +136,7 @@ section('The table is ordered by earning, and a tie goes to whoever got there fi
   await moved(lost.id, -1_000, 'stake', 't-stake:r-lost', new Date(mid));
   await played(even.id, 0, new Date(mid), 'r-even');
 
-  const table = await L.standings(pool, lastWeek);
+  const table = (await L.standings(pool, lastWeek)).filter(notFoe);   // the sparring accounts lost it all, below everybody
   eq(table.map(r => r.name), ['rank-big', 'rank-early', 'rank-late', 'rank-small', 'rank-even', 'rank-lost'],
     'most won is first, and everyone who played is on the board');
   eq(table.map(r => r.earning), [30_000, 20_000, 20_000, 5_000, 0, -1_000], 'with what each of them is up over the week');
@@ -130,6 +158,7 @@ section('A finished season is ranked, paid and frozen');
 {
   await reset();
   const mid = lastWeek.startsAt.getTime() + 24 * HOUR;
+  FOES = await sparring(String(++rooms));
   const players = [];
   for (let i = 0; i < 12; i++) {
     const p = await player(`league-${String(i).padStart(2, '0')}`);
@@ -183,6 +212,7 @@ section('The table is a hundred places long');
 {
   await reset();
   const mid = thisWeek.startsAt.getTime() + 6 * HOUR;
+  FOES = await sparring('deep');
   for (let i = 0; i < 105; i++) {
     const p = await player(`deep-${String(i).padStart(3, '0')}`);
     await played(p.id, (200 - i) * 100, new Date(mid + i * 1000), `d-${i}`);
@@ -217,6 +247,7 @@ section('Fewer players than places');
 {
   await reset();
   const mid = lastWeek.startsAt.getTime() + 12 * HOUR;
+  FOES = await sparring('few');
   const a = await player('few-a'), b = await player('few-b'), c = await player('few-down');
   await played(a.id, 8_000, new Date(mid), 'f-a');
   await played(b.id, 3_000, new Date(mid + 60_000), 'f-b');
@@ -258,6 +289,89 @@ section('The ledger refuses a second prize for the same season');
   const second = await give(pool as never, a.id, 1_000, 'league', idem.league('2026-01-05', a.id));
   eq(second?.applied, false, 'the same season and player cannot be paid twice');
   eq(await goldOf(a.id), before + 1_000, 'and the purse only moved once');
+}
+
+// ── Whose gold a win was ──
+// Netting stops two accounts gaining together, but the table ranks people one at a time: the account that
+// loses does not care. Each Google account brings 10,000 gold, so a prize could be bought with accounts made
+// to lose to one player in a friends' room. What one opponent can hand over is capped, a prize needs several
+// different opponents, and gold whose loser no longer exists is nobody's to credit.
+
+section('What one opponent can hand over in a week is capped');
+{
+  await reset();
+  const CAP = config.league.opponentCap;
+  const mid = thisWeek.startsAt.getTime() + 2 * HOUR;
+  const main = await player('cap-main'), feeder = await player('cap-feeder', 50_000_000), other = await player('cap-other');
+  // A friends' room, three times over: the feeder loses far more than the cap.
+  for (let i = 0; i < 3; i++) await match(main.id, [[feeder.id, CAP]], new Date(mid + i * 60_000), `cap-${i}`);
+  await match(main.id, [[other.id, 5_000]], new Date(mid + 5 * 60_000), 'cap-other');
+  const me = await L.placeOf(pool, thisWeek, main.id);
+  eq(me.earning, CAP + 5_000, `three times the cap from one opponent counts as the cap (${CAP.toLocaleString('en-US')}), plus what came from somebody else`);
+  eq((await L.placeOf(pool, thisWeek, feeder.id)).earning, -3 * CAP, 'while every loss counts in full');
+  eq(me.opponents, 2, 'and two different people were played');
+
+  // Friends who trade wins are netted pair by pair before the cap: up 50,000 and down 30,000 to the same person is 20,000.
+  const f1 = await player('cap-friend-1'), f2 = await player('cap-friend-2');
+  await match(f1.id, [[f2.id, 50_000]], new Date(mid + 10 * 60_000), 'friends-1');
+  await match(f2.id, [[f1.id, 30_000]], new Date(mid + 11 * 60_000), 'friends-2');
+  eq([(await L.placeOf(pool, thisWeek, f1.id)).earning, (await L.placeOf(pool, thisWeek, f2.id)).earning], [20_000, -20_000],
+    'two friends trading wins are netted, and a friends’ room counts');
+
+  const rows = await L.standings(pool, thisWeek);
+  eq(rows.find(r => r.user_id === main.id)?.earning, me.earning, 'the table and the player’s own line agree');
+}
+
+section('A prize needs three different opponents');
+{
+  await reset();
+  const mid = lastWeek.startsAt.getTime() + 30 * HOUR;
+  const foes = await sparring('elig');
+  const pair = await player('elig-pair'), wide = await player('elig-wide');
+  // Two opponents, a big week: on the board, and not paid.
+  await match(pair.id, [[foes[0]!.id, 40_000]], new Date(mid), 'elig-1');
+  await match(pair.id, [[foes[1]!.id, 40_000]], new Date(mid + 60_000), 'elig-2');
+  // Three opponents, a small week: paid first.
+  await match(wide.id, [[foes[0]!.id, 400], [foes[1]!.id, 300], [foes[2]!.id, 300]], new Date(mid + 120_000), 'elig-3');
+  const table = await L.standings(pool, lastWeek);
+  eq(table.slice(0, 2).map(r => [r.name, r.earning, r.opponents, r.eligible]), [['elig-wide', 1_000, 3, true], ['elig-pair', 80_000, 2, false]],
+    'the lines that can be paid rank first, so the ranks are the prize places');
+  const before = [await goldOf(pair.id), await goldOf(wide.id)];
+  await L.ensureSeason(pool, lastWeek);
+  const done = await L.settleDue(now);
+  eq(done!.paid.map(p => p.name), ['elig-wide'], 'only the week played against three people is paid');
+  eq([await goldOf(pair.id) - before[0]!, await goldOf(wide.id) - before[1]!], [0, L.prizeFor(1)], 'and the two-opponent week gets nothing');
+  const idle = await player('elig-idle');
+  eq(await L.placeOf(pool, lastWeek, idle.id), { rank: null, earning: 0, opponents: 0, eligible: false }, 'a player who sat the week out has no line');
+
+  // A room somebody sat down in and left before it started is not a table shared.
+  const code = await room(new Date(mid), false);
+  const sat = await player('elig-sat');
+  await moved(sat.id, -1_000, 'stake', 't-stake:sat-1', new Date(mid), code);
+  await moved(sat.id, 1_000, 'leave_refund', 't-refund:sat-1', new Date(mid), code);
+  await moved(foes[2]!.id, -1_000, 'stake', 't-stake:sat-2', new Date(mid), code);
+  await moved(foes[2]!.id, 1_000, 'leave_refund', 't-refund:sat-2', new Date(mid), code);
+  eq((await L.placeOf(pool, lastWeek, sat.id)).opponents, 0, 'a room that never started makes nobody an opponent');
+}
+
+section('Gold whose loser has deleted their account is nobody’s');
+{
+  await reset();
+  const mid = thisWeek.startsAt.getTime() + 3 * HOUR;
+  const main = await player('gone-main'), stays = await player('gone-stays'), leaves = await player('gone-leaves');
+  await match(main.id, [[stays.id, 5_000]], new Date(mid), 'gone-1');
+  await match(main.id, [[leaves.id, 20_000]], new Date(mid + 60_000), 'gone-2');
+  eq((await L.placeOf(pool, thisWeek, main.id)).earning, 25_000, 'two wins, from two people');
+  await query(pool, 'DELETE FROM users WHERE id = $1', [leaves.id]);
+  const after = await L.placeOf(pool, thisWeek, main.id);
+  eq(after.earning, 5_000, 'the loser deletes their account, their stake goes with it, and so does the credit for it');
+  eq(after.opponents, 1, 'and they are no longer an opponent');
+
+  // The other way round: a winner who deletes their account does not wipe out what the loser lost.
+  const winner = await player('gone-winner'), loser = await player('gone-loser');
+  await match(winner.id, [[loser.id, 7_000]], new Date(mid + 120_000), 'gone-3');
+  await query(pool, 'DELETE FROM users WHERE id = $1', [winner.id]);
+  eq((await L.placeOf(pool, thisWeek, loser.id)).earning, -7_000, 'a loss to somebody since deleted is still a loss');
 }
 
 await finish();

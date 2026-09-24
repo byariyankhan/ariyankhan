@@ -98,15 +98,7 @@ export interface AdClaim {
  * second one collides on the unique index rather than granting twice.
  */
 export async function adClaim(c: PoolClient, userId: number, amount: number, perDay: number): Promise<AdClaim> {
-  // Midnight UTC as PostgreSQL sees it, so every process agrees on when the day turned.
-  const r = await query<{ day: string; used: string }>(c,
-    `SELECT to_char(now() AT TIME ZONE 'utc', 'YYYY-MM-DD') AS day,
-            (SELECT count(*) FROM gold_ledger
-              WHERE user_id = $1 AND reason = 'ad_reward'
-                AND created_at >= date_trunc('day', now() AT TIME ZONE 'utc')) AS used`,
-    [userId]);
-  const day = r.rows[0]!.day;
-  const used = Number(r.rows[0]!.used);
+  const { day, used } = await adUsed(c, userId);
   if (used >= perDay) return { capped: true, gold: await balance(c, userId), granted: 0, used, left: 0 };
 
   const moved = await give(c, userId, amount, 'ad_reward', idem.adReward(userId, day, used + 1));
@@ -118,6 +110,32 @@ export async function adClaim(c: PoolClient, userId: number, amount: number, per
     left: Math.max(0, perDay - used - 1),
   };
 }
+
+/** Today's advertisement claims for this account, and the day they are counted in. */
+export async function adUsed(c: PoolClient | import('pg').Pool, userId: number): Promise<{ day: string; used: number }> {
+  // Midnight UTC as PostgreSQL sees it, so every process agrees on when the day turned -- and as a timestamptz,
+  // so the comparison does not depend on the session's time zone. The claims an earlier account on the same
+  // Google account made today, before it was deleted, count as well (account_tombstones): a new account is
+  // not a new day.
+  const r = await query<{ day: string; used: string; carried: string }>(c,
+    `SELECT to_char(now() AT TIME ZONE 'utc', 'YYYY-MM-DD') AS day,
+            (SELECT count(*) FROM gold_ledger
+              WHERE user_id = $1 AND reason = 'ad_reward'
+                AND created_at >= date_trunc('day', now(), 'UTC')) AS used,
+            (SELECT COALESCE(max(t.ads_used), 0) FROM users u
+               JOIN account_tombstones t ON t.provider = u.provider AND t.sub_hash = ${subHashSql('u.provider', 'u.sub')}
+              WHERE u.id = $1 AND t.ads_day = (now() AT TIME ZONE 'utc')::date) AS carried`,
+    [userId]);
+  return { day: r.rows[0]!.day, used: Number(r.rows[0]!.used) + Number(r.rows[0]!.carried) };
+}
+
+/**
+ * The one-way key a deleted account leaves behind (account_tombstones), as SQL over two text expressions. The
+ * same sha256 auth.ts's tombstoneHash computes, written here once so every query that looks a tombstone up
+ * agrees with the one that wrote it; the test suite checks the two against each other.
+ */
+export const subHashSql = (provider: string, sub: string): string =>
+  `encode(sha256(convert_to('puzzle-tombstone:' || ${provider} || ':' || ${sub}, 'UTF8')), 'hex')`;
 
 export async function balance(c: PoolClient | import('pg').Pool, userId: number): Promise<number> {
   const r = await query<{ gold: number }>(c, 'SELECT gold FROM users WHERE id = $1', [userId]);

@@ -1198,8 +1198,11 @@ links.
   account is in the dashboard because Google Play requires it. A new account is
   created with `PUZZLE_SIGNUP_GOLD` (10,000), written as a `signup` row in
   the gold ledger, so the welcome purse lands exactly once: signing out and back
-  in never tops it up. The balance rides along in every `user` object and shows
-  on the dashboard.
+  in never tops it up, and neither does deleting the account and signing in
+  again — a deletion leaves a one-way hash of the Google id in
+  `account_tombstones`, and the account made later starts with 0 gold (the
+  delete confirmation and the privacy policy both say so). The balance rides
+  along in every `user` object and shows on the dashboard.
   `games/puzzle/tests/` covers the security-critical half against a real
   PostgreSQL: which ID tokens are accepted (audience, issuer, expiry, unverified
   accounts, junk answers), that one Google account makes exactly one player, that
@@ -1310,7 +1313,16 @@ links.
   asking again cannot change that answer — and the card now names the real reason
   (signed out, not your match, gone) instead of blaming the network for
   everything. The server takes the first result per player and no other, so
-  sending it twice is safe.
+  sending it twice is safe. It also takes a clear only once the match has run,
+  on its own clock, as long as the fastest honest clear of its boards takes
+  (`PUZZLE_MIN_BOARD_MS` a board); sooner it answers `too_early` with when, and
+  `sendResult` waits that long and sends it again — the result is kept on the
+  device before it is sent, so a reload in the middle still sends it.
+  **Gold for an advertisement** (`adOffer`, `adTicket`, `adClaimGold`) asks the
+  server for a ticket before anything is shown and claims with it; no ticket (the
+  day spent, or the server unreachable) means no advertisement for gold, and the
+  toast says why. Without advertising (the web's free lifeline) the gold arrives
+  after the few seconds the server holds every ticket for, and the toast says so.
   **Faces** (`faceInner`, `faceClass`, `wireFaces`): a player is their Google
   profile picture where there is one, and their initial on one of eight colours
   picked from a hash of their name where there is not — two players called Ariyan

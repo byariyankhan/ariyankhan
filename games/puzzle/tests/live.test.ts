@@ -11,7 +11,7 @@
 import { pool, query, tx } from '../backend/src/db.js';
 import { config } from '../backend/src/config.js';
 import * as R from '../backend/src/rooms.js';
-import { eq, finish, goldOf, ok, player, reset, section, stake } from './helpers.js';
+import { begun, eq, finish, goldOf, ok, player, reset, section, stake } from './helpers.js';
 
 await reset();
 const S = stake();
@@ -67,6 +67,7 @@ section('Finishing or leaving frees the account');
 {
   const a = await player('free-a'), b = await player('free-b');
   const code = await playing(a, b);
+  await begun(code);   // a clear counts once the board could have been cleared (rooms.ts, submitResult)
   await tx(c => R.submitResult(c, code, a.id, 4_000, true));
   eq(await R.liveMatchOf(pool, a.id), null, 'handing in a run frees the account, before the match even settles');
   eq((await R.liveMatchOf(pool, b.id))?.code, code, 'and leaves the player who is still on the board in it');
@@ -102,6 +103,7 @@ section('A board somebody played is settled, not handed back');
   const a = await player('half-a'), b = await player('half-b');
   const before = { a: await goldOf(a.id), b: await goldOf(b.id) };
   const code = await playing(a, b);
+  await begun(code);
   await tx(c => R.submitResult(c, code, a.id, 5_000, true));   // a cleared it; b walked away
 
   await age(code, IDLE + 1);
@@ -206,6 +208,7 @@ section('The board travels with the seat');
   eq((await runOf(a.id))?.moves, 7, 'and none of it reaches the seat');
 
   // A finished seat is closed to all of it.
+  await begun(code);
   await tx(c => R.submitResult(c, code, a.id, 8_000, true));
   await tx(c => R.saveProgress(c, code, a.id, 100, R.cleanRun({ ...later, moves: 99 })));
   eq((await runOf(a.id))?.moves, 7, 'a run handed in is not rewritten afterwards');
