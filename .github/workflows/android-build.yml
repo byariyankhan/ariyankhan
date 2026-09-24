@@ -192,10 +192,12 @@ jobs:
         run: |
           AAB=app/build/outputs/bundle/release/app-release.aab
           unzip -l "$AAB" | grep -qE 'META-INF/.*\.(RSA|DSA|EC)$' || { echo "::error::the bundle came out unsigned"; exit 1; }
-          # shrinkResources cannot see a resource named only from manifest meta-data, and once dropped the
-          # splash id no longer resolves and the app dies on launch. res/raw/keep.xml holds it; this is the
-          # check that says so before anybody installs the result.
-          unzip -l "$AAB" | grep -q 'splash\.png' || { echo "::error::splash.png is missing — resource shrinking took it; check app/src/main/res/raw/keep.xml"; exit 1; }
+          # A splash resource the shrinker took is an app that dies on launch, and only in the shipped build: the
+          # splash brains (res/drawable/splash_mark*.xml, named from the Theme.App.Starting styles) are held by
+          # those styles and by res/raw/keep.xml, and this is the check that says so before anybody installs it.
+          for mark in splash_mark splash_mark_night splash_mark_mint; do
+            unzip -l "$AAB" | grep -qE "res/drawable[^/]*/${mark}\.xml" || { echo "::error::${mark}.xml is missing — resource shrinking took it; check app/src/main/res/raw/keep.xml"; exit 1; }
+          done
           echo "versionCode ${{ steps.ver.outputs.code }} · versionName ${{ github.event.inputs.version_name }}"
           keytool -printcert -jarfile "$AAB" | grep -E 'Owner:|SHA256:' || true
 

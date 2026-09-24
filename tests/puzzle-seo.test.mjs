@@ -153,8 +153,8 @@ test('a script-less reader gets one true sentence', () => {
 test('the h1 reads "Puzzle Train your brain." with a space', () => {
   assert.equal(text(html.match(/<h1 class="aa-title">([\s\S]*?)<\/h1>/)[1]), 'Puzzle Train your brain.');
 });
-test('interface text stays out of snippets: data-nosnippet on the gate, splash, sign-in sheet, session and developer groups, not on Settings', () => {
-  for (const id of ['aaGate', 'aaSplash', 'aaSignInSheet', 'aaSessionGroup', 'aaDevGroup']) assert.match(html, new RegExp(`<div[^>]*id="${id}"[^>]*\\sdata-nosnippet[\\s>]`), id);
+test('interface text stays out of snippets: data-nosnippet on the opening, sign-in sheet, session and developer groups, not on Settings', () => {
+  for (const id of ['aaSplash', 'aaSignInSheet', 'aaSessionGroup', 'aaDevGroup']) assert.match(html, new RegExp(`<div[^>]*id="${id}"[^>]*\\sdata-nosnippet[\\s>]`), id);
   assert.ok(!/<div[^>]*id="aaSheet"[^>]*data-nosnippet/.test(html), '#aaSheet holds the FAQ');
   assert.ok(!/data-nosnippet/.test(about), 'nor anything in the FAQ');
 });

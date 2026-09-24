@@ -12,4 +12,10 @@
 <resources>
     <color name="paper">#F4EDE0</color>
     <color name="ink">#2E2016</color>
+    <!-- The splash screen in the other two themes (Theme.App.Starting.Night and .Mint), chosen by the player in the
+         game rather than by the phone: each theme's background in css/puzzle.css, and its brain (the mark). -->
+    <color name="paper_night">#0E0E10</color>
+    <color name="ink_night">#F4F4F1</color>
+    <color name="paper_mint">#E6F2EC</color>
+    <color name="ink_mint">#12332D</color>
 </resources>

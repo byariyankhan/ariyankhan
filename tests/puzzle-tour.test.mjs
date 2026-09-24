@@ -113,7 +113,7 @@ test('the arrow tutorial counts as seen when finished, skipped or the board is c
   for (const how of [undefined, 'left']) assert.equal(run(how).set.coached, undefined, String(how));
   assert.equal(run('done').toasts.length, 1, 'finishing says so'); assert.equal(run('skip').toasts.length, 0);
   const r = run(undefined); assert.ok(!r.on && r.hidden && !r.top, 'closed either way, and the card back at the bottom for next time');
-  assert.match(grab(/function winLevel\(\) \{\n[^\n]+/), /coachEnd\('won'\)/);
+  assert.match(grab(/function winLevel\(\) \{\n(?:[^\n]+\n){2}/), /coachEnd\('won'\)/);
   assert.match(grab(/function failLevel\(reason\) \{\n[^\n]+/), /coachEnd\(\);/);
   assert.match(grab(/function goToLevels\(\) \{\n[^\n]+/), /coachEnd\(\);/);
   assert.match(grab(/el\.coachSkip\?\.addEventListener[^\n]+/), /coachEnd\('skip'\)/);
@@ -220,7 +220,7 @@ test('the tour is wired where the page moves: the deck, the sheets, a board, the
   assert.match(grab(/async function notifyFirstAsk\(\) \{[\s\S]*?\n  \}\n/), /push\.asking = true;[\s\S]*finally \{ push\.asking = false; \}/, 'the phone\'s notification question is waited for');
   const wait = grab(/function tourWait\(replay = false\) \{[\s\S]*?\n  \}\n/);
   assert.match(wait, /setInterval\(tick, 400\)/); assert.match(js, /const TOUR_WAIT_MS = 30000;/);
-  assert.match(wait, /\(el\.gate && !el\.gate\.hidden\) \|\| push\.asking \|\| document\.hidden\) tour\.since = Date\.now\(\)/, 'the clock stands still while somebody is reading');
+  assert.match(wait, /\(el\.splash && !el\.splash\.hidden\) \|\| push\.asking \|\| document\.hidden\) tour\.since = Date\.now\(\)/, 'the clock stands still while somebody is reading (the terms are on the opening now)');
 });
 
 console.log(`\n${tests} tests`);

@@ -983,7 +983,7 @@ links.
   its purple is gone: `--accent2` is the brain's rose `#DB3A5E` (the arrows that light the brain up on the
   home card, the slogan's colour), the Hard tier is magenta rather than purple, the primary buttons wear
   the same rose-to-coral gradient, a faint rose brain sits behind the home screen in every theme, and the
-  splash mark is the rose one (`images/puzzle-brain-mark-rose.svg`) everywhere but Night. There is no
+  opening's brain turns to the rose (`--mark-to`) as its line types, everywhere but Night. There is no
   separate Brain theme: the brain is in Paper.
 - **The out-of-hearts card, as drawn:** "Get a free life" first and biggest, orange with the play icon
   and an AD pill on the right when it is a real advertisement (no pill in free mode); "Try again" under it
@@ -1040,10 +1040,10 @@ links.
 - **Every button is the brain's colour** (`.aa-btn`: the rose-to-coral gradient of Play & Discover, white
   text), the table tiles (`.aa-stake`) carry the same rose in their wash and edge, and the dashboard header
   is one row: the picture, the name, the gold to its right (`.aa-me-id`). "Get a free life" stays orange.
-- **The app asks for notifications on first open** (`notifyFirstAsk`): the phone's own dialog the moment
-  the app is up, once (`pushAsked`); the answer is kept, and the switch in Settings stays. Browsers are
-  never asked unprompted. **No card before a system dialog**, in the app or the browser: the switch is the
-  question.
+- **The app asks for notifications once** (`notifyFirstAsk`): the phone's own dialog, once (`pushAsked`);
+  the answer is kept, and the switch in Settings stays. Never on the way in: it used to be the moment the app
+  was up (Accept, and a timer at boot), over the opening; see "The opening". Browsers are never asked
+  unprompted. **No card before a system dialog**, in the app or the browser: the switch is the question.
 - **Buttons carry the logo's brain** (`.aa-btn::after`: the white mark, faint, on the right, as Play &
   Discover does). **The home brain's arrows are always the rose** — GOAT is the whole brain lit, not a
   green one — and **lit arrows keep moving** (`aabrainflow`: a small step along each arrow's own direction
@@ -1154,9 +1154,9 @@ links.
   nothing to anything else answering the scheme. One button: the app's own way first, the browser by itself
   when that fails. The first notification ask no longer bails on "not granted", which on Android 13+ is
   what a permission never asked for looks like.
-  The welcome screen shows the brain mark instead of the old arrows, and **the app asks for notifications the
-  moment Accept is tapped** (`notifyFirstAsk` waits for `welcomed`, signed in or not: `notifyInitApp` no
-  longer needs an account).
+  The welcome screen shows the brain mark instead of the old arrows, and **the app asked for notifications the
+  moment Accept was tapped** (`notifyFirstAsk` waits for `welcomed`, signed in or not: `notifyInitApp` no
+  longer needs an account). No longer on the way in: see "The opening".
 - **The invite flow, audited** (September 2026). Fixed: signing in from a challenge link now brings the
   lobby socket up too (`signedIn` calls `authLoad(true)` on both paths), so later invitations reach that
   player; the challenge link survives the app's browser sign-in, which comes back as a fresh page
@@ -1541,11 +1541,44 @@ links.
   permissions, children, playing without an account), linked from the welcome gate
   and Settings. Clearing the site data wipes every `aa:v1:*` key; Settings →
   Delete account removes the account copy.
-- **First open / launch**: `#aaGate` (welcome, Terms + Privacy links, Accept,
-  stored in `aa:v1:welcomed`), then `#aaSplash` (logo + one line from `QUOTES`,
-  rotating per launch in `aa:v1:launches`, tap or 2.4 s to dismiss, skipped for
-  `#level-N`/`#daily` deep links and once per browser session). In the app, on a
-  phone that has played nothing, the home tour follows (see "The home tour").
+- **The opening** (`#aaSplash`; the inline scripts in `puzzle/index.html` and "The opening" in
+  `js/puzzle.js`): one surface from the first frame to home, where there used to be a welcome gate, a flash
+  of the home screen and a 2.64 s splash with a second, differently placed brain.
+  - **The first frame is the opening.** An inline script at the top of `<head>`, before any stylesheet,
+    decides it (`openingPlan`: first open, later open, or none) and sets `html.is-opening` (`is-first`) and
+    the theme from `localStorage`, every read guarded; `#aaSplash` is shown by that class, never `hidden` in
+    the markup, and the home screen is never painted before it.
+  - **The brain is the app's splash, continued**: drawn inline, 96 px, dead centre of the layer, in the ink the
+    app's splash uses (`--mark`), so the phone's splash hands over to the page without a visible change
+    (android/README.md, "The splash"). While the line types it turns the rose of the brain (not with reduced
+    motion).
+  - **The line types itself**, letter by letter (`typeSchedule` in the second inline script: about 34 ms a
+    letter and a breath after punctuation, squeezed into a budget). Every letter is its own span, laid out from
+    the start and shown by a CSS delay, so it runs on the compositor while the game's 418 KB script loads; it
+    waits for the web font (0.25 s at most). The keys are `SFX.key` (pitch nudged letter by letter), `SFX.space`
+    for the return before "— Puzzle" and `SFX.ding` at the end, all quieter than a tap, all put on the audio
+    clock at once against the letters' moments, at most one every 45 ms and none on a space. In the app, whose
+    WebView lets sound play without a tap, the typing waits up to 0.6 s for the game script so the first
+    letter has its key; on the website the typing is silent until a gesture (`soundLive()` never makes a
+    context there before one, and never lets a key play late).
+  - **First open**: a quote from `QUOTES` (rotating by `aa:v1:launches`) and "— Puzzle" type in 1.8 s at
+    most, then the Terms and Privacy sentence and Accept fade in under them on the same surface (on a small
+    phone the stage slides up to make room). Accept (`aa:v1:welcomed`) fades straight into home. A tap or a
+    key finishes the typing and shows the terms at once. Through a link: the terms, nothing typed, and
+    Accept goes straight to what the link opened.
+  - **Later opens**: the quote once a day (`aa:v1:quoteDay`), "Train your brain." otherwise; into home once
+    the line has been read and home is drawn, never later than 2.64 s (the quote) or 1.3 s (the tagline),
+    waits included. A tap or a key goes to home at once. `resumeLive` still cuts it short for a match.
+  - **No opening** for a link (`#level-N`, `#b-…`, `#daily`, `#league`, `#m=…`, `#handoff=…`, `?handoff=`),
+    a reload in the same session (`sessionStorage aa:splash`), a warm resume (the page is not reloaded), or
+    reduced motion (whose first open shows the whole block at once, without typing or keys).
+  - **Themes**: night and mint open in their own colours from the first frame, except where the phone's own
+    splash was paper (app build 1, and build 2 on Android 12 and older): there the opening stays on that paper
+    (`is-paper-first`) and fades into the player's colours.
+  - `aa:opened` is dispatched on `window` once, when home is what is on the screen (after the fade, or, with no
+    opening, once home is drawn); `#aaSplash` is `hidden` from then on. No notification permission is asked on
+    the way in.
+  - **The home tour** follows in the app, on a phone that has played nothing (see "The home tour").
 - **Data**: `games/data/puzzle.json` (112 KB for 168 countries) built by
   `games/build-puzzle-boards.mjs` from world-atlas 110m + Natural Earth 50m
   properties: per country the outline (`d`, in a 100×100 box) and five tier
@@ -1561,7 +1594,9 @@ links.
 - **Adding countries**: append to `TOUR` and `CAPITALS`, rebuild, bump
   `DATA_VERSION`. Tiers by level index are in `TIER_OF` in the JS.
 - **PWA**: `puzzle/app.webmanifest` (and `games/arrow-atlas.webmanifest`, kept so copies installed under the old name update in place); the shared worker
-  `piece-the-world-sw.js` also caches this game's files.
+  `piece-the-world-sw.js` also caches this game's files. Opening the game (`openGame`) gives the network 2 s:
+  an answer in time is used as before, and after that the cached page is served while the network's answer
+  still goes into the cache, so a connection that is up but barely moving no longer holds the app's splash.
 - **Tests**: `node tests/puzzle.test.mjs` runs the production `generate()` on
   every level (and 100 random seeds on the hardest tier), checks solvability, full
   coverage, determinism and data shape.
