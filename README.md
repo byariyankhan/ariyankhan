@@ -971,13 +971,16 @@ links.
   consecutive days that round was played, ending today or yesterday), a bar under the round in the list. The
   painting's credit after a round sits behind a `?` (`data-train-info`), and so does the sheet's own
   explanation (`data-train-about`). The rounds are cards with **drawn icons** (`TRAIN_ICON`: line marks in the
-  brain's colour, no emoji). **Every round is taught the way the board is** (`TRAIN_COACH`, `trainCoachStart`/`Show`/`Place`/`Event`/`End`): the first time a round is opened, a spotlight (`.aa-coach-spot`) sits on the thing to touch, a one-sentence card sits under it, and where the move is a drag a hand (`.aa-hand`, Web Animations) makes the move over and over until the player does; each step clears itself on the move it asked for (`wait`: `placed`, `found`, `play`, `ask`) or on Next; once through or skipped it is not shown again (`trainHow:<id>`). The three-step text stays behind the `?` in the round's bar (`trainHowCard`). **Restore the Canvas is drag and drop** (`canvasDragWire`, `canvasDrop`: pointer events, a carried copy `.aa-art-drag`, the slot under the finger lit `.is-over`, a swap when dropped on a full slot from another slot, `touch-action:none` so a drag never turns into a scroll; a piece dragged out of the frame goes back to the tray. Dragging is the only way a piece moves — the tap-then-tap way is gone, so there is one thing to learn; Gallery Memory is wired through the same `trainDragWire`, and its coach shows the hand carrying the first painting to place 1). **Every round is free once a day** (`trainPlay`, `trainFree`, `train:<day>.pp` counted when a round
-  starts). Once a round is scored its card, and its result, offer two things: **Play again**, the same puzzle
+  brain's colour, no emoji). **Every round is taught the way the board is** (`TRAIN_COACH`, `trainCoachStart`/`Show`/`Place`/`Event`/`End`): the first time a round is opened, a spotlight (`.aa-coach-spot`) sits on the thing to touch, a one-sentence card sits by it, and where the move is a drag a hand (`.aa-hand`, Web Animations) makes the move over and over until the player does; each step clears itself on the move it asked for (`wait`: `placed`, `found`, `answer`; such a step has no Next, only Skip) or on Next. The coach starts when the round's play does -- after Go and after the look, which is not spent reading -- and its numbers are the round's own level's (`p`, `tierParams`: "Three patches", "time past 1:30", "Three times over"). The card sits at the bottom unless what it points at reaches down into it, then at the top just under the sheet's head, so ← is never under it; a piece being carried sees through it (`body.aa-dragging`). A round played to its end counts as learned, whatever card was up; once through or skipped it is not shown again (`trainHow:<id>`). The three-step text stays behind the `?` beside the round's name (`trainHowCard`; the round holds while it is open, and Back or Escape close it first). **Restore the Canvas is drag and drop** (`canvasDragWire`, `canvasDrop`: pointer events, a carried copy `.aa-art-drag`, the slot under the finger lit `.is-over`, a swap when dropped on a full slot from another slot, `touch-action:none` so a drag never turns into a scroll; a piece dragged out of the frame goes back to the tray. Dragging is the only way a piece moves — the tap-then-tap way is gone, so there is one thing to learn; Gallery Memory is wired through the same `trainDragWire`, and its coach shows the hand carrying the first painting to place 1). **Every round is free once a day** (`trainPlay`, `trainFree`, `train:<day>.pp` counted once the round
+  is on the screen, `trainBegun`). Once a round is scored its card, and its result, offer two things: **Play again**, the same puzzle
   for nothing, as often as the player likes, and **Play next**, a new puzzle of the same round (a new painting,
-  a new deal: `train:<day>.nx` per round is the serial folded into `artPicks` and every round's day seed
-  through `train.serial`) for an advertisement the player chooses each time (`adOffer('trainplay')`); where
-  advertising is off (the site) Play next is simply free and nothing says AD. Before a round is scored its
-  card has one chip, Play (`trainCardState`, `.aa-train-cta`, `chipAgain`/`chipNext`); the card itself is a
+  a new deal: `train:<day>.nx` per round is the serial, moved on once the new puzzle is on the screen) for an
+  advertisement the player chooses each time (`adOffer('trainplay')`); where advertising is off (the site) Play
+  next is simply free and nothing says AD. An advertisement watched for a puzzle that never came -- the player
+  went back or closed the sheet while it played, or the paintings would not load -- starts nothing behind their
+  back and is owed (`train.owed`, `trainOwed`): that round's next Play next that day is free and says so. An
+  advertisement that did not come says "No advertisement right now. Play again is free."
+  Before a round is scored its card has one chip, Play (`trainCardState`, `.aa-train-cta`, `chipAgain`/`chipNext`); the card itself is a
   div with role button, the chips are buttons inside it carrying `data-train-mode`. The line above the list
   (`trainTally`) is "Four rounds, free every day", then "2 of 4 done today · 3 days in a row" -- never "done
   for today" while a round is still to play -- and with all four "Congratulations! Today's brain training is
@@ -1002,43 +1005,85 @@ links.
   scrolls, and a hundred Mughal, Deccani, Bengal, Rajput, Pahari, Jain, Persian, Ottoman, Tibetan, Nepalese
   and Burmese works, so the gallery has something near for most of the world, listed with title, painter, date and source in `games/data/art.json` (fetched once,
   `ART_VERSION`, `loadArt`) and kept resized (≤ 800 px, ~13 MB in all, fetched a painting at a time) in `images/art/`, cached forever by
-  the worker. The day's works are the same for everybody (`artPicks`, seeded by the day). Every round fits the screen (`trainFit`, run when a round draws and on resize): what a round draws under its line gets the room left below it, read from the layout (offsets up to the sheet, the panel's bottom padding, and a further safe strip, `TRAIN_SAFE`, 24 px, for a gesture bar or a toolbar coming back), and the paintings are as big as that room allows and no bigger, so both halves of the Forgery, the whole frame with its tray (the tray takes five to ten columns, whichever leaves the frame widest, then the pieces biggest, with a 30 px floor under a piece and 36 px under a place in the frame: where even that leaves no room for the whole frame the frame gives way, not the pieces, and on the shortest screens the tray's last row scrolls), the Curator's painting and then its four details are on the glass together, nothing to scroll for. **Restore the
+  the worker. **No painting hangs twice in a day** while the gallery has one not yet seen (`artDay`,
+  `artMains`, `artOthers`): the day has one order of works -- the player's window shuffled by the day, then the
+  works past it, nearest first -- and each puzzle of the day (a serial) takes the next ones in a fixed order
+  (the canvas, the forgery, the curator's painting, the gallery's wall), so a puzzle hangs the same paintings
+  whenever it is played and later puzzles reach past the window; the Curator's other details come from works not
+  yet shown whole that day. Same home country, same day, same history: same paintings. **Every round starts with
+  a count-in** (`trainCount`, `trainVeil`, `.aa-train-count`, `TRAIN_COUNT`): once its paintings are fetched and
+  decoded (`artReady`: `new Image()` and `decode()`, at most `ART_WAIT_MS` 7 s, "Hanging the paintings…" while it
+  waits -- so no look or clock runs over an empty frame, and the Curator's four details all arrive before its
+  painting is shown, where on a slow line the right one used to appear first), an opaque veil over the round's
+  own box counts 3, 2, 1, Go with the online room's sounds (`SFX.tick` on each number, `SFX.go` and a buzz at Go)
+  and a line saying what is coming, built from the round's level ("Five paintings, 5 seconds. Remember the
+  order."); the number pops, not under reduced motion. The painting and the hint are under the veil, the sheet's
+  ← and ? above it, and nothing of the round runs until Go. **A round holds** (`trainHold`/`trainRelease`, a set
+  of reasons behind `train.paused`: the Leave question, the `?` card, a hint's advertisement, the app or tab in
+  the background, the count-in): its timers skip, the count-in waits, and when the last hold comes off the look's
+  end and the play clock move on by the time held, so nothing is counted that was not played. Going into the
+  background veils the round at once ("Paused"); coming back runs the count-in again, then the music. Every start
+  carries a token (`train.run`) checked after each wait, so a round left while its paintings loaded never runs
+  behind the list, and a second finger or a round left mid-drag leaves no carried copy on the glass
+  (`train.drag`, `trainDragClear`, `lostpointercapture`). Drags, flights and the coach read the page's own
+  coordinates (`ptOf`, `rectOf`), so they are right in a phone browser held sideways. **The round's bar**
+  (`trainHud`, `trainStat`) is the level chip, then what is happening now with its mark -- an eye and "Look 3s"
+  with a bar draining under the row (`trainLook`), a clock against the allowance ("0:12 / 1:30", `trainClock`),
+  "2 of 5 placed", "Question 1 of 3" -- and the Hint, which looks disabled (`aria-disabled`, `trainHintSync`)
+  whenever it could do nothing; the round's name and its `?` are the sheet's head (`trainHead`). Every round fits the screen (`trainFit`, run when a round draws and on resize): what a round draws under its line gets the room left below it, read from the layout (offsets up to the sheet, the panel's bottom padding, and a further safe strip, `TRAIN_SAFE`, 24 px, for a gesture bar or a toolbar coming back), and the paintings are as big as that room allows and no bigger, so both halves of the Forgery, the whole frame with its tray (the tray takes five to ten columns, whichever leaves the frame widest, then the pieces biggest, with a 30 px floor under a piece and 36 px under a place in the frame: where even that leaves no room for the whole frame the frame gives way, not the pieces, and on the shortest screens the tray's last row scrolls), the Curator's painting and then its four details are on the glass together, nothing to scroll for. **Restore the
   Canvas** (`canvasStart`) cuts one painting into pieces (`.aa-art-tile`, the picture as a background
-  at n × 100 %): the painting hangs whole in the frame for four seconds (`CANVAS_LOOK`, a countdown in the
-  bar, no dragging, the coach's first step), then it comes apart and the pieces tumble into the tray
+  at n × 100 %): after Go the painting hangs whole in the frame for four seconds (`CANVAS_LOOK`, "Look 4s"
+  draining in the bar, no dragging), then it comes apart and the pieces tumble into the tray
   (`canvasScatter`, `trainFly`: each piece flies from the slot it hung in to its place in the tray, one after
   another with a small tumble, `SFX.scatter`, nothing under reduced motion) and the clock starts; drag each
-  piece home; scored on wrong tries and time over the allowance. **The Forgery**
+  piece home; scored on wrong tries and time over the allowance. A full frame with pieces out of place marks
+  them (`.aa-art-slot.is-wrong`) and charges each wrong placing once, the first time the frame is full with it
+  (`trainCharge`), so finding them costs nothing more. **The Forgery**
   (`forgeryStart`) shows the painting and a copy with patches wrong in it (`artPatch`: mirrored,
-  recoloured, taken from elsewhere in the same work, cycling); tap them in the copy, under the original or beside it,
+  recoloured, taken from elsewhere in the same work, cycling), each placed where it shows (`forgeLies`,
+  `lieSeen`: the decoded painting read small into a canvas, and a spot refused where the copy would differ from
+  the original by less than `LIE_SEEN` -- about the flattest fifth of the gallery's spots of each kind -- and a
+  patch "from elsewhere" taken at least 1.5 patches away); the clock starts at Go, and finds in a row climb in
+  pitch (`SFX.cheer`); tap them in the copy, under the original or beside it,
   whichever leaves the two bigger on that screen (`trainFit` decides and the line says which). **Gallery Memory**
   (`galleryStart`) hangs the paintings numbered for a few seconds, takes them down (the same `trainFly`
   flight, each painting falling from where it hung to where it lands in the tray, `SFX.scatter`), and deals
   them into a tray: the player **drags each one back to its number** (`galleryDragWire`, `galleryDrop`, `galleryDraw`,
   through the same `trainDragWire` as the canvas; a piece dropped on a full place swaps with it, one dragged
   out goes back to the tray). When every place is filled the wrong ones are outlined (`.is-wrong`,
-  `galleryCheck`, ten points each) and the round goes on until all hang right; the hint hangs the first
+  `galleryCheck`, ten points for each wrong placing, charged once) and the round goes on until all hang right; the hint hangs the first
   wrong one where it belongs and locks it. **Leaving a round is asked about** (`trainBack`, from the corner
-  arrow and the app's Back): "Leave this round? It is not scored, and it starts again from the beginning next
-  time." -- Leave the round / Keep playing, the game's own `ask` dialog, as leaving a board is; the round's
-  clock does not count the time the question was open; from a result there is no question. **The Curator's Eye** (`curatorStart`) shows one painting for a
-  few seconds, then, several times, four details — which is from it? **Every round gets harder the way the
+  arrow, the app's Back, Escape, and a tap in the margin beside a round on a wide screen): "Leave this round? It
+  is not scored, and it starts again from the beginning next time." -- Leave the round / Keep playing, the game's
+  own `ask` dialog, as leaving a board is; the round holds while the question is open; from a result there is
+  no question. **The Curator's Eye** (`curatorStart`) shows one painting for a
+  few seconds, then, several times, four details — which is from it? Each detail is a square of its painting as
+  it hangs (`curatorPatch`, `artPatch` with its own vertical fraction), so a wide or tall work is not squashed,
+  and somewhere with something in it (`DETAIL_SEEN`); right answers in a row climb in pitch. **Every round gets harder the way the
   board does** (`TRAIN_TIERS`, `trainTier`, `TIER_OF_ROUND`, `tierParams`): five difficulty steps per round,
   not shown -- a player plays for levels, and those are the main count's, below; a day scored 85 or more takes
   the round up a step, a day under 50 takes it down, read off the days before today so the step holds still
-  within a day and every device with the same history agrees. Step 1 → 5: the canvas 3×3 → 5×5 pieces
+  within a day and every device with the same history agrees, and off each day's first finish of its free
+  puzzle (`train:<day>.f1`, `trainFirst`), not its best, so a puzzle replayed until it is known by heart cannot
+  climb it; a day kept before first scores were is read by its best. Step 1 → 5: the canvas 3×3 → 5×5 pieces
   (allowance 90 s → 200 s), the forgery 3 → 5 patches, smaller and closer in colour, the gallery 5 → 8
   paintings shown for 5 → 4 seconds, the curator 3 → 5 questions with smaller details after 6 → 4 seconds.
   **Every training puzzle finished is a level on the main count** -- the same count as the home card's "Level
   N" and the boards' numbers (`levelNo`): a puzzle is a round's serial of the day (0 the free one, then each
-  Play next), its first finish is kept with its time (`train:<day>.cl`, round → serial → when; `trainSave`,
-  `trainCleared`) and takes its place among the boards by that time (`trainClearTimes`); Play again replays the
-  same serial, so it is never a second level. A round scored before clears were kept counts its free puzzle,
+  Play next), its first clear is kept with its time (`train:<day>.cl`, round → serial → when; `trainSave`,
+  `trainCleared`) and takes its place among the boards by that time (`trainClearTimes`). A clear asks for a
+  score of 50 (`TRAIN_PASS`): a round finished under it keeps its score but is no level, and its result says
+  "Score 50 or more to clear this puzzle" with Play again first. Play again replays the same serial, so it is
+  never a second level, and deals it anew (`trainSalt`: a new shuffle, new lies, new options, a new order on the
+  wall, salted with the round's starts that day). A round scored before clears were kept counts its free puzzle,
   at the day's last save. The round's bar shows the level finishing it will be (`levelChip`, `.aa-train-lv`,
   nothing on a replay), the result the level it was. The clears sync with the rest of the day (the server keeps
-  the union, the earliest time of each: `cleanTrainDay`, `mergeTrainDay`). Every round ends with the work's credit (`artCredit`, behind the `?`). Every round has a **Hint**
-  (`trainHint`): one free a day (`TRAIN_FREE_HINTS`, `train:<day>.h`), then an advertisement the player
-  chooses (`adOffer('trainhint')`, free where advertising is off); a hint costs ten points of that round
+  the union, the earliest time of each: `cleanTrainDay`, `mergeTrainDay`; the first scores `f1` by the lower per
+  round, on the account and on the device, `trainMergeF1`). Every round ends with the work's credit (`artCredit`, behind the `?`). Every round has a **Hint**
+  (`trainHint`): one free a day (`TRAIN_FREE_HINTS`, `train:<day>.h`, counted on the round's own day), then an
+  advertisement the player chooses (`adOffer('trainhint')`, free where advertising is off; the round holds while
+  it plays); only when it would do something (`g.canHint`, each round's `hint()` answering whether it acted), so
+  a press before Go, in a look or with nothing left to show spends nothing; a hint costs ten points of that round
   (a piece put home and locked, a lie circled, the next painting marked, one more short look). Kept per day
   as `train:<day>` (best of the day per round, `h` hints used, `p` rounds played), pushed in the state blob
   as `train` and merged by the better score per round and the larger `h`/`p`, on the account
@@ -1291,9 +1336,14 @@ links.
   **The room answers back** (`SFX`): every button in the game plays a short `tap`
   on `pointerdown` (one delegated listener; the board's arrows are not buttons,
   so they keep their own shot), a player arriving plays `join` and a buzz, one
-  leaving plays `left`, the last three seconds of the clock `tick`, and the board
-  being dealt plays `go`. All of it goes through the same `beep`, so the sound
-  switch silences the lot. The countdown is counted down on the device between
+  leaving plays `left`, the last three seconds of the clock `tick` (and pop), and
+  the board being dealt plays `go`. The ticks come from whichever clock gets to a
+  number first, the one counted here or the server's `countdown_tick` over the
+  socket (`fillShow`, `state.ticked`: one number never ticks twice), and at nought
+  the card says "Get ready…" while the server's sweep starts the room; `go` is a
+  race starting, not a player coming back onto one already run (`playMatch`). The
+  same two sounds count in every Daily Training round. All of it goes through the
+  same `beep`, so the sound switch silences the lot. The countdown is counted down on the device between
   polls and pulled back to the server's number whenever the two drift two seconds
   apart, which is what a backgrounded tab does to it.
   **Coming back to a race board puts the player back in the match**, not just back
