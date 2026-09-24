@@ -3481,6 +3481,7 @@
       if (early > 0) {
         if (!ads.isAd()) toast(`Your gold arrives in ${Math.ceil(early / 1000)} seconds.`, 'hint', Math.min(early, 4000));
         await new Promise(res => setTimeout(res, early + 150));
+        if (!auth.user) return;               // signed out while it waited: there is no purse to claim into
       }
       let r, d;
       for (let tries = 0; ; tries++) {
@@ -5332,6 +5333,9 @@
       const d = await sendResult(sent.code, sent.ms, sent.cleared, sent.gave_up);
       store.set(PENDING, null);
       setGold(d.gold);
+      // A result told to wait can land after the player has left the race for another board: the sheet is not
+      // thrown over whatever they are playing now, the purse and a line say how it went.
+      if (state.daily !== R) { if (d.match?.you_won) toast(`Your time got through. You won ${gpurse(d.match.pot)} gold.`, 'good', 5000); return; }
       renderRanks(d.match.players);
       el.overlay.hidden = true;
       showMatchState(d.match, before);

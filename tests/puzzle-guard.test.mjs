@@ -74,7 +74,7 @@ test('the result is kept on the device before it is sent, so a reload while it w
 const adSrc = [grab(/const adCapped = [^\n]+\n[^\n]+\n/), grab(/const adPost = [^\n]+\n[^\n]+\n/),
   grab(/async function adTicket\(\) \{[\s\S]*?\n  \}\n/), grab(/async function adClaimGold\(ticket\) \{[\s\S]*?\n  \}\n/)].join('\n');
 /** The gold flow over a scripted server: every POST takes the next answer for its path. */
-function adFlow(script, { isAd = true, now = 1_000_000 } = {}) {
+function adFlow(script, { isAd = true, now = 1_000_000, signedIn = true } = {}) {
   const posts = [], toasts = [], waits = [], gold = [], signIn = [];
   const fetch = async (url, opts) => {
     const pathOf = url.replace('/api/puzzle/v1', '');
@@ -86,7 +86,7 @@ function adFlow(script, { isAd = true, now = 1_000_000 } = {}) {
   const env = {
     fetch, API_V1: '/api/puzzle/v1', ads: { isAd: () => isAd }, toast: (msg, kind) => toasts.push({ msg, kind }),
     setGold: g => gold.push(g), openSignIn: m => signIn.push(m), gfmt: n => String(n),
-    setTimeout: (fn, ms) => { waits.push(ms); fn(); return 0; }, Date: { now: () => now },
+    setTimeout: (fn, ms) => { waits.push(ms); fn(); return 0; }, Date: { now: () => now }, auth: { user: signedIn ? { id: 7 } : null },
   };
   const names = Object.keys(env);
   const { adTicket, adClaimGold } = new Function(...names, adSrc + '\nreturn { adTicket, adClaimGold };')(...names.map(n => env[n]));
@@ -126,6 +126,15 @@ await test('the free tap waits out the hold, says so, and claims once', async ()
   assert.equal(f.toasts[0].msg, 'Your gold arrives in 15 seconds.');
   assert.deepEqual(f.waits, [15_150], 'the hold and a breath');
   assert.equal(f.posts.length, 1, 'one claim, not a refused one first');
+  const gone = adFlow({ '/ads/reward': [{ status: 401, body: { error: 'signed_out' } }] }, { isAd: false, signedIn: false });
+  await gone.adClaimGold({ id: 'T'.repeat(32), at: 1_000_000, wait: 15_000 });
+  assert.equal(gone.posts.length, 0, 'signed out while it waited, nothing is claimed');
+  assert.equal(gone.signIn.length, 0, 'and no sign-in sheet jumps up');
+});
+test('a result that lands after the player left the race tells them in a line, not a sheet over their board', () => {
+  const fin = grab(/async function finishMatch\(cleared, ms, gaveUp = false\) \{[\s\S]*?\n  \}\n/);
+  const left = fin.indexOf('if (state.daily !== R)'), sheet = fin.indexOf('showMatchState(d.match, before)');
+  assert.ok(left > 0 && sheet > left, 'the check comes before the sheet');
 });
 await test('a clock behind the server’s is told too early, waits what it is told and claims again', async () => {
   const f = adFlow({ '/ads/reward': [{ status: 409, body: { error: 'too_early', retry_after: 2, retry_after_ms: 1_200 } }, { status: 200, body: { gold: 500, granted: 500, left: 9 } }] });
