@@ -1,9 +1,9 @@
 // A player's tour, and the one property that makes syncing it safe: nothing a device pushes can ever take
 // something away. Two phones, opened in any order, converge on the better of what each has seen.
 import { pool, query } from '../backend/src/db.js';
-import { cleanDevice, cleanLevels, cleanState, cleanStats, cleanStreak, combineState, difficulty, mergeLevels, mergeState, mergeStats, mergeStreak, nextDay, readAll, readLevels, readState, STATE_KEEP_DAYS } from '../backend/src/progress.js';
+import { cleanDevice, cleanLevels, cleanState, cleanStats, cleanStreak, combineState, difficulty, levelIdOk, MAX_BLOB_BYTES, MAX_SERIALS, MAX_STAT_DEVICES, mergeLevels, mergeState, mergeStats, mergeStreak, nextDay, readAll, readLevels, readState, STATE_KEEP_DAYS } from '../backend/src/progress.js';
 import { deleteUser } from '../backend/src/auth.js';
-import { releasePlayer } from '../backend/src/rooms.js';
+import { boardIdSet, releasePlayer } from '../backend/src/rooms.js';
 import { eq, finish, ok, player, reset, section } from './helpers.js';
 
 await reset();
@@ -237,10 +237,12 @@ section('Training puzzles finished on two devices are all on the account, each w
   same(combineState(ab, a), ab, 'and again changes nothing');
   const dirty = cleanState({ train: { [today]: { cl: { r: { '0': 5, x: 9, '12345': 9, '007': 9, '2': -1 }, z: { '0': 5 } } } } }) as Record<string, any>;
   same(dirty.train[today], { cl: { r: { '0': 5 } } }, 'a serial that is not a small number (or is written with a leading zero), a time that is not a time and a round that is not a round are dropped');
-  const many = (from: number) => Object.fromEntries(Array.from({ length: 200 }, (_, i) => [String(from + i), 1000 + i]));
-  const capped = combineState({ train: { [today]: { cl: { r: many(100) } } } }, { train: { [today]: { cl: { r: many(0) } } } }) as Record<string, any>;
-  eq(Object.keys(capped.train[today].cl.r).length, 200, 'the union of two full rounds keeps 200 puzzles');
-  ok('0' in capped.train[today].cl.r && !('250' in capped.train[today].cl.r), 'the lowest of them, whichever device pushed first');
+  const many = (from: number) => Object.fromEntries(Array.from({ length: MAX_SERIALS }, (_, i) => [String(from + i), 1000 + i]));
+  const capped = combineState({ train: { [today]: { cl: { r: many(MAX_SERIALS / 2) } } } }, { train: { [today]: { cl: { r: many(0) } } } }) as Record<string, any>;
+  eq(Object.keys(capped.train[today].cl.r).length, MAX_SERIALS, `the union of two full rounds keeps ${MAX_SERIALS} puzzles`);
+  ok('0' in capped.train[today].cl.r && !(String(MAX_SERIALS) in capped.train[today].cl.r), 'the lowest of them, whichever device pushed first');
+  const flood = cleanState({ train: { [today]: { cl: { r: Object.fromEntries(Array.from({ length: 200 }, (_, i) => [String(i), 1000 + i])) } } } }) as Record<string, any>;
+  eq(Object.keys(flood.train[today].cl.r).length, MAX_SERIALS, `two hundred puzzles of one round in one day are cut to ${MAX_SERIALS}, a believable day`);
   const p = await player('progClears');
   await mergeState(pool, p.id, a); await mergeState(pool, p.id, b);
   same(((await readState(pool, p.id)) as Record<string, any>).train?.[today]?.cl, { r: { '0': 1000, '1': 2000 }, f: { '0': 1500 } }, 'on the account as well');
@@ -372,6 +374,66 @@ section('What a board costs is counted per device, and only ever grows');
 
   await query(pool, `DELETE FROM users WHERE id = $1`, [q.id]);
   eq((await difficulty(pool, 1)).find(x => x.level_id === 'lk')?.players ?? 0, 1, 'a deleted account takes its counts with it');
+}
+
+section('Only boards of the game are synced');
+{
+  // A push could carry six hundred invented ids a time, and every one became a row on the account and in the
+  // public difficulty table. What the route keeps now is what could be a board.
+  const countries = await boardIdSet();
+  ok(countries.size >= 190 && countries.has('050'), `the country list is the one the server deals from (${countries.size} boards)`);
+  for (const id of ['050', 'd:050', 'f:brain', 's:diamond', 's:diamond~2', 'n:anything_1']) ok(levelIdOk(id, countries), `${id} is a board`);
+  for (const id of ['bd', 'c1', 'pace-board', 'd:999', 'd:bd', 's:diamond~0', 's:diamond~x', 'z:foo', 'f:', 'f:a b', '0500', 'x'.repeat(65)]) ok(!levelIdOk(id, countries), `${JSON.stringify(id.slice(0, 20))} is not`);
+  ok(levelIdOk('999', new Set()) && !levelIdOk('abc', new Set()), 'with no list to read, a country is three digits');
+  const known = (id: string) => levelIdOk(id, countries);
+  eq(Object.keys(cleanLevels({ '050': rec(), junk1: rec(), 's:tower~3': rec() }, known)).sort(), ['050', 's:tower~3'], 'a push keeps its real boards and drops the rest');
+  eq(Object.keys(cleanStats({ '050': { p: 1 }, junk1: { p: 1 } }, known)), ['050'], 'and so do its counts');
+}
+
+section('An account holds a bounded number of boards');
+{
+  const p = await player('progRows');
+  eq(await mergeLevels(pool, p.id, cleanLevels({ a1: rec(), a2: rec(), a3: rec() }), 5), 3, 'under the line, every new board lands');
+  const moved = await mergeLevels(pool, p.id, cleanLevels({ a1: rec({ stars: 3, ms: 10_000 }), b1: rec(), b2: rec(), b3: rec(), b4: rec() }), 5);
+  eq(moved, 3, 'at the line, the board already held still improves and only the room left is filled');
+  const got = await readLevels(pool, p.id);
+  eq(Object.keys(got).length, 5, 'so the account stops at its line');
+  eq(got.a1?.stars, 3, 'and the better run on a board it had was taken');
+  eq(await mergeLevels(pool, p.id, cleanLevels({ c1: rec() }), 5), 0, 'a new board past the line is dropped');
+}
+
+section('An account keeps the counts of a bounded number of devices');
+{
+  const p = await player('progDevices');
+  for (let i = 0; i < MAX_STAT_DEVICES; i++) {
+    await mergeStats(pool, p.id, `dev${String(i).padStart(2, '0')}`, cleanStats({ '050': { p: 1, c: 1, ms: 30_000 } }));
+    await query(pool, `UPDATE level_stats SET updated_at = now() - ($2 || ' minutes')::interval WHERE user_id = $1 AND device = $3`,
+      [p.id, String(MAX_STAT_DEVICES - i), `dev${String(i).padStart(2, '0')}`]);
+  }
+  await mergeStats(pool, p.id, 'freshPhone', cleanStats({ '050': { p: 2, c: 1, ms: 30_000 } }));
+  const devs = (await query<{ device: string }>(pool, `SELECT DISTINCT device FROM level_stats WHERE user_id = $1`, [p.id])).rows.map(r => r.device);
+  eq(devs.length, MAX_STAT_DEVICES, `a new device past ${MAX_STAT_DEVICES} does not grow the account`);
+  ok(devs.includes('freshPhone') && !devs.includes('dev00'), 'it takes the place of the one heard from least recently');
+  eq(cleanStats({ '050': { p: 50_000, c: 1 } })['050']?.plays, 0, 'and a count past anything believable is not a count');
+  eq(cleanStats({ '050': { p: 3, c: 1, ms: 9_000_000 } })['050']?.ms, 0, 'nor more than an hour a clear');
+}
+
+section('The settings blob the account keeps is bounded, the oldest days going first');
+{
+  const heavy: Record<string, unknown> = {};
+  const cl = Object.fromEntries(Array.from({ length: MAX_SERIALS }, (_, i) => [String(i), 1_700_000_000_000 + i]));
+  for (let i = 0; i < 200; i++) heavy[back(i)] = { r: 90, f: 80, g: 70, e: 60, cl: { r: cl, f: cl, g: cl, e: cl } };
+  const merged = combineState({ train: heavy }, { train: { [today]: { r: 99 } } }) as Record<string, any>;
+  const size = JSON.stringify(merged).length;
+  ok(size <= MAX_BLOB_BYTES, `a year of the heaviest training there could be is kept under ${MAX_BLOB_BYTES / 1024} KB (${Math.round(size / 1024)} KB)`);
+  ok(today in merged.train && merged.train[today].r === 99, 'today is kept');
+  ok(!(back(199) in merged.train), 'and what made room was the oldest days');
+  // What a script would do: a different fortnight in every push, each one under the per-push limit.
+  const p = await player('progBlob');
+  const days = Object.keys(heavy).sort();
+  for (let i = 0; i < days.length; i += 14) await mergeState(pool, p.id, { train: Object.fromEntries(days.slice(i, i + 14).map(d => [d, heavy[d]])) });
+  const stored = JSON.stringify(await readState(pool, p.id)).length;
+  ok(stored <= MAX_BLOB_BYTES && stored > MAX_BLOB_BYTES / 2, `and so is what the account stores, however many pushes it took (${Math.round(stored / 1024)} KB)`);
 }
 
 await finish();

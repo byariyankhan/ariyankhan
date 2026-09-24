@@ -3750,13 +3750,15 @@
     gold: {
       earn: 'Watch this through and the gold goes to your purse.',
       needsAccount: true,
-      async grant() {
+      // claimed with a ticket the server hands out before anything is shown (adTicket)
+      ticket: true,
+      async grant(quiet, ticket) {
         // The stand-in panel asks nothing of any network, and the reward has to hold to the same rule. It did
         // not: the gold was claimed from the server for an advertisement that was never requested, never
         // shown and never paid for by anybody — real gold, on an account that can stake it against other
         // people. What the test mode owes is the shape of the thing, and the toast is that.
         if (ads.mode === 'test') { toast('Test advertisement watched. The real one adds gold here.', 'good', 3200); return; }
-        await adClaimGold();
+        await adClaimGold(ticket);
       },
     },
   };
@@ -3823,6 +3825,16 @@
     // else's board under them. The other two would quietly add an allowance to a board nobody asked for.
     const board = R.board ? state.pieces : null;
 
+    // Gold is claimed with a ticket the server hands out first, so this asks before anything is shown: a day
+    // already spent, or a server that cannot give one, is said now rather than after half a minute watched for
+    // nothing. The test panel claims nothing and needs none.
+    let ticket = null;
+    if (R.ticket && ads.mode !== 'test') {
+      ads.showing = true;                       // a second tap while it is fetched is not a second advertisement
+      try { ticket = await adTicket(); } finally { ads.showing = false; }
+      if (!ticket) return;                      // adTicket has said why
+    }
+
     if (ads.isAd()) {
       // A match does not pause for this, and a player about to spend half a minute on an advertisement is owed
       // that before it starts, not after.
@@ -3850,27 +3862,60 @@
           toast('That board is over, so there was nothing to add it to.', 'hint', 3200);
           return false;
         }
-        await R.grant(quiet);
+        await R.grant(quiet, ticket);
       } finally { ads.showing = false; }
       return true;
     }
 
-    // Advertising off: there is nothing to watch and nothing to agree to, so the tap simply pays out.
+    // Advertising off: there is nothing to watch and nothing to agree to, so the tap simply pays out -- gold
+    // after the few seconds the server holds every ticket for (adClaimGold says so while it waits).
     ads.showing = true;                         // gold's grant goes to the server; a second tap is not a second reward
-    try { await R.grant(quiet); } finally { ads.showing = false; }
+    try { await R.grant(quiet, ticket); } finally { ads.showing = false; }
     return true;
   }
   const PRODUCT_AD = 'puzzle';
 
-  // Gold is the server's to give. The client says an advertisement finished; the server decides what that is
-  // worth, counts the day's claims from the ledger and answers with the balance it now holds.
-  async function adClaimGold() {
+  const adCapped = () => toast(ads.isAd() ? 'That is all the gold advertisements give today. Come back tomorrow.'
+    : 'That is all the free gold today. Come back tomorrow.', 'hint', 4000);
+  const adPost = (path, body) => fetch(`${API_V1}${path}`, { method: 'POST', credentials: 'include', cache: 'no-store', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+    .then(async r => ({ r, d: await r.json().catch(() => ({})) }));
+  // The ticket a gold claim is made with: one at a time, spendable once, and not before an advertisement's
+  // length has passed since it was handed out. Null when there is none to be had, having said why -- in which
+  // case no advertisement is shown for gold at all.
+  async function adTicket() {
     try {
-      const r = await fetch(`${API_V1}/ads/reward`, { method: 'POST', credentials: 'include', cache: 'no-store', headers: { 'Content-Type': 'application/json' }, body: '{}' });
-      const d = await r.json().catch(() => ({}));
+      const { r, d } = await adPost('/ads/start', {});
+      if (r.ok && typeof d.ticket === 'string') return { id: d.ticket, at: Date.now(), wait: Math.max(0, Number(d.min_seconds) || 0) * 1000 };
+      if (typeof d.gold === 'number') setGold(d.gold);
+      if (d.error === 'ad_cap') { adCapped(); return null; }
+      if (d.error === 'signed_out') { openSignIn('Sign in first, so the gold has a purse to go into.'); return null; }
+    } catch { /* offline, or the server did not answer: said below */ }
+    toast(ads.isAd() ? 'No gold advertisement right now. Try again in a moment.'
+      : 'No free gold right now. Try again in a moment.', 'hint', 4200);
+    return null;
+  }
+
+  // Gold is the server's to give. The client says an advertisement finished and hands over its ticket; the
+  // server decides what that is worth, counts the day's claims from the ledger and answers with the balance.
+  async function adClaimGold(ticket) {
+    try {
+      // The server holds a ticket for an advertisement's length. After a real one that has passed; after the
+      // free tap it has not, so the gold is claimed when it may be, and the player is told it is coming.
+      const early = ticket ? ticket.at + ticket.wait - Date.now() : 0;
+      if (early > 0) {
+        if (!ads.isAd()) toast(`Your gold arrives in ${Math.ceil(early / 1000)} seconds.`, 'hint', Math.min(early, 4000));
+        await new Promise(res => setTimeout(res, early + 150));
+        if (!auth.user) return;               // signed out while it waited: there is no purse to claim into
+      }
+      let r, d;
+      for (let tries = 0; ; tries++) {
+        ({ r, d } = await adPost('/ads/reward', { ticket: ticket?.id || '' }));
+        // A clock a little behind the server's: wait what it says, and claim again.
+        if (r.status !== 409 || d.error !== 'too_early' || tries >= 3) break;
+        await new Promise(res => setTimeout(res, Math.min(30000, (Number(d.retry_after_ms) || (Number(d.retry_after) || 1) * 1000) + 150)));
+      }
       if (!r.ok) {
-        if (d.error === 'ad_cap') toast(ads.isAd() ? 'That is all the gold advertisements give today. Come back tomorrow.'
-          : 'That is all the free gold today. Come back tomorrow.', 'hint', 4000);
+        if (d.error === 'ad_cap') adCapped();
         else if (d.error === 'signed_out') openSignIn('Sign in first, so the gold has a purse to go into.');
         else toast('The gold could not be added. Try again in a moment.', 'bad');
         if (typeof d.gold === 'number') setGold(d.gold);
@@ -4640,7 +4685,7 @@
   }
   const matchApi = (a, body, query = '') => {
     const { url, method } = matchUrl(a, body, query);
-    return apiCall(url, body, method, d => ({ gold: d.gold, matchCode: d.match_code, retryAfter: d.retry_after }));
+    return apiCall(url, body, method, d => ({ gold: d.gold, matchCode: d.match_code, retryAfter: d.retry_after, retryAfterMs: d.retry_after_ms }));
   };
   // ── The live socket ──
   //
@@ -5690,7 +5735,9 @@
     await notifyRelease();
   });
   el.deleteAccBtn?.addEventListener('click', async () => {
-    if (!await ask({ title: 'Delete your account?', body: 'Your gold and any matches go with it. The progress on this device stays.',
+    // The welcome gold is once per Google account (the server keeps a one-way hash to know it again), so the
+    // player is told before they choose, not after they sign in again and find an empty purse.
+    if (!await ask({ title: 'Delete your account?', body: 'Your gold and any matches go with it. A new account made later starts with 0 gold. The progress on this device stays.',
       ok: 'Delete it', cancel: 'Keep my account', danger: true })) return;
     await notifyDrop();   // the rows go with the account anyway; the browser's own subscription does not
     try { await authApi('delete', {}); auth.user = null; renderAccountRow(); renderNotify(); closeSheets(); toast('Account deleted.'); }
@@ -5704,14 +5751,21 @@
   // is tried a few times, kept on the device if it still will not go, and sent again on the next visit. Only a
   // straight refusal from the server stops the retrying: asking again cannot change that answer.
   const PENDING = 'pendingResult';
+  // The server counts a clear only once the match has run, on its own clock, as long as the fastest honest
+  // clear of its boards takes; sooner, it answers too_early and says when. A player quicker than that, or a
+  // device whose clock runs ahead, is not refused -- the result simply goes when it is told to, a breath after
+  // the moment named so it lands past it rather than on it.
+  const tooEarlyWait = err => Math.min(60000, Math.max(250, Number(err.retryAfterMs) || (Number(err.retryAfter) || 1) * 1000) + 150);
   async function sendResult(code, ms, cleared, gaveUp = false) {
     let last;
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0, waits = 0; i < 3;) {
       try { return await matchApi('result', { code, ms, cleared, gave_up: gaveUp }); }
       catch (err) {
         last = err;
+        if (err.code === 'too_early' && waits++ < 8) { await new Promise(r => setTimeout(r, tooEarlyWait(err))); continue; }
         if (err.code) break;
-        await new Promise(r => setTimeout(r, 500 * (i + 1)));
+        i++;
+        await new Promise(r => setTimeout(r, 500 * i));
       }
     }
     throw last;
@@ -5728,10 +5782,17 @@
     stopProgressPoll();
     const before = auth.user?.gold ?? 0;
     const sent = { code: R.match.code, ms: Math.max(0, Math.round(ms) || 0), cleared: !!cleared, gave_up: !!gaveUp };
+    // Kept on the device before it is sent, not only once it has failed: a result told to wait (too_early) is
+    // still on its way when the page is closed or reloaded, and the next visit sends it (flushResult). The
+    // server takes a result once, so sending one that did get through changes nothing.
+    store.set(PENDING, sent);
     try {
       const d = await sendResult(sent.code, sent.ms, sent.cleared, sent.gave_up);
       store.set(PENDING, null);
       setGold(d.gold);
+      // A result told to wait can land after the player has left the race for another board: the sheet is not
+      // thrown over whatever they are playing now, the purse and a line say how it went.
+      if (state.daily !== R) { if (d.match?.you_won) toast(`Your time got through. You won ${gpurse(d.match.pot)} gold.`, 'good', 5000); return; }
       renderRanks(d.match.players);
       el.overlay.hidden = true;
       showMatchState(d.match, before);
@@ -6011,8 +6072,9 @@
     </div>`;
   // A prize belongs to a row only while that row is in front: the table holds everyone who played, so places
   // one to ten can be held by a player who is down on the week, and "wins 5.12M" under a losing line would be
-  // a promise the settlement does not keep.
-  const prizeOn = (r, prizes) => r.earning > 0 ? (prizes[r.rank - 1] || 0) : 0;
+  // a promise the settlement does not keep. The same for a line the server says cannot be paid yet (eligible,
+  // fewer than three different opponents); a server from before that word leaves it out, and is believed.
+  const prizeOn = (r, prizes) => r.earning > 0 && r.eligible !== false ? (prizes[r.rank - 1] || 0) : 0;
 
   function renderLeague() {
     if (!el.leagueBody) return;
@@ -6051,7 +6113,7 @@
     // Your own row, pinned to the foot of the sheet. A hundred places is a long scroll, and a player deep in
     // it should not have to find themselves to see where they stand — so it follows the scroll, and gets out
     // of the way when the real row is on screen (see wireLeaguePin).
-    const pinRow = showing === 'last' ? mineLast : (mine && mine.rank ? { ...auth.user, rank: mine.rank, earning: mine.earning, you: true } : null);
+    const pinRow = showing === 'last' ? mineLast : (mine && mine.rank ? { ...auth.user, rank: mine.rank, earning: mine.earning, eligible: mine.eligible, you: true } : null);
     const pinned = auth.user && pinRow
       ? `<div class="aa-lg-pin" id="aaLeaguePin" hidden>${leagueRow(pinRow, showing === 'last' ? pinRow.gold : prizeOn(pinRow, prizes), showing === 'last')}</div>`
       : '';
@@ -6063,6 +6125,7 @@
       <div class="aa-lg-rules" id="aaLeagueRules" hidden>
         <p>Every gold match counts, a friend's room the same as an online table: play one and you are on the board. What you win, less the stakes you paid, is your earning for the week — so the table is what you are up over the week, and gold you were given does not count.</p>
         <p>When the week ends the top ten are paid, tenth place taking ${gshort(prizes[prizes.length - 1] || 0)} and every place above it doubling that, up to ${gshort(prizes[0] || 0)} for first. A week you end down on keeps your place on the board and pays nothing.</p>
+        <p>A prize needs matches against at least three different people in the week, and only so much of a week's earning can come from any one of them: the league is won at the tables, not handed over by a second account.</p>
         <p class="aa-cap aa-lg-cap">What the places pay</p>
         <div class="aa-lg-prizes">
           ${prizes.map((g, i) => `<div class="aa-lg-prize"><span class="aa-lg-medal${MEDAL(i + 1)}">${i + 1}</span><span>${COIN} ${gshort(g)}</span></div>`).join('')}

@@ -23,9 +23,38 @@ import { clientIp } from './proxies.js';
 import { cookies } from './httpkit.js';
 import { log } from './log.js';
 
-interface Client { socket: WebSocket; user: User; watching: string | null; alive: boolean; }
+interface Client {
+  socket: WebSocket; user: User; watching: string | null; alive: boolean;
+  /** what the socket may still send before it is over its allowance (see spend) */
+  tokens: number; filled: number;
+  /** when this socket's last resync was answered, and the one waiting to be */
+  resyncAt: number; resyncLater: NodeJS.Timeout | null;
+}
 
 const clients = new Set<Client>();
+
+// ── What one socket may ask of the server ──
+//
+// Every message but `progress` used to be free, and `watch` alone is a room read, a Redis write, three or four
+// queries for the state and a message to everyone in the room: one socket sending thousands a second could
+// hold every connection in the pool. The honest client sends one progress a second while racing and asks for
+// a resync on each event in its room -- seven or eight messages a second in a full room at the most -- so the
+// allowance is ten a second with room for a burst of twenty. A message over it is dropped; a socket that keeps
+// going far past it is closed with 1008 (policy violation), and the client falls back to asking over REST.
+export const WS_RATE = 10;
+export const WS_BURST = 20;
+export const WS_DEBT = 20;                   // how far past empty before the socket is closed
+export const WS_PER_USER = 6;                // sockets one account may hold open in one process: tabs and a phone
+export const RESYNC_EVERY_MS = 2_000;
+
+/** Take one message's worth from the socket's allowance: 'ok', 'drop' (over, ignore it) or 'close'. */
+export function spend(c: Pick<Client, 'tokens' | 'filled'>, now = Date.now()): 'ok' | 'drop' | 'close' {
+  c.tokens = Math.min(WS_BURST, c.tokens + ((now - c.filled) / 1000) * WS_RATE);
+  c.filled = now;
+  c.tokens -= 1;
+  if (c.tokens >= 0) return 'ok';
+  return c.tokens < -WS_DEBT ? 'close' : 'drop';
+}
 /** Which sockets are watching which room, so an event costs one lookup rather than a scan. */
 const byRoom = new Map<string, Set<Client>>();
 
@@ -109,8 +138,18 @@ export function attachWebSocket(app: FastifyInstance): void {
       socket.destroy();
       return;
     }
+    // A few tabs and a phone is a player; more than that is one account multiplying its allowance. The new
+    // socket is the one refused, not an old one closed: closing the oldest would have two tabs take turns
+    // knocking each other off for ever. A refused client plays on over REST.
+    let open = 0;
+    for (const o of clients) if (o.user.id === user.id) open++;
+    if (open >= WS_PER_USER) {
+      socket.write('HTTP/1.1 429 Too Many Requests\r\nRetry-After: 30\r\n\r\n');
+      socket.destroy();
+      return;
+    }
     wss.handleUpgrade(req, socket, head, ws => {
-      const c: Client = { socket: ws, user, watching: null, alive: true };
+      const c: Client = { socket: ws, user, watching: null, alive: true, tokens: WS_BURST, filled: Date.now(), resyncAt: 0, resyncLater: null };
       clients.add(c);
       void online.seen(user.id);
       send(c, { type: 'hello', user_id: user.id, name: user.name, server_time: Date.now(), heartbeat_seconds: 30 });
@@ -119,9 +158,12 @@ export function attachWebSocket(app: FastifyInstance): void {
       ws.on('pong', () => { c.alive = true; void online.seen(user.id); });
 
       ws.on('message', async raw => {
+        const allowance = spend(c);
+        if (allowance === 'close') { log.warn('socket over its allowance, closed', { user_id: user.id }); try { ws.close(1008, 'too many messages'); } catch { /* going */ } return; }
+        if (allowance === 'drop') return;
         let msg: { type?: string; code?: string; pct?: number; run?: unknown; hidden?: unknown };
         try { msg = JSON.parse(String(raw)) as typeof msg; } catch { return; }
-        const code = String(msg.code ?? '').trim().toUpperCase();
+        const code = String(msg.code ?? '').trim().toUpperCase().slice(0, 16);
 
         switch (msg.type) {
           case 'ping':
@@ -135,7 +177,14 @@ export function attachWebSocket(app: FastifyInstance): void {
             return;
 
           case 'watch': {
-            if (!code) return;
+            // Already watching it: the feed is already coming, and asking again is not worth a room read.
+            if (!code || c.watching === code) return;
+            // Only a room that is still going has a feed. A finished one never changes again, and every room
+            // watched costs the countdown ticker a query a second -- a socket used to be able to watch every
+            // room its account had ever sat in.
+            const m = await R.matchRow(pool, code);
+            if (!m) { send(c, { type: 'no_match', code }); return; }
+            if (m.state !== 'open' && m.state !== 'playing') { send(c, { type: 'closed', code, state: m.state }); return; }
             const seats = await R.room(pool, code);
             // only the people actually in a room get its live feed: a code is not a ticket to watch strangers
             if (!seats.some(p => p.user_id === user.id)) { send(c, { type: 'not_yours', code }); return; }
@@ -146,9 +195,24 @@ export function attachWebSocket(app: FastifyInstance): void {
             return;
           }
 
-          case 'resync':
-            if (c.watching) await sendState(c, c.watching, 'resync');
+          case 'resync': {
+            // The client asks on every event in its room, which in a full room is several a second; the state
+            // is sent at most once in two seconds. An ask inside the two seconds is answered once at the end of
+            // them, so the last event of a burst is never left out of what the client draws.
+            const now = Date.now();
+            if (!c.watching) return;
+            const wait = RESYNC_EVERY_MS - (now - c.resyncAt);
+            if (wait > 0) {
+              c.resyncLater ??= setTimeout(() => {
+                c.resyncLater = null; c.resyncAt = Date.now();
+                if (c.watching) void sendState(c, c.watching, 'resync').catch(e => log.err('resync failed', e));
+              }, wait);
+              return;
+            }
+            c.resyncAt = now;
+            await sendState(c, c.watching, 'resync');
             return;
+          }
 
           case 'progress': {
             const target = c.watching;
@@ -173,6 +237,7 @@ export function attachWebSocket(app: FastifyInstance): void {
 
       ws.on('close', async () => {
         const room = c.watching;
+        if (c.resyncLater) { clearTimeout(c.resyncLater); c.resyncLater = null; }
         unwatch(c);
         clients.delete(c);
         // only say they are gone if this was their last socket: a reload opens the new one before closing the old
