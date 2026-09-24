@@ -35,6 +35,14 @@ RewriteRule ^arrow-atlas\.html$          https://%{HTTP_HOST}/puzzle/ [R=301,L,N
 RewriteRule ^arrow-atlas-privacy\.html$  https://%{HTTP_HOST}/puzzle/privacy.html [R=301,L,NE]
 RewriteRule ^arrow-atlas-terms\.html$    https://%{HTTP_HOST}/puzzle/terms.html [R=301,L,NE]
 
+# ── /puzzle → /puzzle/ in one hop ──
+#    /puzzle/ is the game's one address: its canonical, the sitemap, the manifest's scope. Left to itself,
+#    mod_dir's DirectorySlash adds the slash, but behind the TLS-terminating proxy it answers http://…/puzzle/,
+#    so the bare address cost two hops and one of them over plain HTTP. Written in full for the same reason
+#    as the rules above. Not on the youtube subdomain, which has no game to send anybody to.
+RewriteCond %{HTTP_HOST} !^youtube\. [NC]
+RewriteRule ^puzzle$                     https://%{HTTP_HOST}/puzzle/ [R=301,L,NE]
+
 # ── Never serve deploy/test tooling ──────────────
 RedirectMatch 404 ^/(deploy|tests)(/|$)
 RedirectMatch 404 ^/games/build-[a-z-]+\.mjs$
