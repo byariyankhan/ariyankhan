@@ -164,7 +164,7 @@
     btnHint: $('#aaHint'), btnCheck: $('#aaCheck'), hintVal: $('#aaHintVal'), checkVal: $('#aaCheckVal'), btnLevels: $('#aaBackToLevels'), btnSound: $('#aaSound'),
     overlay: $('#aaOverlay'), card: $('#aaCard'),
     loading: $('#aaLoading'), error: $('#aaError'),
-    gate: $('#aaGate'), accept: $('#aaAccept'), splash: $('#aaSplash'), splashQuote: $('#aaSplashQuote'),
+    accept: $('#aaAccept'), splash: $('#aaSplash'), splashStage: $('#aaSplashStage'), splashCopy: $('#aaSplashCopy'),
     worldMap: $('#aaWorldMap'), worldCap: $('#aaWorldCap'),
     brainArt: $('#aaBrainArt'), brainLv: $('#aaBrainLv'), brainNote: $('#aaBrainNote'),
     deck: $('#aaDeck'), deckTrack: $('#aaDeckTrack'), deckDots: $('#aaDeckDots'),
@@ -275,20 +275,43 @@
   }
 
   // ── Sound ──
-  let audio = null;
-  function beep(notes) {
+  // One context for everything. The opening may have made it already (see puzzle/index.html): in the app the
+  // WebView lets sound start without a tap, and the first key of the typing is due before this script arrives.
+  let audio = window.aaOpening?.audio || null;
+  // A context that is not running is woken: suspended until the first gesture in a browser, or interrupted
+  // (iOS, a phone call). Asking is free, and a refusal is not an error worth a console line.
+  const wake = () => { try { if (audio && audio.state !== 'running') audio.resume()?.catch?.(() => {}); } catch { /* no audio */ } };
+  // `out` is where the notes go: the speakers, or a bus that can be silenced before they are due.
+  function beep(notes, out) {
     if (state.muted) return;
     try {
       audio = audio || new (window.AudioContext || window.webkitAudioContext)();
-      if (audio.state === 'suspended') audio.resume();
+      wake();
       const t0 = audio.currentTime;
       notes.forEach(([freq, start, dur, type = 'sine', gain = 0.07]) => {
         const o = audio.createOscillator(), g = audio.createGain();
         o.type = type; o.frequency.value = freq;
         g.gain.setValueAtTime(0.0001, t0 + start); g.gain.exponentialRampToValueAtTime(gain, t0 + start + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t0 + start + dur);
-        o.connect(g).connect(audio.destination); o.start(t0 + start); o.stop(t0 + start + dur + 0.02);
+        o.connect(g).connect(out || audio.destination); o.start(t0 + start); o.stop(t0 + start + dur + 0.02);
       });
     } catch { /* silent */ }
+  }
+  /**
+   * Whether a sound made now is heard now. beep() schedules against the context's clock, and a context that is
+   * not running has a clock that is not moving: everything scheduled on it waits, and plays at once, in a heap,
+   * the moment the first tap lets it run. For most sounds a late click is still a click. For the ones that only
+   * mean something on the beat -- the keys under the typing -- silence is better than late, and this is asked
+   * first. It never makes a context in a browser that has not been touched yet (Chrome would only log that it
+   * was not allowed to start); the app's WebView allows sound from the first frame, and Firefox can say so.
+   */
+  function soundLive() {
+    if (state.muted) return false;
+    let allowed = shell.on || !!navigator.userActivation?.hasBeenActive;
+    try { allowed = allowed || navigator.getAutoplayPolicy?.('audiocontext') === 'allowed'; } catch { /* only Firefox can say */ }
+    if (!audio && !allowed) return false;
+    try { audio = audio || new (window.AudioContext || window.webkitAudioContext)(); } catch { return false; }
+    if (audio.state !== 'running') { wake(); return false; }
+    return true;
   }
   // ── Music: a slow ambient pad synthesised on the device (no audio file, no licence, works offline) ──
   //
@@ -335,7 +358,7 @@
     if (music.on) { music.spike = 0; music.race = 0; music.lastMove = performance.now(); return; }
     try {
       audio = audio || new (window.AudioContext || window.webkitAudioContext)();
-      if (audio.state === 'suspended') audio.resume();
+      wake();
       const ctx = audio; music.ctx = ctx;
       // Two stages, and the reason is the ticker. The intensity layer ramps the master every 400ms, so a slow
       // fade-in written on the master is overwritten by the first tick 0.64s later -- the eight-second arrival
@@ -512,7 +535,7 @@
     if (!state.muted && !document.hidden) {
       try {
         audio = audio || new (window.AudioContext || window.webkitAudioContext)();
-        if (audio.state === 'suspended') audio.resume();
+        wake();
         const t = audio.currentTime;
         // The last heart eases off once the news has landed; everything else is at the level its urgency asked for.
         const settled = !heart.until && heart.lastAt && performance.now() - heart.lastAt > HEART_EASE_MS;
@@ -550,6 +573,14 @@
     left: () => beep([[622, 0, 0.08, 'triangle', 0.055], [392, 0.07, 0.16, 'triangle', 0.05]]),
     tick: () => beep([[880, 0, 0.05, 'square', 0.035]]),
     go: () => beep([[196, 0, 0.2, 'triangle', 0.07], [523, 0.05, 0.1], [784, 0.13, 0.12], [1047, 0.21, 0.26]]),
+    // the typewriter under the opening's line, all of it quieter than a tap: a key (a high tick over a low thock,
+    // its pitch nudged a few per cent letter by letter so a line never sounds like a machine), the return before
+    // the byline (the thock alone), and a small bell when the line is done. `at` is seconds from now, so a
+    // whole line is put on the audio clock at once; `out` is the bus that silences it if the line is cut short.
+    // Silent rather than late: soundLive() first.
+    key: (i = 0, at = 0, out) => { if (!soundLive()) return; const j = [0, 3, -2, 5, -4, 1, 4, -1][i & 7] / 100; beep([[2300 * (1 + j), at, 0.018, 'triangle', 0.014], [170 * (1 + j), at + 0.004, 0.045, 'sine', 0.022]], out); },
+    space: (i = 0, at = 0, out) => { if (soundLive()) beep([[130, at, 0.05, 'sine', 0.018]], out); },
+    ding: (i = 0, at = 0, out) => { if (soundLive()) beep([[1568, at, 0.16, 'sine', 0.026], [2093, at + 0.035, 0.24, 'sine', 0.016]], out); },
     // the focus bar filling: a run of small rising blips while it travels, and one note at the end whose pitch
     // is the reading itself — high for a sharp run, low for a long one, so the ear hears what the bar shows
     focus: pct => {
@@ -573,6 +604,14 @@
       if (n.matches?.(TAP_BY_TAG) || getComputedStyle(n).cursor === 'pointer') { SFX.tap(); return; }
     }
   }, true);
+  // The gesture that lets sound play. A browser counts a finger lifting (pointerup, touchend), a click and a key
+  // as the player's own act, and a finger landing (pointerdown) not at all -- which is when the tap above
+  // plays, so on a phone its resume() was never allowed, and the context stayed asleep until something happened
+  // to call beep() from a click. It used to be woken only for the music, too, so a player with Music off heard
+  // their first sounds late and bunched. Now every gesture wakes it, whatever is on, and whenever it has gone
+  // to sleep again. Nothing is made while the sound is off.
+  const unlock = () => { if (state.muted) return; try { audio = audio || new (window.AudioContext || window.webkitAudioContext)(); } catch { return; } wake(); };
+  for (const t of ['pointerup', 'touchend', 'keydown', 'click']) document.addEventListener(t, unlock, { capture: true, passive: true });
   function vibe(ms) { if (state.vibe && navigator.vibrate) { try { navigator.vibrate(ms); } catch { /* ignore */ } } }
   function renderToggles() {
     el.btnMusic?.setAttribute('aria-checked', String(state.music));
@@ -3970,14 +4009,16 @@
       catch (err) { if (err.code === 'push_off') push.app = false; }
     }
     renderNotify();
-    void notifyFirstAsk();
+    // Not asked from here any more. This runs on every open, and a system dialog on the way in lands on the
+    // opening, or on the home screen a moment after it -- before the player has done anything the question could
+    // be about. notifyFirstAsk() stays, for a moment that has earned it.
   }
 
   /**
-   * The first time the app is opened, the phone is asked for notifications straight away -- before anything
-   * else, the way apps do: its own dialog, once, and not again; what the phone answers is its answer, and
-   * the switch in Settings stays for changing it. Only in the app: a browser asked on a first visit is a
-   * browser that says no for good.
+   * The phone's own notification dialog, once, and not again; what the phone answers is its answer, and the
+   * switch in Settings stays for changing it. Only in the app: a browser asked on a first visit is a browser
+   * that says no for good. Never on the way in: it used to be asked the moment Accept was tapped (and again by
+   * a timer at boot), which put a system dialog over the opening before the player had played anything.
    */
   async function notifyFirstAsk() {
     if (!appPush() || store.get('pushAsked') || !store.get('welcomed')) return;   // after Accept, not under it
@@ -5700,8 +5741,9 @@
   });
   // Themes
   const THEMES = ['paper', 'night', 'mint'];
-  // The splash mark is the rose one everywhere but Night, where the dark one is inverted to white by the stylesheet.
-  function applyTheme(t) { document.documentElement.dataset.theme = t; store.set('theme', t); $('meta[name="theme-color"]')?.setAttribute('content', t === 'night' ? '#0E0E10' : t === 'mint' ? '#E6F2EC' : '#F4EDE0'); $('.aa-splash-logo img')?.setAttribute('src', t === 'night' ? '/images/puzzle-brain-mark.svg?v=2' : '/images/puzzle-brain-mark-rose.svg?v=1'); renderThemes(); }
+  // The same colours the inline script in puzzle/index.html sets before the first paint, and the app's own
+  // (android/app/src/main/res/values/colors.xml): the opening's brain takes its colour from the stylesheet.
+  function applyTheme(t) { document.documentElement.dataset.theme = t; store.set('theme', t); $('meta[name="theme-color"]')?.setAttribute('content', t === 'night' ? '#0E0E10' : t === 'mint' ? '#E6F2EC' : '#F4EDE0'); renderThemes(); }
   // ── The build line, and the developer switch behind it ────────────────────────────────────────────
   //
   // The version is not hardcoded: it is the one the page asked for, read back off the script tag, so it can
@@ -5850,16 +5892,13 @@
     shellWired = b;
     shell.ask('hello', 4000).then(d => { if (d?.ok) shell.caps = d; });   // so the app holds a way to reach this page, and the page knows what the app can do
   }
-  if (shell.on) { shellListen(); window.addEventListener('load', shellListen); setTimeout(() => { void notifyFirstAsk(); }, 400); }
+  if (shell.on) { shellListen(); window.addEventListener('load', shellListen); }
   el.btnSound.addEventListener('click', () => { state.muted = !state.muted; store.set('muted', state.muted); renderSound(); if (!state.muted) SFX.shoot(); });
   el.btnVibe?.addEventListener('click', () => { state.vibe = !state.vibe; store.set('vibe', state.vibe); renderToggles(); vibe(20); });
   // Turning music on while standing in the lobby does not start it: it starts on the next board, the same as
   // it would have if it had been on all along.
   el.btnMusic?.addEventListener('click', () => { state.music = !state.music; store.set('music', state.music); renderToggles(); if (state.music) { if (!el.game.hidden) musicStart(); } else musicStop(); });
-  // Browsers only allow sound after a gesture: the first tap anywhere starts the pad (if Music is on).
-  // Not a start: a rescue. If the browser would not let the context run when the board began, the next tap on
-  // the board is a gesture it will accept, and the music that was built silently comes up then.
-  document.addEventListener('pointerdown', () => { try { if (music.on && audio?.state === 'suspended') audio.resume(); } catch { /* ignore */ } }, { passive: true });
+  // (A board's music built before the browser allowed sound comes up on the next gesture: see unlock, by SFX.)
   document.addEventListener('visibilitychange', () => {
     live.away(document.hidden);   // an invitation while hidden rings the phone instead of landing on a tab nobody sees
     if (document.hidden) { musicStop(); heartbeatStop(); deckStop(); return; }
@@ -5914,46 +5953,120 @@
   window.addEventListener('resize', onTurn);
   onTurn();
 
-  // ── First open: welcome and terms. Every launch: the logo and a line to set the mood ──
-  const QUOTES = [
-    'Endless scrolling has shrunk your attention span? Play 30 minutes a day for 21 days and watch your focus come back.',
-    'Your brain has learned to skim. Teach it to look again: one board, one right move at a time.',
-    '21 days. 30 minutes a day. One country at a time. That is how focus is rebuilt.',
-    'No feed, no noise, no timer. Just you, a map and the next clear move.',
-    'Attention is a muscle. Every board you clear is one more rep.',
-    'Cannot sit with one thing for ten minutes any more? Start with one board tonight.',
-    'Play a board before bed instead of the feed. Wind down, then sleep well.',
-    'Look before you tap. Patience clears more boards than speed.',
-  ];
-  // The launch splash holds the screen for a couple of seconds with a line about focus. A match the account is
-  // in the middle of is more urgent than the line, so finding one cuts the splash short: this is the handle.
-  let splashSkip = null;
-  function showSplash(then) {
-    if (!el.splash) { then?.(); return; }
-    // On a first open the welcome comes before this, and the account can have been asked and a match found
-    // while the welcome was being read. A board already on the screen is not covered with a line about focus.
-    if (resumedCode && !el.game.hidden) { then?.(); return; }
-    const n = store.get('launches', 0); store.set('launches', n + 1);
-    el.splashQuote.textContent = QUOTES[n % QUOTES.length];
-    el.splash.hidden = false;
-    let done = false;
-    const finish = () => { if (done) return; done = true; splashSkip = null; el.splash.classList.add('is-out'); setTimeout(() => { el.splash.hidden = true; el.splash.classList.remove('is-out'); then?.(); }, 240); };
-    splashSkip = finish;
-    el.splash.addEventListener('click', finish, { once: true });
-    setTimeout(finish, 2400);
+  // ── The opening: the brain, a line typed out, and on a first open the terms ──
+  //
+  // One surface from the first frame to home (#aaSplash). It used to be up to three screens -- a welcome gate
+  // with its own big brain, then a splash with another, higher up, after a flash of the home screen under both
+  // -- and 2.64 s of splash on every cold start after that. Now the inline script in the head of
+  // puzzle/index.html decides the opening before anything paints, the one after #aaSplash types the line, and
+  // this is the rest: the keys, the terms and Accept on a first open, a tap or a key to finish, and the
+  // handover to home.
+  //
+  //   a first open    the quote types, then the terms and Accept fade in under it; Accept fades into home
+  //   a later open    the quote once a day, "Train your brain." otherwise; into home when it is typed and
+  //                   home is drawn, and never later than the old 2.64 s whatever happens
+  //   none at all     a link into the game, a reload in the same session, a warm resume, reduced motion
+  //
+  // `aa:opened` is dispatched on window once, when home is what is on the screen: at the end of the fade, or,
+  // with no opening, once home has been drawn (or has said why it cannot be). #aaSplash is `hidden` from then.
+  let splashSkip = null;   // a match the account is in is more urgent than the line: resumeLive cuts it short with this
+  let homeShown = null; const homeReady = new Promise(r => { homeShown = r; });
+  let openedSent = false;
+  const openedSignal = () => { if (openedSent) return; openedSent = true; window.dispatchEvent(new Event('aa:opened')); };
+  let keyBus = null;
+  // The keys under the typing, put on the audio clock in one go against the same moments the letters appear at,
+  // from wherever the line has got to: a key that is already late is not played at all. In the app a context
+  // that is still starting is waited for, and the keys from then on are heard.
+  function openingKeys(o) {
+    if (!o.sound || !o.plan.typing || state.muted || calmer() || !o.whenStarted) return;
+    o.whenStarted(() => {
+      const play = () => {
+        if (o.done || keyBus || !o.schedule || !soundLive()) return;
+        keyBus = audio.createGain(); keyBus.connect(audio.destination);
+        const now = performance.now();
+        for (const c of o.schedule.clicks) { const at = (o.startedAt + c.at - now) / 1000; if (at >= 0) SFX[c.kind](c.i, at, keyBus); }
+      };
+      play();
+      if (!keyBus && audio && !state.muted) audio.resume?.().then(play, () => {});
+    });
   }
-  function showGate(then) {
-    if (!el.gate) { then?.(); return; }
-    el.gate.hidden = false;
-    el.accept.addEventListener('click', () => { store.set('welcomed', Date.now()); analyticsOn(); el.gate.hidden = true; showSplash(then); if (shell.on) void notifyFirstAsk(); }, { once: true });
-    el.accept.focus({ preventScroll: true });
+  // A line cut short takes its keys with it: the ones still due are on the bus, and the bus goes quiet.
+  function keysOff() {
+    const bus = keyBus; keyBus = null;
+    if (!bus) return;
+    try { bus.gain.setTargetAtTime(0, audio.currentTime, 0.01); } catch { /* already gone */ }
+    setTimeout(() => { try { bus.disconnect(); } catch { /* already gone */ } }, 400);
+  }
+  function openingRun(o) {
+    const root = document.documentElement, plan = o.plan, app = $('#aaApp');
+    const T = { hold: 650, holdShort: 250, cap: 2440, capShort: 1100, fade: 200, terms: 250, home: 1500, ...o.T };
+    const t0 = o.t0 || performance.now();
+    const until = ms => new Promise(r => setTimeout(r, Math.max(0, ms)));
+    const typed = new Promise(r => (o.whenStarted || (f => f()))(r)).then(() => until((o.typedAt || 0) - performance.now()));
+    let over = false, timer = 0, skip = () => {}, lifted = 0;
+    if (app) app.inert = true;   // under the opening nothing can be reached, by a finger or by Tab
+    o.ready?.();                 // the game is here: the typing may start, and its keys be played
+    openingKeys(o);
+    const finish = () => { o.finish?.(); keysOff(); };
+    // The terms are taller than the room under the brain on a small phone. The brain has done its job by then
+    // (the handover from the phone's own splash is long over), so the stage slides up just far enough, never
+    // taking the brain under the clock, and whatever still does not fit can be scrolled to.
+    const fit = () => {
+      if (!el.splashStage || !el.splashCopy) return;
+      const cs = getComputedStyle(el.splash), top = parseFloat(cs.paddingTop) || 0, bottom = parseFloat(cs.paddingBottom) || 0, h = el.splash.clientHeight;
+      const need = el.splashCopy.getBoundingClientRect().bottom + lifted + el.splash.scrollTop - (h - bottom);
+      const room = h / 2 - 48 - 12 - top;
+      lifted = Math.max(0, Math.min(need, room));
+      el.splashStage.style.setProperty('--lift', `${-lifted}px`);
+      el.splash.classList.toggle('is-tall', need > room);
+    };
+    let onKey = () => skip();
+    // Into home. It is drawn underneath by now -- or, past the cap, is whatever it has got to, which on a very
+    // slow first open is its own "Loading…". A player whose phone drew its splash on paper gets their own
+    // colours here: the page under the opening has been in them all along, and the fade is the cross-fade.
+    const leave = () => {
+      if (over) return; over = true; clearTimeout(timer); splashSkip = null; finish();
+      document.removeEventListener('keydown', onKey, true); removeEventListener('resize', fit);
+      if (app) app.inert = false;
+      // is-first and is-paper-first stay for the fade, so the terms and the paper fade with the rest.
+      root.classList.remove('is-opening'); root.classList.add('is-leaving');
+      setTimeout(() => { root.classList.remove('is-leaving', 'is-first', 'is-paper-first'); el.splash.hidden = true; openedSignal(); }, calmer() ? 0 : T.fade);
+    };
+    const leaveWithHome = cap => { Promise.race([homeReady, until(cap)]).then(leave); };
+    if (plan.first) {
+      // Not a splash any more but a question, and it is labelled as one.
+      el.splash.setAttribute('role', 'dialog'); el.splash.setAttribute('aria-modal', 'true'); el.splash.setAttribute('aria-label', 'Welcome to Puzzle');
+      let shown = false;
+      const terms = () => {
+        if (shown) return; shown = true; clearTimeout(timer); finish();
+        document.removeEventListener('keydown', onKey, true);   // the keys are the player's now: Tab to the links, Enter on Accept
+        el.splash.classList.add('is-terms'); fit(); addEventListener('resize', fit);
+        el.accept.focus({ preventScroll: true });
+      };
+      typed.then(() => { if (!shown) timer = setTimeout(terms, plan.typing ? T.terms : 0); });
+      skip = terms; splashSkip = terms;   // a tap or a key types the rest at once; the terms are never skipped
+      onKey = e => { e.preventDefault(); terms(); };
+      el.accept.addEventListener('click', () => { store.set('welcomed', Date.now()); analyticsOn(); leaveWithHome(T.home); }, { once: true });
+    } else {
+      analyticsOn();
+      const short = plan.line === 'tagline', capLeft = () => t0 + (short ? T.capShort : T.cap) - performance.now();
+      timer = setTimeout(leave, capLeft());
+      Promise.all([typed.then(() => until(short ? T.holdShort : T.hold)), homeReady]).then(leave);
+      skip = () => { finish(); leaveWithHome(capLeft()); };   // a tap or a key: now, as soon as home is there
+      splashSkip = leave;
+    }
+    document.addEventListener('keydown', onKey, true);
+    el.splash.addEventListener('click', e => { if (!e.target.closest?.('a, button')) skip(); });
   }
   {
-    const deep = /^#(level-\d+|b-[\w:]+|daily|league|m=[A-Za-z0-9]+)$/.test(location.hash);
-    let seenThisSession = false;
-    try { seenThisSession = sessionStorage.getItem('aa:splash') === '1'; sessionStorage.setItem('aa:splash', '1'); } catch { /* ignore */ }
-    if (!store.get('welcomed')) showGate();
-    else { analyticsOn(); if (!deep && !seenThisSession) showSplash(); }
+    const o = window.aaOpening;
+    if (o?.plan?.show) openingRun(o);
+    else {
+      // No opening (or an older copy of the page around this script, which has none): home as it comes.
+      if (el.splash) el.splash.hidden = true;
+      analyticsOn();
+      homeReady.then(openedSignal);
+    }
   }
 
   renderSound();
@@ -5965,6 +6078,7 @@
   loadData().then(() => {
     el.loading.hidden = true;
     renderSelect();
+    homeShown();   // the opening may hand over now
     // the purse and the account row from the first paint, not only once Play with Friends has been tapped, and
     // a time from last time that never got through goes now
     authEarly.then(() => {
@@ -5992,7 +6106,7 @@
     else if (location.hash === '#daily') { const d = dailyPick(); startLevel(d.idx, false, d); }
     // Where a league notification lands: the table it is about, not the lobby it happens to be reached through.
     else if (location.hash === '#league') openLeague();
-  }).catch(err => { el.loading.hidden = true; el.error.textContent = `Could not load the levels (${err.message}). Check your connection and tap Play again.`; el.error.hidden = false; });
+  }).catch(err => { el.loading.hidden = true; el.error.textContent = `Could not load the levels (${err.message}). Check your connection and tap Play again.`; el.error.hidden = false; homeShown(); });
 
   if ('serviceWorker' in navigator && window.isSecureContext) {
     window.addEventListener('load', () => { navigator.serviceWorker.register('/piece-the-world-sw.js').catch(() => {}); });

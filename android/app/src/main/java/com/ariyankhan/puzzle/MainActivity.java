@@ -6,6 +6,7 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
+import android.content.res.Resources;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
@@ -21,7 +22,6 @@ import android.webkit.WebView;
 import android.webkit.WebChromeClient;
 import android.webkit.WebViewClient;
 import android.widget.FrameLayout;
-import android.widget.ImageView;
 
 import androidx.activity.ComponentActivity;
 import androidx.activity.OnBackPressedCallback;
@@ -33,6 +33,7 @@ import androidx.browser.customtabs.CustomTabsClient;
 import androidx.browser.customtabs.CustomTabsIntent;
 import androidx.core.content.ContextCompat;
 import androidx.core.graphics.Insets;
+import androidx.core.splashscreen.SplashScreen;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
@@ -80,8 +81,13 @@ public final class MainActivity extends ComponentActivity {
 
     private WebView web;
     private View offline;
-    private ImageView splash;
-    private boolean splashGone;
+    /**
+     * Whether the page has put something on the screen, or never will (an error, a page of our own choosing):
+     * the splash stays until it has. Read by the splash on every frame it holds, so it only ever turns true.
+     */
+    private boolean pageShown;
+    /** Longer than any page takes to paint on a connection worth the name; the splash never outstays it. */
+    private static final long SPLASH_MAX_MS = 4000;
     /** True while the WebView is showing a page this app sent it to on purpose, rather than the game. */
     private boolean away;
     /** The advertising library's WebViewClient. Ours is the delegate behind it. One per WebView, always. */
@@ -105,12 +111,24 @@ public final class MainActivity extends ComponentActivity {
 
     @Override
     protected void onCreate(@Nullable Bundle state) {
+        // Before super.onCreate, which is the library's one rule: it swaps the splash theme the manifest starts
+        // this activity in (Theme.App.Starting) for the one it runs in (Theme.App, its postSplashScreenTheme).
+        SplashScreen splash = SplashScreen.installSplashScreen(this);
         super.onCreate(state);
         setContentView(R.layout.activity_main);
+        // The splash stays until the page has painted, and the page's first frame is the same brain in the same
+        // place (the web opening, puzzle/index.html), so the moment one hands over to the other cannot be seen.
+        // It used to be an ImageView of our own over the WebView, faded out at the first frame -- and on
+        // Android 12 and up, where the system draws a splash of its own first whatever the app does, that made
+        // two splashes with two different brains. The condition is asked on every frame the splash holds;
+        // everything that ends the wait sets it (releaseSplash), and nothing waits longer than SPLASH_MAX_MS.
+        splash.setKeepOnScreenCondition(() -> !pageShown);
+        new Handler(Looper.getMainLooper()).postDelayed(this::releaseSplash, SPLASH_MAX_MS);
 
         web = findViewById(R.id.web);
         offline = findViewById(R.id.offline);
-        splash = findViewById(R.id.splash);
+        // Whatever is behind the page before it paints is the colour the splash was just drawn in.
+        applyStartColour();
 
         // The page gets the whole window, bars included, which is what the Trusted Web Activity did and what
         // the page is already written for: its viewport is viewport-fit=cover and css/puzzle.css pads by
@@ -219,6 +237,9 @@ public final class MainActivity extends ComponentActivity {
      */
     @Override
     protected void onPause() {
+        // A theme chosen in Settings changes nothing native until something asks. Leaving is the last chance to
+        // ask before the next launch, whose splash should already be in that theme.
+        if (web.getUrl() != null) readThemeColour();
         // Before super, so nothing is still drawing or sounding by the time the activity is told it is gone.
         web.onPause();
         // The session cookie reaches the disk when the WebView gets round to it, which is not before a player
@@ -254,14 +275,71 @@ public final class MainActivity extends ComponentActivity {
                                 + 0.114 * Color.blue(colour)) / 255.0;
                         boolean light = luma > 0.6;
                         findViewById(R.id.root).setBackgroundColor(colour);
+                        web.setBackgroundColor(colour);
                         WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView())
                                 .setAppearanceLightStatusBars(light);
                         WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView())
                                 .setAppearanceLightNavigationBars(light);
+                        rememberTheme(hex);
                     } catch (RuntimeException notAColour) {
                         // Leave the bars as they are.
                     }
                 });
+    }
+
+    /** The game's three themes, by the theme-color the page sets for each (applyTheme in js/puzzle.js). */
+    @Nullable
+    private static String themeOf(String hex) {
+        switch (hex.toUpperCase(Locale.ROOT)) {
+            case "#F4EDE0": return "paper";
+            case "#0E0E10": return "night";
+            case "#E6F2EC": return "mint";
+            default: return null;
+        }
+    }
+
+    private SharedPreferences shellPrefs() {
+        return getSharedPreferences("shell", MODE_PRIVATE);
+    }
+
+    /**
+     * Keep the player's theme for the next launch, and on Android 13 and up tell the system to draw that launch's
+     * splash in it. Android keeps the choice itself (by the style's name, so it survives an update), which is
+     * the point: the splash is drawn before any of this code runs. Asked only when the theme has changed, or
+     * when nothing is remembered yet -- a fresh install, or cleared data, which the system's copy may outlive.
+     */
+    private void rememberTheme(String hex) {
+        String theme = themeOf(hex);
+        if (theme == null) return;
+        SharedPreferences prefs = shellPrefs();
+        if (theme.equals(prefs.getString("theme", null))) return;
+        prefs.edit().putString("theme", theme).apply();
+        if (Build.VERSION.SDK_INT < 33) return;
+        int style = "night".equals(theme) ? R.style.Theme_App_Starting_Night
+                : "mint".equals(theme) ? R.style.Theme_App_Starting_Mint
+                : Resources.ID_NULL;   // paper: the manifest's own, Theme.App.Starting
+        try {
+            getSplashScreen().setSplashScreenTheme(style);
+        } catch (RuntimeException notToday) {
+            // The splash stays as it was. The page copes with a paper one (it starts on paper and fades).
+        }
+    }
+
+    /**
+     * The colour this launch's splash was drawn in: the remembered theme where the system was told to use it
+     * (Android 13 and up), paper everywhere else. It goes behind the page, so a gap before the first frame --
+     * or a reload -- is never a flash of anything else, and it decides whether the bar icons start dark or
+     * light. The page's theme-color takes over once it has loaded (readThemeColour).
+     */
+    private void applyStartColour() {
+        String theme = Build.VERSION.SDK_INT >= 33 ? shellPrefs().getString("theme", "paper") : "paper";
+        int colour = ContextCompat.getColor(this, "night".equals(theme) ? R.color.paper_night
+                : "mint".equals(theme) ? R.color.paper_mint : R.color.paper);
+        findViewById(R.id.root).setBackgroundColor(colour);
+        web.setBackgroundColor(colour);
+        boolean light = !"night".equals(theme);
+        WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView()).setAppearanceLightStatusBars(light);
+        WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView()).setAppearanceLightNavigationBars(light);
     }
 
     /** A link to the game, tapped anywhere on the phone, arrives here rather than in the browser. */
@@ -302,8 +380,10 @@ public final class MainActivity extends ComponentActivity {
         // what makes a second launch work with no network at all.
         s.setDomStorageEnabled(true);
         // An advertisement is a video that has to start without a second tap, once the player has already
-        // asked for it. The game's own music still waits for a gesture, because the browser's autoplay rules
-        // for audio are separate from this flag.
+        // asked for it. This is also the WebView's whole autoplay policy, Web Audio included: with it off, the
+        // page's AudioContext runs from the first frame with no tap, which is what lets the opening's typing be
+        // heard as the app opens. (The game's music still starts with a board, because the game waits for one,
+        // not because the WebView would stop it.)
         s.setMediaPlaybackRequiresUserGesture(false);
         // Nothing in this app reads or writes local files, so neither should the page.
         s.setAllowFileAccess(false);
@@ -321,8 +401,13 @@ public final class MainActivity extends ComponentActivity {
         // be reached by a third-party frame the way an injected object can.
         // A debug build says so, and that word is what lets the page open its developer settings: the seven
         // taps on the build line do nothing in the release build or on the site, where anybody could tap them.
+        //
+        // The number is the shell's build. 2 is the one whose splash is Android's own, holds until the page has
+        // painted and, on Android 13 and up, is drawn in the player's theme, so the page starts its opening in
+        // that theme rather than on paper (the inline script at the top of puzzle/index.html). Any
+        // PuzzleApp/<n> is the app to the page (shell.on in js/puzzle.js).
         boolean debuggable = (getApplicationInfo().flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0;
-        s.setUserAgentString(s.getUserAgentString() + " PuzzleApp/1" + (debuggable ? " debug" : ""));
+        s.setUserAgentString(s.getUserAgentString() + " PuzzleApp/2" + (debuggable ? " debug" : ""));
     }
 
     /** Where to open: a link if we were started by one, the game's own front door otherwise. */
@@ -467,12 +552,9 @@ public final class MainActivity extends ComponentActivity {
         }
     }
 
-    private void hideSplash() {
-        if (splashGone) return;
-        splashGone = true;
-        // The same 240ms the Trusted Web Activity faded over, so the way in looks no different than before.
-        splash.animate().alpha(0f).setDuration(240)
-                .withEndAction(() -> splash.setVisibility(View.GONE)).start();
+    /** The splash may go: the page has painted, or is not going to (see pageShown). Only ever on the main thread. */
+    private void releaseSplash() {
+        pageShown = true;
     }
 
     /**
@@ -510,7 +592,7 @@ public final class MainActivity extends ComponentActivity {
      *
      * <p>Without a WebChromeClient the request is simply dropped: the page thinks it went fullscreen, the
      * WebView draws nothing, and a rewarded video advertisement — the one thing this app exists to be paid
-     * for — is a black rectangle. The view arrives here instead, goes over everything including the splash,
+     * for — is a black rectangle. The view arrives here instead, goes over everything else in the window,
      * and comes back out the same way.
      */
     private final class Chrome extends WebChromeClient {
@@ -992,10 +1074,14 @@ public final class MainActivity extends ComponentActivity {
             return true;
         }
 
-        /** The first frame the page actually paints — the honest moment to take the splash away. */
+        /**
+         * The first frame the page actually paints — the honest moment to take the splash away. It arrives
+         * while the splash is still holding every frame back: in a WebView the page's frame is ready (the
+         * compositor has it) before it is drawn, and this is called then, not after.
+         */
         @Override
         public void onPageCommitVisible(@NonNull WebView v, @NonNull String url) {
-            hideSplash();
+            releaseSplash();
         }
 
         @Override
@@ -1025,10 +1111,10 @@ public final class MainActivity extends ComponentActivity {
             // covered by "you are offline" — which is both wrong and the exact opposite of a diagnostic.
             Uri here = Uri.parse(url == null ? "" : url);
             if (away && ours(here)) away = false;
-            if (away) { hideSplash(); offline.setVisibility(View.GONE); return; }
+            if (away) { releaseSplash(); offline.setVisibility(View.GONE); return; }
             v.evaluateJavascript("!!document.getElementById('aaPlay')", value -> {
                 boolean isTheGame = "true".equals(value);
-                hideSplash();
+                releaseSplash();
                 offline.setVisibility(isTheGame ? View.GONE : View.VISIBLE);
                 if (isTheGame) readThemeColour();
             });
@@ -1040,7 +1126,7 @@ public final class MainActivity extends ComponentActivity {
                                     @NonNull WebResourceError e) {
             if (!r.isForMainFrame()) return;
             // The splash has to go too, or the failure hides behind it and the app looks hung.
-            hideSplash();
+            releaseSplash();
             offline.setVisibility(View.VISIBLE);
         }
     }

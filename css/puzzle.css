@@ -9,18 +9,23 @@
   --ink:#3A2A1C; --muted:#8C7A66; --accent:#D9782A; --accent2:#DB3A5E; --accent-ink:#fff;
   --hard:#B23A8A; --expert:#D9782A; --master:#C7342F; --heart:#E8565A; --good:#3AA66B; --bad:#C7342F;
   --outline:rgba(91,63,38,.09); --card:#FFFFFF; --shadow:0 10px 30px rgba(60,40,20,.12);
+  /* the brain on the opening: the ink the app's own splash draws it in (android/app/src/main/res/values/colors.xml),
+     turning to the rose of the brain everywhere else while the line types */
+  --mark:#2E2016; --mark-to:#D93A5C;
 }
 :root[data-theme="night"]{
   --bg:#0E0E10; --bg2:#141416; --panel:#17171A; --line:#F2F2EE; --line-soft:rgba(242,242,238,.35);
   --ink:#F4F4F1; --muted:#9A9A94; --accent:#FFED54; --accent2:#9B6BFF; --accent-ink:#111;
   --hard:#B08BFF; --expert:#FFB347; --master:#FF6B6B; --heart:#FF5C61; --good:#5FE08F; --bad:#FF6B6B;
   --outline:rgba(255,237,84,.06); --card:#1E1E22; --shadow:0 12px 34px rgba(0,0,0,.5);
+  --mark:#F4F4F1; --mark-to:#F4F4F1;
 }
 :root[data-theme="mint"]{
   --bg:#E6F2EC; --bg2:#D9EAE1; --panel:#F3FAF6; --line:#17423A; --line-soft:rgba(23,66,58,.35);
   --ink:#12332D; --muted:#5F7F76; --accent:#1F8A70; --accent2:#2F6BD8; --accent-ink:#fff;
   --hard:#2F6BD8; --expert:#D9782A; --master:#C7342F; --heart:#E8565A; --good:#1F8A70; --bad:#C7342F;
   --outline:rgba(23,66,58,.08); --card:#FFFFFF; --shadow:0 10px 30px rgba(20,60,50,.12);
+  --mark:#12332D; --mark-to:#D93A5C;
 }
 /* the brain feel, in every theme: a faint brain of arrows behind the home screen, and the primary button in
    the same rose-to-coral as the big one */
@@ -538,35 +543,58 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-toast--hint{ background:var(--accent); color:var(--accent-ink); }
 .aa-toast--hard{ background:var(--hard); color:#fff; font-size:16px; letter-spacing:1px; }
 .aa-toast--combo{ background:var(--accent2); color:#fff; font-size:16px; }
-/* ── First-open gate and launch splash ── */
-.aa-gate, .aa-splash{ position:fixed; inset:0; z-index:60; background:var(--bg); display:flex; align-items:center; justify-content:center; padding:24px calc(16px + env(safe-area-inset-left, 0px)) calc(24px + env(safe-area-inset-bottom, 0px)); text-align:center; }
-.aa-gate-inner, .aa-splash-inner{ width:100%; max-width:400px; display:flex; flex-direction:column; align-items:center; }
-.aa-gate-inner{ gap:26px; }
+/* ── Signed in, back to the app ── (handoffFinish in js/puzzle.js: the browser tab a sign-in from the app ends in) */
+.aa-gate{ position:fixed; inset:0; z-index:60; background:var(--bg); display:flex; align-items:center; justify-content:center; padding:24px calc(16px + env(safe-area-inset-left, 0px)) calc(24px + env(safe-area-inset-bottom, 0px)); text-align:center; }
+.aa-gate-inner{ width:100%; max-width:400px; display:flex; flex-direction:column; align-items:center; gap:26px; }
 .aa-gate-title{ font-size:clamp(34px,9.5vw,46px); font-weight:900; margin:0; color:var(--line); line-height:1.08; letter-spacing:-.3px; }
 .aa-gate-art{ width:min(58vw,220px); height:auto; }
 .aa-gate-text{ font-size:17px; line-height:1.45; color:var(--muted); margin:0; }
 .aa-gate-text a{ color:var(--accent); font-weight:900; text-decoration:underline; text-underline-offset:3px; }
 .aa-gate-accept{ width:100%; max-width:360px; padding:17px 22px; font-size:22px; border-radius:20px; margin-top:6px; }
-.aa-splash{ cursor:pointer; user-select:none; -webkit-user-select:none; animation:aa-in .3s ease-out; }
-.aa-splash.is-out{ animation:aa-out .25s ease-in forwards; }
-.aa-splash-inner{ gap:36px; max-width:360px; }
-/* The mark sits on its own card. The three-colour arrow rules that used to be here went with the three arrows. */
-/* The mark sits on the page, not on a card.
+/* ── The opening: one surface from the first frame to home ──
+   Shown by the class the inline script in puzzle/index.html puts on <html> before anything paints
+   (is-opening; is-first on a first open), so the home screen is never seen before it, and faded into home by
+   js/puzzle.js (is-leaving). It replaced a welcome gate and a launch splash, each with a brain of its own.
 
-   It used to be a white rounded square with a shadow — an app icon, drawn inside an app that was already
-   open. On the website it was merely odd; in the Android app it was a flash of white, because the app's own
-   splash is the same brain on the same cream with nothing behind it, so the moment the page painted, a white
-   tile appeared under the logo and then vanished again. Two splashes that look alike hand over invisibly.
-   It was also hardcoded #fff, which would have been a white tile on black once the night theme was on. */
-.aa-splash-logo{ width:116px; height:116px; display:grid; place-items:center; }
-.aa-splash-logo img{ width:104px; height:104px; display:block; }
-/* The mark is one colour, #2E2016, which the white card used to sit behind. Without the card it is a dark
-   drawing on a dark screen once the night theme is on, and all but invisible. Inverting flips its lightness
-   and the hue rotation puts the warmth back, so it lands near the night theme's own off-white rather than on
-   the pale blue a bare invert would give. Only night needs it: paper and mint are both light. */
-:root[data-theme="night"] .aa-splash-logo img{ filter:invert(1) hue-rotate(180deg); }
-.aa-splash-quote{ font-size:21px; line-height:1.4; color:var(--muted); margin:16px 0 0; width:100%; text-align:left; font-weight:700; }
-.aa-splash-by{ font-size:17px; color:var(--muted); margin:-22px 0 0; width:100%; text-align:right; font-weight:700; }
+   The brain is the app's splash, continued. The app draws it 96 dp across in the middle of the whole window,
+   in ink on paper (android/app/src/main/res/drawable/splash_mark.xml, and the 512 px splash.png of build 1 at
+   xxhdpi before it); a CSS pixel is a dp in the WebView, so this draws it 96 px across in the middle of the
+   whole layer, in the same ink, and the moment the phone hands over to the page cannot be seen. Nothing in the
+   layer is allowed to move it: the words hang below it, positioned on their own. The padding is not layout
+   (everything inside is positioned against the whole layer); it is where js/puzzle.js reads the safe area. */
+.aa-splash{ display:none; position:fixed; inset:0; z-index:60; background:var(--bg); overflow:hidden; cursor:pointer; user-select:none; -webkit-user-select:none; padding:env(safe-area-inset-top, 0px) 0 env(safe-area-inset-bottom, 0px); }
+html.is-opening .aa-splash, html.is-leaving .aa-splash{ display:block; }
+html.is-opening, html.is-leaving{ overflow:hidden; }
+html.is-leaving .aa-splash{ animation:aa-out .2s ease-in forwards; pointer-events:none; }
+html.is-first .aa-splash{ cursor:auto; }
+/* A night or mint player whose phone drew its splash on paper (build 1 of the app, or Android 12 and older):
+   the opening stays on that paper, and their own colours come in as it fades into home. */
+html.is-paper-first .aa-splash{ --bg:#F4EDE0; --ink:#3A2A1C; --muted:#8C7A66; --mark:#2E2016; --mark-to:#D93A5C; }
+.aa-splash-stage{ position:absolute; inset:0; transform:translateY(var(--lift, 0px)); transition:transform .35s ease; }
+.aa-splash.is-tall{ overflow-y:auto; }
+.aa-splash-mark{ position:absolute; left:50%; top:50%; width:96px; height:96px; margin:-48px 0 0 -48px; display:block; color:var(--mark); transition:color 1.2s ease; }
+.aa-splash.is-typing .aa-splash-mark{ color:var(--mark-to); }
+.aa-splash-copy{ position:absolute; left:0; right:0; top:calc(50% + 70px); width:min(360px, calc(100% - 32px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px))); margin:0 auto; padding-bottom:16px; }
+.aa-splash-quote{ font-size:clamp(17px, 5.2vw, 21px); line-height:1.4; color:var(--muted); margin:0; text-align:left; font-weight:700; }
+.aa-splash.is-tagline .aa-splash-quote{ text-align:center; }
+.aa-splash-by{ font-size:clamp(15px, 4.4vw, 17px); color:var(--muted); margin:6px 0 0; text-align:right; font-weight:700; }
+.aa-splash-by:empty{ display:none; }
+/* The typing: every letter is laid out from the start and shown at its own moment (--d, set by the inline
+   script), an opacity animation the compositor runs even while the game's script keeps the page busy. */
+.aa-splash-type > span{ opacity:0; }
+.aa-splash.is-typing .aa-splash-type > span{ animation:aa-key .05s linear both; animation-delay:var(--d, 0ms); }
+.aa-splash.is-typed .aa-splash-type > span{ animation:none; opacity:1; }
+@keyframes aa-key{ from{ opacity:0; } to{ opacity:1; } }
+/* A first open: the terms and Accept, under the line once it is typed. They are laid out (and measured) from
+   the start and only shown then; on a small phone the whole stage slides up to make room (--lift). */
+.aa-splash-terms{ display:none; }
+html.is-first .aa-splash-terms{ display:flex; flex-direction:column; align-items:center; gap:14px; margin-top:22px; visibility:hidden; opacity:0; transition:opacity .18s ease-out, visibility 0s linear .18s; }
+html.is-first .aa-splash.is-terms .aa-splash-terms{ visibility:visible; opacity:1; transition:opacity .18s ease-out; }
+.aa-splash-legal{ font-size:clamp(15px, 4.4vw, 17px); line-height:1.45; color:var(--muted); margin:0; text-align:center; }
+.aa-splash-legal a{ color:var(--accent); font-weight:900; text-decoration:underline; text-underline-offset:3px; }
+.aa-splash-accept{ width:100%; max-width:360px; padding:15px 22px; font-size:21px; border-radius:20px; }
+/* Read by screen readers, not seen: the typed line whole, rather than letter by letter. */
+.aa-sr{ position:absolute; width:1px; height:1px; margin:-1px; padding:0; border:0; overflow:hidden; clip:rect(0 0 0 0); clip-path:inset(50%); white-space:nowrap; }
 /* ── Sideways ──────────────────────────────────────────────────────────────────────────────────────
    The game is a column and stays one, however the phone is held. It used to say so and stop: a notice asking
    for the phone back, which is the wrong answer for somebody lying on their side — they did not turn the
@@ -592,7 +620,7 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 }
 @keyframes aa-in{ from{ opacity:0; } to{ opacity:1; } }
 @keyframes aa-out{ from{ opacity:1; } to{ opacity:0; } }
-@media(prefers-reduced-motion:reduce){ .aa-splash, .aa-splash.is-out{ animation:none; } }
+@media(prefers-reduced-motion:reduce){ html.is-leaving .aa-splash, .aa-splash-stage, .aa-splash-mark, html.is-first .aa-splash-terms, html.is-first .aa-splash.is-terms .aa-splash-terms{ animation:none; transition:none; } }
 .aa-overlay{ position:absolute; inset:0; z-index:5; display:flex; align-items:center; justify-content:center; padding:12px; background:color-mix(in srgb, var(--bg) 70%, transparent); backdrop-filter:blur(3px); }
 .aa-card{ width:min(100%,440px); background:var(--card); border-radius:24px; padding:24px 20px; text-align:center; box-shadow:var(--shadow); max-height:100%; overflow:auto; }
 .aa-card h3{ font-size:28px; font-weight:900; margin:0 0 6px; line-height:1.05; color:var(--ink); }

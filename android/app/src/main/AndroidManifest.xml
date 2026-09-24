@@ -8,8 +8,11 @@
 
      POST_NOTIFICATIONS is here for a reason the app can now use. The Push API does not exist in a WebView, so
      the game's web push never could work in the app; what delivers an invitation to a phone is Firebase Cloud
-     Messaging, received by PuzzleMessagingService below. The permission is asked for at one moment only: when
-     the player turns the switch on in Settings. Never on the way in. -->
+     Messaging, received by PuzzleMessagingService below. The permission dialog is only ever opened by the page
+     (the bridge's pushOn): when the player turns the switch on in Settings, and once by the game itself
+     (notifyFirstAsk in js/puzzle.js) at a moment it chooses after the player has played. Never on the way in:
+     not over the opening, not at Accept, not on a timer at launch. (This comment used to say the same while the
+     page asked the moment Accept was tapped; it is true now.) -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />
@@ -99,7 +102,10 @@
             android:name="com.google.firebase.messaging.default_notification_channel_id"
             android:value="invites" />
 
-        <!-- configChanges is the difference between a rotation costing nothing and a rotation throwing the
+        <!-- Theme.App.Starting is the splash (res/values/themes.xml): it is what Android draws while the app
+             starts, and MainActivity swaps it for Theme.App before anything of its own is shown.
+
+             configChanges is the difference between a rotation costing nothing and a rotation throwing the
              board away. Without it Android destroys and rebuilds the activity, and a rebuilt WebView starts
              the page again: saveState() restores a URL and a history list, never the running JavaScript. The
              game is locked to portrait, but a theme change, a font-size change and a foldable being opened
@@ -109,6 +115,7 @@
              rather than stacking a second copy of it. -->
         <activity
             android:name=".MainActivity"
+            android:theme="@style/Theme.App.Starting"
             android:exported="true"
             android:launchMode="singleTask"
             android:screenOrientation="portrait"

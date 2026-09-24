@@ -4,14 +4,14 @@
          mode says, so a DayNight parent would have styled this app's own widgets — the one Button on the
          offline screen — dark grey on a cream background on half the phones that install it.
 
-         windowBackground is that paper, and it is what fills the screen between the icon being tapped and the
-         layout being inflated. After that the page owns every pixel, including the strips behind the clock and
-         the navigation bar, which is why both bar colours are transparent: on API 35 and up they are ignored
+         windowBackground is that paper, and it is what fills the screen between the splash going and the page
+         painting. After that the page owns every pixel, including the strips behind the clock and the
+         navigation bar, which is why both bar colours are transparent: on API 35 and up they are ignored
          anyway, and below it transparency is what lets the page background show through, so a player on
          the night theme gets black behind the clock rather than a cream band around a dark game.
 
-         MainActivity reads the page's theme-color and decides from it whether those bars should be drawn with
-         dark icons or light ones. -->
+         The bar icons start dark, for paper; MainActivity turns them light for the night theme, from the colour
+         it remembers before the page loads and from the page's theme-color once it has. -->
     <style name="Theme.App" parent="android:Theme.DeviceDefault.Light.NoActionBar">
         <item name="android:windowBackground">@color/paper</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
@@ -19,5 +19,35 @@
         <item name="android:windowDrawsSystemBarBackgrounds">true</item>
         <item name="android:enforceNavigationBarContrast">false</item>
         <item name="android:enforceStatusBarContrast">false</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
+    </style>
+
+    <!-- The splash screen: the brain on paper, from the moment the icon is tapped until the page has painted
+         the same brain in the same place (androidx.core:core-splashscreen; Android 12 and up draw it themselves,
+         the library draws it before that). The drawable puts the brain in the middle 96 dp of the 288 dp canvas
+         Android gives a splash icon, which is exactly where and how big the web opening draws it, so the
+         handover cannot be seen. postSplashScreenTheme is the theme the activity really runs in.
+
+         This one is in the manifest. The other two are for players who chose night or mint in the game:
+         Android 13 and up can be told which to use next time (SplashScreen.setSplashScreenTheme, in
+         MainActivity.rememberTheme); older phones always show this one, and the page knows it (the user agent
+         says which Android it is), starting on paper and fading into the player's colours. -->
+    <style name="Theme.App.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/paper</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/splash_mark</item>
+        <item name="postSplashScreenTheme">@style/Theme.App</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
+    </style>
+    <style name="Theme.App.Starting.Night">
+        <item name="windowSplashScreenBackground">@color/paper_night</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/splash_mark_night</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+    <style name="Theme.App.Starting.Mint">
+        <item name="windowSplashScreenBackground">@color/paper_mint</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/splash_mark_mint</item>
     </style>
 </resources>

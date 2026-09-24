@@ -86,6 +86,13 @@ dependencies {
     implementation 'androidx.activity:activity:1.9.0'
     implementation 'androidx.core:core:1.17.0'
 
+    // The splash screen: Android 12 and up draw one whatever the app does, and this is what lets the app say
+    // what is on it (the brain, at the size and place the page will draw it), how long it stays (until the page
+    // has painted) and, from Android 13, in which of the game's themes. Below 12 it draws the same thing itself.
+    // 1.0.1 on purpose: the same API as the 1.2 line, with nothing under it but annotations -- 1.2 brings
+    // appcompat-resources along -- and it is the version most apps in the wild are running.
+    implementation 'androidx.core:core-splashscreen:1.0.1'
+
     // Sign-in. Google refuses its own OAuth endpoint inside a WebView, so the token is fetched natively and
     // handed to the page — credentials is the API that asks, credentials-play-services-auth is what talks to
     // Play services underneath it, and googleid is the GetGoogleIdOption and the credential it comes back as.
