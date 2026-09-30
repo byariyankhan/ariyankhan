@@ -59,7 +59,7 @@ const fAt = (P, g) => P.f[Math.min(4, Math.floor(g / 3))];
 function simulate(P, rule, boards = 20000, seed = 11) {
   const rnd = mulberry32(seed);
   let f = rule === 'new' ? { ...ladder.FORM0 } : { tier: 0, wins: 0, losses: 0 };
-  let attempts = 0, fails = 0, run = 0, runs3 = 0, worst = 0;
+  let attempts = 0, fails = 0, run = 0, runs3 = 0, worst = 0; const dealt = {};
   const gradeNow = () => (rule === 'new' ? ladder.gradeOf(f) : f.tier * 3 + 2);
   for (let b = 0; b < boards; b++) {
     let g = gradeNow(), tries = 0;
@@ -70,29 +70,30 @@ function simulate(P, rule, boards = 20000, seed = 11) {
         const flaw = rnd() < fAt(P, g) / p, scrappy = !flaw && rnd() < 1 - p;
         const r = { firstTry: tries === 1, heartsLost: flaw ? 0 : scrappy ? 2 : 1, hints: flaw ? 0 : scrappy ? 1 : 0, secPerArrow: flaw ? 0.9 : 2 };
         f = rule === 'new' ? ladder.nextForm(f, true, r) : oldNext(f, true, r);
+        if (rule === 'new') { const t = Math.floor(g / 3); dealt[t] = (dealt[t] || 0) + 1; }
         run = 0; worst = Math.max(worst, tries); break;
       }
       fails++; run++; if (run === 3) runs3++;
-      f = rule === 'new' ? ladder.nextForm(f, false, null) : oldNext(f, false, null);
+      f = rule === 'new' ? ladder.nextForm(f, false, { fails: tries }) : oldNext(f, false, null);
+      if (rule === 'new' && b >= 2 && ladder.gradeOf(f) < 6) f = { grade: 6, tier: 2 };   // the floor: Hard after two boards
       if (rule === 'new' && tries >= 2) g = gradeNow();   // New layout, dealt as the ladder stands now
     }
   }
-  return { failRate: fails / attempts, runs3: 100 * runs3 / boards, worst };
+  return { failRate: fails / attempts, runs3: 100 * runs3 / boards, worst, dealt };
 }
-test('the ladder settles near three clears in four: the attempt failure rate drops for casual, average and strong players', () => {
+test('the ladder: every clear one tier up, every second loss on a board one tier down, Hard the floor; most clears are on Expert and Master', () => {
   const rows = [];
   for (const [name, P] of Object.entries(PLAYERS)) {
-    const was = simulate(P, 'old'), now = simulate(P, 'new');
-    rows.push(`${name.padEnd(8)} failed attempts ${(100 * was.failRate).toFixed(1)}% -> ${(100 * now.failRate).toFixed(1)}%   three losses in a row per 100 boards ${was.runs3.toFixed(1)} -> ${now.runs3.toFixed(1)}   most tries on one board ${was.worst} -> ${now.worst}`);
-    assert.ok(was.failRate > 0.34, `${name}: the old rule was near a coin flip (${was.failRate.toFixed(3)})`);
-    assert.ok(now.failRate < 0.32 && now.failRate > 0.12, `${name}: about one try in four fails now (${now.failRate.toFixed(3)})`);
-    assert.ok(now.failRate < was.failRate - 0.08, `${name}: clearly fewer failed tries`);
-    assert.ok(now.runs3 < was.runs3 / 2, `${name}: far fewer runs of three losses`);
-    assert.ok(now.worst < was.worst, `${name}: no board takes as many tries as the worst did`);
+    const now = simulate(P, 'new'), tot = Object.values(now.dealt).reduce((a, b) => a + b, 0), share = t => (now.dealt[t] || 0) / tot;
+    rows.push(`${name.padEnd(8)} failed attempts ${(100 * now.failRate).toFixed(1)}%   cleared on Hard/Expert/Master ${[2, 3, 4].map(t => (100 * share(t)).toFixed(0) + '%').join(' / ')}   most tries on one board ${now.worst}`);
+    assert.ok(share(3) + share(4) > 0.8, `${name}: most clears are on Expert or Master (${(share(3) + share(4)).toFixed(2)})`);
+    assert.ok(now.failRate < 0.7, `${name}: still clearable (${now.failRate.toFixed(3)})`);
+    assert.ok(now.worst <= 16, `${name}: two losses always bring an easier layout, so no board is endless (${now.worst})`);
   }
+  assert.ok(simulate(PLAYERS.strong, 'new').dealt[4] > simulate(PLAYERS.casual, 'new').dealt[4], 'a stronger player spends more of the game on Master');
   console.log('    ' + rows.join('\n    '));
 });
-test('a heart-out is two grades but never a whole tier at once, a clear one or two, a scrappy clear none: the staircase aims at 3 in 4', () => {
+test('nextForm: a clear is the next tier at its easiest deal (on Master the next deal); every second heart-out a tier down; clearPoints still reads the run', () => {
   const { nextForm, clearPoints } = ladder;
   assert.equal(clearPoints({ firstTry: true, heartsLost: 0, hints: 0, secPerArrow: 1.2 }), 2, 'flawless and fast');
   assert.equal(clearPoints({ firstTry: true, heartsLost: 0, hints: 0, secPerArrow: 1.3 }), 1, 'flawless, not fast');
@@ -107,10 +108,17 @@ test('a heart-out is two grades but never a whole tier at once, a clear one or t
   assert.equal(clearPoints({ firstTry: false, heartsLost: 0, hints: 0, secPerArrow: 0.5, focus: 90 }), 2, 'a Locked-in retry: two steps');
   assert.equal(clearPoints({ firstTry: false, heartsLost: 0, hints: 0, secPerArrow: 0.5, focus: 83 }), 1, 'a steady retry: a step');
   assert.equal(clearPoints({ firstTry: false, heartsLost: 0, hints: 0, secPerArrow: 0.5, focus: 69 }), 0, 'a scrappier retry holds');
-  assert.deepEqual(nextForm({ grade: 8, tier: 2 }, false, null), { grade: 6, tier: 2 }, 'two grades down');
-  assert.deepEqual(nextForm({ grade: 7, tier: 2 }, false, null), { grade: 6, tier: 2 }, 'a loss stops at the floor of its tier');
-  assert.deepEqual(nextForm({ grade: 6, tier: 2 }, false, null), { grade: 4, tier: 1 }, 'only a loss already on the floor goes down a tier');
-  assert.deepEqual(nextForm({ grade: 7, tier: 2 }, true, { firstTry: true, heartsLost: 2, hints: 2, secPerArrow: 9 }), { grade: 7, tier: 2 }, 'no reset: the grade stays');
+  const win = { firstTry: false, heartsLost: 2, hints: 2, secPerArrow: 9 };
+  assert.deepEqual(nextForm({ grade: 6, tier: 2 }, true, win), { grade: 9, tier: 3 }, 'Hard cleared, however scrappily: Expert');
+  assert.deepEqual(nextForm({ grade: 8, tier: 2 }, true, win), { grade: 9, tier: 3 }, 'from any deal of Hard: Expert at its easiest deal');
+  assert.deepEqual(nextForm({ grade: 10, tier: 3 }, true, win), { grade: 12, tier: 4 }, 'Expert cleared: Master');
+  assert.deepEqual(nextForm({ grade: 12, tier: 4 }, true, win), { grade: 13, tier: 4 }, 'on Master: the next, harder deal');
+  assert.deepEqual(nextForm({ grade: 14, tier: 4 }, true, win), { grade: 14, tier: 4 }, 'and no further');
+  assert.deepEqual(nextForm({ grade: 12, tier: 4 }, false, { fails: 1 }), { grade: 12, tier: 4 }, 'one heart-out holds the tier: Try again is the same board');
+  assert.deepEqual(nextForm({ grade: 13, tier: 4 }, false, { fails: 2 }), { grade: 9, tier: 3 }, 'the second: a tier down, so New layout is Expert');
+  assert.deepEqual(nextForm({ grade: 9, tier: 3 }, false, { fails: 3 }), { grade: 9, tier: 3 }, 'the third holds');
+  assert.deepEqual(nextForm({ grade: 9, tier: 3 }, false, { fails: 4 }), { grade: 6, tier: 2 }, 'the fourth: another tier down');
+  assert.deepEqual(nextForm({ grade: 6, tier: 2 }, false, null), { grade: 6, tier: 2 }, 'a loss with no count holds');
 });
 
 // ── 2. The deal: the ladder's pick among the candidates ──
@@ -167,9 +175,9 @@ test('a scene is a whole tier up, the board after it the easiest deal of the pla
   assert.ok(/if \(state\.level\?\.scene\) store\.set\('breather', true\);/.test(js), 'a scene skipped earns one too');
   assert.ok(/One step harder: this scene is \$\{state\.diff\}\./.test(fn('startLevel')), 'a scene says on start that it is one step harder');
 });
-test('Easy and Normal for the first two boards only; from the third, never below Hard; never past Hard before twelve', () => {
+test('Easy and Normal for the first two boards only; from the third, never below Hard, and nothing to wait out before Expert', () => {
   const levels = [{ id: '050' }, { id: 's:tower', scene: true }];
-  for (const [done, tier] of [[0, 1], [1, 1], [2, 2], [11, 2], [12, 4]]) {
+  for (const [done, tier] of [[0, 1], [1, 1], [2, 4], [11, 4], [12, 4]]) {
     const k = dealKit(levels, done); k.store.set('form', { grade: 14, tier: 4 });
     assert.equal(k.TIER_OF(), tier, `${done} boards cleared: tier ${tier}`);
   }
@@ -187,15 +195,15 @@ test('Easy and Normal for the first two boards only; from the third, never below
   const a = learn(1); for (let n = 0; n < 6; n++) a.learnFrom(true, flawless);
   assert.deepEqual(a.formNow(), { grade: 5, tier: 1 }, 'six flawless clears within the first two boards: the top of Normal');
   const b = learn(2); b.store.set('form', { grade: 5, tier: 1 }); b.learnFrom(true, flawless);
-  assert.deepEqual(b.formNow(), { grade: 8, tier: 2 }, 'the third board goes on from there: Locked in, a whole tier');
+  assert.deepEqual(b.formNow(), { grade: 9, tier: 3 }, 'past two boards the floor lifts Normal to Hard, and a clear there is Expert next');
   const c = learn(1); c.store.set('form', { grade: 14, tier: 4 }); c.learnFrom(false, {});
-  assert.deepEqual(c.formNow(), { grade: 3, tier: 1 }, 'a heart-out counts down from the grade as dealt');
+  assert.deepEqual(c.formNow(), { grade: 5, tier: 1 }, 'a first heart-out holds the grade as dealt');
   const d = learn(1); d.store.set('form', { tier: 4, wins: 0, losses: 0 }); d.learnFrom(true, flawless);
   assert.deepEqual(d.formNow(), { grade: 14, tier: 4 }, 'a win under the ceiling leaves a grade from elsewhere (a reinstall before the sync, the old ladder) where it was');
-  const e = learn(5); e.store.set('form', { grade: 6, tier: 2 }); e.learnFrom(false, {}); e.learnFrom(false, {});
+  const e = learn(5); e.store.set('form', { grade: 6, tier: 2 }); e.learnFrom(false, { fails: 1 }); e.learnFrom(false, { fails: 2 });
   assert.deepEqual(e.formNow(), { grade: 6, tier: 2 }, 'past the first two boards a heart-out never drops below Hard');
   const f = learn(5); f.store.set('form', { grade: 3, tier: 1 }); f.learnFrom(true, { fails: 0, lost: 2, hints: 2, t: 90_000, arrows: 40 });
-  assert.deepEqual(f.formNow(), { grade: 6, tier: 2 }, 'a form left on Normal is lifted to the floor by the next board');
+  assert.deepEqual(f.formNow(), { grade: 9, tier: 3 }, 'a form left on Normal is read at the floor, Hard, and the clear goes on to Expert');
   assert.ok(/levelNo\(-1\); return numCache\.boards;/.test(one('boardsDone')) && /const boards = done\.length;/.test(fn('levelNo')), 'boards cleared are counted with the level numbers, each id once, training not counted');
 });
 

@@ -177,14 +177,14 @@ test('learnFrom reads the run it is handed, never the live board: a Back tap dur
   assert.ok(!/state\./.test(body('learnFrom')), 'learnFrom does not touch state');
   const k = formKit({ tier: 2, wins: 0, losses: 0 });
   const got = k.learnFrom(true, { fails: 0, lost: 2, hints: 1, t: 120_000, arrows: 40 });
-  assert.deepEqual(got.after, { grade: 8, tier: 2 }, 'a scrappy slow clear holds the grade (an old Hard form is read as grade 8), as the run says');
+  assert.deepEqual(got.after, { grade: 9, tier: 3 }, 'a scrappy slow clear of Hard (an old Hard form is read as grade 8) is still Expert next');
   // the same call with an emptied board (what clearRun leaves) would have been 2 grades; the run is what counts
   const k2 = formKit({ tier: 2, wins: 0, losses: 0 });
-  assert.deepEqual(k2.learnFrom(true, { fails: 0, lost: 0, hints: 0, t: 30_000, arrows: 40 }).after, { grade: 11, tier: 3 }, 'a flawless fast clear reads Locked in: a whole tier up');
+  assert.deepEqual(k2.learnFrom(true, { fails: 0, lost: 0, hints: 0, t: 30_000, arrows: 40 }).after, { grade: 9, tier: 3 }, 'a flawless fast clear: the same, one tier up');
   const k3 = formKit({ grade: 7, tier: 2 });
-  assert.deepEqual(k3.learnFrom(true, { fails: 1, lost: 0, hints: 0, t: 30_000, arrows: 40 }).after, { grade: 9, tier: 3 }, 'a Locked-in clear on the retry is two steps up, not a hold');
+  assert.deepEqual(k3.learnFrom(true, { fails: 1, lost: 0, hints: 0, t: 30_000, arrows: 40 }).after, { grade: 9, tier: 3 }, 'a clear on the retry is a tier up too');
   const k4 = formKit({ grade: 7, tier: 2 });
-  assert.deepEqual(k4.learnFrom(true, { fails: 1, lost: 1, hints: 1, t: 200_000, arrows: 40 }).after, { grade: 7, tier: 2 }, 'a slow retry holds');
+  assert.deepEqual(k4.learnFrom(true, { fails: 1, lost: 1, hints: 1, t: 200_000, arrows: 40 }).after, { grade: 9, tier: 3 }, 'however slow');
   assert.equal(k2.learnFrom(true, { daily: { key: 'x' }, fails: 0, lost: 0, hints: 0, t: 1, arrows: 40 }), null, 'the daily board moves nothing');
 });
 test('a replay never promotes the ladder', () => {

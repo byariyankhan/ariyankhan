@@ -521,17 +521,14 @@ grade 0–14 lives in `aa:v1:form` as `{grade, tier}`: three grades a tier (0 Ea
 2 Hard / 3 Expert / 4 Master, `tier = floor(grade / 3)`, written alongside for an older client),
 and within the tier which of the board's candidate deals is dealt (`grade % 3`: 0 the widest, 1 the
 middle one, 2 the narrowest, `bestBoard(mask, tier, seed, pick)`); `nextForm` moves it on every tour
-board: `clearPoints` is +2 for a flawless fast first-try clear (no heart, no hint, ≤
-`FAST_SEC_PER_ARROW` 1.2 s per arrow), +1 for any other first-try clear, 0 for a scrappy one (two
-hearts or two hints gone); a Focus of 85+ ("Locked in") is +3 on a first try, and on a retry +2 (85+),
-+1 (`STEADY`, 70+) or 0; every heart-out is −2 (`GRADE_DOWN`) but stops at the floor of its tier, so only a
-heart-out already on a tier's first step costs the tier. The board itself is sized by `fitBoard()` to the
-room really left on the screen (the column's height less everything above the board and a safe margin:
-52px top under the zoom buttons, 16px each side, 20px at the bottom), so no country, however long or flat,
-runs under the buttons or off the glass. The result is a
-weighted staircase that settles near three clears in four, where the old two-up/two-down rule on the
-hardest deal settled near a coin flip (`tests/puzzle-habits.test.mjs` simulates both for three
-kinds of player: 37–46 % of tries failed before, about 26–28 % now). A form from before grades is read
+board: **any clear, however many tries it took, is the next tier at its easiest deal** (Hard → Expert → Master;
+on Master the next, harder deal), a heart-out holds the tier (Try again is the same board), and **every second
+heart-out on the same board is a tier down** (`fails % 2 === 0`), so the New layout the card offers is a step
+easier; a clear down there goes back up. Hard is the floor after the first two boards (`GRADE_FLOOR`), and there
+is no count of boards to wait out before Expert (`GRADE_CAP` only holds the first two boards to Normal). The
+Focus bar still reads the run but no longer moves the tier (`clearPoints` is kept for the scene breather). In
+the simulation in `tests/puzzle-habits.test.mjs` a casual player fails about 62% of tries, an average one 53%
+and a strong one 39%, and most clears are on Expert and Master: hard on purpose. A form from before grades is read
 as its tier's hardest deal (`gradeOf`: `tier * 3 + 2`). Easy and Normal are dealt on the first two boards only: from the third board on nothing is
 dealt below Hard's easiest deal, grade 6 (`GRADE_FLOOR`), and a heart-out stops there. A new player is never dealt past Normal before
 2 boards are cleared nor past Hard before 12 (`GRADE_CAP`, on `boardsDone()`), and the ladder itself

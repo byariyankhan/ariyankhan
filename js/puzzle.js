@@ -113,16 +113,15 @@
   // ── Adaptive difficulty ──
   // Difficulty follows the player, never the level number. The player's form is a grade, 0 to 14: three grades a
   // tier (0 Easy … 4 Master), and within the tier which of the board's candidate deals they get -- the easiest,
-  // the middle one or the hardest (bestBoard). It moves on every tour board: a first-try clear is one grade up,
-  // a flawless and fast one two; a scrappy clear (two hearts or two hints gone) holds; every heart-out is two
-  // grades down, but never a whole tier at once: a loss stops at the floor of the tier it was played in, and
-  // only a loss already on that floor goes down a tier. One bad board never turns Hard into Normal.
-  //
-  // The result card shows the run as a Focus bar out of 100 (focusOf). A clear it reads as "Locked in" (85 and
-  // up) is a whole tier: players who cleared a board at 90 and were then handed an Easy one -- because a heart-out
-  // earlier had taken them down three grades and a clear only ever brought back one -- rightly read that as the
-  // game not watching. A board cleared on its retry is read the same way: Locked in is two steps, a steady retry
-  // (70 and up) one, and only a scrappier one holds.
+  // the middle one or the hardest (bestBoard). The rule is the one puzzle games with a difficulty ladder use:
+  //   - a board cleared, however many tries it took, sends the next board one tier up, at that tier's easiest
+  //     deal (Hard -> Expert -> Master); on Master each clear is the next, harder deal of Master;
+  //   - a heart-out holds the tier (Try again is the same board), but every second heart-out on the same board
+  //     takes the ladder one tier down, so the New layout the card offers is one tier easier;
+  //   - a clear down there sends the next board back up a tier.
+  // So a player is always one clear away from the next tier and two losses away from the one below. Hard is
+  // the floor after the first two boards (GRADE_FLOOR). The Focus bar is still shown and still reads the run;
+  // it no longer decides the tier (clearPoints is kept for the scene breather only).
   const GRADE_UP = 1, GRADE_UP_CLEAN = 2, GRADE_UP_TIER = 3, GRADE_DOWN = 2, GRADES = 15;
   const LOCKED_IN = 85, STEADY = 70;   // Focus readings: "Locked in" is a whole tier; a retry at STEADY or up is a step
   const FAST_SEC_PER_ARROW = 1.2;   // level 1 (~22 arrows) in under ~26 s counts as fast
@@ -136,17 +135,16 @@
   const gradeOf = f => { const t = clampTier(Number(f?.tier) | 0), g = Number(f?.grade); return Number.isFinite(g) && clampGrade(g) === g && Math.floor(g / 3) === t ? g : t * 3 + 2; };
   const formOf = g => ({ grade: clampGrade(g), tier: Math.floor(clampGrade(g) / 3) });
   const nextForm = (f, won, run) => {
-    const g = gradeOf(f), floor = g - g % 3;
-    if (won) return formOf(g + clearPoints(run));
-    return formOf(g > floor ? Math.max(floor, g - GRADE_DOWN) : g - GRADE_DOWN);
+    const g = gradeOf(f), t = Math.floor(g / 3), fails = run?.fails | 0;
+    if (won) return formOf(t < 4 ? (t + 1) * 3 : g + 1);
+    return formOf(fails >= 2 && fails % 2 === 0 ? (t - 1) * 3 : g);
   };
   const formNow = () => { const f = store.get('form', null); return f && typeof f === 'object' ? f : { ...FORM0 }; };
   // Easy and Normal are for the first two boards only: the tutorial board and the one after it. From the third
-  // board on, nothing is dealt below Hard (GRADE_FLOOR) -- its easiest deal, grade 6, is where a bad run lands
-  // now, instead of a Normal board that a player past the start reads as the game talking down to them. A new
-  // player is still not taken past Hard before twelve boards are cleared, however well the first few went
-  // (GRADE_CAP). The ladder moves inside those bounds; the deals within Hard are the room it has to ease off.
-  const GRADE_CAP = n => n < 2 ? 5 : n < 12 ? 8 : GRADES - 1, GRADE_FLOOR = n => n < 2 ? 0 : 6;
+  // board on, nothing is dealt below Hard (GRADE_FLOOR), and a player who clears Hard meets Expert next, whoever
+  // they are: there is no longer a count of boards to wait out before Expert (GRADE_CAP only holds the first
+  // two boards to Normal).
+  const GRADE_CAP = n => n < 2 ? 5 : GRADES - 1, GRADE_FLOOR = n => n < 2 ? 0 : 6;
   const gradeNow = () => { const n = boardsDone(); return Math.max(GRADE_FLOOR(n), Math.min(gradeOf(formNow()), GRADE_CAP(n))); };
   const TIER_OF = () => Math.floor(gradeNow() / 3);
   const MAXLEN_OF = [7, 9, 14, 16, 18];  // longest body per tier: long snakes, as on the reference boards -- and on Hard and Master, the long winding ones that fill a page
@@ -2410,7 +2408,7 @@
     // A replay never moves the ladder up: a board already cleared is known, often by heart, and a quick clean
     // clear of it says nothing about the next new one. Two taps of Play again used to take Easy to Hard.
     if (won && run.replay) return { before, after: before, points: 0 };
-    const r = { firstTry: won && run.fails === 0, heartsLost: run.lost, hints: run.hints, secPerArrow: run.t / 1000 / Math.max(1, run.arrows), focus: won ? focusOf(run.t, run.arrows, run.lost, run.hints) : 0 };
+    const r = { fails: run.fails | 0, firstTry: won && run.fails === 0, heartsLost: run.lost, hints: run.hints, secPerArrow: run.t / 1000 / Math.max(1, run.arrows), focus: won ? focusOf(run.t, run.arrows, run.lost, run.hints) : 0 };
     // A grade above the ceiling did not come from play under it -- it is the account's, from another device, or
     // the old ladder's -- and a win under the ceiling says nothing about it: it stays. A loss is a loss at the
     // grade dealt, and steps down from there.
@@ -2692,7 +2690,7 @@
     // the run is over: what comes after it is a free life (which keeps it again) or a fresh start
     if (!state.daily) { countBoard(baseId(state.level.id), { f: 1 }); dropRun(state.level.id); }
     SFX.lose(); renderHud();
-    learnFrom(false, { daily: state.daily });   // the form moves on a loss, whether or not the card says so
+    learnFrom(false, { daily: state.daily, fails: state.fails });   // every second heart-out on a board is a tier down
     // The rank: some of the arrows still on the board come off it (lossFor), held until the player moves on.
     // The daily board and a race are not the tour and cost none.
     // a loss whose charge a free life gave back is charged again when that life runs out (lossRedo): the free

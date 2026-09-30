@@ -67,31 +67,25 @@ test('boards are dense: Hard tour levels average over 90 arrows on the finer gri
   const avg = tier => { const idx = data.levels.map((_, i) => i).filter(i => BASE_TIER(i) === tier); return idx.reduce((n, i) => n + generate(maskFor(data.levels[i], tier), MAXLEN_OF[tier], (i + 1) * 1000).pieces.length, 0) / idx.length; };
   assert.ok(avg(1) > 35, `Normal averages ${avg(1)}`); assert.ok(avg(2) > 90, `Hard averages ${avg(2)}`);
 });
-test('difficulty follows form, not the level: grades 0-14, a first-try clear one up, a flawless fast one two, a scrappy retry holds, Locked in a whole tier, a heart-out two down but never a tier at once', () => {
-  const flawless = { firstTry: true, heartsLost: 0, hints: 0, secPerArrow: 0.9 }, slow = { firstTry: true, heartsLost: 0, hints: 0, secPerArrow: 2 }, oneEach = { firstTry: true, heartsLost: 1, hints: 1, secPerArrow: 0.9 };
-  const twoHearts = { firstTry: true, heartsLost: 2, hints: 0, secPerArrow: 2.5 }, twoHints = { firstTry: true, heartsLost: 0, hints: 2, secPerArrow: 1 }, retry = { firstTry: false, heartsLost: 0, hints: 0, secPerArrow: 0.9 };
+test('difficulty follows form, not the level: grades 0-14, every clear a tier up (on Master the next deal), every second heart-out on a board a tier down', () => {
+  const slow = { firstTry: false, heartsLost: 2, hints: 2, secPerArrow: 9 };
   let f = { ...FORM0 };
   assert.deepEqual(f, { grade: 0, tier: 0 }, 'a new player starts on the easiest deal of Easy');
-  f = nextForm(f, true, flawless); assert.deepEqual(f, { grade: 2, tier: 0 }, 'flawless and fast: two grades, the hardest deal of Easy');
-  f = nextForm(f, true, slow); assert.deepEqual(f, { grade: 3, tier: 1 }, 'any other clean first-try clear: one grade, and grade 3 is Normal');
-  f = nextForm(f, true, oneEach); assert.deepEqual(f, { grade: 4, tier: 1 }, 'a heart and a hint gone is still a clear');
-  f = nextForm(f, true, twoHearts); assert.deepEqual(f, { grade: 4, tier: 1 }, 'two hearts lost: holds');
-  f = nextForm(f, true, twoHints); assert.deepEqual(f, { grade: 4, tier: 1 }, 'two hints: holds');
-  f = nextForm(f, true, retry); assert.deepEqual(f, { grade: 4, tier: 1 }, 'a clear after a retry, with no Focus reading, holds and resets nothing');
-  // the card's Focus reading, where the run carries it: Locked in (85+) is a whole tier; a Locked-in retry two steps
-  f = nextForm(f, true, { ...slow, focus: 90 }); assert.deepEqual(f, { grade: 7, tier: 2 }, 'Locked in: a whole tier up');
-  f = nextForm(f, true, { ...retry, focus: 90 }); assert.deepEqual(f, { grade: 9, tier: 3 }, 'Locked in on the retry: two steps');
-  f = { grade: 4, tier: 1 };
-  f = nextForm(f, false, null); assert.deepEqual(f, { grade: 3, tier: 1 }, 'a heart-out stops at the floor of its tier');
-  f = nextForm(f, false, null); assert.deepEqual(f, { grade: 1, tier: 0 }, 'from the floor, two grades down');
-  for (let k = 0; k < 6; k++) f = nextForm(f, false, null); assert.deepEqual(f, { grade: 0, tier: 0 }, 'never below Easy');
-  for (let k = 0; k < 12; k++) f = nextForm(f, true, flawless); assert.deepEqual(f, { grade: 14, tier: 4 }, 'never above the hardest deal of Master');
+  f = nextForm(f, true, slow); assert.deepEqual(f, { grade: 3, tier: 1 }, 'Easy cleared: Normal');
+  f = nextForm(f, true, slow); assert.deepEqual(f, { grade: 6, tier: 2 }, 'Normal cleared: Hard');
+  f = nextForm(f, true, slow); assert.deepEqual(f, { grade: 9, tier: 3 }, 'Hard cleared: Expert');
+  f = nextForm(f, true, slow); assert.deepEqual(f, { grade: 12, tier: 4 }, 'Expert cleared: Master');
+  f = nextForm(f, false, { fails: 1 }); assert.deepEqual(f, { grade: 12, tier: 4 }, 'a heart-out holds');
+  f = nextForm(f, false, { fails: 2 }); assert.deepEqual(f, { grade: 9, tier: 3 }, 'the second on the board: a tier down');
+  f = nextForm(f, true, slow); assert.deepEqual(f, { grade: 12, tier: 4 }, 'cleared down there: back up');
+  for (let k = 0; k < 6; k++) f = nextForm(f, true, slow); assert.deepEqual(f, { grade: 14, tier: 4 }, 'never above the hardest deal of Master');
+  f = { grade: 0, tier: 0 }; for (let k = 1; k <= 6; k++) f = nextForm(f, false, { fails: k }); assert.deepEqual(f, { grade: 0, tier: 0 }, 'never below Easy');
   // a form kept before grades (or written since by a device on the old rule) is its tier's hardest deal
   assert.equal(gradeOf({ tier: 2, wins: 1, losses: 0 }), 8); assert.equal(gradeOf({ tier: 0 }), 2); assert.equal(gradeOf({ tier: 4, wins: 0, losses: 1 }), 14);
   assert.equal(gradeOf({ grade: 4, tier: 1 }), 4, 'a grade and its tier agree: the grade');
   assert.equal(gradeOf({ grade: 4, tier: 3 }), 11, 'an old device moved the tier since: the tier wins');
   assert.deepEqual(nextForm({ tier: 3, wins: 1, losses: 0 }, true, slow), { grade: 12, tier: 4 }, 'and the ladder moves on from there');
-  assert.deepEqual(nextForm({ grade: 'x', tier: 9 }, false, null), { grade: 12, tier: 4 }, 'junk is read as the nearest tier');
+  assert.deepEqual(nextForm({ grade: 'x', tier: 9 }, false, null), { grade: 14, tier: 4 }, 'junk is read as the nearest tier');
 });
 test('narrow play: on Hard tour boards fewer than 20% of the arrows are free at the start (the game then keeps the best of 8)', () => {
   const freeAtStart = b => b.pieces.filter(p => { const [dr, dc] = DIRS[p.dir]; let [y, x] = p.cells[0]; y += dr; x += dc; while (y >= 0 && y < b.H && x >= 0 && x < b.W) { if (b.occ[y][x] >= 0) return false; y += dr; x += dc; } return true; }).length;
