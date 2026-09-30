@@ -1,130 +1,90 @@
-# ariyankhan.com/service — Niche Landing Pages Guide
+# ariyankhan.com/service — Retired Folder (Redirects Only)
 
-Subfolder for **audience-specific service landing pages** — narrower variants of the
-4 main service pages (`talking-head-video-editing.html`, `documentary-video-editing.html`,
-`short-form-video-editing.html`, `map-animation-video-editing.html`) that target a
-specific audience's search intent instead of a specific editing style.
+This folder used to hold audience-specific landing pages: narrower variants of the
+4 main service pages. **It holds no pages any more.** Every URL that lived here was
+deleted and now **301-redirects** to one of the four main service pages, which are the
+only service pages that are live and indexable:
 
----
+- `talking-head-video-editing.html`
+- `documentary-video-editing.html`
+- `short-form-video-editing.html`
+- `map-animation-video-editing.html`
 
-## Why This Exists
-
-The 4 main service pages already rank for style-based searches ("talking head video
-editing"). They don't target *audience*-based searches ("video editor for founders",
-"video editor for online coaches") — different search intent, different visitor,
-same underlying service. Rather than stuffing every audience into one page (diluting
-it) or writing a doorway page per keyword (Google penalty risk, keyword
-cannibalization against the main pages), each page in this folder is a genuinely
-differentiated landing page for **one specific audience segment**: its own pain
-points, its own FAQ, its own case-study framing — but reusing the same booking flow
-and portfolio as the main service page it's a variant of.
-
-**Rule: one page per audience segment, not one page per keyword.** If a new page
-would say almost the same thing as an existing one, add a section/FAQ to the
-existing page instead, or write a blog article (`../blog/`) targeting that keyword.
+This README is the only file left in the folder, kept so the redirect map is written
+down next to the URLs it covers.
 
 ---
 
-## Folder Structure
+## Why They Were Removed
 
-```
-service/
-├── README.md                              ← this file
-├── corporate-video-editing.html           ← Corporate / Internal Teams (variant of talking-head)
-├── remote-video-editor.html               ← Clients hiring remotely (variant of talking-head)
-└── index.php                              ← internal directory of this folder (noindex)
-```
+AdSense turned the site down for **low value content**. Twenty templated variants of
+the same four services read as doorway pages, and several of them (history, military
+history, geography, economics) shared 20–30% of their wording. They were removed
+rather than rewritten:
 
-No dedicated `css/` or `js/` here — every page reuses the site-wide bundles:
-- `../css/style.css`, `../css/service.css`, `../css/service-profile.css`
-- `../js/site-nav.js`, `../js/site-footer.js`, `../js/service-profile.js`, `../js/portfolio-data.js`, `../js/main.js`
-
-Pages in this folder are built from the **same markup structure as the 4 main
-service pages** (hero → trusted-by → what-i-do → who-this-is-for → problems-i-solve
-→ how-it-works → portfolio → faq → explore-services). Copy an existing page in this
-folder (or one of the 4 main service pages) as your starting template — don't
-build a new layout from scratch.
+- deleted from the repository, along with the folder's internal directory
+  (`index.php`) and its stylesheet (`css/service-index.css`)
+- taken out of `../sitemap.xml`, `../llms.txt` and `../llms-full.txt`
+- every internal link to them now points straight at the main page, so nothing on
+  the site hits a redirect
+- **none of their copy was moved or merged into the 4 main service pages**, and the
+  4 main pages were not edited
 
 ---
 
-## Subfolder-Relative Paths (important)
+## Redirect Map
 
-Every page here is one level deep (`service/<page>.html`), so:
-- All asset links use `../` prefix: `../css/style.css`, `../images/...`, `../favicon/...`
-- `<site-nav data-page="subpage" data-home-path="../index.html">`
-- `<site-footer data-base-path="../">`
-- `<service-profile base-path="../" ...>` — the `base-path` attribute was added to
-  `service-profile.js` specifically to support this folder (it prefixes the avatar
-  image and the "Order Now" link). Without it the component assumes it's at site
-  root and breaks.
-- The `who-this-is-for-button` and any other manual CTA links point to
-  `../index.html?service=<service-key>#contact`, reusing the **same** contact-form
-  service key as the main page (e.g. `talking-head`), not a new one — the contact
-  form only recognizes the 4 existing service keys.
-- `buildPortfolioGrid("<service-key>")` also reuses the main page's service key —
-  there's no separate portfolio pool per audience page.
+The rules are at the top of the root `.htaccess`. Each page goes to the main service
+page it named in its own `<service-profile service="…">`, so a bookmark, backlink or
+search result lands on the same service it was already selling.
 
----
-
-## How to Add a New Audience Page
-
-1. Copy the closest-matching page in this folder (or the main service page it's a
-   variant of) as a starting point.
-2. Update: `<title>`, meta description, canonical URL, OG/Twitter tags, all 4
-   JSON-LD blocks (Service, BreadcrumbList, FAQPage, VideoObject) — keep the
-   `Person` `@id` as `https://ariyankhan.com/about.html#person`.
-3. Rewrite hero copy, trusted-by tags, what-i-do card copy, who-this-is-for tags,
-   problems-i-solve cards, and FAQ for the new audience. Keep the section
-   structure and CSS classes identical — only the words change.
-4. Keep `service="<key>"` on `<service-profile>` and `buildPortfolioGrid("<key>")`
-   pointed at whichever of the 4 main service keys this audience page is a variant
-   of (talking-head / documentary / short-form / map-animation).
-5. Keep the "Explore More Services" block limited to the 4 main service pages
-   (`../talking-head-video-editing.html`, `../documentary-video-editing.html`,
-   `../short-form-video-editing.html`, `../map-animation-video-editing.html`) —
-   do not add links to other pages in `service/`.
-6. Add a `<url>` entry to `../sitemap.xml`.
-7. Bump the `?v=` cache-busting number on any shared CSS/JS file you actually
-   edited (not on files you only reused unchanged) — see the root `README.md` for
-   the convention — and update it on every page that loads that file.
-
----
-
-## Current Pages
-
-| Page | Audience | Variant of |
-|---|---|---|
-| `corporate-video-editing.html` | HR/L&D teams, marketing departments, company leadership, internal comms | `talking-head-video-editing.html` |
-| `remote-video-editor.html` | Clients hiring an editor remotely, across time zones | `talking-head-video-editing.html` |
-
-## Removed: the `video-editor-for-*.html` pages
-
-The 18 `video-editor-for-*.html` audience pages were deleted after AdSense rejected the
-site for **low value content**: templated variants of the same four services read as
-doorway pages, and several (history, military history, geography, economics) shared
-20–30% of their wording. They came out of `../sitemap.xml`, `../llms.txt` and
-`../llms-full.txt`, every internal link to them now points at the main page instead,
-and none of their copy was merged into the main pages.
-
-Each old URL **301-redirects** (rules in the root `.htaccess`) to the main service page
-it named in its own `<service-profile service="…">`:
-
-| Old pages | Redirect to |
+| Old URL | 301 → |
 |---|---|
-| authors-and-speakers, coaches, finance-and-investing-channels, founders, healthcare-professionals, podcasters, real-estate-agents | `talking-head-video-editing.html` |
-| business-documentary-channels, faceless-youtube-channels, nonprofit-organizations, true-crime-youtube-channels, wildlife-and-nature-documentaries | `documentary-video-editing.html` |
-| fitness-creators, social-media-promo-clips | `short-form-video-editing.html` |
-| economics-and-trade-explainer-channels, geography-and-country-explainer-channels, history-and-geopolitics-channels, military-history-channels | `map-animation-video-editing.html` |
+| `/service/` and `/service/index.php` (internal directory) | `/talking-head-video-editing.html` |
+| `/service/corporate-video-editing.html` | `/talking-head-video-editing.html` |
+| `/service/remote-video-editor.html` | `/talking-head-video-editing.html` |
+| `/service/video-editor-for-authors-and-speakers.html` | `/talking-head-video-editing.html` |
+| `/service/video-editor-for-coaches.html` | `/talking-head-video-editing.html` |
+| `/service/video-editor-for-finance-and-investing-channels.html` | `/talking-head-video-editing.html` |
+| `/service/video-editor-for-founders.html` | `/talking-head-video-editing.html` |
+| `/service/video-editor-for-healthcare-professionals.html` | `/talking-head-video-editing.html` |
+| `/service/video-editor-for-podcasters.html` | `/talking-head-video-editing.html` |
+| `/service/video-editor-for-real-estate-agents.html` | `/talking-head-video-editing.html` |
+| `/service/video-editor-for-business-documentary-channels.html` | `/documentary-video-editing.html` |
+| `/service/video-editor-for-faceless-youtube-channels.html` | `/documentary-video-editing.html` |
+| `/service/video-editor-for-nonprofit-organizations.html` | `/documentary-video-editing.html` |
+| `/service/video-editor-for-true-crime-youtube-channels.html` | `/documentary-video-editing.html` |
+| `/service/video-editor-for-wildlife-and-nature-documentaries.html` | `/documentary-video-editing.html` |
+| `/service/video-editor-for-fitness-creators.html` | `/short-form-video-editing.html` |
+| `/service/video-editor-for-social-media-promo-clips.html` | `/short-form-video-editing.html` |
+| `/service/video-editor-for-economics-and-trade-explainer-channels.html` | `/map-animation-video-editing.html` |
+| `/service/video-editor-for-geography-and-country-explainer-channels.html` | `/map-animation-video-editing.html` |
+| `/service/video-editor-for-history-and-geopolitics-channels.html` | `/map-animation-video-editing.html` |
+| `/service/video-editor-for-military-history-channels.html` | `/map-animation-video-editing.html` |
 
-Keep those redirect rules even though the files are gone — they are what answers for
-old bookmarks, backlinks and search results. Don't bring back a page at one of those
-URLs, and think twice before adding a new audience page here: the rule below is what
-the removed pages were meant to follow, and the review still judged them thin.
+How the rules behave:
 
-Every page's "Explore More Services" links **only to the 4 main service pages**
-(with `../` prefix) — never to another niche page in this folder, and the 4 main
-pages never link into `service/` either. Niche pages don't cross-link each other.
+- **One hop from any variant.** They run before the www and HTTPS rules and write the
+  target for the canonical host over https, so `http://www.ariyankhan.com/service/…`
+  lands on `https://ariyankhan.com/<main page>` in a single 301, not three.
+  (A `youtube.` prefix is stripped too: the pages only ever lived on the main site.)
+- **Query strings carry over** (`?utm_source=…` arrives on the main page intact).
+- **Unknown `/service/` paths stay a 404.** Sending a URL that never existed to a page
+  is a soft 404 as far as Google is concerned, so only the URLs above redirect.
 
-## Planned (not yet built)
+`tests/service-redirects.test.mjs` checks all of this against the repository: every
+row above has its rule, the sitemap and llms files list none of them, and no page,
+script or text file links to a redirected URL.
 
-- None currently queued — add the next audience segment here when identified.
+---
+
+## Rules Going Forward
+
+- **Keep the redirect rules**, even though the files are gone: they are what answers
+  for old bookmarks, backlinks and search results.
+- **Don't put a page back at any of these URLs**, and don't add new pages to this
+  folder. A new audience or keyword belongs in a blog article (`../blog/`), not in a
+  new service landing page.
+- **Link to the main page, never to a URL in the table.** A link that goes through a
+  redirect costs every visitor a hop and tells Google the site doesn't know its own
+  addresses.
