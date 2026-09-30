@@ -489,18 +489,72 @@
   /* ══════════════════════════════════════════════
      URL state (share links), status helpers
      ══════════════════════════════════════════════ */
+  // A share link carries only what differs from a fresh map, as readable key=value pairs after the #:
+  // #c=250.276 is "France and Germany highlighted", and an untouched map has no # at all. Older links
+  // (#m= followed by base64 JSON of every setting) still open.
+  const DEFAULTS = JSON.parse(JSON.stringify(state));
+  const HEX = { land: 'l', ocean: 'o', border: 'b', graticuleColor: 'gc', labelColor: 'lc' };
+  const FLAGS = { oceanTransparent: 't', graticule: 'gr', labels: 'lb', sphereOutline: 'so' };
+  const NUMS = { zoom: 'z', padding: 'pd', borderWidth: 'bw', labelSize: 'ls' };
+  const defaultLabel = i => (i === 0 ? DEFAULTS.groups[0].label : `Group ${i + 1}`);
+  const defaultColor = i => GROUP_COLORS[i % GROUP_COLORS.length];
   function saveHash() {
-    const s = { p: state.projection, a: state.aspect, r: state.region, f: state.fit, z: state.zoom, pd: state.padding, d: state.detail,
-      st: [state.land, state.ocean, state.oceanTransparent ? 1 : 0, state.border, state.borderWidth, state.graticule ? 1 : 0, state.graticuleColor, state.labels ? 1 : 0, state.labelColor, state.labelSize, state.sphereOutline ? 1 : 0],
-      g: state.groups.map(g => [g.color, g.label, g.ids.join(',')]) };
-    const enc = btoa(unescape(encodeURIComponent(JSON.stringify(s)))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-    history.replaceState(null, '', `#m=${enc}`);
+    const q = [];
+    const put = (k, v) => q.push(`${k}=${encodeURIComponent(v).replace(/%20/g, '+')}`);
+    if (state.projection !== DEFAULTS.projection) put('p', state.projection);
+    if (state.aspect !== DEFAULTS.aspect) put('a', state.aspect.replace(':', 'x'));
+    if (state.region !== DEFAULTS.region) put('r', state.region);
+    if (state.fit !== DEFAULTS.fit) put('f', 's');
+    if (state.detail !== DEFAULTS.detail) put('d', '50');
+    for (const [k, key] of Object.entries(NUMS)) if (state[k] !== DEFAULTS[k]) put(key, +Number(state[k]).toFixed(2));
+    for (const [k, key] of Object.entries(HEX)) if (state[k].toLowerCase() !== DEFAULTS[k].toLowerCase()) put(key, state[k].slice(1).toLowerCase());
+    for (const [k, key] of Object.entries(FLAGS)) if (state[k] !== DEFAULTS[k]) put(key, state[k] ? 1 : 0);
+    // Groups: c = the ids of each group, joined with "." and groups separated by "_"; a colour or a name is
+    // written only for a group whose colour or name is not the one it would get by default.
+    const gs = state.groups;
+    if (gs.length > 1 || gs[0].ids.length) {
+      put('c', gs.map(g => g.ids.join('.')).join('_'));
+      if (gs.some((g, i) => g.color.toLowerCase() !== defaultColor(i).toLowerCase())) put('k', gs.map(g => g.color.slice(1).toLowerCase()).join('.'));
+      if (gs.some((g, i) => g.label !== defaultLabel(i))) put('n', gs.map(g => g.label.replace(/_/g, ' ')).join('_'));
+    } else {
+      if (gs[0].color.toLowerCase() !== defaultColor(0).toLowerCase()) put('k', gs[0].color.slice(1).toLowerCase());
+      if (gs[0].label !== defaultLabel(0)) put('n', gs[0].label.replace(/_/g, ' '));
+    }
+    history.replaceState(null, '', q.length ? `#${q.join('&')}` : location.pathname + location.search);
   }
   function loadHash() {
-    const m = location.hash.match(/#m=([A-Za-z0-9_-]+)/);
-    if (!m) return false;
+    const h = location.hash.slice(1);
+    if (!h) return false;
+    if (h.startsWith('m=')) return loadLegacyHash(h.slice(2));
+    const q = new URLSearchParams(h);
+    const hex = v => (/^[0-9a-f]{6}$/i.test(v || '') ? `#${v.toLowerCase()}` : null);
+    if (PROJECTIONS[q.get('p')]) state.projection = q.get('p');
+    const asp = (q.get('a') || '').replace('x', ':');
+    if (ASPECTS[asp]) state.aspect = asp;
+    if (q.get('r') in REGIONS) state.region = q.get('r');
+    if (q.get('f') === 's') state.fit = 'selection';
+    if (q.get('d') === '50') state.detail = '50m';
+    const num = (key, lo, hi) => { const v = Number(q.get(key)); return q.has(key) && Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : null; };
+    state.zoom = num('z', 0.5, 8) ?? state.zoom;
+    state.padding = num('pd', 0, 20) ?? state.padding;
+    state.borderWidth = num('bw', 0, 4) ?? state.borderWidth;
+    state.labelSize = num('ls', 8, 80) ?? state.labelSize;
+    for (const [k, key] of Object.entries(HEX)) state[k] = hex(q.get(key)) || state[k];
+    for (const [k, key] of Object.entries(FLAGS)) if (q.has(key)) state[k] = q.get(key) === '1';
+    const ids = q.has('c') ? q.get('c').split('_') : [''];
+    const colors = (q.get('k') || '').split('.');
+    const names = q.has('n') ? q.get('n').split('_') : [];
+    state.groups = ids.slice(0, GROUP_COLORS.length).map((list, i) => ({
+      color: hex(colors[i]) || defaultColor(i),
+      label: (names[i] ?? defaultLabel(i)).slice(0, 40),
+      ids: list.split('.').filter(x => /^\d+$/.test(x)),
+    }));
+    state.active = 0;
+    return true;
+  }
+  function loadLegacyHash(b64) {
     try {
-      const s = JSON.parse(decodeURIComponent(escape(atob(m[1].replace(/-/g, '+').replace(/_/g, '/')))));
+      const s = JSON.parse(decodeURIComponent(escape(atob(b64.replace(/-/g, '+').replace(/_/g, '/')))));
       if (PROJECTIONS[s.p]) state.projection = s.p;
       if (ASPECTS[s.a]) state.aspect = s.a;
       if (s.r in REGIONS) state.region = s.r;
