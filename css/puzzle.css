@@ -190,14 +190,6 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 /* Settings > About > About Puzzle & FAQ: folded like Credits, with some structure inside it. It is the first
    row of its group, so the row after it needs the divider that .aa-row + .aa-row would have drawn. */
 .aa-about-credit + .aa-row{ border-top:1px solid var(--bg2); }
-.aa-about-game-text{ padding-right:4px; }
-.aa-about-game-text h3{ font-size:14px; font-weight:900; color:var(--ink); margin:14px 0 4px; }
-.aa-about-game-text h3:first-child{ margin-top:0; }
-.aa-about-game-text h4{ font-size:13px; font-weight:900; color:var(--ink); margin:10px 0 2px; }
-.aa-about-game-text p{ margin:0 0 6px; }
-.aa-about-game-text ul{ margin:4px 0 8px; padding-left:18px; }
-.aa-about-game-text li{ margin:0 0 4px; }
-.aa-about-game-text b{ color:var(--ink); }
 #aaHomeSheet{ z-index:51; }   /* opened from Settings, so it must paint over it */
 .aa-row-go{ color:var(--muted); font-size:24px; font-weight:900; line-height:1; padding-right:4px; }
 .aa-search{ font:inherit; font-weight:700; font-size:15px; color:var(--ink); background:var(--bg2); border:none; border-radius:14px; padding:12px 14px; width:100%; margin:0 0 12px; box-sizing:border-box; -webkit-appearance:none; appearance:none; }
@@ -829,6 +821,10 @@ html.is-first .aa-splash.is-terms .aa-splash-terms{ visibility:visible; opacity:
 .aa-legal .tag-pill{ display:inline-block; font-size:11px; font-weight:900; letter-spacing:1.5px; text-transform:uppercase; color:var(--accent); margin:0; }
 .aa-legal-back{ display:block; font-size:14px; margin-bottom:18px; text-decoration:none; }
 .aa-legal-date{ font-size:13px; }
+/* the About & FAQ and How to play pages: a question or a sub-part under a section, and one way back into the game */
+.aa-legal h3{ font-size:16px; font-weight:900; margin:18px 0 4px; color:var(--ink); }
+.aa-legal-cta{ margin:28px 0 8px; }
+.aa-legal-cta .aa-btn{ display:inline-flex; text-decoration:none; color:var(--accent-ink); }
 .aa-legal-foot{ margin-top:34px; padding-top:16px; border-top:1px solid var(--bg2); font-size:13px; }
 
 /* ── About content (reused sections) ── */
@@ -1033,3 +1029,4 @@ body.aa-dragging .aa-train-coach .aa-coach-card{ pointer-events:none; opacity:.3
 .aa-art-credit{ margin:10px 0 4px; font-size:12px; font-weight:700; color:var(--muted); text-align:center; line-height:1.4; }
 .aa-art-credit b{ color:var(--ink); }
 @keyframes aashake{ 0%,100%{ transform:translateX(0); } 30%{ transform:translateX(-4px); } 60%{ transform:translateX(4px); } }
+
