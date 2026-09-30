@@ -84,7 +84,7 @@
       var seen = false, calm = false;
       try { seen = sessionStorage.getItem('aa:splash') === '1'; sessionStorage.setItem('aa:splash', '1'); } catch (e) { /* no session storage: every load is a new session */ }
       try { calm = matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { /* no media queries: motion as usual */ }
-      var deep = /^#(level-\d+|b-[\w:~]+|daily|league|m=[A-Za-z0-9]+|handoff=[a-f0-9]+)$/.test(location.hash) || /[?&]handoff=/.test(location.search);
+      var deep = /^#(level-\d+|b-[\w:~]+|league|m=[A-Za-z0-9]+|handoff=[a-f0-9]+)$/.test(location.hash) || /[?&]handoff=/.test(location.search);
       var plan = o.plan = openingPlan({ welcomed: !!get('welcomed'), deep: deep, seen: seen, calm: calm });
       // The theme from the first frame, so a night or mint player never sees paper and then their colours. The
       // app draws its own splash before this page, though: build 1 always on paper, build 2 in the player's theme
@@ -600,6 +600,6 @@
       </div>
     </div>
 
-    <script src="/js/puzzle.js?v=107"></script>
+    <script src="/js/puzzle.js?v=108"></script>
   </body>
 </html>
