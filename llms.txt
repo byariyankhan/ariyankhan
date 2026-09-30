@@ -39,6 +39,7 @@ across the niches and formats listed below.
 ## Blog
 
 - [Blog Home](https://ariyankhan.com/blog/)
+- [How to Tell If an Image Is AI-Generated](https://ariyankhan.com/blog/how-to-tell-if-an-image-is-ai-generated.html): What metadata, Content Credentials, reverse image search and visual clues can and cannot prove about whether a picture was made with AI.
 - [Why Eastern Europe Still Lags Behind, and How Fast It Is Catching Up](https://ariyankhan.com/blog/why-eastern-europe-still-lags-behind.html): Serfdom, two world wars, forty years of central planning and a painful 1990s left Eastern Europe behind. Why the gap persists, and how fast it is closing.
 - [Why So Much of Spain Is Empty](https://ariyankhan.com/blog/why-most-of-spain-is-empty.html): Around 90% of Spaniards live on about 30% of the land. How a high plateau, medieval resettlement and the rural exodus of the 1950s–70s emptied inland Spain.
 - [Why Iran Is So Hard to Invade](https://ariyankhan.com/blog/why-iran-is-so-hard-to-invade.html): Mountains, deserts and the Strait of Hormuz make Iran a natural fortress. How its geography shaped the Iran–Iraq War and the strategy it has followed since 1979.
