@@ -1,4 +1,4 @@
-// Daily Training: the count-in, the holds, the hint, the clear at 50, the first score, the day's paintings,
+// Daily Training: the look's ticks, the holds, the drag, the hint, the clear at 50, the first score, the day's paintings,
 // the lies that show and the room's last three seconds -- the exact production code, pulled out of js/puzzle.js.
 // Run: node tests/puzzle-train.test.mjs
 import fs from 'node:fs';
@@ -133,7 +133,7 @@ test('the day\'s paintings: no painting twice in a day while the gallery has oth
 });
 test('holds: the clocks move on by the time held, and only when the last hold comes off', () => {
   let now = 1000;
-  const env = { performance: { now: () => now }, train: { holds: new Set(), paused: false, heldAt: 0, game: null }, tcoach: { box: null }, trainCoachPlace() {}, trainHintSync() {}, trainHintDone() {} };
+  const env = { performance: { now: () => now }, train: { holds: new Set(), paused: false, heldAt: 0, game: null }, tcoach: { box: null }, trainCoachPlace() {}, trainHintSync() {}, trainHintDone() {}, el: { trainBody: {} }, $: () => ({ classList: { add() {}, remove() {} } }) };
   const f = new Function(...Object.keys(env), fn('trainHold') + fn('trainRelease') + '\nreturn { trainHold, trainRelease };')(...Object.values(env));
   const g = env.train.game = { t0: 900, showUntil: 5000, showFrom: 1000, canHint: () => false };
   f.trainHold('leave'); assert.equal(env.train.paused, true);
@@ -158,21 +158,66 @@ test('the hint spends nothing when it would do nothing', () => {
   assert.equal(during, 2, 'counted before it acts: a hint that finishes the round is in that round\'s score');
   env.trainHintsLeft = () => 0; assert.equal(ads, 0);
 });
-test('the count-in: 3, 2, 1 tick and Go goes, like the online room; it holds the round and hides it', () => {
+test('no count-in: a round starts when it is opened, its look or its clock at once', () => {
+  assert.ok(!/const TRAIN_COUNT = /.test(js), 'no 3, 2, 1');
   const src = fn('trainCount');
-  assert.match(src, /SFX\.tick\(\)/); assert.match(src, /SFX\.go\(\)/); assert.match(src, /trainHold\('count'\)/); assert.match(src, /trainRelease\('count'\)/);
-  assert.match(src, /calmer\(\)/, 'no pop under reduced motion');
-  assert.match(grab(/const TRAIN_COUNT = [^\n]+/), /TRAIN_COUNT = 3/);
+  assert.match(src, /if \(!resume\) return Promise\.resolve\(true\);/, 'the round in hand: straight on, no veil, no hold');
+  assert.ok(src.indexOf('if (!resume)') < src.indexOf("trainHold('count')"), 'the hold is only for coming back');
   for (const id of ['canvasStart', 'forgeryStart', 'galleryStart', 'curatorStart']) {
     const s = fn(id);
     assert.match(s, /await artReady\(/, `${id} waits for its paintings`);
-    assert.match(s, /await trainCount\(g\)/, `${id} counts in`);
     const awaits = s.match(/await /g).length, checks = (s.match(/train\.run !== run|return;|\) return;/g) || []).length;
     assert.ok(checks >= awaits, `${id}: a check after every await`);
-    assert.ok(s.indexOf('trainCount(g)') < s.indexOf('g.t0 = performance.now()') || !/g\.t0 = performance\.now\(\)/.test(s), `${id}: no clock before Go`);
   }
-  assert.match(css, /\.aa-train-count\{[^}]*position:absolute[^}]*background:var\(--bg\)/, 'an opaque veil over the round');
-  assert.match(css, /prefers-reduced-motion:reduce\)\{ \.aa-train-count-n\.is-pop/);
+  assert.ok(!/SFX\.tick|SFX\.go/.test(src), 'nothing counts down: coming back says "Paused" and goes on');
+  assert.match(css, /\.aa-train-count\{[^}]*position:absolute[^}]*background:var\(--bg\)/, '"Paused" is an opaque veil over the round');
+});
+test('the look ticks its last three seconds, once each, and not while the round is held', () => {
+  let now = 0, ticks = [], buzz = 0;
+  const env = { performance: { now: () => now }, SFX: { tick: () => ticks.push(now) }, vibe: () => buzz++, trainStat: () => {}, ICON_EYE: '', el: { trainBody: {} }, $: () => null, train: { paused: false } };
+  const f = new Function(...Object.keys(env), one('TRAIN_LOOK_TICKS') + '\n' + fn('trainLook') + '\nreturn { trainLook };')(...Object.values(env));
+  const g = { showUntil: 8000, look: 8000 };
+  for (now = 0; now <= 8200; now += 200) f.trainLook(g);
+  assert.deepEqual(ticks, [5000, 6000, 7000], 'at 3, 2 and 1 seconds left, and never at 0');
+  assert.equal(buzz, 3);
+  const h = { showUntil: 3000, look: 3000 }; ticks = []; env.train.paused = true;
+  for (now = 0; now <= 3000; now += 200) f.trainLook(h);
+  assert.deepEqual(ticks, [], 'a held round does not tick');
+  for (const id of ['canvasStart', 'galleryStart', 'curatorStart']) assert.match(fn(id), /trainLook\(g\)/, `${id} looks through trainLook`);
+});
+test('a held round is not on show: a look cannot be stretched under the rules or the Leave question', () => {
+  assert.match(fn('trainHold'), /classList\.add\('is-held'\)/);
+  assert.match(fn('trainRelease'), /classList\.remove\('is-held'\)/);
+  assert.match(fn('trainStop'), /classList\.remove\('is-held'\)/);
+  for (const sel of ['.aa-art-slots', '.aa-gallery-row', '#aaCurator', '.aa-forge-pair']) assert.ok(css.includes(`#aaTrainGame.is-held ${sel}`), sel);
+});
+test('a drag on a phone: the piece\'s own capture handed to the box is the drag starting, not ending', () => {
+  // a touch is captured by the element it pressed; box.setPointerCapture takes it off the piece, and the
+  // browser tells the piece (lostpointercapture, which bubbles to the box) before the box gets the rest
+  const L = {}, box = { dataset: {}, addEventListener: (t, fn) => { (L[t] = L[t] || []).push(fn); }, setPointerCapture: () => fire('lostpointercapture', { target: piece }) };
+  const cls = () => ({ add() {}, remove() {} });
+  const piece = { dataset: { tile: '5' }, classList: cls(), closest: sel => (sel === '.aa-art-piece' ? piece : null) };
+  const slot = { dataset: { slot: '0' }, classList: cls(), closest: sel => (sel === '.aa-art-slot' ? slot : null) };
+  const fire = (type, o = {}) => (L[type] || []).forEach(fn => fn({ type, pointerId: 1, button: 0, clientX: 0, clientY: 0, target: box, ...o }));
+  let dropped = null, redrawn = 0;
+  const env = {
+    train: { game: { kind: 'r', phase: 'play' }, drag: null, paused: false }, el: { trainBody: null }, $$: () => [],
+    rectOf: () => ({ left: 0, top: 0, width: 40, height: 30 }), ptOf: e => ({ x: e.clientX, y: e.clientY }),
+    document: { elementFromPoint: (x, y) => (y < -100 ? slot : null), createElement: () => ({ style: {}, remove() {} }), body: { appendChild() {}, classList: cls() } },
+  };
+  const f = new Function(...Object.keys(env), fn('trainDragTidy') + fn('trainDragWire') + '\nreturn { trainDragWire };')(...Object.values(env));
+  f.trainDragWire(box, { kind: 'r', piece: '.aa-art-piece', slot: '.aa-art-slot', key: 'tile', locked: () => false, ghost: () => '', drop: (k, from, to) => { dropped = [k, from, to]; }, out() {}, redraw: () => { redrawn++; } });
+  fire('pointerdown', { target: piece });
+  fire('pointermove', { target: piece, clientY: -20 });     // past the slop: the box takes the pointer
+  assert.ok(env.train.drag, 'still carrying it after the capture moved to the box');
+  fire('pointermove', { clientY: -150 });
+  fire('pointerup', { clientY: -150 });
+  fire('lostpointercapture');                                // the box's own capture ends after the drop
+  assert.deepEqual(dropped, [5, -1, 0], 'dropped on the slot under the finger');
+  assert.equal(redrawn, 0);
+  // and the box losing its own capture mid-drag (the browser took the pointer back) still puts it down
+  fire('pointerdown', { target: piece }); fire('pointermove', { target: piece, clientY: -20 }); fire('lostpointercapture');
+  assert.equal(env.train.drag, null); assert.equal(redrawn, 1);
 });
 test('the online room: the socket\'s count ticks the last three, once each, and says "Get ready" at nought', () => {
   const block = grab(/if \(ev\.type === 'countdown_tick'\) \{[\s\S]*?return;\n      \}/);

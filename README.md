@@ -1114,22 +1114,24 @@ links.
   works past it, nearest first -- and each puzzle of the day (a serial) takes the next ones in a fixed order
   (the canvas, the forgery, the curator's painting, the gallery's wall), so a puzzle hangs the same paintings
   whenever it is played and later puzzles reach past the window; the Curator's other details come from works not
-  yet shown whole that day. Same home country, same day, same history: same paintings. **Every round starts with
-  a count-in** (`trainCount`, `trainVeil`, `.aa-train-count`, `TRAIN_COUNT`): once its paintings are fetched and
-  decoded (`artReady`: `new Image()` and `decode()`, at most `ART_WAIT_MS` 7 s, "Hanging the paintings…" while it
-  waits -- so no look or clock runs over an empty frame, and the Curator's four details all arrive before its
-  painting is shown, where on a slow line the right one used to appear first), an opaque veil over the round's
-  own box counts 3, 2, 1, Go with the online room's sounds (`SFX.tick` on each number, `SFX.go` and a buzz at Go)
-  and a line saying what is coming, built from the round's level ("Five paintings, 5 seconds. Remember the
-  order."); the number pops, not under reduced motion. The painting and the hint are under the veil, the sheet's
-  ← and ? above it, and nothing of the round runs until Go. **A round holds** (`trainHold`/`trainRelease`, a set
-  of reasons behind `train.paused`: the Leave question, the `?` card, a hint's advertisement, the app or tab in
-  the background, the count-in): its timers skip, the count-in waits, and when the last hold comes off the look's
-  end and the play clock move on by the time held, so nothing is counted that was not played. Going into the
-  background veils the round at once ("Paused"); coming back runs the count-in again, then the music. Every start
+  yet shown whole that day. Same home country, same day, same history: same paintings. **A round starts as soon as it
+  is opened**, once its paintings are fetched and decoded (`artReady`: `new Image()` and `decode()`, at most
+  `ART_WAIT_MS` 7 s, "Hanging the paintings…" while it waits -- so no look or clock runs over an empty frame, and
+  the Curator's four details all arrive before its painting is shown, where on a slow line the right one used to
+  appear first). There is no 3, 2, 1 in front of it: the look's **last three seconds tick** instead (`trainLook`,
+  `TRAIN_LOOK_TICKS`: `SFX.tick` and a buzz at 3, 2 and 1 seconds left, once each), the moment before the canvas
+  comes apart, the gallery comes down or the Curator's painting goes. **A round holds** (`trainHold`/`trainRelease`,
+  a set of reasons behind `train.paused`: the Leave question, the `?` card, a hint's advertisement, the app or tab
+  in the background, the "Paused" veil after it): its timers skip, and when the last hold comes off the look's end
+  and the play clock move on by the time held, so nothing is counted that was not played. While it is held its
+  paintings are hidden (`#aaTrainGame.is-held`), so a look cannot be stretched under a question or a card. Going
+  into the background veils the round at once; coming back, "Paused" stays over it a moment (`trainCount(g,
+  true)`, `trainVeil`, `.aa-train-count`, `TRAIN_PAUSED_MS`), then the round and the music go on. Every start
   carries a token (`train.run`) checked after each wait, so a round left while its paintings loaded never runs
   behind the list, and a second finger or a round left mid-drag leaves no carried copy on the glass
-  (`train.drag`, `trainDragClear`, `lostpointercapture`). Drags, flights and the coach read the page's own
+  (`train.drag`, `trainDragClear`, `lostpointercapture`). A touch is captured by the piece it pressed, and
+  handing it to the box takes it off the piece: that `lostpointercapture` is the drag starting, so only the box's
+  own counts as an end (read as one, it dropped every piece the moment it moved on every phone). Drags, flights and the coach read the page's own
   coordinates (`ptOf`, `rectOf`), so they are right in a phone browser held sideways. **The round's bar**
   (`trainHud`, `trainStat`) is the level chip, then what is happening now with its mark -- an eye and "Look 3s"
   with a bar draining under the row (`trainLook`), a clock against the allowance ("0:12 / 1:30", `trainClock`),

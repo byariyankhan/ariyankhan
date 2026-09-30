@@ -937,18 +937,16 @@ html.is-first .aa-splash.is-terms .aa-splash-terms{ visibility:visible; opacity:
 .aa-train-drain{ position:absolute; left:0; right:0; bottom:-7px; height:3px; border-radius:2px; overflow:hidden; background:color-mix(in srgb, var(--muted) 18%, transparent); }
 .aa-train-drain i{ display:block; height:100%; width:100%; border-radius:2px; background:var(--accent2); transition:width .2s linear; }
 @media(prefers-reduced-motion:reduce){ .aa-train-drain i{ transition:none; } }
-/* 3, 2, 1, Go: an opaque veil over the round's box only (the painting and the hint under it, the head's ← and ?
-   above it), the number popping as it ticks. Also "Paused" when the app comes back from the background. */
+/* "Paused", when the app comes back from the background: an opaque veil over the round's box only (the
+   painting and the hint under it, the head's ← and ? above it). */
 #aaTrainGame{ position:relative; }
 .aa-train-count{ position:absolute; inset:-6px -2px 0; z-index:6; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; min-height:280px; padding:24px 12px; background:var(--bg); text-align:center; }
 .aa-train-count-n{ display:block; min-height:1em; font-size:clamp(76px, 26vw, 132px); font-weight:900; line-height:1; color:var(--accent2); font-variant-numeric:tabular-nums; }
 .aa-train-count-n.is-word{ font-size:clamp(40px, 13vw, 64px); }
-.aa-train-count-n.is-pop{ animation:aapop .45s ease-out; }
-.aa-train-count-t{ font-size:12px; font-weight:900; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); }
-.aa-train-count-cue{ max-width:300px; margin:6px 0 0; font-size:15px; font-weight:800; line-height:1.4; color:var(--ink); }
-.aa-train-count-cue:empty{ display:none; }
+/* a round on hold (trainHold): its paintings are not on show while its clocks stand still */
+#aaTrainGame.is-held .aa-art-slots, #aaTrainGame.is-held .aa-art-tray, #aaTrainGame.is-held .aa-gallery-row, #aaTrainGame.is-held .aa-gal-slots, #aaTrainGame.is-held .aa-gal-tray, #aaTrainGame.is-held #aaCurator, #aaTrainGame.is-held .aa-forge-pair{ visibility:hidden; }
 .aa-train-count.is-out{ animation:aa-out .3s ease-in forwards; }
-@media(prefers-reduced-motion:reduce){ .aa-train-count-n.is-pop, .aa-train-count.is-out{ animation:none; } }
+@media(prefers-reduced-motion:reduce){ .aa-train-count.is-out{ animation:none; } }
 .aa-train-hud span:first-child{ color:var(--ink); }
 .aa-train-res{ text-align:center; padding:6px 0 2px; }
 .aa-train-big{ margin:4px 0; font-size:64px; font-weight:900; line-height:1; color:var(--accent2); font-variant-numeric:tabular-nums; }

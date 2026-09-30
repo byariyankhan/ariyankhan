@@ -2797,8 +2797,8 @@
     return n;
   }
   // run: the start in hand (every await in a start checks it is still the one; stopping or leaving moves it on);
-  // holds: what the round is waiting on (paused says whether anything is, trainHold); count: the count-in in
-  // hand; drag: a piece being carried; owed: a Play next paid for and not played yet, per round; id: the round
+  // holds: what the round is waiting on (paused says whether anything is, trainHold); count: the "Paused" veil
+  // in hand; drag: a piece being carried; owed: a Play next paid for and not played yet, per round; id: the round
   const train = { game: null, timer: 0, busy: false, serial: 0, day: '', paused: false, run: 0, holds: new Set(), heldAt: 0, count: null, countTimer: 0, drag: null, owed: {}, id: '' };
   const trainKey = d => 'train:' + (d || dayKey());
   const trainDay = d => { const t = store.get(trainKey(d), null); return t && typeof t === 'object' ? t : {}; };
@@ -2964,7 +2964,7 @@
     if (r) h.insertAdjacentHTML('afterend', howBtnHtml());
   }
   // stop: the round in hand ends (its result stays on the full screen); leave: back to the list, or out. Both
-  // end whatever a start was still waiting for (the run token moves on), the count-in, the holds and a piece
+  // end whatever a start was still waiting for (the run token moves on), the veil, the holds and a piece
   // in the air.
   function trainStop() {
     train.run++;
@@ -2972,6 +2972,7 @@
     clearTimeout(train.countTimer); train.countTimer = 0;
     const c = train.count; train.count = null; c?.done(false);
     train.game = null; train.holds.clear(); train.paused = false;
+    if (el.trainBody) $('#aaTrainGame', el.trainBody)?.classList.remove('is-held');
     trainDragClear();
     if (el.trainBody) $$('.aa-train-count, .aa-train-howcard', el.trainBody).forEach(n => n.remove());
     trainCoachEnd(false);
@@ -2979,19 +2980,23 @@
   function trainLeave() { trainStop(); trainScreen(false); train.serial = 0; train.day = ''; train.id = ''; }
   // ── Holding a round ──
   // A round holds while something else has the player: the Leave question ('leave'), the rules behind the ?
-  // ('how'), a hint's advertisement ('ad'), the app or the tab in the background ('away'), and the count-in
-  // ('count'). Its timers skip while anything holds it (train.paused), and when the last hold comes off its
+  // ('how'), a hint's advertisement ('ad'), the app or the tab in the background ('away'), and the "Paused"
+  // veil after it ('count'). Its timers skip while anything holds it (train.paused), and when the last hold comes off its
   // clocks move on by the time held -- the play clock's start and the look's end, each by the part of the hold
-  // it was running for -- so nothing is counted that was not played. The count-in keeps its own three seconds
-  // (trainCount), which wait the same way.
+  // it was running for -- so nothing is counted that was not played. The veil keeps its own moment (trainCount),
+  // which waits the same way.
   function trainHold(why) {
     if (!train.holds.size) train.heldAt = performance.now();
     train.holds.add(why); train.paused = true;
     if (tcoach.box) tcoach.box.hidden = true;   // the coach is not over a question, a card or a veil
+    // and the round is not on show while its clocks stand still: a look held open under the rules or the
+    // Leave question would be a look without end (css: #aaTrainGame.is-held)
+    if (train.game) $('#aaTrainGame', el.trainBody)?.classList.add('is-held');
   }
   function trainRelease(why) {
     if (!train.holds.delete(why) || train.holds.size) return;
     train.paused = false;
+    if (el.trainBody) $('#aaTrainGame', el.trainBody)?.classList.remove('is-held');
     const g = train.game, now = performance.now();
     if (g) {
       if (typeof g.t0 === 'number') g.t0 += now - Math.max(train.heldAt, g.t0);
@@ -3002,35 +3007,35 @@
     if (tcoach.box) { tcoach.box.hidden = false; trainCoachPlace(); }
     trainHintSync();
   }
-  // ── 3, 2, 1, Go ──
-  // In front of every round, once its paintings are in: the online room's last three seconds (SFX.tick, a
-  // buzz, the number popping) and its start (SFX.go). It stands over the round's own box -- an opaque veil, so
-  // the painting is not on show and the hint cannot be spent before Go, while the sheet's ← above it still
-  // works -- and nothing of the round runs until Go: no look, no clock. It waits while anything else holds
-  // the round, its three seconds with it. Coming back from the background runs it again, "Paused" first.
-  // Resolves true at Go, false if the round went.
-  const TRAIN_COUNT = 3, TRAIN_PAUSED_MS = 900;
-  // the veil, made once: a start's says what the round is about to ask (its cue); a comeback's ("Paused") does not
-  function trainVeil(word = '') {
+  // ── Paused ──
+  // A round starts the moment it is opened: its look (with the last three seconds of it ticking, trainLook)
+  // or its clock. Coming back from the background it does not go straight on: the round was held and hidden
+  // the moment the app went (trainHold 'away', the veil), and "Paused" stays over it a moment -- an opaque
+  // veil, so the painting is not on show and the hint cannot be spent, while the sheet's ← above it still
+  // works -- and the round goes on when it lifts. It waits while anything else holds the round.
+  // trainCount(g) answers whether g is still the round in hand; trainCount(g, true) is the comeback, and
+  // resolves true when it lifts, false if the round went.
+  const TRAIN_PAUSED_MS = 900;
+  function trainVeil(word = 'Paused') {
     const box = $('#aaTrainGame', el.trainBody); if (!box) return null;
     let v = $('.aa-train-count', box);
     if (!v) {
       v = document.createElement('div'); v.className = 'aa-train-count'; v.setAttribute('role', 'status'); v.setAttribute('aria-live', 'assertive');
-      v.innerHTML = '<b class="aa-train-count-n"></b><small class="aa-train-count-t">Get ready</small><p class="aa-train-count-cue"></p>';
-      $('.aa-train-count-cue', v).textContent = word ? '' : train.game?.cue || '';
+      v.innerHTML = '<b class="aa-train-count-n is-word"></b>';
       box.appendChild(v);
     }
     v.classList.remove('is-out');
-    if (word) { const n = $('.aa-train-count-n', v); n.textContent = word; n.classList.add('is-word'); }
+    $('.aa-train-count-n', v).textContent = word;
     return v;
   }
   function trainCount(g, resume = false) {
     if (train.game !== g || !$('#aaTrainGame', el.trainBody)) return Promise.resolve(false);
+    if (!resume) return Promise.resolve(true);
     if (train.count) train.count.done(false);
     trainHold('count');
-    const veil = trainVeil(resume ? 'Paused' : ''), n = $('.aa-train-count-n', veil);
+    const veil = trainVeil();
     return new Promise(resolve => {
-      const c = train.count = { shown: resume ? 'Paused' : '', blocked: 0 };
+      const c = train.count = { blocked: 0 };
       c.done = ok => {
         if (train.count === c) train.count = null;
         clearTimeout(train.countTimer); train.countTimer = 0;
@@ -3038,36 +3043,24 @@
         if (ok) trainRelease('count');
         resolve(ok);
       };
-      const show = v => {
-        if (c.shown === v) return; c.shown = v;
-        n.textContent = v; n.classList.toggle('is-word', !/^\d$/.test(v));
-        if (!calmer()) { n.classList.remove('is-pop'); void n.offsetWidth; n.classList.add('is-pop'); }
-      };
-      // back from the background again while it counts: it starts over, "Paused" first
-      c.again = () => { g.countUntil = performance.now() + TRAIN_PAUSED_MS + TRAIN_COUNT * 1000; c.blocked = 0; show('Paused'); };
-      g.countUntil = performance.now() + (resume ? TRAIN_PAUSED_MS : 0) + TRAIN_COUNT * 1000;
+      // back from the background again while it is up: its moment starts over
+      c.again = () => { g.countUntil = performance.now() + TRAIN_PAUSED_MS; c.blocked = 0; };
+      g.countUntil = performance.now() + TRAIN_PAUSED_MS;
       const step = () => {
         if (train.count !== c) return;
         const now = performance.now();
         if (document.hidden || [...train.holds].some(h => h !== 'count')) { c.blocked = c.blocked || now; train.countTimer = setTimeout(step, 100); return; }
-        if (c.blocked) { g.countUntil += now - c.blocked; c.blocked = 0; }   // it waited: so do its seconds
-        const left = Math.ceil((g.countUntil - now) / 1000);
-        if (left > TRAIN_COUNT) show('Paused');
-        else if (left > 0) { if (c.shown !== String(left)) { show(String(left)); SFX.tick(); vibe(12); } }
-        else {
-          show('Go'); SFX.go(); vibe([0, 30, 60, 70]);
-          veil.classList.add('is-out');
-          train.countTimer = setTimeout(() => { if (train.count === c) c.done(true); }, calmer() ? 150 : 320);
-          return;
-        }
-        train.countTimer = setTimeout(step, 50);
+        if (c.blocked) { g.countUntil += now - c.blocked; c.blocked = 0; }   // it waited: so does its moment
+        if (now < g.countUntil) { train.countTimer = setTimeout(step, 50); return; }
+        veil.classList.add('is-out');
+        train.countTimer = setTimeout(() => { if (train.count === c) c.done(true); }, calmer() ? 150 : 320);
       };
       step();
     });
   }
   // Back from the background: the round was held and hidden the moment it went (trainHold 'away', the veil),
-  // and it comes back through the count-in rather than straight into the clock. One hold is swapped for the
-  // other, so the clocks do not move in between; the music, stopped when the page went, comes back at Go.
+  // and it comes back through "Paused" rather than straight into the clock. One hold is swapped for the
+  // other, so the clocks do not move in between; the music, stopped when the page went, comes back when it lifts.
   async function trainResume(g) {
     trainHold('count'); trainRelease('away');
     if (await trainCount(g, true) && el.trainSheet.classList.contains('is-playing')) musicBegin();
@@ -3151,7 +3144,7 @@
   // The hint button of the round in hand: free once a day, then an advertisement the player chooses.
   const hintLabel = () => `\u{1F4A1} Hint${trainHintsLeft() > 0 ? '' : ads.isAd() ? ICON_AD : ''}`;
   const hintBtnHtml = () => `<button type="button" class="aa-train-hint" data-train-hint aria-disabled="true">${hintLabel()}</button>`;
-  // The hint only when it would do something: never before Go, in a look, on hold, in the Curator's answer or
+  // The hint only when it would do something: never in a look, on hold, in the Curator's answer or
   // after its one peek, or with nothing left to show -- the button says so (aria-disabled), and a press then
   // spends nothing: not the day's free hint, not an advertisement, not the ten points.
   function trainHintSync() {
@@ -3170,8 +3163,8 @@
       trainHintDone();
       return;
     }
-    // the advertisement: the round holds while it plays, and its hint lands after it (or at the end of the
-    // count-in, if the advertisement took the app into the background)
+    // the advertisement: the round holds while it plays, and its hint lands after it (or when "Paused" lifts,
+    // if the advertisement took the app into the background)
     g.hintBusy = true; trainHold('ad');
     let got = false;
     try { got = await adOffer('trainhint', null, true); }
@@ -3224,8 +3217,8 @@
   // spotlight on the thing to touch, a card of one sentence, and -- where the move is a drag -- a hand that
   // makes the move over and over until the player makes it. The card never blocks the round; each step
   // clears itself when the move it asked for is made (`wait`: such a step has no Next, only Skip), or on Next.
-  // It starts when the round's play does -- after Go, and after the look, which is the round's own and is not
-  // spent reading (the count-in says what the look is for) -- and a round played to its end has been learned,
+  // It starts when the round's play does -- after the look, which is the round's own and is not spent
+  // reading -- and a round played to its end has been learned,
   // whatever card was showing. Once through, or skipped, it is not shown again (`trainHow:<id>`); the text
   // version stays behind the ? beside the round's name. Its numbers are the round's own, read off its level
   // (`p`, tierParams): three patches or five, 1:30 or 3:20.
@@ -3457,7 +3450,7 @@
     box.innerHTML = '<p class="aa-sheet-note">Opening the gallery…</p>';
     try { await loadArt(); return true; } catch { box.innerHTML = '<p class="aa-sheet-note">The gallery could not be loaded. Check the connection and try again.</p><div class="aa-actions aa-actions--stack"><button type="button" class="aa-btn aa-btn--soft" data-train-back>Back</button></div>'; return false; }
   }
-  // The paintings of a round, fetched and decoded before it starts (new Image, decode): the count-in, the look
+  // The paintings of a round, fetched and decoded before it starts (new Image, decode): the look
   // and the clock never run over an empty frame, and the Curator's four details all arrive before its painting
   // is shown -- on a slow line the right one, already here from the look, used to be the first to appear. A
   // painting still not in after ART_WAIT_MS is waited for no longer: the round starts and it fills in when it
@@ -3651,10 +3644,14 @@
   const ICON_CLOCK = ICO('<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>');
   const trainHud = id => `<div class="aa-train-hud">${levelChip(id)}<span class="aa-train-stat" id="aaTrainStat"></span><span class="aa-train-drain" hidden><i></i></span>${hintBtnHtml()}</div>`;
   function trainStat(html) { const s = el.trainBody && $('#aaTrainStat', el.trainBody); if (s && s.dataset.v !== html) { s.dataset.v = html; s.innerHTML = html; } }
-  // the look: its seconds, and the bar draining with them; answers what is left of it (ms)
+  // the look: its seconds, and the bar draining with them; answers what is left of it (ms). Its last three
+  // seconds tick (SFX.tick, a buzz), once each, the way the online room counts in: the painting is about to
+  // come apart, or come down, or go.
+  const TRAIN_LOOK_TICKS = 3;
   function trainLook(g) {
-    const left = Math.max(0, g.showUntil - performance.now());
-    trainStat(`${ICON_EYE}<span>Look <b>${Math.ceil(left / 1000)}s</b></span>`);
+    const left = Math.max(0, g.showUntil - performance.now()), secs = Math.ceil(left / 1000);
+    if (secs > 0 && secs <= TRAIN_LOOK_TICKS && g.ticked !== secs && !train.paused) { g.ticked = secs; SFX.tick(); vibe(12); }
+    trainStat(`${ICON_EYE}<span>Look <b>${secs}s</b></span>`);
     const d = $('.aa-train-drain', el.trainBody); if (d) { d.hidden = false; d.firstElementChild.style.width = `${(100 * left / g.look).toFixed(1)}%`; }
     return left;
   }
@@ -3663,7 +3660,7 @@
 
   // Restore the Canvas: a painting in pieces. It hangs whole for a moment, then falls into the tray; drag each
   // piece home. Every round starts the same way: the gallery, then its paintings in (artReady), the round
-  // drawn under the count-in's veil, and only at Go its look or its clock -- with a check after every wait
+  // drawn, and at once its look or its clock -- with a check after every wait
   // that this is still the round the player asked for (run).
   async function canvasStart(box, run, next) {
     if (!(await needArt(box)) || train.run !== run) return;   // left while the gallery loaded
@@ -3673,7 +3670,6 @@
     const tray = shuffleBy(Array.from({ length: n * n }, (_, i) => i), rnd);
     const tile = i => `<span class="aa-art-tile" style="background-image:url('${w.file}');background-size:${n * 100}% ${n * 100}%;background-position:${(100 * (i % n) / (n - 1)).toFixed(2)}% ${(100 * Math.floor(i / n) / (n - 1)).toFixed(2)}%"></span>`;
     const g = train.game = { kind: 'r', p, w, n, allow, tile, slots: Array(n * n).fill(null), wrong: 0, charged: new Set(), phase: 'count', locked: new Set(), look: CANVAS_LOOK * 1000,
-      cue: `Remember where everything is. It hangs whole for ${CANVAS_LOOK} seconds, then comes apart.`,
       canHint: () => !train.paused && g.phase === 'play' && g.slots.some((t, i) => t !== i && !g.locked.has(i)),
       hint() {
         // the first piece out of place goes home and stays there
@@ -3770,9 +3766,13 @@
       d.ghost.style.transform = `translate(${pt.x - d.dx}px, ${pt.y - d.dy}px)`;
       over(e.clientX, e.clientY);
     });
-    // up, cancelled, or the capture lost (the element went, the browser took the pointer back): put down
+    // up, cancelled, or the box's capture lost (the element went, the browser took the pointer back): put
+    // down. A finger is captured by the piece it pressed (a touch's implicit capture), and handing it to the
+    // box on the first move takes it off the piece: that lostpointercapture, on the piece, is the drag
+    // starting, not ending -- read as an end it dropped every piece the moment it moved, on every phone.
     const end = e => {
       const d = train.drag; if (!d || d.kind !== o.kind || e.pointerId !== d.id) return;
+      if (e.type === 'lostpointercapture' && e.target !== box) return;
       const g = train.game; train.drag = null;
       if (!d.moved) return;   // a press that went nowhere
       // where it lands is read before the tidy: until then a coach card over the frame lets the drop through
@@ -3835,7 +3835,7 @@
   }
 
   // The Forgery: the painting and a copy with things wrong in it. Tap the copy where it lies. No look: the
-  // clock starts at Go, and the copy answers nothing before it.
+  // clock starts when the round does.
   const forgeLeft = (n, all) => all ? `${numWord(n, true)} thing${n === 1 ? ' is' : 's are'} wrong` : `${numWord(n, true)} more ${n === 1 ? 'is' : 'are'} wrong`;
   async function forgeryStart(box, run, next) {
     if (!(await needArt(box)) || train.run !== run) return;
@@ -3845,7 +3845,6 @@
     const lies = forgeLies(artSample(imgs.get(w)), rnd, nLies, s, hue);
     const patches = lies.map((q, i) => { const src = q.from || q; return artPatch(w, src.px, src.py, s, 'aa-forge-lie', `left:${(100 * q.px).toFixed(2)}%;top:${(100 * q.py).toFixed(2)}%;width:${100 * s}%;height:${100 * s}%;${q.extra || ''}`, `data-lie="${i}"`); }).join('');
     const g = train.game = { kind: 'f', p, w, lies, allow, found: new Set(), wrong: 0, combo: 0, phase: 'count',
-      cue: `${numWord(lies.length, true)} things are wrong in the copy. Find them, fast.`,
       canHint: () => !train.paused && g.phase === 'play' && g.found.size < g.lies.length,
       hint() { if (train.game !== g || g.phase !== 'play') return false; const k = g.lies.findIndex((_, i) => !g.found.has(i)); if (k < 0) return false; forgeryFound(k, true); return true; } };
     box.innerHTML = `${trainHud('f')}
@@ -3853,7 +3852,7 @@
       <div class="aa-forge-pair${w.h > w.w ? ' is-side' : ''}">${artFrame(w, 'aa-forge-orig')}${artFrame(w, 'aa-forge-copy', patches, 'id="aaForgeCopy" role="img" aria-label="The copy"')}</div>`;
     trainFit(); trainBegun('f', next);
     $('#aaForgeCopy', box)?.addEventListener('click', e => {
-      if (train.game !== g || g.phase !== 'play' || train.paused) return;   // nothing counts before Go, or on hold
+      if (train.game !== g || g.phase !== 'play' || train.paused) return;   // nothing counts on hold
       const lie = e.target.closest('[data-lie]');
       if (lie) { const i = +lie.dataset.lie; if (!g.found.has(i)) forgeryFound(i, false); return; }
       g.wrong++; g.combo = 0; SFX.block(); vibe(30); toast('Not there.', 'hint', 900);
@@ -3890,7 +3889,6 @@
     if (salt) shuffleBy(picks, rnd);   // a replay hangs the same paintings in a new order: the order is what is remembered
     const deal = shuffleBy(picks.map((_, i) => i), rnd);
     const g = train.game = { kind: 'g', p, picks, deal, n, slots: Array(n).fill(null), locked: new Set(), charged: new Set(), wrong: 0, phase: 'count', look: secs * 1000,
-      cue: `${numWord(n, true)} paintings, ${secs} seconds. Remember the order they hang in.`,
       canHint: () => !train.paused && g.phase === 'play' && g.slots.some((q, i) => q !== i && !g.locked.has(i)),
       hint() {
         // the first painting out of place goes to its number and stays there
@@ -3960,7 +3958,6 @@
     const seen = new Map(), sample = o => { if (!seen.has(o)) seen.set(o, artSample(imgs.get(o))); return seen.get(o); };
     const ask = Array.from({ length: nQ }, (_, q) => shuffleBy([w, ...others.slice(q * 3, q * 3 + 3)].map(o => curatorPatch(o, s, rnd, sample(o))), rnd));
     const g = train.game = { kind: 'e', p, w, ask, q: 0, right: 0, combo: 0, phase: 'count', look: secs * 1000,
-      cue: `One painting, ${secs} seconds. Then: which detail is from it? The corners as much as the middle.`,
       canHint: () => !train.paused && g.phase === 'ask' && !g.peeked && !g.lock,
       hint() {
         // one more look, a short one
