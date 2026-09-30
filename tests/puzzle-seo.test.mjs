@@ -187,7 +187,7 @@ test('no removed round, stale count or borrowed name anywhere the game is descri
     assert.ok(!GONE.test(s), `${where}: ${s.match(GONE)?.[0]}`);
 });
 test('llms-full.txt: the metadata remover\'s paragraph sits under its own line, not under Puzzle\'s', () => {
-  const at = llmsFull.indexOf('- AI Metadata Remover: https://ariyankhan.com/ai-metadata-remover.html\n');
+  const at = llmsFull.indexOf('- AI Metadata Remover: https://ariyankhan.com/ai-metadata-remover/\n');
   assert.ok(at >= 0);
   assert.ok(llmsFull.slice(at).split('\n')[1].includes('Free, browser-only tool that removes C2PA'));
   const pz = llmsFull.indexOf('- Puzzle – Train Your Brain (daily brain training');
