@@ -123,8 +123,9 @@ test('the arrow tutorial counts as seen when finished, skipped or the board is c
 test('Back and Escape close a tutorial card first: the home tour, the board\'s, a round\'s', () => {
   const log = [];
   const close = new Function('tour', 'coach', 'tcoach', 'tourEnd', 'coachEnd', 'trainCoachEnd', grab(/function closeTutorial\(\) \{[\s\S]*?\n  \}\n/) + '\nreturn closeTutorial;');
-  const mk = (a, b, c) => close({ on: a }, { on: b }, { on: c }, h => log.push('tour:' + h), h => log.push('board:' + h), d => log.push('round:' + d));
+  const mk = (a, b, c, shown = true) => close({ on: a }, { on: b }, { on: c, box: { hidden: !shown } }, h => log.push('tour:' + h), h => log.push('board:' + h), d => log.push('round:' + d));
   assert.equal(mk(true, false, false)(), true); assert.equal(mk(false, true, false)(), true); assert.equal(mk(false, false, true)(), true); assert.equal(mk(false, false, false)(), false);
+  assert.equal(mk(false, false, true, false)(), false, 'a round\'s coach held out of sight (a question, the ? card, Paused) is not the top layer');
   assert.deepEqual(log, ['tour:skip', 'board:skip', 'round:true'], 'each closes as its Skip does');
   const back = grab(/function backPressed\(\) \{[\s\S]*?\n  \}\n/);
   assert.ok(back.indexOf('askClose()') < back.indexOf('closeTutorial()') && back.indexOf('closeTutorial()') < back.indexOf('el.homeSheet') && back.indexOf('closeTutorial()') < back.indexOf('el.btnLevels.click()'), 'Back: a question first, then a tutorial card, then sheets and the board');

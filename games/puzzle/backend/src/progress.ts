@@ -206,7 +206,8 @@ export async function difficulty(c: Sql, minPlayers = 1): Promise<Difficulty[]> 
 //           each; f1, each round's first score of its free puzzle (what its difficulty reads), the lower
 //   daily   day -> { t, stars, quiz, tier, arrows, at } the better run: more stars, then the faster time
 //   loss    device -> arrows                            the larger per device (each device's count only grows)
-//   playStreak, dailyStreak  { count, last }           the later day; two runs that meet are joined
+//   playStreak, dailyStreak  { count, last, freeze }   the later day; two runs that meet are joined; the
+//           freezes held (0-2) are the later day's, the more of the two on the same day
 //
 // Anything else (home, form) is a setting and the last device to say it wins, as before.
 
@@ -381,18 +382,28 @@ function cleanLoss(raw: unknown): Record<string, number> {
   return topLoss(out);
 }
 
-/** A streak: how many days in a row, and the last of them. */
-export interface Streak { count: number; last: string }
+/**
+ * A streak: how many days in a row, the last of them, and the streak freezes held. A freeze (0 to 2, earned in
+ * the game, never bought) stands in for one missed day; the client spends it, and a day it covered counts as a
+ * day of the run, so a streak is always one unbroken stretch of the calendar. Kept only when there is one, so a
+ * streak without reads as it always has.
+ */
+export const FREEZE_MAX = 2;
+export interface Streak { count: number; last: string; freeze?: number }
 export function cleanStreak(raw: unknown, now = new Date()): Streak | undefined {
   if (!isObj(raw) || typeof raw.last !== 'string' || !inWindow(raw.last, dayWindow(now))) return undefined;   // no day ahead of the calendar
   const count = cnt(raw.count); if (!count) return undefined;
-  return { count, last: raw.last };
+  const freeze = Math.min(FREEZE_MAX, cnt(raw.freeze) ?? 0);
+  return freeze ? { count, last: raw.last, freeze } : { count, last: raw.last };
 }
 /**
  * Two devices' streaks of the same player, as one. A streak is a run of days, `count` of them ending on `last`,
  * so two of them are two runs on the calendar: if they overlap or meet, they are one run from the earlier start
  * to the later end -- the phone played Monday and Tuesday, the website Tuesday to Thursday, and that is four
  * days in a row. If there is a gap between them, the later run is the streak.
+ *
+ * The freezes held are the later run's: the device that played last has seen every freeze spent and earned
+ * before its day. On the same last day, the more of the two. Commutative and idempotent, like the rest.
  */
 export function mergeStreak(a: Streak | undefined, b: Streak | undefined): Streak | undefined {
   if (!a) return b; if (!b) return a;
@@ -400,7 +411,8 @@ export function mergeStreak(a: Streak | undefined, b: Streak | undefined): Strea
   const [later, le, earlier, ee] = ea >= eb ? [a, ea, b, eb] : [b, eb, a, ea];
   const ls = le - later.count + 1, es = ee - earlier.count + 1;
   const count = ee >= ls - 1 ? le - Math.min(ls, es) + 1 : later.count;
-  return { count, last: later.last };
+  const freeze = ea === eb ? Math.max(a.freeze ?? 0, b.freeze ?? 0) : later.freeze ?? 0;
+  return freeze ? { count, last: later.last, freeze } : { count, last: later.last };
 }
 
 /**
@@ -610,12 +622,24 @@ export async function mergeLevels(c: Sql, userId: number, levels: Levels, maxRow
  * together would each wait on the other's inserts -- a deadlock. NO KEY UPDATE does not conflict with KEY
  * SHARE and still makes a second push wait for the first, then read what the first one wrote.
  */
-export async function mergeState(c: Sql, userId: number, state: PlayerState): Promise<void> {
-  if (!state || Object.keys(state).length === 0) return;
+export async function mergeState(c: Sql, userId: number, state: PlayerState): Promise<boolean> {
+  if (!state || Object.keys(state).length === 0) return false;
   const r = await query<{ state: PlayerState }>(c, `SELECT state FROM users WHERE id = $1 FOR NO KEY UPDATE`, [userId]);
-  if (!r.rows[0]) return;
+  if (!r.rows[0]) return false;
   const merged = combineState(r.rows[0].state ?? {}, state);
   await query(c, `UPDATE users SET state = $2::jsonb WHERE id = $1`, [userId, JSON.stringify(merged)]);
+  return playedIn(r.rows[0].state ?? {}, merged);
+}
+/**
+ * Whether the records of play moved: a training round, a daily board, a streak day, a board lost. What the
+ * evening nudge counts as having played (routes.ts, last_played_at) -- a sync that only brought the same
+ * records back again, which every open of the app makes, is not a game.
+ */
+export function playedIn(before: PlayerState, after: PlayerState): boolean {
+  // keys sorted all the way down: a merge writes a day's fields in its own order, and that is not play
+  const canon = (v: unknown): string => JSON.stringify(v, (_k, x: unknown) => (isObj(x) ? Object.fromEntries(Object.keys(x).sort().map(k => [k, x[k]])) : x));
+  const pick = (s: PlayerState) => canon([...PLAY_KEYS].sort().map(k => (s as Rec)[k] ?? null));
+  return pick(cleanState(before, new Date(), false) ?? {}) !== pick(after);
 }
 
 /** Everything a device needs to show this player's tour. */

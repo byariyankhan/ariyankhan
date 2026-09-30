@@ -111,23 +111,35 @@
   const LIVES_OF = [4, 4, 3, 2, 2];   // hearts per tier: four on Easy and Normal, three on Hard, two on Expert and Master
   const livesFor = tier => LIVES_OF[tier] ?? LIVES;
   // ── Adaptive difficulty ──
-  // Difficulty follows the player, never the level number. One tier (0 Easy … 4 Master) lives on the device and
-  // moves on form alone. A cleared board earns points towards the next step: a flawless, fast first-try clear (no
-  // heart lost, no hint, quick per arrow) earns the whole step at once, so a strong player leaves Easy after level 1;
-  // any other first-try clear earns half (two in a row step up, hearts and hints spent or not); a clear after a
-  // retry earns nothing and resets. Two lost boards in a row step down. Nobody stays bored or stuck.
-  const STEP_POINTS = 2, STEP_DOWN_LOSSES = 2;
+  // Difficulty follows the player, never the level number. The player's form is a grade, 0 to 14: three grades a
+  // tier (0 Easy … 4 Master), and within the tier which of the board's candidate deals they get -- the easiest,
+  // the middle one or the hardest (bestBoard). It moves on every tour board: a first-try clear is one grade up,
+  // a flawless and fast one two; a scrappy clear (two hearts or two hints gone) or a clear after a retry holds;
+  // every heart-out is three grades down. Three down for one up is a staircase that settles where about three
+  // tries in four are cleared -- the old rule (two up, two down, always the hardest deal) settled near a coin
+  // flip, and players spent close to half their tries losing.
+  const GRADE_UP = 1, GRADE_UP_CLEAN = 2, GRADE_DOWN = 3, GRADES = 15;
   const FAST_SEC_PER_ARROW = 1.2;   // level 1 (~22 arrows) in under ~26 s counts as fast
   const clampTier = t => Math.max(0, Math.min(4, t));
-  const clearPoints = ({ firstTry, heartsLost, hints, secPerArrow }) => !firstTry ? 0 : heartsLost === 0 && hints === 0 && secPerArrow <= FAST_SEC_PER_ARROW ? STEP_POINTS : 1;
-  // form = { tier, wins: points towards the next step, losses: lost boards in a row }
-  const FORM0 = { tier: 0, wins: 0, losses: 0 };
+  const clampGrade = g => Math.max(0, Math.min(GRADES - 1, Math.round(g) || 0));
+  const clearPoints = ({ firstTry, heartsLost, hints, secPerArrow }) => !firstTry || heartsLost >= 2 || hints >= 2 ? 0 : heartsLost === 0 && hints === 0 && secPerArrow <= FAST_SEC_PER_ARROW ? GRADE_UP_CLEAN : GRADE_UP;
+  // form = { grade, tier }: the tier rides along (floor(grade / 3)) for a device still on the old rule, which
+  // reads only the tier. A form from before grades, or one such a device has written since, is taken at the
+  // hardest deal of its tier: exactly what that device was dealing.
+  const FORM0 = { grade: 0, tier: 0 };
+  const gradeOf = f => { const t = clampTier(Number(f?.tier) | 0), g = Number(f?.grade); return Number.isFinite(g) && clampGrade(g) === g && Math.floor(g / 3) === t ? g : t * 3 + 2; };
+  const formOf = g => ({ grade: clampGrade(g), tier: Math.floor(clampGrade(g) / 3) });
   const nextForm = (f, won, run) => {
-    if (won) { const pts = clearPoints(run), wins = pts ? f.wins + pts : 0; return wins >= STEP_POINTS ? { tier: clampTier(f.tier + 1), wins: 0, losses: 0 } : { tier: f.tier, wins, losses: 0 }; }
-    const losses = f.losses + 1; return losses >= STEP_DOWN_LOSSES ? { tier: clampTier(f.tier - 1), wins: 0, losses: 0 } : { tier: f.tier, wins: 0, losses };
+    const g = gradeOf(f);
+    return formOf(won ? g + clearPoints(run) : g - GRADE_DOWN);
   };
-  const formNow = () => ({ ...FORM0, ...(store.get('form', null) || {}) });
-  const TIER_OF = () => clampTier(formNow().tier);
+  const formNow = () => { const f = store.get('form', null); return f && typeof f === 'object' ? f : { ...FORM0 }; };
+  // A new player is not taken past Normal before five boards are cleared, nor past Hard before twelve, however
+  // well the first few went: a Hard board is a hundred arrows on three hearts, and meeting one on board three is
+  // how a first evening ends. The ceiling is the grade at the top of the allowed tier.
+  const GRADE_CAP = n => n < 5 ? 5 : n < 12 ? 8 : GRADES - 1;
+  const gradeNow = () => Math.min(gradeOf(formNow()), GRADE_CAP(boardsDone()));
+  const TIER_OF = () => Math.floor(gradeNow() / 3);
   const MAXLEN_OF = [7, 9, 14, 16, 18];  // longest body per tier: long snakes, as on the reference boards -- and on Hard and Master, the long winding ones that fill a page
   // Hard and Master boards are drawn on a finer grid than the level data asks for: more cells, so more arrows
   // on the same outline. The scale is the same for everybody, so a match is still the same board for both.
@@ -171,6 +183,7 @@
     deck: $('#aaDeck'), deckTrack: $('#aaDeckTrack'), deckDots: $('#aaDeckDots'),
     notifyCap: $('#aaNotifyCap'), notifyGroup: $('#aaNotifyGroup'), btnNotify: $('#aaNotify'), notifyNote: $('#aaNotifyNote'), remindRow: $('#aaRemindRow'), btnRemind: $('#aaRemind'), mutedCap: $('#aaMutedCap'), mutedGroup: $('#aaMutedGroup'),
     statBoards: $('#aaStatBoards'), statCountries: $('#aaStatCountries'), statStreak: $('#aaStatStreak'),
+    streak: $('#aaStreak'), streakNo: $('#aaStreakNo'), streakFz: $('#aaStreakFz'), streakFzNo: $('#aaStreakFzNo'),
   };
   if (!el.board) return;
 
@@ -180,7 +193,7 @@
     idx: -1, level: null, tier: 0, mask: null, pieces: [], occ: null, W: 0, H: 0, left: 0,
     lives: LIVES, livesMax: LIVES, startedAt: 0, raceBase: 0, elapsed: 0, timerId: 0, finished: false, hintsUsed: 0, checksUsed: 0, checksMax: CHECKS_PER_LEVEL, wrong: 0, fails: 0, seedBump: 0, busy: false, potGone: false,
     combo: 0, bestCombo: 0, lastShot: 0, cheerHold: 0, shown: new Set(), daily: null,
-    seed: 0, replay: false, resultTimer: 0, lossHeld: 0,
+    seed: 0, pick: 2, replay: false, resultTimer: 0, lossHeld: 0,
   };
 
   // ── Helpers ──
@@ -260,6 +273,54 @@
   const dayKeyOf = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   const dayKey = () => dayKeyOf(new Date());
   const dayKeyBack = n => { const d = new Date(); d.setDate(d.getDate() - n); return dayKeyOf(d); };
+  // ── One streak ──
+  // Days played in a row, one count for the whole game: a day counts once a board is cleared or a training
+  // round is scored, on any device (playStreak, synced and joined by mergeStreak). There used to be three --
+  // the boards', the daily board's and the training's -- and somebody who trained every morning read "0 day
+  // streak" on the home screen. { count, last, freeze }: `count` days ending on `last`, and 0 to 2 freezes
+  // held, each good for one missed day. A freeze is earned, never bought: all four training rounds in a day,
+  // or every seventh day of a streak. It is spent by itself when the player comes back after exactly one missed
+  // day, and the day it covers counts as a day of the streak: the run stays one unbroken stretch of the
+  // calendar, which is the shape two devices' streaks are joined in. It is spent only when it saves something:
+  // a second missed day ends the streak with the freeze still held.
+  const FREEZE_MAX = 2, FREEZE_EVERY = 7;
+  const STREAK_MILESTONES = [3, 7, 14, 30, 50, 100];
+  const freezeOf = v => Math.max(0, Math.min(FREEZE_MAX, Math.floor(Number(v)) || 0));
+  const streakOf = v => {
+    const ok = v && typeof v === 'object' && typeof v.last === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v.last) && Number(v.count) >= 1;
+    return ok ? { count: Math.floor(Number(v.count)), last: v.last, freeze: freezeOf(v.freeze) } : { count: 0, last: '', freeze: freezeOf(v?.freeze) };
+  };
+  // as stored: a freeze only when there is one, so a streak without one reads as it always has
+  const streakRec = s => (s.freeze ? { count: s.count, last: s.last, freeze: s.freeze } : { count: s.count, last: s.last });
+  /** A day played, on a streak: pure. What it did -- counted, a freeze spent or earned, a milestone passed. */
+  function stepStreak(ps, day, allFour = false) {
+    let { count, last, freeze } = streakOf(ps);
+    const out = { counted: false, bridged: false, earned: 0, milestone: 0 };
+    if (!last || last < day) {
+      const gap = last ? dayNo(day) - dayNo(last) : 0, bridge = gap === 2 && freeze > 0;
+      const was = gap === 1 || bridge ? count : 0;
+      count = bridge ? count + 2 : was + 1;
+      if (bridge) { freeze--; out.bridged = true; }
+      last = day; out.counted = true;
+      if (Math.floor(count / FREEZE_EVERY) > Math.floor(was / FREEZE_EVERY) && freeze < FREEZE_MAX) { freeze++; out.earned++; }
+      out.milestone = STREAK_MILESTONES.filter(m => was < m && count >= m).pop() || 0;
+    }
+    if (allFour && freeze < FREEZE_MAX) { freeze++; out.earned++; }
+    return { ...out, count, rec: { count, last, freeze } };
+  }
+  /** The streak as it stands today: its count while alive, whether today is done, and a freeze about to cover yesterday. */
+  function streakNow(ps = store.get('playStreak', null), today = dayKey()) {
+    const s = streakOf(ps), gap = s.last ? dayNo(today) - dayNo(s.last) : Infinity;
+    if (gap <= 1) return { count: s.count, done: gap <= 0, freeze: s.freeze, covering: false };
+    if (gap === 2 && s.freeze > 0) return { count: s.count + 1, done: false, freeze: s.freeze, covering: true };
+    return { count: 0, done: false, freeze: s.freeze, covering: false };
+  }
+  /** Count a day played (today, or the day a training round belongs to) and say what it did. */
+  function bumpDay(day = dayKey(), allFour = false) {
+    const step = stepStreak(store.get('playStreak', null), day, allFour);
+    if (step.counted || step.earned) { store.set('playStreak', streakRec(step.rec)); renderStreak(); }
+    return step;
+  }
   const hashStr = str => { let h = 2166136261; for (const ch of str) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; };
   // the daily board is the same country for everyone: picked from the canonical list, then found in the player's own order
   const dailyPick = () => { const h = hashStr('aa-daily-' + dayKey()); const L = DATA.canon[h % DATA.canon.length]; return { key: dayKey(), idx: DATA.levels.indexOf(L), tier: 1 + (h >> 8) % 4, seed: 900000 + (h % 100000) }; };
@@ -279,13 +340,17 @@
     if (!numCache) {
       const seen = new Set(), done = [];
       DATA.levels.forEach((L, j) => { if (seen.has(L.id)) return; seen.add(L.id); const rec = cleared(j); if (rec) done.push({ id: L.id, j, at: rec.at || 0 }); });
+      const boards = done.length;
       for (const at of trainClearTimes()) done.push({ id: null, j: -1, at });
       done.sort((a, b) => (a.at - b.at) || (a.j - b.j));
       const of = new Map(); done.forEach((x, k) => { if (x.id) of.set(x.id, k + 1); });
-      numCache = { n: done.length, of };
+      numCache = { n: done.length, of, boards };
     }
     return (i >= 0 && DATA.levels[i] && numCache.of.get(DATA.levels[i].id)) || numCache.n + 1;
   }
+  // Boards cleared, each id once, training not counted: what the new player's ceiling on the ladder reads
+  // (GRADE_CAP). Counted with the level numbers and forgotten with them whenever a record changes.
+  const boardsDone = () => { if (!DATA) return 0; levelNo(-1); return numCache.boards; };
   /** The boards cleared, each id once. */
   const clearedLevels = () => { const seen = new Set(); return DATA.levels.filter((L, i) => !seen.has(L.id) && seen.add(L.id) && cleared(i)); };
 
@@ -1007,17 +1072,31 @@
     const tour = orderFor(d, home).flatMap((C, k) => [C, discLevelFor(C), (k + 1) % SCENE_EVERY === 0 ? sceneLevelFor(nth++) : null].filter(Boolean));
     // discovery clears were briefly kept under dv:<id> before the boards became levels of their own
     for (const L of tour) if (L.disc && !store.get('lv:' + L.id)) { const v = store.get('dv:' + L.country.id); if (v) store.set('lv:' + L.id, v); }
-    // The focus boards go in at the frontier — right after the last board the player has cleared (frontierOf).
+    // The focus boards start at the frontier -- right after the last board the player has cleared (frontierOf).
     // For a new player that is the very start, which is the point: the game is called Train Your Brain and the
-    // first thing it hands you is a brain. For a player who has already cleared a hundred countries it is the board
-    // they were about to play, so the new boards are the next thing they meet rather than never (appending would
-    // be never) and rather than a wall (putting them first would lock the country they were on until all of these
-    // were done). Not in front of the first board without a record: a scene added behind the frontier is such a
-    // board, and the whole block used to land in that hole, a hundred levels back.
-    const focus = focusLevels();
+    // first thing it hands you is a brain. Not in front of the first board without a record: a scene added behind
+    // the frontier is such a board, and the focus boards used to land in that hole, a hundred levels back.
+    // They are dealt in among the tour, one after every FOCUS_GAP tour boards, not as one block: twenty-six
+    // abstract shapes in a row kept a new player off the map, the countries and their discoveries -- the game's
+    // own reward -- for an hour. So: the brain, then the home country and its discovery, then the next focus
+    // board, and so on until they run out. The ones already cleared stay behind the frontier, together: a
+    // player who has passed them all meets the tour exactly as before.
+    //
+    // The list is built again on every load and every sync, so where the rhythm stands is read off the records
+    // rather than off the frontier: the tour boards cleared since the last focus board was (first-clear times).
+    // Otherwise every rebuild would start the rhythm over, and the board after the brain would be the lightbulb
+    // after a reload and the home country before one. A focus board put off with Skip for now (`focusLater`)
+    // comes after the others.
+    const focus = focusLevels(), FOCUS_GAP = 2;
     if (!focus.length) return tour;
-    const at = frontierOf(tour, L => !!store.get('lv:' + L.id));
-    return tour.slice(0, at).concat(focus, tour.slice(at));
+    const rec = L => store.get('lv:' + L.id), at = frontierOf(tour, L => !!rec(L)), done = focus.filter(L => rec(L));
+    const later = new Set(store.get('focusLater', []) || []), open = focus.filter(L => !rec(L));
+    const todo = open.filter(L => !later.has(L.id)).concat(open.filter(L => later.has(L.id)));
+    const lastF = Math.max(-1, ...done.map(L => Number(rec(L).at) || 0));
+    const since = lastF < 0 ? FOCUS_GAP : tour.filter(L => (Number(rec(L)?.at) || 0) > lastF).length;
+    const ahead = tour.slice(at), out = tour.slice(0, at).concat(done, ahead.splice(0, Math.max(0, FOCUS_GAP - since)));
+    for (const F of todo) out.push(F, ...ahead.splice(0, FOCUS_GAP));
+    return out.concat(ahead);
   }
   // ── Home country: the tour starts at the player's own country and spreads out from there ──
   // Cloudflare tells the server which country a connection comes from (games/geo.php passes on the two-letter code,
@@ -1235,12 +1314,32 @@
     const cleared_ = clearedLevels();
     el.statBoards.textContent = String(cleared_.length);
     el.statCountries.textContent = String(cleared_.filter(isCountry).length);
-    // Days played in a row, and nothing decays the stored record, so it counts only while it is still alive:
-    // played today, or played yesterday with today still to come.
-    const ps = store.get('playStreak', { count: 0, last: '' });
-    const alive = ps.last === dayKey() || ps.last === dayKeyBack(1);
-    el.statStreak.textContent = String(alive ? ps.count || 0 : 0);
+    renderStreak();
   }
+  // The flame in the home bar: the streak while it is alive, rose while today is still to play and lit once
+  // it is, with the freezes held beside it. Nothing at all with no streak to show. And the tile under the map:
+  // days played in a row, and nothing decays the stored record, so it counts only while it is still alive --
+  // played today, or yesterday with today still to come (or the day before, with a freeze to cover yesterday).
+  function renderStreak() {
+    const s = streakNow();
+    if (el.statStreak) el.statStreak.textContent = String(s.count);
+    if (!el.streak) return;
+    el.streak.hidden = s.count < 1;
+    if (s.count < 1) return;
+    el.streakNo.textContent = String(s.count);
+    el.streak.classList.toggle('is-due', !s.done);
+    if (el.streakFz) { el.streakFz.hidden = !s.freeze; el.streakFzNo.textContent = String(s.freeze); }
+    el.streak.setAttribute('aria-label', `${s.count}-day streak, ${s.done ? 'today played' : 'play today to keep it'}${s.freeze ? `, ${s.freeze} streak freeze${s.freeze > 1 ? 's' : ''} held` : ''}`);
+  }
+  // A tap says what the flame means, in the words of the rule.
+  el.streak?.addEventListener('click', () => {
+    const s = streakNow();
+    const today = s.done ? 'Today counts already.' : 'Clear a board or finish a training round today to keep it.';
+    const fz = s.covering ? 'A streak freeze covers yesterday once you play.'
+      : s.freeze ? `${s.freeze === 1 ? 'One freeze' : 'Two freezes'} held: each covers one day you miss.`
+      : 'All four training rounds in a day, or every seventh day, earn a freeze.';
+    toast(`${s.count}-day streak. ${today} ${fz}`, s.done ? 'good' : 'hint', 5200);
+  });
 
   // ── The home deck ──
   // The brain and the world map used to sit one above the other, which asked the player which of the two they
@@ -1486,9 +1585,17 @@
     for (let j = 0; j < Math.min(f, n); j++) if (open(j)) return j;
     return -1;
   }
-  // The tier a tour board is dealt at: the player's own, and one step up on a scene board -- the long game. The
-  // card's Next button names it, so it has to be the same rule startLevel deals by.
-  const tierFor = i => DATA.levels[i]?.scene ? clampTier(TIER_OF() + 1) : TIER_OF();
+  // The grade a tour board is dealt at: the player's own, and a whole tier up on a scene board -- the long game,
+  // and it says so when it starts. After a scene comes a breather: the next board is the easiest deal of the
+  // player's tier (store 'breather', set when a scene is cleared or skipped, gone with the next clear). The
+  // card's Next button names the tier, so it has to be the same rule startLevel deals by.
+  const gradeFor = i => {
+    const g = gradeNow(), L = DATA.levels[i];
+    if (L?.scene) return Math.min(GRADES - 1, g + 3);
+    return store.get('breather', false) ? g - g % 3 : g;
+  };
+  const tierFor = i => Math.floor(gradeFor(i) / 3);
+  const pickFor = i => gradeFor(i) % 3;
   // What the header calls the board: where it stands in the count, and its name where the header gives one.
   const hudParts = () => {
     if (state.daily?.race) { const R = state.daily; return { head: R.boards && R.boards.length > 1 ? `Board ${(R.bi | 0) + 1} of ${R.boards.length}` : 'Challenge', name: '' }; }
@@ -1739,8 +1846,11 @@
     throw new Error('could not generate a solvable board');
   }
 
-  // Generate a few candidate boards from the seed and keep the narrowest (fewest arrows free at the start), so the
-  // difficulty a tier promises does not depend on the luck of one seed. Candidates per tier: CANDIDATES_OF.
+  // Generate a few candidate boards from the seed and rank them by how narrow they play (fewest arrows free at
+  // any moment), so the difficulty a tier promises does not depend on the luck of one seed. Candidates per tier:
+  // CANDIDATES_OF. The pick is the ladder's grade within the tier (grade % 3): 2 the narrowest -- what every
+  // board used to be dealt as, and what a race and the daily board still are, so a board shared between
+  // players is the same board for all of them -- 1 the middle one, 0 the widest.
   const CANDIDATES_OF = [4, 6, 8, 8, 6];
   // Lower is better. A quick simulated player who always takes the free arrow nearest the one just tapped (the
   // way people actually play) measures how many arrows are free at any moment and how often the arrow freed by
@@ -1760,32 +1870,36 @@
     const singles = pieces.filter(p => p.cells.length === 1).length;
     return sumFree / pieces.length + 2 * near / Math.max(1, freed) + 0.15 * start + 0.03 * singles;
   }
-  function bestBoard(mask, tier, seed) {
-    let best = null, bestScore = Infinity;
+  const PICK_HARDEST = 2;
+  function bestBoard(mask, tier, seed, pick = PICK_HARDEST) {
+    const all = [];
     for (let k = 0; k < CANDIDATES_OF[tier]; k++) {
-      const b = generate(mask, MAXLEN_OF[tier], seed + k * 97, GEN_OPTS(tier)); const sc = boardScore(b);
-      if (sc < bestScore) { best = b; bestScore = sc; }
+      const b = generate(mask, MAXLEN_OF[tier], seed + k * 97, GEN_OPTS(tier));
+      all.push({ b, sc: boardScore(b), k });
     }
-    return best;
+    // narrowest first, the earlier candidate on a tie: the same board the hardest deal has always been
+    const ranked = all.filter(c => Number.isFinite(c.sc)).sort((x, y) => x.sc - y.sc || x.k - y.k);
+    if (!ranked.length) return all[0]?.b ?? null;
+    return ranked[pick >= PICK_HARDEST ? 0 : pick === 1 ? Math.floor((ranked.length - 1) / 2) : ranked.length - 1].b;
   }
   // The last board drawn is kept. Try again deals the same board, tier and seed, and drawing a Master board costs
   // a phone a second or more on the main thread, right after a loss. Every deal is a copy: a board is played by
   // marking its pieces gone and emptying their cells, and the kept one has to stay whole for the next deal.
   let lastDeal = null;
   const copyBoard = g => ({ W: g.W, H: g.H, land: g.land, occ: g.occ.map(r => r.slice()), pieces: g.pieces.map(p => ({ ...p, cells: p.cells.map(c => c.slice()) })) });
-  function dealBoard(L, tier, seed) {
-    const key = `${L.id}:${tier}:${seed}`;
-    if (lastDeal?.key !== key) { const mask = maskFor(L, tier); lastDeal = { key, mask, gen: bestBoard(mask, tier, seed) }; }
+  function dealBoard(L, tier, seed, pick = 2) {
+    const key = `${L.id}:${tier}:${seed}:${pick}`;
+    if (lastDeal?.key !== key) { const mask = maskFor(L, tier); lastDeal = { key, mask, gen: bestBoard(mask, tier, seed, pick) }; }
     return { mask: lastDeal.mask, gen: copyBoard(lastDeal.gen) };
   }
   // The generator gives up after sixty tries (and a bad outline can throw earlier), which left the board blank
   // under "Drawing the board…" with every tap ignored. So a board that cannot be drawn is drawn from the next
   // seed, then one tier down, and only then is the player told. Deterministic, so a race falls back the same
   // way on every device in it.
-  function dealSafe(L, tier, seed) {
+  function dealSafe(L, tier, seed, pick = 2) {
     const tries = [[tier, seed], [tier, seed + 1]].concat(tier > 0 ? [[tier - 1, seed]] : []);
     for (const [t, sd] of tries) {
-      try { return { tier: t, seed: sd, ...dealBoard(L, t, sd) }; } catch (err) { console.warn('puzzle: board not drawn', L.id, t, sd, err); }
+      try { return { tier: t, seed: sd, ...dealBoard(L, t, sd, pick) }; } catch (err) { console.warn('puzzle: board not drawn', L.id, t, sd, err); }
     }
     return null;
   }
@@ -1927,17 +2041,23 @@
   function keepRun() {
     // busy: a board being dealt, when state.level is already the next board and the pieces are still the last one's
     if (state.daily || state.replay || !state.level || state.finished || state.busy || !state.pieces.length || state.left <= 0 || state.lives <= 0) return;
-    store.set(runKey(state.level.id), { tier: state.tier, seed: state.seed, fails: state.fails, ms: Math.round(currentElapsed()), combo: state.bestCombo,
+    store.set(runKey(state.level.id), { tier: state.tier, seed: state.seed, pick: state.pick, fails: state.fails, ms: Math.round(currentElapsed()), combo: state.bestCombo,
       armed: [...(state.armed || [])].map(p => p.idx), ...runSnapshot() });
   }
-  // Put the kept run back on the board just drawn, if it is this very board. Anything else -- another tier or
-  // seed (the ladder moved, the tour was reordered), a board cleared since, a run with nothing left to play --
+  // The deal a kept run was played at, when it is this board's at this seed: what startLevel deals it at again.
+  const keptDeal = (L, seed) => {
+    const r = store.get(runKey(L.id), null);
+    return r && r.seed === seed && Number.isInteger(r.tier) && r.tier >= 0 && r.tier <= 4 ? { tier: r.tier, pick: [0, 1, 2].includes(r.pick) ? r.pick : 2 } : null;
+  };
+  // Put the kept run back on the board just drawn, if it is this very board. Anything else -- another tier, seed
+  // or deal (the ladder moved, the tour was reordered), a board cleared since, a run with nothing left to play --
   // is stale and goes.
   function resumeRun() {
     const id = state.level.id, r = store.get(runKey(id), null);
     if (!r) return false;
     const n = state.pieces.length;
-    const fits = !state.replay && r.tier === state.tier && r.seed === state.seed && Array.isArray(r.gone) && r.gone.length < n
+    // a run kept before deals had a pick was the hardest deal, which is what they all were then
+    const fits = !state.replay && r.tier === state.tier && r.seed === state.seed && (r.pick ?? 2) === (state.pick ?? 2) && Array.isArray(r.gone) && r.gone.length < n
       && r.gone.every(k => Number.isInteger(k) && k >= 0 && k < n) && Number.isInteger(r.lives) && r.lives > 0;
     if (!fits) { dropRun(id); return false; }
     applyRun(r);
@@ -1967,17 +2087,27 @@
     if (i < 0) i = 0;
     stopTimer(); stopProgressPoll(); heartbeatStop(); tourLeave(true); coachEnd(); deckStop();
     if (el.ranks) el.ranks.hidden = true;
+    // Try again and Play again deal the board in hand once more: its tier (keepTier) and its deal (state.pick)
+    const same = state.idx === i && !!daily === !!state.daily, again = keepTier >= 0 && same;
     if (daily?.race) state.seedBump = 0;   // a race is that exact board: a stray reshuffle must not change it
-    else if (bumpSeed) state.seedBump++; else if (state.idx !== i || !!daily !== !!state.daily) { state.seedBump = 0; state.fails = 0; state.lossRedo = false; }
+    else if (bumpSeed) state.seedBump++; else if (!same) { state.seedBump = 0; state.fails = 0; state.lossRedo = false; }
     state.daily = daily; state.level = DATA.levels[i]; state.disc = state.level.disc ? state.level : null;
+    // A board left mid-play is dealt again as it was dealt, so the run kept for it carries on (resumeRun),
+    // whatever the ladder has done since: every heart-out steps the ladder down now, and the free life taken
+    // after one kept that very board going.
+    const kept = !daily && keepTier < 0 ? keptDeal(state.level, (i + 1) * 1000 + state.seedBump) : null;
+    if (kept) keepTier = kept.tier;
     // A scene board is one tier harder than the player's own: it is the long game, and the tier is the pace.
     state.idx = i; state.tier = daily ? daily.tier : keepTier >= 0 ? keepTier : tierFor(i); state.diff = DIFF_OF(state.tier);
+    // which of the candidate deals: the hardest for everything shared with other players (a race, the daily
+    // board), the ladder's own pick for a tour board
+    state.pick = daily ? PICK_HARDEST : kept ? kept.pick : again ? state.pick ?? PICK_HARDEST : pickFor(i);
     state.replay = !daily && !!cleared(i);   // a board cleared before: the header says so, and it is not kept mid-play
     state.busy = true; el.select.hidden = true; el.game.hidden = false; el.overlay.hidden = true; el.board.innerHTML = '';
     renderTitle(); el.hudLeft.textContent = 'Drawing the board…';
     el.btnLevels.setAttribute('aria-label', daily?.race ? 'Leave the challenge' : 'Back to home');
     await new Promise(r => setTimeout(r, 20));   // let the game screen paint before the (up to ~1 s on phones) generation
-    const deal = dealSafe(state.level, state.tier, (daily ? daily.seed : (i + 1) * 1000) + state.seedBump);
+    const deal = dealSafe(state.level, state.tier, (daily ? daily.seed : (i + 1) * 1000) + state.seedBump, state.pick);
     if (!deal) { boardFailed(); return; }
     const { gen } = deal;
     state.maskInfo = deal.mask; state.tier = deal.tier; state.seed = deal.seed;
@@ -2004,6 +2134,8 @@
     else if (resumed) toast('Carrying on where you left it.', 'good', 1800);
     if (resumed && state.lives === 1) heartLost();   // carried on with the last heart: it beats, as it did when left
     else if (i === 0 && !cleared(0) && !daily) teach('tap', 'Tap an arrow to shoot it off the board. If another arrow is in its way, you lose a heart.');
+    // a scene is the long game, dealt a tier up: said before the first tap, so the step up is no surprise
+    else if (!daily && !again && state.level.scene && !state.replay && state.tier > TIER_OF()) toast(`One step harder: this scene is ${state.diff}.`, 'hint', 2600);
   }
   // Nothing could be drawn at all, not even a tier down. The card says so and leads home, rather than a blank
   // board under "Drawing the board…" that ignores every tap.
@@ -2249,12 +2381,18 @@
   // the run it is handed and never the live board, which can be emptied under a card still on its way.
   function learnFrom(won, run) {
     if (run.daily) return null;
-    const before = formNow();
+    // The grade as it is dealt: a new player's ceiling holds the ladder down too, so the climb past it starts
+    // from the top of the allowed tier rather than from wherever the first few boards had pushed it.
+    const cap = GRADE_CAP(boardsDone()), stored = gradeOf(formNow()), before = formOf(Math.min(stored, cap));
     // A replay never moves the ladder up: a board already cleared is known, often by heart, and a quick clean
     // clear of it says nothing about the next new one. Two taps of Play again used to take Easy to Hard.
     if (won && run.replay) return { before, after: before, points: 0 };
     const r = { firstTry: won && run.fails === 0, heartsLost: run.lost, hints: run.hints, secPerArrow: run.t / 1000 / Math.max(1, run.arrows) };
-    const after = nextForm(before, won, r), points = won ? clearPoints(r) : 0;
+    // A grade above the ceiling did not come from play under it -- it is the account's, from another device, or
+    // the old ladder's -- and a win under the ceiling says nothing about it: it stays. A loss is a loss at the
+    // grade dealt, and steps down from there.
+    const next = nextForm(before, won, r).grade, points = won ? clearPoints(r) : 0;
+    const after = formOf(won && stored > cap ? stored : Math.min(next, cap));
     store.set('form', after);
     return { before, after, points };
   }
@@ -2304,6 +2442,20 @@
   const ICON_SHARE = ICO('<circle cx="17.5" cy="5.5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="17.5" cy="18.5" r="2.6"/><path d="M8.4 10.7l6.8-3.9"/><path d="M8.4 13.3l6.8 3.9"/>');
   const ICON_AD    = ICO('<rect x="2.8" y="4.8" width="18.4" height="14.4" rx="2.4"/><path d="M10.2 9.4l4.6 2.6-4.6 2.6z"/>');
   const ICON_FLAG  = ICO('<path d="M6 21V4"/><path d="M6 5h11l-2.2 3.4L17 12H6z"/>');
+  const ICON_SHUFFLE = ICO('<path d="M16 3.5h4.5V8"/><path d="M3.5 20.5l17-17"/><path d="M20.5 16v4.5H16"/><path d="M14.5 14.5l6 6"/><path d="M3.5 3.5l5 5"/>');
+  const ICON_SKIP  = ICO('<path d="M5 5.5l9 6.5-9 6.5z"/><path d="M18.5 5.5v13"/>');
+  const FLAME = '<svg class="aa-flame" viewBox="0 0 24 24" aria-hidden="true"><path d="M12.2 2c.7 3.3-1.3 5.2-3 7.1C7.6 10.9 6 12.8 6 15.6 6 19.2 8.7 22 12 22s6-2.7 6-6.3c0-2.6-1.2-4.6-2.8-6.2-.1 1.6-.8 2.8-2 3.4.6-3.9 0-7.5-1-10.9z"/></svg>';
+  // What a day played did to the streak, on the card that follows it: a milestone passed (3, 7, 14, 30, 50 and
+  // 100 days), a freeze spent on a missed day, a freeze earned. An ordinary day says nothing here: the flame on
+  // the home screen already has the count.
+  function streakNews(step) {
+    if (!step || !(step.milestone || step.bridged || step.earned)) return '';
+    // the count as it stands: a covered day can carry it past a milestone, and "7-day streak!" on day eight is wrong
+    const head = `<b>${step.count}-day streak${step.milestone ? '!' : '.'}</b>`;
+    const more = [step.bridged ? 'A freeze covered the day you missed.' : '',
+      step.earned ? (step.earned > 1 ? 'Two streak freezes earned.' : 'Streak freeze earned: it covers a day you miss.') : ''].filter(Boolean).join(' ');
+    return `<p class="aa-streak-news">${FLAME}<span>${head}${more ? ' ' + more : ''}</span></p>`;
+  }
   // The bar is filled in front of the player rather than handed to them finished: the brain travels, the
   // number counts up with it, and the sound climbs alongside. That second is the whole point of the reading —
   // it is the only part of the card that is worth watching happen.
@@ -2378,7 +2530,7 @@
   /** Keep a win, all of it, and hand back what the card needs to say about it. */
   function keepWin() {
     const R = state.daily?.race ? state.daily : null, daily = state.daily, L = state.level, i = state.idx;
-    const run = { level: L, idx: i, disc: state.disc, daily, race: R, tier: state.tier, t: Math.round(state.elapsed), stars: stars(),
+    const run = { level: L, idx: i, disc: state.disc, daily, race: R, tier: state.tier, pick: state.pick, t: Math.round(state.elapsed), stars: stars(),
       lost: state.livesMax - state.lives, hints: state.hintsUsed, arrows: state.pieces.length, combo: state.bestCombo, fails: state.fails, mode: state.mode };
     if (R) {
       // How the run went is the player's either way, so the reading goes with them onto the result sheet: the
@@ -2398,11 +2550,9 @@
     }
     run.arrowsWas = arrowsShot();   // the rank before this board is saved, so the card can say if it moved
     const before = levelNo(-1) - 1;
-    // The streak on the home screen is a streak of days this player played. It used to be the daily board's own
-    // streak, which is a board most people never open, so somebody who had cleared a hundred boards — several of
-    // them that morning — was told their streak was zero. Any cleared board keeps it alive; a day missed ends it.
-    const ps = store.get('playStreak', { count: 0, last: '' }), today = dayKey();
-    if (ps.last !== today) store.set('playStreak', { count: ps.last === dayKeyBack(1) ? (ps.count || 0) + 1 : 1, last: today });
+    // The streak on the home screen is a streak of days this player played: any cleared board keeps it alive,
+    // and so does a training round (bumpDay). What it did today -- a milestone, a freeze -- the card says.
+    run.day = bumpDay();
     const now = { t: run.t, stars: run.stars, tier: run.tier, arrows: run.arrows, at: Date.now() };
     if (daily) {
       store.set(`daily:${daily.key}`, recordFor(store.get(`daily:${daily.key}`), now));
@@ -2414,6 +2564,8 @@
       const lid = L.id, prev = store.get('lv:' + lid);   // by id: the tour may have been reordered under this board
       run.replay = !!prev;
       run.learn = learnFrom(true, run);
+      // a scene cleared: the next board is a breather (gradeFor). Any other new clear has had its breather.
+      if (!prev) { if (L.scene) store.set('breather', true); else store.del('breather'); }
       countBoard(baseId(lid), { c: 1, h: run.hints, l: run.lost, ms: run.t });
       const rec = recordFor(prev, now);
       store.set('lv:' + lid, rec); dropRun(lid); forgetNums(); pushOne(lid, rec); showBrainNext = true;
@@ -2471,6 +2623,7 @@
       <p class="aa-stars" aria-label="${s} of 3 stars">${'★'.repeat(s)}${'☆'.repeat(3 - s)}</p>
       <div class="aa-stats"><span><b>${fmtTime(t, true)}</b>time</span><span><b>${run.lost}</b>hearts lost</span><span><b>${run.hints}</b>hints</span><span><b>x${run.combo}</b>best combo</span></div>
       ${rankLine}
+      ${streakNews(run.day)}
       <div class="aa-focus" id="aaFocus" role="img" aria-label="Focus ${focus} out of 100 — ${band.name}">
         <p class="aa-focus-cap">Your focus level<b class="aa-focus-num">0</b></p>
         <div class="aa-focus-bar">
@@ -2489,7 +2642,9 @@
     showCard();
     $('[data-act]', el.card)?.focus({ preventScroll: true });
     runFocusBar(focus);
-    showPace(baseId(L.id), run.tier, t);
+    // Everybody else's times are the hardest deal's, so only a hardest deal is compared with them.
+    if ((run.pick ?? PICK_HARDEST) === PICK_HARDEST) showPace(baseId(L.id), run.tier, t);
+    askAfterResult();
     if (typeof gtag === 'function') gtag('event', 'level_complete', { game: 'puzzle', level: n, disc: D ? 1 : 0, mode: run.mode, tier: run.tier, arrows: run.arrows, time_ms: t, stars: s, tier_next: run.learn?.after.tier ?? run.tier });
   }
   // Everybody else who has cleared this board at this difficulty. The server answers with a percentage only
@@ -2532,10 +2687,19 @@
         : `<p class="aa-card-rank">−${fmtN(take)} arrows · <b>${rk.name}</b></p>`;
       showBrainNext = true;
     }
+    // How close it was, as it was: the share of the board cleared and what is left, never rounded up to a
+    // near miss. From the second heart-out on the same board a new layout is offered, dealt at the tier the
+    // ladder has just stepped down to; from the third, the board can be left for later. Try again stays first.
+    const n = state.pieces.length, pct = n ? Math.floor(100 * (n - state.left) / n) : 0;
+    const tour = !state.daily, canSkip = tour && !state.replay && state.fails >= 3 && state.idx + 1 < DATA.levels.length && !cleared(state.idx);
+    const easier = DIFF_OF(tierFor(state.idx));   // the tier the new layout will be dealt at, under its name
+    const alt = [tour && state.fails >= 2 ? `<button type="button" class="aa-btn" data-act="shuffle" aria-label="New layout, ${easier}">${ICON_SHUFFLE}<span class="aa-alt-label">New layout<small>${easier}</small></span></button>` : '',
+      canSkip ? `<button type="button" class="aa-btn" data-act="skip">${ICON_SKIP}Skip for now</button>` : ''].join('');
     el.card.innerHTML = `
       <p class="aa-card-kicker">${state.daily ? (state.daily.race ? `Gold match · ${gpurse(state.daily.match?.stake || 0)}` : 'Daily board') : hudLabel()} · ${DIFF_OF(state.tier)}</p>
       <h3>${reason}</h3>
-      <p class="aa-card-lead">${state.left} of ${state.pieces.length} arrows were still on the board.</p>
+      <div class="aa-fail-bar" role="img" aria-label="${pct}% of the board cleared"><i></i></div>
+      <p class="aa-card-lead aa-fail-lead">${pct}% cleared · ${fmtN(state.left)} arrow${state.left === 1 ? '' : 's'} to go</p>
       ${rankLine}
       ${state.daily?.race && sayOnce('race-retry') ? '<p class="aa-adapt">Try again puts you back on the same board with your hearts back. Nothing is lost until somebody else clears it.</p>' : ''}
       <div class="aa-actions aa-actions--stack aa-actions--out">
@@ -2543,7 +2707,9 @@
         <button type="button" class="aa-btn aa-btn--soft aa-btn--big" data-act="retry">${ICON_AGAIN}Try again</button>
         ${state.daily?.race ? `<button type="button" class="aa-btn aa-btn--big" data-act="giveup">${ICON_FLAG}Give the board up</button>` : ''}
       </div>
-      `;   // nothing under the two buttons: the corner arrow is the way back to the tour
+      ${alt ? `<div class="aa-actions aa-actions--alt">${alt}</div>` : ''}
+      `;   // nothing more under the buttons: the corner arrow is the way back to the tour
+    $('.aa-fail-bar', el.card)?.style.setProperty('--at', `${pct}%`);
     showCard();
     $('[data-act]', el.card)?.focus({ preventScroll: true, focusVisible: false });   // for the keyboard's sake, without a ring drawn on a tap
   }
@@ -2662,6 +2828,10 @@
     let first = false;
     if (serial === 0 && !(t.f1 && typeof t.f1[k] === 'number')) { t.f1 = t.f1 && typeof t.f1 === 'object' ? t.f1 : {}; t.f1[k] = score; first = true; }
     const fresh = score >= TRAIN_PASS && !trainCleared(t, k, serial);
+    // A round scored is a day played, whatever it scored, on the one streak the boards keep too; the four
+    // rounds all scored for the first time that day earn a streak freeze. Said on the result (trainFinish).
+    const allFour = typeof t[k] !== 'number' && TRAIN_ROUNDS.every(r => r.id === k || typeof t[r.id] === 'number');
+    train.news = bumpDay(day, allFour);
     if (fresh) {
       t.cl = t.cl && typeof t.cl === 'object' ? t.cl : {};
       const m = t.cl[k] && typeof t.cl[k] === 'object' ? t.cl[k] : (t.cl[k] = {});
@@ -2715,12 +2885,15 @@
   // with a round still to play read as if the day were finished -- and the run of days after it. With all
   // four done, the day is congratulated, and the list says how to go on: a new puzzle with an advertisement
   // where they are on, Play next where they are not. Empty when nothing has been played today.
-  function trainTally(t, streak, onResult = false) {
-    const n = TRAIN_ROUNDS.filter(r => typeof t[r.id] === 'number').length; if (!n) return '';
-    if (n === TRAIN_ROUNDS.length) return 'Congratulations! Today\u2019s brain training is done.' + (onResult ? '' : ads.isAd() ? ' You can keep training by watching an ad.' : ' You can keep training with Play next.');
-    return `${n} of ${TRAIN_ROUNDS.length} done today${streak > 1 ? ` \u00b7 ${streak} days in a row` : ''}`;
+  // A round is done when it is cleared (TRAIN_PASS): a round played under it is played, not done, and is
+  // neither ticked nor congratulated. `word` is the day the result belongs to (today, or yesterday for a round
+  // finished after midnight).
+  function trainTally(t, streak, onResult = false, word = 'today') {
+    const n = TRAIN_ROUNDS.filter(r => typeof t[r.id] === 'number' && t[r.id] >= TRAIN_PASS).length; if (!n) return '';
+    const whose = word === 'today' ? 'Today\u2019s' : word === 'yesterday' ? 'Yesterday\u2019s' : 'That day\u2019s';
+    if (n === TRAIN_ROUNDS.length) return `Congratulations! ${whose} brain training is done.` + (onResult ? '' : ads.isAd() ? ' You can keep training by watching an ad.' : ' You can keep training with Play next.');
+    return `${n} of ${TRAIN_ROUNDS.length} done ${word}${streak > 1 ? ` \u00b7 ${streak} days in a row` : ''}`;
   }
-  function trainStreak() { let n = 0; while (trainDone(trainDay(dayKeyBack(n + 1)))) n++; if (trainDone(trainDay())) n++; return n; }
   // What a round's card says, read off its state: a small line above the name (the tag) and the chip at the
   // end (the call to action). Filled rose = do this one; soft rose with the video mark = costs a short
   // advertisement; green with a tick = done today, play again free. Grey is never used: every card is tappable.
@@ -2732,7 +2905,9 @@
   const chipAgain = id => `<button type="button" class="aa-train-got is-again" data-train="${id}" data-train-mode="again">${ICON_AGAIN}Play again</button>`;
   const chipNext = id => `<button type="button" class="aa-train-got is-next" data-train="${id}" data-train-mode="next">Play next${ads.isAd() && !trainOwed(id) ? ICON_AD : ICON_NEXT}</button>`;
   function trainCardState(t, id) {
-    if (typeof t[id] === 'number') return { cls: 'is-done', tag: `\u2713 ${t[id]}`, chips: chipAgain(id) + chipNext(id) };
+    if (typeof t[id] === 'number') return t[id] >= TRAIN_PASS
+      ? { cls: 'is-done', tag: `\u2713 ${t[id]}`, chips: chipAgain(id) + chipNext(id) }
+      : { cls: '', tag: `${t[id]}`, chips: chipAgain(id) + chipNext(id) };   // played under the pass: not ticked
     return { cls: '', tag: '', chips: `<span class="aa-train-got">${ICON_PLAY}Play</span>` };
   }
   const runLine = id => {
@@ -2908,7 +3083,8 @@
     trainLeave(); renderTrain();
   }
   function renderTrain() {
-    const t = trainDay(), score = trainScore(t), done = trainDone(t), all = trainAll(t), streak = trainStreak();
+    // the one streak, boards and training alike (streakNow): the same number as the flame on the home screen
+    const t = trainDay(), score = trainScore(t), done = trainDone(t), all = trainAll(t), sk = streakNow(), streak = sk.count;
     // seven days of bars, today on the right; a day with no score is an empty bar
     const days = Array.from({ length: 7 }, (_, i) => { const k = dayKeyBack(6 - i); const v = trainScore(trainDay(k)); return { k, v, today: i === 6 }; });
     const bars = days.map(d => `<span class="aa-train-bar${d.today ? ' is-today' : ''}${d.v == null ? ' is-none' : ''}" title="${d.k}${d.v == null ? '' : ' · ' + d.v}"><i style="height:${d.v == null ? 6 : Math.max(6, d.v)}%"></i></span>`).join('');
@@ -2917,7 +3093,7 @@
         <div class="aa-train-score"><b>${score == null ? '—' : score}</b><span>Brain Score</span></div>
         <div class="aa-train-week" role="img" aria-label="Last seven days">${bars}</div>
       </div>
-      <p class="aa-train-line${!done && streak > 1 ? ' is-warn' : ''}"><span>${trainTally(t, streak) || (streak > 1 ? `${streak} days in a row \u00b7 play today` : 'Four rounds, free every day')}</span><button type="button" class="aa-train-info" data-train-about aria-label="How Daily Training works" aria-expanded="false">?</button></p>
+      <p class="aa-train-line${!sk.done && streak > 1 ? ' is-warn' : ''}"><span>${trainTally(t, streak) || (streak > 1 ? `${streak} days in a row${sk.done ? '' : ' \u00b7 play today'}` : 'Four rounds, free every day')}</span><button type="button" class="aa-train-info" data-train-about aria-label="How Daily Training works" aria-expanded="false">?</button></p>
       <p class="aa-sheet-note aa-train-about" id="aaTrainAbout" hidden>${ads.isAd() ? 'Every round is free once a day. Then play it again for nothing, as often as you like, or play a new one of it with a short advertisement. Your best score of the day counts, and the bar under a round is the days you have played it.' : 'Every round is free, every day. Play it again, or play a new one of it. Your best score of the day counts, and the bar under a round is the days you have played it.'}</p>
       <div class="aa-train-rounds">
         ${TRAIN_ROUNDS.map(r => { const c = trainCardState(t, r.id); return `<div class="aa-train-card ${c.cls}" data-train="${r.id}" data-train-mode="again" role="button" tabindex="0">${trainIcon(r.id)}<span class="aa-row-label">${c.tag ? `<small class="aa-train-tag">${c.tag}</small>` : ''}<span class="aa-train-name">${r.name}</span><small class="aa-train-run">${runLine(r.id)}</small></span><span class="aa-train-cta">${c.chips}</span></div>`; }).join('')}
@@ -3225,26 +3401,31 @@
   const dayWord = day => day === dayKey() ? 'today' : day === dayKeyBack(1) ? 'yesterday' : 'on ' + day;
   function trainFinish(kind, score, lines, work = null, works = null) {
     if (tcoach.on && tcoach.id === kind) trainCoachEnd(true);   // played to its end: learned, whatever card was up
-    trainStop(); const pass = clamp100(score) >= TRAIN_PASS, fresh = trainSave(kind, score);
+    // a miss on a replay of a puzzle already cleared is not told to clear it again: it cannot be cleared twice
+    const had = trainCleared(trainDay(train.day || dayKey()), kind, train.serial | 0);
+    trainStop(); const pass = clamp100(score) >= TRAIN_PASS, fresh = trainSave(kind, score), news = train.news; train.news = null;
+    const lead = pass || had;   // Play next leads, unless this very puzzle is still to clear
     trainHead('');
     const lvl = fresh ? levelNo(-1) - 1 : 0;   // the level this clear was: the latest on the main count
     const box = $('#aaTrainGame', el.trainBody); if (!box) return;
     const day = train.day || dayKey(), t = trainDay(day);   // the round's own day, if it was finished after midnight
     // under the pass the way on is the same puzzle again, dealt anew: that button leads
-    const nextBtn = `<button type="button" class="aa-btn ${pass ? 'aa-btn--primary' : 'aa-btn--soft'}${ads.isAd() ? ' aa-btn--ad' : ''}" data-train="${kind}" data-train-mode="next">Play next${ads.isAd() && !trainOwed(kind) ? ICON_AD : ICON_NEXT}</button>`;
-    const againBtn = `<button type="button" class="aa-btn ${pass ? 'aa-btn--soft' : 'aa-btn--primary'}" data-train="${kind}" data-train-mode="again">${ICON_AGAIN}Play again</button>`;
+    const nextBtn = `<button type="button" class="aa-btn ${lead ? 'aa-btn--primary' : 'aa-btn--soft'}${ads.isAd() ? ' aa-btn--ad' : ''}" data-train="${kind}" data-train-mode="next">Play next${ads.isAd() && !trainOwed(kind) ? ICON_AD : ICON_NEXT}</button>`;
+    const againBtn = `<button type="button" class="aa-btn ${lead ? 'aa-btn--soft' : 'aa-btn--primary'}" data-train="${kind}" data-train-mode="again">${ICON_AGAIN}Play again</button>`;
     // the painting's name, painter and source sit behind a ? -- there for whoever wants them, in nobody's way
     const credit = work ? artCredit(work) : works ? `<p class="aa-art-credit">${works.map((w, i) => `${i + 1}. <b>${escapeHtml(w.title)}</b> \u2014 ${escapeHtml(w.artist)}`).join('<br>')}<br>The Met, public domain</p>` : '';
     box.innerHTML = `<div class="aa-train-res">
       <p class="aa-card-kicker">${TRAIN_ROUNDS.find(r => r.id === kind).name}${lvl ? ` <b class="aa-train-lv">Level ${lvl}</b>` : ''}${credit ? ' <button type="button" class="aa-train-info" data-train-info aria-label="About the painting" aria-expanded="false">?</button>' : ''}</p>
       <p class="aa-train-big${pass ? '' : ' is-short'}">${clamp100(score)}</p>
       <p class="aa-train-sub">${lines}</p>
-      ${pass ? '' : `<p class="aa-train-sub aa-train-short">Score ${TRAIN_PASS} or more to clear this puzzle. Play it again: it is dealt anew.</p>`}
+      ${lead ? '' : `<p class="aa-train-sub aa-train-short">Score ${TRAIN_PASS} or more to clear this puzzle. Play it again: it is dealt anew.</p>`}
       ${credit.replace('<p class="aa-art-credit">', '<p class="aa-art-credit" hidden>')}
-      ${(() => { const n = TRAIN_ROUNDS.filter(r => typeof t[r.id] === 'number').length; return (n > 1 ? `<p class="aa-train-sub"><b>Brain Score ${dayWord(day)}: ${trainScore(t)}</b></p>` : '') + `<p class="aa-train-sub aa-train-ok">\u2713 ${trainTally(t, trainStreak(), true)}</p>`; })()}
-      <div class="aa-actions aa-actions--stack">${pass ? nextBtn + againBtn : againBtn + nextBtn}</div>
+      ${(() => { const n = TRAIN_ROUNDS.filter(r => typeof t[r.id] === 'number').length; return (n > 1 ? `<p class="aa-train-sub"><b>Brain Score ${dayWord(day)}: ${trainScore(t)}</b></p>` : '') + (() => { const line = trainTally(t, streakNow().count, true, dayWord(day)); return line ? `<p class="aa-train-sub aa-train-ok">\u2713 ${line}</p>` : ''; })(); })()}
+      ${streakNews(news)}
+      <div class="aa-actions aa-actions--stack">${lead ? nextBtn + againBtn : againBtn + nextBtn}</div>
     </div>`;
     if (pass) { SFX.win(); vibe(20); } else { SFX.lose(); vibe([0, 40, 60, 40]); }
+    askAfterResult(() => !!$('.aa-train-res', el.trainBody) && !el.trainSheet.hidden);
   }
 
   // ── The gallery rounds: real paintings, public domain ──
@@ -3820,8 +4001,17 @@
     if (act === 'adheart') { adOffer('heart'); return; }
     if (act === 'next') { const j = nextOpen(state.idx); if (j < 0) goToLevels(); else startLevel(j); }
     else if (act === 'again' || act === 'retry') { if (state.daily?.race) state.daily.moves = (state.moves | 0) + 1; else if (!state.daily) dropRun(state.level.id); startLevel(state.idx, false, state.daily, state.tier); }
-    else if (act === 'shuffle') startLevel(state.idx, true, state.daily);
-    else if (act === 'skip') { const id = DATA.levels[state.idx + 1]?.id; store.set(skipKey(state.idx + 1), true); if (id && !isLocalOnly(id)) syncTour({ [id]: { cleared: false, skipped: true } }); startLevel(nextOpen(state.idx)); }
+    // a new layout of the same board, dealt as the ladder stands now (a heart-out has just stepped it down)
+    else if (act === 'shuffle') { if (!state.daily) dropRun(state.level.id); startLevel(state.idx, true, state.daily); }
+    // Skip for now: the slot after this board opens, and this one stays where it is -- on the map, and dealt
+    // again once nothing is left ahead of it. A scene passed over still earns its breather.
+    else if (act === 'skip') {
+      const id = DATA.levels[state.idx + 1]?.id; if (!id) { goToLevels(); return; }
+      store.set(skipKey(state.idx + 1), true); if (!isLocalOnly(id)) syncTour({ [id]: { cleared: false, skipped: true } });
+      if (state.level?.scene) store.set('breather', true);
+      if (state.level?.focus) { const later = store.get('focusLater', []) || []; if (!later.includes(state.level.id)) store.set('focusLater', later.concat(state.level.id)); }
+      startLevel(nextOpen(state.idx));
+    }
     // Out of hearts is not the end of a challenge — giving up is, and it cannot be taken back: the loss goes
     // to the server, the seat closes and the stake is gone. So the quiet button asks before it does that.
     else if (act === 'giveup') {
@@ -4708,13 +4898,16 @@
   const dayNo = day => { const [y, m, d] = day.split('-').map(Number); return Math.round(Date.UTC(y, m - 1, d) / 864e5); };
   const okStreak = v => v && typeof v === 'object' && typeof v.last === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v.last) && v.last <= dayKey()
     && Number.isFinite(Number(v.count)) && Number(v.count) >= 1;
+  // The freezes held are the later streak's -- the device that played last has seen every freeze spent or
+  // earned before it -- and on the same last day the more of the two: whichever way round, and the same again
+  // if merged twice. Kept only when there is one (streakRec).
   function mergeStreak(a, b) {
-    const A = okStreak(a) ? { count: Math.floor(Number(a.count)), last: a.last } : null, B = okStreak(b) ? { count: Math.floor(Number(b.count)), last: b.last } : null;
-    if (!A || !B) return A || B;
+    const A = okStreak(a) ? streakOf(a) : null, B = okStreak(b) ? streakOf(b) : null;
+    if (!A || !B) return A || B ? streakRec(A || B) : null;
     const ea = dayNo(A.last), eb = dayNo(B.last);
     const [later, le, earlier, ee] = ea >= eb ? [A, ea, B, eb] : [B, eb, A, ea];
     const ls = le - later.count + 1, es = ee - earlier.count + 1;
-    return { count: ee >= ls - 1 ? le - Math.min(ls, es) + 1 : later.count, last: later.last };
+    return streakRec({ count: ee >= ls - 1 ? le - Math.min(ls, es) + 1 : later.count, last: later.last, freeze: ea === eb ? Math.max(A.freeze, B.freeze) : later.freeze });
   }
 
   // The same rule the server applies, applied here too — not for the server's benefit but for the race: a board
@@ -4965,6 +5158,15 @@
     // Not asked from here any more. This runs on every open, and a system dialog on the way in lands on the
     // opening, or on the home screen a moment after it -- before the player has done anything the question could
     // be about. notifyFirstAsk() stays, for a moment that has earned it.
+  }
+
+  // The phone's question, asked after the first result instead: a board cleared or a training round finished
+  // is the first moment a reminder would have anything to remind the player of. A second after the result is
+  // drawn, so it is seen before the dialog covers it, and only while it is still on screen -- a player who has
+  // already tapped on is asked after the next one. notifyFirstAsk keeps it to once, in the app only.
+  function askAfterResult(onScreen = () => !el.overlay.hidden && !el.game.hidden) {
+    if (!appPush() || store.get('pushAsked')) return;
+    setTimeout(() => { if (onScreen()) void notifyFirstAsk(); }, 1200);
   }
 
   /**

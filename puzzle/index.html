@@ -146,7 +146,7 @@
          set these two when the backend moves to a host of its own and the client follows without a change:
          <meta name="puzzle-api" content="https://api.example.com" />
          <meta name="puzzle-ws"  content="wss://api.example.com" /> -->
-    <link rel="stylesheet" href="/css/puzzle.css?v=66" />
+    <link rel="stylesheet" href="/css/puzzle.css?v=67" />
     <link rel="preload" href="/games/data/puzzle.json?v=11" as="fetch" crossorigin="anonymous" />
 
     <!-- SCHEMA -->
@@ -348,6 +348,9 @@
       <section class="aa-screen aa-home" id="aaSelect" aria-label="Home">
         <header class="aa-home-top">
           <span class="aa-chip aa-chip--purse" id="aaPurse" hidden title="Your gold"><img class="aa-coin" src="/images/puzzle-coin.png?v=1" alt="" width="128" height="128" decoding="async"><b id="aaPurseNo">0</b><button type="button" class="aa-purse-add" id="aaGoldAd" hidden aria-label="More gold">+</button></span>
+          <!-- The streak: days in a row with a board cleared or a training round scored, rose while today is
+               still to play; the freezes held beside it (renderStreak). Hidden with no streak to show. -->
+          <button type="button" class="aa-chip aa-chip--streak" id="aaStreak" hidden aria-label="Your streak"><svg class="aa-flame" viewBox="0 0 24 24" aria-hidden="true"><path d="M12.2 2c.7 3.3-1.3 5.2-3 7.1C7.6 10.9 6 12.8 6 15.6 6 19.2 8.7 22 12 22s6-2.7 6-6.3c0-2.6-1.2-4.6-2.8-6.2-.1 1.6-.8 2.8-2 3.4.6-3.9 0-7.5-1-10.9z"/></svg><b id="aaStreakNo">0</b><span class="aa-streak-fz" id="aaStreakFz" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18M4.2 7.5l15.6 9M4.2 16.5l15.6-9M9.5 4.5 12 7l2.5-2.5M9.5 19.5 12 17l2.5 2.5"/></svg><b id="aaStreakFzNo">0</b></span></button>
           <button type="button" class="aa-icon aa-train-ico" id="aaTrainBtn" aria-label="Daily brain training"><img class="aa-play-mark" src="/images/puzzle-brain-mark-rose.svg?v=1" alt="" width="30" height="30" /><span class="aa-train-pill is-dot" id="aaTrainPill"></span></button>
           <button type="button" class="aa-chip aa-chip--league" id="aaLeague" hidden aria-label="This week's league"><span aria-hidden="true">🏆</span><b id="aaLeagueEnds"></b></button>
           <button type="button" class="aa-icon" id="aaSettings" aria-label="Settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5 19.4 7.7v8.6L12 20.5 4.6 16.3V7.7z"/><circle cx="12" cy="12" r="3"/></svg></button>
@@ -628,6 +631,6 @@
       </div>
     </div>
 
-    <script src="/js/puzzle.js?v=98"></script>
+    <script src="/js/puzzle.js?v=99"></script>
   </body>
 </html>

@@ -102,12 +102,13 @@ test('head script: the theme from the first frame; on a paper native splash the 
   const web = runHead({ ls: night });
   assert.deepEqual([web.theme, web.meta, web.cls.includes('is-paper-first')], ['night', '#0E0E10', false]);
   const app1 = runHead({ ls: night, ua: UA_APP1 });
-  assert.deepEqual([app1.theme, app1.meta, app1.cls.includes('is-paper-first')], ['night', '#0E0E10', true], 'build 1 always drew paper');
+  assert.deepEqual([app1.theme, app1.meta, app1.cls.includes('is-paper-first')], ['night', '#F4EDE0', true], 'build 1 always drew paper: the bars stay paper until the opening fades');
   const app2 = runHead({ ls: night, ua: UA_APP2 });
   assert.equal(app2.cls.includes('is-paper-first'), false, 'build 2 on Android 14 drew night');
   const app2old = runHead({ ls: night, ua: UA_APP2.replace('Android 14', 'Android 12') });
   assert.equal(app2old.cls.includes('is-paper-first'), true, 'build 2 on Android 12 cannot theme its splash');
-  assert.equal(runHead({ ls: { welcomed: 1, theme: 'mint' }, ua: UA_APP1 }).meta, '#E6F2EC');
+  assert.equal(runHead({ ls: { welcomed: 1, theme: 'mint' }, ua: UA_APP1 }).meta, '#F4EDE0', 'mint on a paper splash: paper bars first');
+  assert.equal(runHead({ ls: { welcomed: 1, theme: 'mint' } }).meta, '#E6F2EC', 'mint on the web from the first frame');
   assert.equal(runHead({ ls: { welcomed: 1, theme: 'paper' }, ua: UA_APP1 }).cls.includes('is-paper-first'), false);
   assert.equal(runHead({ ls: { welcomed: 1, theme: 'plaid' } }).theme, 'paper', 'an unknown theme is paper');
   assert.equal(runHead({ ls: { welcomed: 1, theme: 'night' }, ua: UA_APP1, hash: '#daily' }).cls.includes('is-paper-first'), false, 'no opening, nothing to keep on paper');
@@ -258,7 +259,7 @@ const cssVars = block => Object.fromEntries([...block.matchAll(/--([\w-]+):\s*([
 const paperVars = cssVars(grab(css, /:root\{\n  --bg[\s\S]*?\n\}/)), nightVars = cssVars(grab(css, /:root\[data-theme="night"\]\{[\s\S]*?\n\}/)), mintVars = cssVars(grab(css, /:root\[data-theme="mint"\]\{[\s\S]*?\n\}/));
 const xmlColour = n => (new RegExp(`<color name="${n}">(#[0-9A-Fa-f]{6})</color>`).exec(colorsXml) || [])[1];
 const headColours = new Function('return ' + grab(HEAD, /\{ paper: '#F4EDE0', night: '#[0-9A-F]{6}', mint: '#[0-9A-F]{6}' \}/))();
-const applyTheme = grab(js, /function applyTheme\(t\) \{[^\n]+/);
+const applyTheme = grab(js, /const themeBar = [^\n]+/);   // the colours applyTheme sets the bars to
 test('paper is one colour everywhere: colors.xml, the stylesheet, theme-color, the manifest, the asset builder, both scripts', () => {
   const paper = '#F4EDE0';
   for (const [where, v] of [['colors.xml', xmlColour('paper')], ['--bg', paperVars.bg], ['theme-color', grab(html, /<meta name="theme-color" content="[^"]+"/).split('"').at(-2)],
@@ -337,7 +338,7 @@ test('XML comments carry no double hyphen (aapt2 refuses the file)', () => {
 });
 
 // ── The service worker's way into the game ──
-const openGameSrc = grab(sw, /const NAV_WAIT_MS = \d+;/) + '\n' + grab(sw, /function openGame\(event\) \{[\s\S]*?\n\}\n/);
+const openGameSrc = grab(sw, /const NAV_WAIT_MS = \d+;/) + '\n' + grab(sw, /async function matchBest\(cache, req\) \{[\s\S]*?\n\}\n/) + grab(sw, /function openGame\(event\) \{[\s\S]*?\n\}\n/);
 test('the way into the game waits about 2 s for the network, and only for /puzzle/ navigations', () => {
   assert.match(openGameSrc, /const NAV_WAIT_MS = 2000;/);
   assert.match(sw, /if \(req\.mode === 'navigate' && \(path === '\/puzzle' \|\| path === '\/puzzle\/'\)\) \{ event\.respondWith\(openGame\(event\)\); return; \}/);

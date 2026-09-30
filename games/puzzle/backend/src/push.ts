@@ -165,7 +165,9 @@ export async function sendToTokens(rows: TokenRow[], note: PushNote): Promise<nu
       const how = await fcm.send(row.token, note, config.push.ttlSeconds);
       if (how === 'sent') {
         sent++;
-        await query(pool, `UPDATE push_tokens SET seen_at = now(), fails = 0 WHERE id = $1`, [row.id]);
+        // fails only: seen_at is the phone saying hello (saveToken, on every open), which the evening nudge
+        // reads as "last opened" -- a nudge delivered is not the player opening the game
+        await query(pool, `UPDATE push_tokens SET fails = 0 WHERE id = $1`, [row.id]);
       } else if (how === 'dead') {
         await query(pool, `DELETE FROM push_tokens WHERE id = $1`, [row.id]);
       } else {
@@ -199,7 +201,7 @@ export async function sendToSubs(rows: SubRow[], note: PushNote): Promise<number
           { TTL: config.push.ttlSeconds, urgency: 'normal' },
         );
         sent++;
-        await query(pool, `UPDATE push_subscriptions SET seen_at = now(), fails = 0 WHERE id = $1`, [row.id]);
+        await query(pool, `UPDATE push_subscriptions SET fails = 0 WHERE id = $1`, [row.id]);   // not seen_at: as for phones
       } catch (e) {
         const status = (e as { statusCode?: number }).statusCode ?? 0;
         if (DEAD.has(status)) {
@@ -239,13 +241,46 @@ export const leagueNote = (rank: number, gold: number): PushNote => ({
   tag: 'league',
 });
 
-/** Seven in the evening, and the player has not been on a board today. Named, because it is addressed to them. */
-// A device with no account gets the nudge without a name in it: the game does not know one, and "Hey there"
-// is a stranger pretending to.
-export const dailyNote = (name: string): PushNote => ({
-  kind: 'daily',
-  title: name.trim() ? `Hey ${name.trim()}, it\u2019s time to train your brain` : 'It\u2019s time to train your brain',
-  body: 'A fresh board is waiting. A few minutes keeps the streak alive.',
-  url: '/puzzle/',
-  tag: 'daily',
-});
+/**
+ * Seven in the evening, and the player has not played today. What it says fits where they are (reminder.ts
+ * decides): a streak still alive is about to end at midnight, and says so with its count; a player whose
+ * streak has gone is told what is waiting, never that a streak they no longer have is at stake; and after a
+ * fortnight away, one last note says the reminders stop. Each has a few wordings, taken in turn per player
+ * (the last one used is remembered in Redis): the same sentence every evening is soon a sentence nobody reads.
+ *
+ * Named where the wording has room for it, because it is addressed to them. A device with no account gets it
+ * without a name: the game does not know one, and "Hey there" is a stranger pretending to.
+ */
+export type NudgeKind = 'streak' | 'back' | 'final';
+export interface NudgeCtx { kind?: NudgeKind; streak?: number; tmpl?: number }
+type Wording = (name: string, n: number) => { title: string; body: string };
+const hi = (name: string, rest: string) => (name ? `${name}, ${rest}` : rest.charAt(0).toUpperCase() + rest.slice(1));
+export const NUDGES: Record<NudgeKind, Wording[]> = {
+  streak: [
+    (_, n) => ({ title: `Your ${n}-day streak ends at midnight`, body: 'One board or one training round keeps it going.' }),
+    (name, n) => ({ title: hi(name, `keep your ${n} days going`), body: 'Your streak ends at midnight. A single training round is enough.' }),
+    (_, n) => ({ title: `Day ${n + 1} is waiting`, body: `Your ${n}-day streak ends at midnight. A few minutes keeps it alive.` }),
+    (_, n) => ({ title: `${n} days in a row so far`, body: `Clear one board before midnight and make it ${n + 1}.` }),
+    (_, n) => ({ title: 'Still time for today', body: `Your ${n}-day streak ends at midnight. Today\u2019s four rounds are ready.` }),
+  ],
+  back: [
+    () => ({ title: 'Today\u2019s four rounds are ready', body: 'Restore the Canvas, The Forgery, Gallery Memory and The Curator\u2019s Eye. A few minutes, free.' }),
+    (name) => ({ title: name ? `Hey ${name}, it\u2019s time to train your brain` : 'It\u2019s time to train your brain', body: 'Today\u2019s four rounds are ready, and so is the next country on your tour.' }),
+    () => ({ title: 'New paintings are up', body: 'Today\u2019s training rounds are hung with new paintings. One round starts a streak.' }),
+    () => ({ title: 'Your next country is waiting', body: 'One board a day builds a streak, and today can be day one.' }),
+    (name) => ({ title: hi(name, 'start a new streak today'), body: 'One board or one training round is day one.' }),
+  ],
+  final: [
+    () => ({ title: 'We\u2019ll stop reminding you', body: 'These evening reminders don\u2019t seem to help, so this is the last one. Your tour and your training are here whenever you come back.' }),
+  ],
+};
+/** The wording after `last` ("kind:index", as remembered): the next of the same kind, the first of another. */
+export function nextTemplate(kind: NudgeKind, last: string | null | undefined): number {
+  const [k, i] = String(last ?? '').split(':');
+  return k === kind && /^\d+$/.test(i ?? '') ? (Number(i) + 1) % NUDGES[kind].length : 0;
+}
+export const dailyNote = (name: string, ctx: NudgeCtx = {}): PushNote => {
+  const kind: NudgeKind = ctx.kind === 'streak' && (ctx.streak ?? 0) > 0 ? 'streak' : ctx.kind === 'final' ? 'final' : 'back';
+  const list = NUDGES[kind], say = list[Math.abs(Math.floor(ctx.tmpl ?? 0)) % list.length]!;
+  return { kind: 'daily', ...say(name.trim(), Math.floor(ctx.streak ?? 0)), url: '/puzzle/', tag: 'daily' };
+};

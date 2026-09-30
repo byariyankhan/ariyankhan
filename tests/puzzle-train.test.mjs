@@ -44,7 +44,7 @@ test('first scores merge by the lower per round: commutative, idempotent, junk d
 });
 test('a finish under 50 is kept and is not a clear; 50 is; the first score of the free puzzle stays the first', () => {
   const { m, ls, store } = makeStore();
-  const env = { store, localStorage: ls, STORE: 'aa:v1:', train: { day: '', serial: 0 }, renderTrainPill() {}, renderBrain() {}, forgetNums() {}, syncTour: () => Promise.resolve(), syncOwed: false };
+  const env = { store, localStorage: ls, STORE: 'aa:v1:', train: { day: '', serial: 0 }, renderTrainPill() {}, renderBrain() {}, forgetNums() {}, syncTour: () => Promise.resolve(), syncOwed: false, bumpDay: () => null };
   const f = new Function(...Object.keys(env), common + '\n' + grab(/const TRAIN_PASS = \d+;/) + '\n' + fn('trainSave') + '\n' + fn('trainClearTimes') + '\nreturn { trainSave, trainClearTimes, TRAIN_PASS };')(...Object.values(env));
   assert.equal(f.TRAIN_PASS, 50);
   env.train.day = TODAY();
