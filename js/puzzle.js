@@ -141,11 +141,13 @@
     return formOf(g > floor ? Math.max(floor, g - GRADE_DOWN) : g - GRADE_DOWN);
   };
   const formNow = () => { const f = store.get('form', null); return f && typeof f === 'object' ? f : { ...FORM0 }; };
-  // A new player is not taken past Normal before five boards are cleared, nor past Hard before twelve, however
-  // well the first few went: a Hard board is a hundred arrows on three hearts, and meeting one on board three is
-  // how a first evening ends. The ceiling is the grade at the top of the allowed tier.
-  const GRADE_CAP = n => n < 5 ? 5 : n < 12 ? 8 : GRADES - 1;
-  const gradeNow = () => Math.min(gradeOf(formNow()), GRADE_CAP(boardsDone()));
+  // Easy and Normal are for the first two boards only: the tutorial board and the one after it. From the third
+  // board on, nothing is dealt below Hard (GRADE_FLOOR) -- its easiest deal, grade 6, is where a bad run lands
+  // now, instead of a Normal board that a player past the start reads as the game talking down to them. A new
+  // player is still not taken past Hard before twelve boards are cleared, however well the first few went
+  // (GRADE_CAP). The ladder moves inside those bounds; the deals within Hard are the room it has to ease off.
+  const GRADE_CAP = n => n < 2 ? 5 : n < 12 ? 8 : GRADES - 1, GRADE_FLOOR = n => n < 2 ? 0 : 6;
+  const gradeNow = () => { const n = boardsDone(); return Math.max(GRADE_FLOOR(n), Math.min(gradeOf(formNow()), GRADE_CAP(n))); };
   const TIER_OF = () => Math.floor(gradeNow() / 3);
   const MAXLEN_OF = [7, 9, 14, 16, 18];  // longest body per tier: long snakes, as on the reference boards -- and on Hard and Master, the long winding ones that fill a page
   // Hard and Master boards are drawn on a finer grid than the level data asks for: more cells, so more arrows
@@ -330,7 +332,7 @@
   }
   const hashStr = str => { let h = 2166136261; for (const ch of str) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; };
   // the daily board is the same country for everyone: picked from the canonical list, then found in the player's own order
-  const dailyPick = () => { const h = hashStr('aa-daily-' + dayKey()); const L = DATA.canon[h % DATA.canon.length]; return { key: dayKey(), idx: DATA.levels.indexOf(L), tier: 1 + (h >> 8) % 4, seed: 900000 + (h % 100000) }; };
+  const dailyPick = () => { const h = hashStr('aa-daily-' + dayKey()); const L = DATA.canon[h % DATA.canon.length]; return { key: dayKey(), idx: DATA.levels.indexOf(L), tier: 2 + (h >> 8) % 3, seed: 900000 + (h % 100000) }; };
   function mulberry32(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
   function scrollToGame() { window.scrollTo({ top: 0, behavior: 'smooth' }); }
   // the address names the board (#b-<id>), not its place in the list: the list is personal and the numbers are progress
@@ -2401,7 +2403,7 @@
     if (run.daily) return null;
     // The grade as it is dealt: a new player's ceiling holds the ladder down too, so the climb past it starts
     // from the top of the allowed tier rather than from wherever the first few boards had pushed it.
-    const cap = GRADE_CAP(boardsDone()), stored = gradeOf(formNow()), before = formOf(Math.min(stored, cap));
+    const n = boardsDone(), cap = GRADE_CAP(n), floor = GRADE_FLOOR(n), stored = gradeOf(formNow()), before = formOf(Math.max(floor, Math.min(stored, cap)));
     // A replay never moves the ladder up: a board already cleared is known, often by heart, and a quick clean
     // clear of it says nothing about the next new one. Two taps of Play again used to take Easy to Hard.
     if (won && run.replay) return { before, after: before, points: 0 };
@@ -2410,7 +2412,7 @@
     // the old ladder's -- and a win under the ceiling says nothing about it: it stays. A loss is a loss at the
     // grade dealt, and steps down from there.
     const next = nextForm(before, won, r).grade, points = won ? clearPoints(r) : 0;
-    const after = formOf(won && stored > cap ? stored : Math.min(next, cap));
+    const after = formOf(won && stored > cap ? stored : Math.max(floor, Math.min(next, cap)));   // never below the floor either
     store.set('form', after);
     return { before, after, points };
   }

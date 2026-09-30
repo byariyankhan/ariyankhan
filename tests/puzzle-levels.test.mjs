@@ -174,25 +174,25 @@ const formKit = form => {
 };
 test('learnFrom reads the run it is handed, never the live board: a Back tap during the confetti cannot fake a flawless 0-second clear', () => {
   assert.ok(!/state\./.test(body('learnFrom')), 'learnFrom does not touch state');
-  const k = formKit({ tier: 1, wins: 0, losses: 0 });
+  const k = formKit({ tier: 2, wins: 0, losses: 0 });
   const got = k.learnFrom(true, { fails: 0, lost: 2, hints: 1, t: 120_000, arrows: 40 });
-  assert.deepEqual(got.after, { grade: 5, tier: 1 }, 'a scrappy slow clear holds the grade (an old Normal form is read as grade 5), as the run says');
+  assert.deepEqual(got.after, { grade: 8, tier: 2 }, 'a scrappy slow clear holds the grade (an old Hard form is read as grade 8), as the run says');
   // the same call with an emptied board (what clearRun leaves) would have been 2 grades; the run is what counts
-  const k2 = formKit({ tier: 1, wins: 0, losses: 0 });
-  assert.deepEqual(k2.learnFrom(true, { fails: 0, lost: 0, hints: 0, t: 30_000, arrows: 40 }).after, { grade: 8, tier: 2 }, 'a flawless fast clear reads Locked in: a whole tier up');
-  const k3 = formKit({ grade: 5, tier: 1 });
-  assert.deepEqual(k3.learnFrom(true, { fails: 1, lost: 0, hints: 0, t: 30_000, arrows: 40 }).after, { grade: 7, tier: 2 }, 'a Locked-in clear on the retry is two steps up, not a hold');
-  const k4 = formKit({ grade: 5, tier: 1 });
-  assert.deepEqual(k4.learnFrom(true, { fails: 1, lost: 1, hints: 1, t: 200_000, arrows: 40 }).after, { grade: 5, tier: 1 }, 'a slow retry holds');
+  const k2 = formKit({ tier: 2, wins: 0, losses: 0 });
+  assert.deepEqual(k2.learnFrom(true, { fails: 0, lost: 0, hints: 0, t: 30_000, arrows: 40 }).after, { grade: 11, tier: 3 }, 'a flawless fast clear reads Locked in: a whole tier up');
+  const k3 = formKit({ grade: 7, tier: 2 });
+  assert.deepEqual(k3.learnFrom(true, { fails: 1, lost: 0, hints: 0, t: 30_000, arrows: 40 }).after, { grade: 9, tier: 3 }, 'a Locked-in clear on the retry is two steps up, not a hold');
+  const k4 = formKit({ grade: 7, tier: 2 });
+  assert.deepEqual(k4.learnFrom(true, { fails: 1, lost: 1, hints: 1, t: 200_000, arrows: 40 }).after, { grade: 7, tier: 2 }, 'a slow retry holds');
   assert.equal(k2.learnFrom(true, { daily: { key: 'x' }, fails: 0, lost: 0, hints: 0, t: 1, arrows: 40 }), null, 'the daily board moves nothing');
 });
 test('a replay never promotes the ladder', () => {
-  const k = formKit({ tier: 0, wins: 1, losses: 0 });
+  const k = formKit({ tier: 2, wins: 1, losses: 0 });
   const flawless = { fails: 0, lost: 0, hints: 0, t: 5_000, arrows: 22, replay: true };
   for (let n = 0; n < 5; n++) k.learnFrom(true, flawless);
-  assert.deepEqual(k.formNow(), { tier: 0, wins: 1, losses: 0 }, 'five flawless replays leave the form as it was');
+  assert.deepEqual(k.formNow(), { tier: 2, wins: 1, losses: 0 }, 'five flawless replays leave the form as it was');
   k.learnFrom(true, { ...flawless, replay: false });
-  assert.equal(k.formNow().tier, 1, 'a new board still does');
+  assert.equal(k.formNow().tier, 3, 'a new board still does');
   assert.ok(/run\.replay = !!prev;\n\s+run\.learn = learnFrom\(true, run\);/.test(body('keepWin')), 'keepWin tells learnFrom whether the board was cleared before this run');
 });
 test('winLevel keeps everything at once; only the card waits, and leaving cancels it', () => {
