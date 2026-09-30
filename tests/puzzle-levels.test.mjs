@@ -342,4 +342,17 @@ test('a stale run is ignored and deleted: another tier, another seed, a board cl
   for (const f of ['shoot', 'blocked', 'hint', 'peek', 'goToLevels']) assert.ok(/keepRun\(\);/.test(body(f)), `${f} keeps the run`);
   assert.ok(/Your progress is kept/.test(js) && /state\.daily \|\| state\.replay \? 'It starts again from the beginning next time/.test(js), 'the leave question says what is kept');
 });
+test('the board is sized to the room really left on the screen, with a safe margin on all four sides', () => {
+  const fit = body('fitBoard');
+  assert.ok(/Math\.min\(roomW \/ vb\.width, roomH \/ vb\.height\)/.test(fit), 'the largest the board can be inside the room, at its own proportions');
+  assert.ok(/appH - top - px\(ws\.paddingTop\) - px\(ws\.paddingBottom\) - px\(as\.paddingBottom\)/.test(fit), 'the room is measured down to the bottom of the column, less the margins');
+  assert.ok(!/svg\.clientHeight|svg\.getBoundingClientRect/.test(fit), 'never read from the board itself');
+  assert.ok(/renderBoard\(\); fitBoard\(\); resetZoom\(\);/.test(body('startLevel')), 'every board is fitted as it is drawn');
+  assert.ok(/fitBoard\(\); applyZoom\(\);/.test(body('onTurn')), 'and again when the phone is turned');
+  const css = fs.readFileSync(path.join(root, 'css/puzzle.css'), 'utf8');
+  const wrap = css.match(/\.aa-board-wrap\{[^}]*\}/)[0];
+  assert.ok(/padding:52px 16px 20px/.test(wrap) && /overflow:hidden/.test(wrap), 'the safe margin: under the zoom buttons, 16px each side, 20px at the bottom');
+  assert.ok(!/aa-board--tall/.test(css), 'no stylesheet guess at the height left');
+});
+
 console.log(process.exitCode ? `\nsome of ${tests} tests failed` : `\nall ${tests} tests passed`);

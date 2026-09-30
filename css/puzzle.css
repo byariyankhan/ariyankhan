@@ -142,6 +142,8 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-ladder.is-up b{ color:var(--accent2); }
 .aa-ladder.is-down b:last-child{ color:var(--bad); }
 .aa-ladder-note{ margin:4px 0 0; font-size:12px; font-weight:700; line-height:1.4; color:var(--muted); text-align:center; }
+.aa-ladder-note.is-near{ margin-top:8px; color:var(--accent); font-weight:800; }
+.aa-goal{ margin-top:10px; }
 .aa-ladder-note.is-down{ margin-top:12px; color:var(--ink); }
 /* what the day did to the streak: a milestone, a freeze spent or earned (streakNews) */
 .aa-streak-news{ margin:8px 0 0; font-size:13px; font-weight:800; line-height:1.45; color:var(--muted); text-align:center; }
@@ -518,11 +520,10 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
    an arrow sitting on the edge of the glass is one the thumb cannot reach without the palm covering half the
    board. So the frame keeps a margin on every side, and a little more at the bottom, where the phone's own
    gesture bar lives. */
-.aa-board-wrap{ position:relative; flex:1; min-height:0; display:flex; align-items:center; justify-content:center; padding:52px 14px calc(16px + env(safe-area-inset-bottom, 0px)); overflow:hidden; touch-action:none; }   /* 52px top: the zoom buttons (36px at top 8px) sit above the board, never on it */
+.aa-board-wrap{ position:relative; flex:1; min-height:0; display:flex; align-items:center; justify-content:center; padding:52px 16px 20px; overflow:hidden; touch-action:none; }   /* the safe margin: 52px top so the zoom buttons (36px at top 8px) sit above the board, never on it; 16px each side; 20px at the bottom, over the column's own bottom padding (which already holds the phone's gesture bar). fitBoard() sizes the board inside it. */
 .aa-board-track{ position:absolute; left:0; right:0; top:0; height:4px; background:var(--bg2); border-radius:4px; }
 .aa-board-bar{ height:100%; width:0; background:var(--accent); border-radius:4px; transition:width .3s; }
 .aa-board{ display:block; width:100%; height:auto; max-height:calc(var(--app-h) - 274px); touch-action:none; transform-origin:0 0; will-change:transform; user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; }
-.aa-board--tall{ max-height:calc(var(--app-h) - 212px); }
 .aa-outline{ fill:var(--accent); fill-opacity:0; stroke:none; transition:fill-opacity .35s; pointer-events:none; }
 .aa-guides{ display:none; }
 .aa-board--guides .aa-guides{ display:block; }

@@ -380,4 +380,20 @@ test('the cards show the tier, the steps to the next one, and why a Next is easi
   assert.ok(/const learned = learnFrom\(false,/.test(fail) && /\$\{ladderLoss\(learned\)\}/.test(fail), 'the out-of-hearts card says it too');
 });
 
+test('the win card says how near Locked in was, the next milestone, and the streak on the first clear of a day', () => {
+  const SRC = [one('LOCKED_IN'), "const FLAME = '<svg></svg>';", one('NEAR'), fn('nearLine'), fn('goalLine')].join('\n');
+  const { nearLine, goalLine } = new Function(SRC + '\nreturn { nearLine, goalLine };')();
+  const text = h => h.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  assert.equal(text(nearLine(83)), '2 short of Locked in (85)');
+  assert.equal(nearLine(85), '', 'Locked in is not near it'); assert.equal(nearLine(74), '', 'more than ten short says nothing');
+  assert.equal(text(goalLine({ n: 176, day: { counted: false, count: 5 } })), 'Next milestone: level 180 · 4 to go');
+  assert.equal(text(goalLine({ n: 170, day: null })), 'Next milestone: level 180 · 10 to go', 'a milestone just passed points at the next one');
+  assert.equal(text(goalLine({ n: 176, day: { counted: true, count: 5 } })), '5-day streak · Next milestone: level 180 · 4 to go', 'the first clear of a day');
+  assert.equal(text(goalLine({ n: 176, day: { counted: true, count: 7, milestone: 7 } })), 'Next milestone: level 180 · 4 to go', 'a streak milestone has its own line already');
+  assert.equal(text(goalLine({ n: 176, day: { counted: true, count: 1 } })), 'Next milestone: level 180 · 4 to go', 'a one-day streak is not a streak yet');
+  assert.equal(goalLine({ daily: {}, n: 3 }), '', 'not on the daily board');
+  const show = fn('showResult');
+  assert.ok(show.indexOf('nearLine(focus)') < show.indexOf('ladderWin(run)') && show.indexOf('ladderWin(run)') < show.indexOf('goalLine(run)') && show.indexOf('goalLine(run)') < show.indexOf('data-act="next"'), 'under the Focus bar, in that order, above Next');
+});
+
 console.log(process.exitCode ? `\nsome of ${tests} tests failed` : `\nall ${tests} tests passed`);

@@ -528,7 +528,12 @@ hearts or two hints gone); a Focus of 85+ ("Locked in") is +3 on a first try, an
 heart-out already on a tier's first step costs the tier. The win card shows where the grade stands
 (`ladderWin`/`ladderMeter`: this tier, three steps, the next tier; "Level up" when a tier is crossed, and a line
 when a heart-out earlier on the same board is why the Next is easier), and the out-of-hearts card shows a tier
-lost (`ladderLoss`). The result is a
+lost (`ladderLoss`). Under the Focus bar the win card also says how near Locked in was when it was within
+ten (`nearLine`), and under the ladder the next milestone and, on the first clear of a day, the streak
+(`goalLine`); nothing on the card counts down or warns. The board itself is sized by `fitBoard()` to the
+room really left on the screen (the column's height less everything above the board and a safe margin:
+52px top under the zoom buttons, 16px each side, 20px at the bottom), so no country, however long or flat,
+runs under the buttons or off the glass. The result is a
 weighted staircase that settles near three clears in four, where the old two-up/two-down rule on the
 hardest deal settled near a coin flip (`tests/puzzle-habits.test.mjs` simulates both for three
 kinds of player: 37–46 % of tries failed before, about 26–28 % now). A form from before grades is read

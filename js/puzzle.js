@@ -1944,7 +1944,6 @@
       grad.appendChild(svgEl('animateTransform', { attributeName: 'gradientTransform', type: 'translate', from: '0 0', to: `${GRAD_PERIOD} ${GRAD_PERIOD}`, dur: '0.5s', repeatCount: 'indefinite' }));
     }
     defs.appendChild(grad); svg.appendChild(defs);
-    svg.classList.toggle('aa-board--tall', H > W * 1.25);
     const t = state.maskInfo;
     const outline = svgEl('path', { d: state.level.d, class: 'aa-outline', transform: `translate(${-t.x} ${-t.y}) scale(${t.k})` });
     svg.appendChild(outline);
@@ -2139,7 +2138,7 @@
     scrollToGame();
     const diff = DIFF_OF(state.tier);
     state.diff = diff;
-    resetZoom(); renderBoard();
+    renderBoard(); fitBoard(); resetZoom();
     const resumed = !daily && resumeRun();
     if (!daily && !resumed) countBoard(baseId(state.level.id), { p: 1 });   // a tour board started; a race or a daily is not the tour's, and a board carried on is not a new start
     renderHud();
@@ -2495,6 +2494,21 @@
     if (learn.after.tier < learn.before.tier) return `<p class="aa-ladder is-down"><b>${DIFF_OF(learn.before.tier)}</b> → <b>${DIFF_OF(learn.after.tier)}</b></p><p class="aa-ladder-note">Clear boards well to climb back.</p>`;
     return ladderMeter();
   }
+  // What is next, said on the win card in a line or two: how near the reading came to Locked in (only when it
+  // came within ten), the next milestone (every ten levels), and on the first clear of a day the streak it
+  // kept going. Each is a fact about the player's own play, never a clock or a warning: nothing here counts
+  // down, and nothing says what will be lost.
+  const NEAR = 10;
+  function nearLine(focus) {
+    const short = LOCKED_IN - focus;
+    return short > 0 && short <= NEAR ? `<p class="aa-ladder-note is-near">${short} short of Locked in (${LOCKED_IN})</p>` : '';
+  }
+  function goalLine(run) {
+    if (run.daily || !run.n) return '';
+    const next = (Math.floor(run.n / 10) + 1) * 10, left = next - run.n;
+    const day = run.day, streak = day?.counted && !(day.milestone || day.bridged || day.earned) && day.count >= 2 ? `${FLAME}<span><b>${day.count}-day streak</b></span> · ` : '';
+    return `<p class="aa-streak-news aa-goal">${streak}Next milestone: level ${next} · ${left} to go</p>`;
+  }
   // What a day played did to the streak, on the card that follows it: a milestone passed (3, 7, 14, 30, 50 and
   // 100 days), a freeze spent on a missed day, a freeze earned. An ordinary day says nothing here: the flame on
   // the home screen already has the count.
@@ -2688,7 +2702,9 @@
         </div>
         <p class="aa-focus-vs" id="aaFocusVs"></p>
       </div>
+      ${nearLine(focus)}
       ${last ? '' : ladderWin(run)}
+      ${goalLine(run)}
       <div class="aa-actions aa-actions--stack">
         ${last || run.daily ? '' : `<button type="button" class="aa-btn aa-btn--primary" data-act="next">Next: Level ${levelNo(nj)} · ${DIFF_OF(tierFor(nj))}${ICON_NEXT}</button>`}
         <button type="button" class="aa-btn" data-act="again">${ICON_AGAIN}Play again</button>
@@ -6754,6 +6770,37 @@
     renderHome();
     toast(v === 'auto' ? 'Tour order follows where you are.' : v ? `Your tour now starts from ${firstCountry()?.name || 'there'}.` : 'Tour in world order.', 'hint');
   }
+  // ── The board's frame ──
+  // A board is sized to the room that is really left on the screen under the header and the bar, whatever the
+  // country's shape. It used to be a stylesheet guess -- the screen's height less 274 px, or less 212 px for a
+  // tall country -- and on a phone with a status bar or a notch the header sits lower than the guess allowed
+  // for: a long thin country ran under the zoom buttons and off the bottom of the glass. Now the frame is
+  // measured: from the top of the board's box to the bottom of the column, less the box's own padding (the
+  // safe margin on all four sides), and the board is the largest it can be inside that at its own proportions.
+  // Only what is above the box and the width of the column are read, never the board itself, so the size
+  // cannot feed back into the room it is measured in.
+  let appHProbe = null;
+  function fitBoard() {
+    const svg = el.board, wrap = el.boardWrap, app = wrap?.closest('.aa-app');
+    if (!svg || !wrap || !app || el.game.hidden) return;
+    const vb = svg.viewBox.baseVal;
+    if (!vb || !vb.width || !vb.height) return;
+    // the column's height as the stylesheet has it (--app-h: the screen's height, or its width once turned)
+    if (!appHProbe) { appHProbe = document.createElement('div'); appHProbe.setAttribute('aria-hidden', 'true'); appHProbe.style.cssText = 'position:absolute;top:0;left:0;width:1px;height:var(--app-h);visibility:hidden;pointer-events:none'; document.body.appendChild(appHProbe); }
+    const appH = appHProbe.offsetHeight;
+    // offsets, not rectangles: a turned page is rotated, and offsets are measured before any transform
+    const offTop = n => { let y = 0; for (; n && n !== document.body; n = n.offsetParent) y += n.offsetTop; return y; };
+    const top = offTop(wrap) - offTop(app);
+    const ws = getComputedStyle(wrap), as = getComputedStyle(app), px = v => parseFloat(v) || 0;
+    const roomW = wrap.clientWidth - px(ws.paddingLeft) - px(ws.paddingRight);
+    const roomH = appH - top - px(ws.paddingTop) - px(ws.paddingBottom) - px(as.paddingBottom);
+    const k = Math.max(0, Math.min(roomW / vb.width, roomH / vb.height));
+    svg.style.width = `${Math.floor(vb.width * k)}px`;
+    svg.style.height = `${Math.floor(vb.height * k)}px`;
+    svg.style.maxHeight = 'none';
+  }
+  window.addEventListener('resize', () => { fitBoard(); applyZoom(); });
+  window.visualViewport?.addEventListener('resize', () => { fitBoard(); applyZoom(); });
   // ── Board zoom: pinch with two fingers, drag to pan while zoomed, or the − ⤢ + buttons ──
   // On a Master board of 180 arrows a cell is ~9 px on a phone: zooming is how a tap lands on the arrow meant.
   const zoom = { s: 1, x: 0, y: 0, MIN: 1, MAX: 4, ptrs: new Map(), pinch: null, pan: null };
@@ -7239,6 +7286,7 @@
     r.toggle('is-turned-ccw', turn.dir === -90);
     r.toggle('is-turned-cw', turn.dir === 90);
     trainRefit();   // a round in hand is fitted to the page's new shape
+    fitBoard(); applyZoom();   // and so is a board
     requestAnimationFrame(() => { coachPlace(); tourPlace(); });   // and a spotlight follows what it is on
   }
   sideways.addEventListener?.('change', onTurn);
