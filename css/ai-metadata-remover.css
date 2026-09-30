@@ -181,3 +181,8 @@ body.amrk{ margin:0; background:var(--bg); color:var(--ink); font-family:var(--s
 body.amrk{ display:flex; flex-direction:column; min-height:100vh; min-height:100dvh; }
 body.amrk > main{ flex:1 0 auto; width:100%; }
 body.amrk > header, body.amrk > footer{ flex-shrink:0; }
+
+/* Home: the explanation below the tool, well clear of the upload */
+.amr-home .amr-explain{ margin:56px auto 0; }
+.amr-home .amr-explain h2{ text-align:center; }
+.amr-home .amr-explain .amr-faq{ max-width:720px; margin:0 auto; }

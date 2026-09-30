@@ -196,3 +196,8 @@ body.mm-busy .mm-canvas{ opacity:.7; }
 body.mmk{ display:flex; flex-direction:column; min-height:100vh; min-height:100dvh; }
 body.mmk > main{ flex:1 0 auto; width:100%; }
 body.mmk > header, body.mmk > footer{ flex-shrink:0; }
+
+/* Home: the explanation below the tool */
+.mm-home .mm-explain{ margin:48px auto 0; }
+.mm-home .mm-explain h2{ text-align:center; }
+.mm-home .mm-explain .mm-faq{ max-width:780px; margin:0 auto; }
