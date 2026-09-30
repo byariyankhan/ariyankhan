@@ -729,6 +729,8 @@ section('Mute: the one answer to being asked too often');
   await online.away(mate.id, false);
   eq((await call(`/matches/${code}/invite`, { token: host.token, body: { user_id: mate.id } })).json.reach, 'live', 'and back in front of it, the screen again');
   await online.gone(mate.id);
+  eq((await call(`/matches/${code}/invite`, { token: host.token, body: { user_id: mate.id } })).json.reach, 'none', 'with the game closed, the phone rung minutes ago by this sender is not rung again, and host is not told it was');
+  await redis.del(k('invring', host.id, mate.id));   // ten minutes on
   eq((await call(`/matches/${code}/invite`, { token: host.token, body: { user_id: mate.id } })).json.reach, 'push', 'with the game closed and a phone registered, the phone is told');
 
   // Mate has had enough.
@@ -743,6 +745,7 @@ section('Mute: the one answer to being asked too often');
 
   // And the way back.
   eq(((await call('/players/unmute', { token: mate.token, body: { user_id: host.id } })).json.muted as unknown[]).length, 0, 'unmuting empties the list');
+  await redis.del(k('invring', host.id, mate.id));   // ten minutes on
   eq((await call(`/matches/${code}/invite`, { token: host.token, body: { user_id: mate.id } })).json.reach, 'push', 'and the phone is told again');
   await query(pool, `DELETE FROM push_tokens WHERE user_id = $1`, [mate.id]);
 }
@@ -767,7 +770,7 @@ section('A phone rings once in ten minutes for one sender, whatever room it is f
     reaches.push(String((await call(`/matches/${code}/invite`, { token: host.token, body: { user_id: mate.id } })).json.reach));
     await call(`/matches/${code}/leave`, { token: host.token, body: {} });
   }
-  eq(reaches, ['push', 'push', 'push'], 'three rooms opened and left to ask again: the sender is told the same each time');
+  eq(reaches, ['push', 'none', 'none'], 'three rooms opened and left to ask again: the phone rings for the first, and the sender is told the truth about the others');
   eq(Number(await redis.get(k('invringday', host.id, mate.id, day))), 1, 'but the phone rang once');
   ok(Number(await redis.ttl(k('invring', host.id, mate.id))) > 500, 'and will not ring for this sender again for ten minutes');
   eq(Number(await redis.get(k('invpops', host.id, mate.id))), 3, 'the card on an open screen is counted per sender too');
@@ -788,8 +791,16 @@ section('A phone rings once in ten minutes for one sender, whatever room it is f
 section('Gold for an advertisement needs a ticket asked for before it');
 {
   const p = await mint('adTicket', 0);
-  const old = await call('/ads/reward', { token: p.token, body: {} });
-  eq([old.status, old.json.error], [400, 'no_ticket'], 'a claim with no ticket -- what a page from before tickets sends -- is refused with a 4xx');
+  // A page from before tickets sends none at all: for a while after the change it is still paid, never twice
+  // within an advertisement's length; after that, refused. (Its own player, so the rest of this reads as before.)
+  const lp = await mint('adLegacy', 0);
+  const old = await call('/ads/reward', { token: lp.token, body: {} });
+  if (Date.now() < Date.parse(config.game.adLegacyUntil)) {
+    eq([old.status, old.json.granted], [200, config.game.adGold], 'a claim with no ticket at all -- a page from before tickets -- is still paid for a while');
+    const old2 = await call('/ads/reward', { token: lp.token, body: {} });
+    eq([old2.status, old2.json.error], [400, 'no_ticket'], 'but not twice within an advertisement\'s length');
+  } else eq([old.status, old.json.error], [400, 'no_ticket'], 'a claim with no ticket -- what a page from before tickets sends -- is refused with a 4xx');
+  eq([(await call('/ads/reward', { token: p.token, body: { ticket: '' } })).json.error], ['no_ticket'], 'an empty ticket is no ticket, whenever');
   eq((await call('/ads/start', { body: {} })).status, 401, 'a signed-out visitor has no purse to ask for');
   const t = await call('/ads/start', { token: p.token, body: {} });
   eq(t.status, 200, 'a ticket is handed out before the advertisement is shown');

@@ -481,10 +481,10 @@ section('The settings blob the account keeps is bounded, the oldest days going f
   ok(size <= MAX_BLOB_BYTES, `a year of the heaviest training there could be is kept under ${MAX_BLOB_BYTES / 1024} KB (${Math.round(size / 1024)} KB)`);
   ok(today in merged.train && merged.train[today].r === 99, 'today is kept');
   ok(!(back(199) in merged.train), 'and what made room was the oldest days');
-  // What a script would do: a different fortnight in every push, each one under the per-push limit.
+  // What a script would do: a few different days in every push, each one under the per-push limit.
   const p = await player('progBlob');
   const days = Object.keys(heavy).sort();
-  for (let i = 0; i < days.length; i += 14) await mergeState(pool, p.id, { train: Object.fromEntries(days.slice(i, i + 14).map(d => [d, heavy[d]])) });
+  for (let i = 0; i < days.length; i += 5) await mergeState(pool, p.id, { train: Object.fromEntries(days.slice(i, i + 5).map(d => [d, heavy[d]])) });   // each push under its own limit
   const stored = JSON.stringify(await readState(pool, p.id)).length;
   ok(stored <= MAX_BLOB_BYTES && stored > MAX_BLOB_BYTES / 2, `and so is what the account stores, however many pushes it took (${Math.round(stored / 1024)} KB)`);
 }
