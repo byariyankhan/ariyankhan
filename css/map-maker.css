@@ -78,6 +78,7 @@ body.mm-busy .mm-canvas{ opacity:.7; }
 .mm-block{ background:var(--paper); border:1px solid var(--line-soft); border-radius:14px; padding:14px; }
 .mm-block h3{ font-family:var(--serif); font-size:17px; font-weight:700; margin:0 0 10px; }
 .mm-row{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:8px; }
+.mm-row[hidden]{ display:none; }
 .mm-row:last-child{ margin-bottom:0; }
 .mm-row label{ font-size:13px; color:var(--muted); flex:1 1 90px; }
 .mm-row select, .mm-row input[type="text"], .mm-row input[type="number"], .mm-search input, .mm-label{
