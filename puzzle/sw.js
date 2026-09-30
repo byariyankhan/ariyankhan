@@ -1,9 +1,10 @@
-/* Puzzle – Train Your Brain — service worker (the file keeps the name of the game it was first written for,
-   Piece the World, since removed: installed copies of the app are registered under this path).
-   Scope is the whole origin (it has to be, to control the game page), but the fetch
-   handler only ever answers for the game's own files; every other request on the
-   site is left to the network exactly as if no worker were installed. */
-const VERSION = 'ptw-cache-v155';
+/* Puzzle – Train Your Brain — service worker, /puzzle/sw.js with the scope /puzzle/.
+   It controls the game's own pages and nothing else on the site. The requests those pages make go through it
+   wherever they point (/js/puzzle.js, /games/data/, /images/art/), and its fetch handler only ever answers
+   for the game's own files; every other request is left to the network exactly as if no worker were
+   installed. It used to be /piece-the-world-sw.js at the root, with the whole origin as its scope, named for
+   a game since removed; js/puzzle.js unregisters that one where a device still has it (swStart). */
+const VERSION = 'puzzle-cache-v1';
 const GAME_FILES = new Set([
   '/puzzle', '/puzzle/', '/css/puzzle.css', '/js/puzzle.js', '/puzzle/app.webmanifest', '/images/puzzle-brain-mark.svg', '/images/puzzle-brain-mark-rose.svg', '/images/puzzle-brain-mark-white.svg',
   // the game's own icon and its coin: installed from the home screen, with no network, the game still has a
@@ -36,7 +37,7 @@ self.addEventListener('install', event => {
     Promise.all(CORE.map(path => cache.add(new Request(path, { cache: 'reload' })).catch(() => {})))));
 });
 self.addEventListener('activate', event => {
-  event.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k.startsWith('ptw-cache-') && k !== VERSION).map(k => caches.delete(k)))).then(() => self.clients.claim()));
+  event.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => (k.startsWith('puzzle-cache-') || k.startsWith('ptw-cache-')) && k !== VERSION).map(k => caches.delete(k)))).then(() => self.clients.claim()));
 });
 
 self.addEventListener('fetch', event => {

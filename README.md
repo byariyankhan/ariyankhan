@@ -161,7 +161,7 @@ uploaded to that old name is not served.
 | `css/ai-metadata-remover.css` | Tool page layout, drop zone, result cards, content sections |
 | `map-maker.html` | Free SEO tool page: highlight countries on a world map, export PNG/SVG — see "Map Maker" section below |
 | `js/map-maker.js`, `css/map-maker.css` | Map Maker engine (d3-geo projections, export, share links) + page styles |
-| `piece-the-world-sw.js` | Puzzle's service worker (offline boards, installable). It keeps the name of the first game, Piece the World, since removed: installed copies are registered under this path |
+| `puzzle/sw.js` | Puzzle's service worker, scope `/puzzle/` (offline boards, installable, web push). It replaced the root `piece-the-world-sw.js`, which `js/puzzle.js` unregisters where a device still has it (`swStart`) |
 | `puzzle/index.html`, `js/puzzle.js`, `css/puzzle.css` | Tap-away arrow puzzle game on country maps, served at `/puzzle/` — see "Puzzle – Train Your Brain" section below |
 | `games/data/puzzle.json`, `games/build-puzzle-boards.mjs`, `puzzle/app.webmanifest` | Its level data (outlines + tier scales for 197 countries; masks are rasterised in the browser), build script and PWA manifest |
 | `games/puzzle/` | Its backend service, which is a project of its own: Node 22 + TypeScript + Fastify, PostgreSQL, Redis and a WebSocket, with its migrations, test suites, compose file, backup and restore scripts and nginx snippet — see `games/puzzle/README.md` |
@@ -318,8 +318,7 @@ Piece the World, the geography jigsaw (`piece-the-world.html`, its JS, CSS,
 manifest, test, `games/build-data.mjs` and the continent level data in
 `games/data/`), was removed on 30 September 2026. `.htaccess` answers its old
 addresses with 410 Gone, and the files were deleted from the live document root
-with the `web-prune` ops mode (`deploy/retired-files.txt`). Its service worker
-file stays under its old name because it is Puzzle's worker now.
+with the `web-prune` ops mode (`deploy/retired-files.txt`). Its service worker file, which had become Puzzle's, moved to `puzzle/sw.js`.
 
 ---
 
@@ -564,7 +563,7 @@ links.
   data files. Versioned with `MAP_VERSION`. There is no Restart button in the game any more (back out or
   fail and retry).
 - **Notifications** (`games/puzzle/backend/src/push.ts`, `migrations/008_push.sql`,
-  the `push` handlers at the end of `piece-the-world-sw.js`, and the switch in
+  the `push` handlers at the end of `puzzle/sw.js`, and the switch in
   Settings): Web Push, for the two things that happen to somebody who is not
   looking at the game — a friend asking them to a match, and the league paying
   out on Sunday night. Nothing else is ever sent. An invitation only pushes when
@@ -1660,7 +1659,7 @@ links.
 - **Adding countries**: append to `TOUR` and `CAPITALS`, rebuild, bump
   `DATA_VERSION`. Tiers by level index are in `TIER_OF` in the JS.
 - **PWA**: `puzzle/app.webmanifest` (and `games/arrow-atlas.webmanifest`, kept so copies installed under the old name update in place); the worker
-  `piece-the-world-sw.js` (named for the removed Piece the World) caches this game's files. Opening the game (`openGame`) gives the network 2 s:
+  `puzzle/sw.js` (scope `/puzzle/`; the requests the game's pages make go through it wherever they point) caches this game's files. It was `/piece-the-world-sw.js` at the root until 30 September 2026: `swStart` in `js/puzzle.js` registers the new one, moves a browser's push subscription to it (same key, posted to the server, the old endpoint dropped) and unregisters the old one; its `ptw-cache-*` caches are deleted when the new worker activates, and the old address answers 410. Opening the game (`openGame`) gives the network 2 s:
   an answer in time is used as before, and after that the cached page is served while the network's answer
   still goes into the cache, so a connection that is up but barely moving no longer holds the app's splash.
 - **Tests**: `node tests/puzzle.test.mjs` runs the production `generate()` on
