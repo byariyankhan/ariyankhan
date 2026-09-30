@@ -92,7 +92,7 @@ test('the ladder settles near three clears in four: the attempt failure rate dro
   }
   console.log('    ' + rows.join('\n    '));
 });
-test('a heart-out is three grades, a clear one or two, a scrappy clear none: the staircase aims at 3 in 4', () => {
+test('a heart-out is two grades but never a whole tier at once, a clear one or two, a scrappy clear none: the staircase aims at 3 in 4', () => {
   const { nextForm, clearPoints } = ladder;
   assert.equal(clearPoints({ firstTry: true, heartsLost: 0, hints: 0, secPerArrow: 1.2 }), 2, 'flawless and fast');
   assert.equal(clearPoints({ firstTry: true, heartsLost: 0, hints: 0, secPerArrow: 1.3 }), 1, 'flawless, not fast');
@@ -100,13 +100,16 @@ test('a heart-out is three grades, a clear one or two, a scrappy clear none: the
   assert.equal(clearPoints({ firstTry: true, heartsLost: 2, hints: 0, secPerArrow: 0.5 }), 0, 'two hearts: scrappy');
   assert.equal(clearPoints({ firstTry: true, heartsLost: 0, hints: 2, secPerArrow: 0.5 }), 0, 'two hints: scrappy');
   assert.equal(clearPoints({ firstTry: false, heartsLost: 0, hints: 0, secPerArrow: 0.5 }), 0, 'after a retry');
-  // the card's Focus reading: Locked in (85 and up) is a whole tier, and a Locked-in retry is a step
+  // the card's Focus reading: Locked in (85 and up) is a whole tier; on a retry Locked in is two steps and steady (70+) one
   assert.equal(clearPoints({ firstTry: true, heartsLost: 0, hints: 0, secPerArrow: 0.5, focus: 92 }), 3, 'Locked in: a whole tier');
   assert.equal(clearPoints({ firstTry: true, heartsLost: 1, hints: 0, secPerArrow: 0.5, focus: 88 }), 3, 'Locked in with a heart gone');
   assert.equal(clearPoints({ firstTry: true, heartsLost: 2, hints: 0, secPerArrow: 0.5, focus: 90 }), 0, 'two hearts is still scrappy');
-  assert.equal(clearPoints({ firstTry: false, heartsLost: 0, hints: 0, secPerArrow: 0.5, focus: 90 }), 1, 'a Locked-in retry: a step');
-  assert.equal(clearPoints({ firstTry: false, heartsLost: 0, hints: 0, secPerArrow: 0.5, focus: 80 }), 0, 'any other retry holds');
-  assert.deepEqual(nextForm({ grade: 7, tier: 2 }, false, null), { grade: 4, tier: 1 });
+  assert.equal(clearPoints({ firstTry: false, heartsLost: 0, hints: 0, secPerArrow: 0.5, focus: 90 }), 2, 'a Locked-in retry: two steps');
+  assert.equal(clearPoints({ firstTry: false, heartsLost: 0, hints: 0, secPerArrow: 0.5, focus: 83 }), 1, 'a steady retry: a step');
+  assert.equal(clearPoints({ firstTry: false, heartsLost: 0, hints: 0, secPerArrow: 0.5, focus: 69 }), 0, 'a scrappier retry holds');
+  assert.deepEqual(nextForm({ grade: 8, tier: 2 }, false, null), { grade: 6, tier: 2 }, 'two grades down');
+  assert.deepEqual(nextForm({ grade: 7, tier: 2 }, false, null), { grade: 6, tier: 2 }, 'a loss stops at the floor of its tier');
+  assert.deepEqual(nextForm({ grade: 6, tier: 2 }, false, null), { grade: 4, tier: 1 }, 'only a loss already on the floor goes down a tier');
   assert.deepEqual(nextForm({ grade: 7, tier: 2 }, true, { firstTry: true, heartsLost: 2, hints: 2, secPerArrow: 9 }), { grade: 7, tier: 2 }, 'no reset: the grade stays');
 });
 
@@ -182,7 +185,7 @@ test('a new player: never past Normal before five boards, never past Hard before
   const b = learn(5); b.store.set('form', { grade: 5, tier: 1 }); b.learnFrom(true, flawless);
   assert.deepEqual(b.formNow(), { grade: 8, tier: 2 }, 'the sixth board goes on from there: Locked in, a whole tier');
   const c = learn(3); c.store.set('form', { grade: 14, tier: 4 }); c.learnFrom(false, {});
-  assert.deepEqual(c.formNow(), { grade: 2, tier: 0 }, 'a heart-out counts down from the grade as dealt');
+  assert.deepEqual(c.formNow(), { grade: 3, tier: 1 }, 'a heart-out counts down from the grade as dealt');
   const d = learn(3); d.store.set('form', { tier: 4, wins: 0, losses: 0 }); d.learnFrom(true, flawless);
   assert.deepEqual(d.formNow(), { grade: 14, tier: 4 }, 'a win under the ceiling leaves a grade from elsewhere (a reinstall before the sync, the old ladder) where it was');
   assert.ok(/levelNo\(-1\); return numCache\.boards;/.test(one('boardsDone')) && /const boards = done\.length;/.test(fn('levelNo')), 'boards cleared are counted with the level numbers, each id once, training not counted');
@@ -351,6 +354,30 @@ test('the notification question: after the first result, a board\'s or a round\'
   assert.ok(calls >= 1);
   const show = fn('showResult'), raceEnd = show.indexOf('if (R) {'), raceClose = show.indexOf('const n = run.n');
   assert.ok(show.indexOf('askAfterResult') > raceClose && raceClose > raceEnd, 'not on a race\'s card');
+});
+
+// ── 5. The cards say where the ladder stands ──
+test('the cards show the tier, the steps to the next one, and why a Next is easier than the board just cleared', () => {
+  const SRC = ['const GRADES = 15;', one('DIFF_OF'), one('GRADE_CAP'), fn('ladderMeter'), fn('ladderWin'), fn('ladderLoss')].join('\n');
+  const kit = (grade, done = 99) => new Function('gradeNow', 'boardsDone', 'TIER_OF', SRC + '\nreturn { ladderMeter, ladderWin, ladderLoss };')(() => grade, () => done, () => Math.floor(grade / 3));
+  const text = h => h.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  assert.match(text(kit(4).ladderMeter()), /^Normal Hard 2 steps to Hard/);
+  assert.equal((kit(4).ladderMeter().match(/is-on/g) || []).length, 1, 'one of three steps filled');
+  assert.match(text(kit(14).ladderMeter()), /Master · the top of the ladder/);
+  assert.match(text(kit(8, 7).ladderMeter()), /Expert opens after 12 cleared boards/, 'a new player held under the ceiling is told when it lifts');
+  const f = (g, t) => ({ grade: g, tier: t });
+  // the case that started this: a heart-out on a Hard board, then a clear on the retry, and a Next on Normal
+  const retry = { tier: 2, fails: 1, level: {}, learn: { before: f(4, 1), after: f(4, 1), points: 0 } };
+  assert.match(text(kit(4).ladderWin(retry)), /The heart-out earlier on this board set you back to Normal\. Normal Hard/);
+  assert.match(text(kit(6).ladderWin({ tier: 1, fails: 0, level: {}, learn: { before: f(5, 1), after: f(6, 2), points: 1 } })), /^Level up: Hard ?!/);
+  assert.equal(kit(4).ladderWin({ replay: true, learn: { before: f(4, 1), after: f(4, 1) } }), '', 'a replay does not move the ladder and says nothing of it');
+  assert.equal(kit(4).ladderWin({ daily: {}, learn: null }), '', 'nor the daily board');
+  assert.match(text(kit(4).ladderLoss({ before: f(6, 2), after: f(4, 1) })), /^Hard → Normal/);
+  assert.match(text(kit(6).ladderLoss({ before: f(8, 2), after: f(6, 2) })), /^Hard Expert 3 steps to Expert/, 'a loss inside the tier shows the meter');
+  assert.equal(kit(4).ladderLoss(null), '');
+  const show = fn('showResult'), fail = fn('failLevel');
+  assert.ok(/\$\{last \? '' : ladderWin\(run\)\}/.test(show) && show.indexOf('ladderWin') < show.indexOf('data-act="next"'), 'the win card says it above the Next button');
+  assert.ok(/const learned = learnFrom\(false,/.test(fail) && /\$\{ladderLoss\(learned\)\}/.test(fail), 'the out-of-hearts card says it too');
 });
 
 console.log(process.exitCode ? `\nsome of ${tests} tests failed` : `\nall ${tests} tests passed`);

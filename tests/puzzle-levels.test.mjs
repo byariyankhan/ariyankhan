@@ -181,7 +181,7 @@ test('learnFrom reads the run it is handed, never the live board: a Back tap dur
   const k2 = formKit({ tier: 1, wins: 0, losses: 0 });
   assert.deepEqual(k2.learnFrom(true, { fails: 0, lost: 0, hints: 0, t: 30_000, arrows: 40 }).after, { grade: 8, tier: 2 }, 'a flawless fast clear reads Locked in: a whole tier up');
   const k3 = formKit({ grade: 5, tier: 1 });
-  assert.deepEqual(k3.learnFrom(true, { fails: 1, lost: 0, hints: 0, t: 30_000, arrows: 40 }).after, { grade: 6, tier: 2 }, 'a Locked-in clear on the retry is a step up, not a hold');
+  assert.deepEqual(k3.learnFrom(true, { fails: 1, lost: 0, hints: 0, t: 30_000, arrows: 40 }).after, { grade: 7, tier: 2 }, 'a Locked-in clear on the retry is two steps up, not a hold');
   const k4 = formKit({ grade: 5, tier: 1 });
   assert.deepEqual(k4.learnFrom(true, { fails: 1, lost: 1, hints: 1, t: 200_000, arrows: 40 }).after, { grade: 5, tier: 1 }, 'a slow retry holds');
   assert.equal(k2.learnFrom(true, { daily: { key: 'x' }, fails: 0, lost: 0, hints: 0, t: 1, arrows: 40 }), null, 'the daily board moves nothing');
