@@ -23,15 +23,22 @@ body.amrk{ margin:0; background:var(--bg); color:var(--ink); font-family:var(--s
 
 /* ── Header ── */
 .amrk-bar{ position:sticky; top:0; z-index:20; background:rgba(255,255,255,.94); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); border-bottom:1px solid var(--line); }
-.amrk-bar-in{ max-width:1100px; margin:0 auto; padding:10px 16px; display:flex; align-items:center; justify-content:space-between; gap:10px 18px; flex-wrap:wrap; }
+.amrk-bar-in{ max-width:1100px; margin:0 auto; padding:10px 16px; display:flex; align-items:center; justify-content:space-between; gap:12px; }
 .amrk-brand{ display:inline-flex; align-items:center; gap:10px; text-decoration:none; }
 .amrk a.amrk-brand{ color:var(--ink); }
 .amrk-brand img{ width:34px; height:34px; display:block; }
 .amrk-brand b{ font-size:18px; font-weight:700; letter-spacing:-.2px; }
-.amrk-nav{ display:flex; gap:4px; flex-wrap:wrap; }
-.amrk-nav a{ font-size:14px; font-weight:500; color:var(--muted); text-decoration:none; padding:7px 11px; border-radius:8px; }
-.amrk-nav a:hover{ color:var(--ink); background:var(--bg); }
-.amrk-nav a[aria-current="page"]{ color:#fff; background:var(--teal); }
+
+/* ── Menu: one settings-style icon, like the game's; the guide pages live inside it ── */
+.amrk-menu{ position:relative; }
+.amrk-menu summary{ list-style:none; cursor:pointer; width:42px; height:42px; border-radius:12px; display:flex; align-items:center; justify-content:center; color:var(--ink); border:1px solid var(--line); background:var(--card); }
+.amrk-menu summary::-webkit-details-marker{ display:none; }
+.amrk-menu summary:hover, .amrk-menu[open] summary{ border-color:var(--teal); color:var(--teal); }
+.amrk-menu summary svg{ width:22px; height:22px; fill:none; stroke:currentColor; stroke-width:2; stroke-linejoin:round; }
+.amrk-menu nav{ position:absolute; right:0; top:calc(100% + 8px); min-width:210px; display:flex; flex-direction:column; padding:6px; background:var(--card); border:1px solid var(--line); border-radius:14px; box-shadow:0 18px 40px -18px rgba(0,0,0,.35); z-index:30; }
+.amrk-menu nav a{ padding:11px 14px; border-radius:10px; font-size:15px; font-weight:600; color:var(--ink); text-decoration:none; }
+.amrk-menu nav a:hover{ background:var(--bg); }
+.amrk-menu nav a[aria-current="page"]{ color:var(--teal); }
 
 /* ── Page ── */
 .amr-page{ max-width:1100px; margin:0 auto; padding:30px 16px 64px; }
@@ -146,18 +153,25 @@ body.amrk{ margin:0; background:var(--bg); color:var(--ink); font-family:var(--s
 .amr-faq details[open] summary::after{ content:'−'; }
 .amr-faq details p{ margin:0; padding:0 16px 16px; color:var(--muted); }
 
-/* ── Footer ── */
-.amrk-foot{ border-top:1px solid var(--line); background:#fff; }
-.amrk-foot-in{ max-width:1100px; margin:0 auto; padding:22px 16px 30px; display:flex; flex-wrap:wrap; gap:8px 18px; align-items:center; justify-content:space-between; font-size:14px; color:var(--muted); }
+/* ── Footer: one credit line ── */
+.amrk-foot{ border-top:1px solid var(--line); background:#fff; padding:20px 16px 28px; text-align:center; font-size:14px; color:var(--muted); }
 .amrk-foot p{ margin:0; }
-.amrk-foot nav{ display:flex; flex-wrap:wrap; gap:6px 14px; }
 .amrk-foot a{ color:var(--ink); }
 
+/* Home: a title, one upload button, then one Download per image. The script still writes its detailed
+   report into each card; on the home page only the file name, sizes and Download show. */
+.amr-home{ max-width:720px; }
+.amr-home > h1{ text-align:center; margin-top:18px; }
+.amr-home > .amr-lede{ text-align:center; margin:0 auto 24px; }
+.amr-home .amr-tool{ padding:14px; }
+.amr-home .amr-drop{ padding:56px 18px; }
+.amr-home .amr-summary, .amr-home .amr-badges, .amr-home .amr-removed, .amr-home .amr-warn, .amr-home .amr-note{ display:none; }
+.amr-home .amr-results-head{ justify-content:flex-end; }
+.amr-home .amr-item{ align-items:center; }
+.amr-home .amr-item-head{ align-items:center; }
+
 @media(max-width:560px){
-  .amrk-bar-in{ justify-content:center; }
-  .amrk-nav{ justify-content:center; }
-  .amrk-nav a{ padding:6px 9px; font-size:13px; }
   .amr-page{ padding-top:20px; }
-  .amrk-foot-in{ justify-content:center; text-align:center; }
+  .amr-home .amr-drop{ padding:44px 16px; }
 }
 @media(prefers-reduced-motion:reduce){ .amr-drop, .amr-drop-icon{ transition:none; animation:none !important; } }

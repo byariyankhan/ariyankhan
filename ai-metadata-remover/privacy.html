@@ -97,11 +97,15 @@
     <header class="amrk-bar">
       <div class="amrk-bar-in">
         <a class="amrk-brand" href="/ai-metadata-remover/"><img src="/ai-metadata-remover/icon.svg" alt="" width="34" height="34" /><b>AI Metadata Remover</b></a>
-        <nav class="amrk-nav" aria-label="AI Metadata Remover">
-        <a href="/ai-metadata-remover/">Clean images</a>
-        <a href="/ai-metadata-remover/how-to-use.html">How to use</a>
-        <a href="/ai-metadata-remover/about.html">About &amp; FAQ</a>
-        </nav>
+        <details class="amrk-menu">
+          <summary aria-label="Menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5 19.4 7.7v8.6L12 20.5 4.6 16.3V7.7z"/><circle cx="12" cy="12" r="3"/></svg></summary>
+          <nav aria-label="AI Metadata Remover">
+            <a href="/ai-metadata-remover/">Clean images</a>
+            <a href="/ai-metadata-remover/how-to-use.html">How to use</a>
+            <a href="/ai-metadata-remover/about.html">About &amp; FAQ</a>
+            <a href="/ai-metadata-remover/privacy.html" aria-current="page">Privacy</a>
+          </nav>
+        </details>
       </div>
     </header>
 
@@ -115,7 +119,7 @@
         <ul>
           <li><strong>They are read and rewritten in your browser.</strong> The page uses the browser’s standard file access to read an image into memory, removes the metadata there and creates the clean file there.</li>
           <li><strong>There is no upload.</strong> The page has no endpoint that receives images. You can confirm it in your browser’s developer tools: cleaning a file makes no network request.</li>
-          <li><strong>Nothing is stored.</strong> Files and reports live in the tab’s memory. <em>Clear</em> releases them, and closing the tab removes them.</li>
+          <li><strong>Nothing is stored.</strong> Files live in the tab’s memory. <em>Clear</em> releases them, and closing the tab removes them.</li>
           <li><strong>No account.</strong> There is nothing to sign up for.</li>
         </ul>
 
@@ -129,14 +133,16 @@
     </main>
 
     <footer class="amrk-foot">
-      <div class="amrk-foot-in">
-        <p>AI Metadata Remover is a free tool made by <a href="https://ariyankhan.com/">Ariyan Khan</a>.</p>
-        <nav aria-label="More about AI Metadata Remover">
-          <a href="/ai-metadata-remover/how-to-use.html">How to use</a>
-          <a href="/ai-metadata-remover/about.html">About &amp; FAQ</a>
-          <a href="/ai-metadata-remover/privacy.html">Privacy</a>
-        </nav>
-      </div>
+      <p>AI Metadata Remover is a free tool made by <a href="https://ariyankhan.com/">Ariyan Khan</a>.</p>
     </footer>
+    <script>
+      // The menu closes on a click outside it or on Escape, like the game's settings.
+      (function () {
+        var m = document.querySelector('.amrk-menu');
+        if (!m) return;
+        document.addEventListener('click', function (e) { if (m.open && !m.contains(e.target)) m.open = false; });
+        document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && m.open) { m.open = false; m.querySelector('summary').focus(); } });
+      })();
+    </script>
   </body>
 </html>

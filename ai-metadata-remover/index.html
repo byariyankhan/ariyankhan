@@ -73,7 +73,7 @@
       "@id": "https://ariyankhan.com/ai-metadata-remover/#app",
       "name": "AI Metadata Remover",
       "url": "https://ariyankhan.com/ai-metadata-remover/",
-      "description": "Removes C2PA Content Credentials, XMP, IPTC, EXIF and GPS data and Stable Diffusion prompt text from JPG, PNG and WebP images, losslessly and entirely in the browser. Reports which AI generator tagged each file.",
+      "description": "Removes C2PA Content Credentials, XMP, IPTC, EXIF and GPS data and Stable Diffusion prompt text from JPG, PNG and WebP images, losslessly and entirely in the browser.",
       "applicationCategory": "UtilitiesApplication",
       "operatingSystem": "Any modern web browser",
       "browserRequirements": "Requires JavaScript",
@@ -114,58 +114,31 @@
     <header class="amrk-bar">
       <div class="amrk-bar-in">
         <a class="amrk-brand" href="/ai-metadata-remover/"><img src="/ai-metadata-remover/icon.svg" alt="" width="34" height="34" /><b>AI Metadata Remover</b></a>
-        <nav class="amrk-nav" aria-label="AI Metadata Remover">
-        <a href="/ai-metadata-remover/" aria-current="page">Clean images</a>
-        <a href="/ai-metadata-remover/how-to-use.html">How to use</a>
-        <a href="/ai-metadata-remover/about.html">About &amp; FAQ</a>
-        </nav>
+        <details class="amrk-menu">
+          <summary aria-label="Menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5 19.4 7.7v8.6L12 20.5 4.6 16.3V7.7z"/><circle cx="12" cy="12" r="3"/></svg></summary>
+          <nav aria-label="AI Metadata Remover">
+            <a href="/ai-metadata-remover/" aria-current="page">Clean images</a>
+            <a href="/ai-metadata-remover/how-to-use.html">How to use</a>
+            <a href="/ai-metadata-remover/about.html">About &amp; FAQ</a>
+            <a href="/ai-metadata-remover/privacy.html">Privacy</a>
+          </nav>
+        </details>
       </div>
     </header>
 
-    <main class="amr-page">
-      <header class="amr-hero">
-        <p class="amrk-kicker">free · lossless · no upload</p>
-        <h1>Remove the hidden data <span>inside your images.</span></h1>
-        <p class="amr-lede">Strip C2PA Content Credentials, XMP, IPTC, EXIF, GPS and Stable Diffusion prompts from JPG, PNG and WebP files. The pixels are copied byte for byte, and your files never leave your device.</p>
-        <ul class="amr-trust">
-          <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z"/><path d="m9 12 2 2 4-4"/></svg>Runs in your browser</li>
-          <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h16"/><path d="m14 6 6 6-6 6"/></svg>Lossless</li>
-          <li><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18"/></svg>Batch &amp; paste</li>
-          <li><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>Names the generator</li>
-        </ul>
-      </header>
+    <main class="amr-page amr-home">
+      <h1>Remove hidden data <span>from your images</span></h1>
+      <p class="amr-lede">Your images never leave your device.</p>
 
-      <section class="amr-tool" aria-labelledby="amrToolTitle">
-        <h2 id="amrToolTitle" class="amr-visually-hidden">Upload images to clean</h2>
+      <section class="amr-tool" aria-label="Clean images">
         <div class="amr-drop" id="amrDrop" role="button" tabindex="0" aria-label="Choose images to clean. Drag and drop, paste, or press Enter to browse." aria-busy="false">
           <div class="amr-drop-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24"><path d="M12 16V4"/><path d="m7 9 5-5 5 5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>
           </div>
-          <p class="amr-drop-title">Drop images here or <u>browse</u></p>
-          <p class="amr-drop-sub">JPG · PNG · WebP (lossless) — other formats are converted to PNG. Paste from clipboard works too. Up to 80 MB per file.</p>
+          <p class="amr-drop-title">Upload images</p>
+          <p class="amr-drop-sub">JPG, PNG or WebP</p>
           <input type="file" id="amrInput" accept="image/*,.jpg,.jpeg,.png,.webp,.avif,.heic,.heif,.gif,.bmp,.tif,.tiff" multiple />
         </div>
-
-        <div class="amr-modes" role="radiogroup" aria-label="Cleaning mode">
-          <label class="amr-mode">
-            <input type="radio" name="amrMode" value="all" checked />
-            <span>
-              <strong>Remove everything (recommended)</strong>
-              <span>C2PA, XMP, IPTC, EXIF, GPS, comments, prompts, hidden trailing data. Colour profile is kept so colours don't shift.</span>
-            </span>
-          </label>
-          <label class="amr-mode">
-            <input type="radio" name="amrMode" value="keep-exif" />
-            <span>
-              <strong>Keep camera EXIF</strong>
-              <span>Removes AI &amp; provenance tags but keeps camera model, lens, exposure and date. For real photos only — EXIF can still hold GPS.</span>
-            </span>
-          </label>
-        </div>
-
-        <p class="amr-privacy">
-          <strong>Privacy by design:</strong> there is no upload endpoint on this page. Open your browser’s developer tools, Network tab, while you clean a file: there are no requests.
-        </p>
         <p class="amr-error" id="amrError" hidden></p>
       </section>
 
@@ -179,31 +152,20 @@
         </div>
         <div class="amr-list" id="amrList"></div>
       </section>
-
-      <section class="amr-section" aria-labelledby="amr-steps-title">
-        <h2 id="amr-steps-title">Three steps, no uploads</h2>
-        <ol class="amr-steps">
-          <li><strong>Drop, paste or browse</strong>Pick one image or fifty. Each file is read into your browser’s memory; the page never sends it anywhere.</li>
-          <li><strong>The file is rewritten</strong>The tool walks the file’s blocks, copies the compressed picture untouched and leaves every metadata block out. A report lists what was removed and which generator left a signature.</li>
-          <li><strong>Download the clean copy</strong>You get a new file ending in <code>-clean</code>, visually identical and usually smaller. Close the tab and it is gone from memory.</li>
-        </ol>
-        <p class="amr-links">
-          <a class="amr-btn amr-btn--primary" href="/ai-metadata-remover/how-to-use.html">Read the full guide</a>
-          <a class="amr-btn" href="/ai-metadata-remover/about.html">About &amp; FAQ</a>
-        </p>
-      </section>
     </main>
 
     <footer class="amrk-foot">
-      <div class="amrk-foot-in">
-        <p>AI Metadata Remover is a free tool made by <a href="https://ariyankhan.com/">Ariyan Khan</a>.</p>
-        <nav aria-label="More about AI Metadata Remover">
-          <a href="/ai-metadata-remover/how-to-use.html">How to use</a>
-          <a href="/ai-metadata-remover/about.html">About &amp; FAQ</a>
-          <a href="/ai-metadata-remover/privacy.html">Privacy</a>
-        </nav>
-      </div>
+      <p>AI Metadata Remover is a free tool made by <a href="https://ariyankhan.com/">Ariyan Khan</a>.</p>
     </footer>
+    <script>
+      // The menu closes on a click outside it or on Escape, like the game's settings.
+      (function () {
+        var m = document.querySelector('.amrk-menu');
+        if (!m) return;
+        document.addEventListener('click', function (e) { if (m.open && !m.contains(e.target)) m.open = false; });
+        document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && m.open) { m.open = false; m.querySelector('summary').focus(); } });
+      })();
+    </script>
     <script src="/js/ai-metadata-remover.js?v=1"></script>
   </body>
 </html>

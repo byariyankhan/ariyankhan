@@ -410,7 +410,10 @@ Map Maker (`/map-maker/`) and AI Metadata Remover (`/ai-metadata-remover/`) are
 built like Puzzle: each is its own product, not a page of the portfolio. Each
 folder holds the tool, a How to use guide, About & FAQ and Privacy; each has its
 own logo (`icon.svg`, also the favicon), share image (`og.png`), colours, fonts,
-header and footer, and loads only its own stylesheet. **No `<site-nav>`, no
+header and footer, and loads only its own stylesheet. **The home page is the tool and
+nothing else**: a title, then the tool (the remover is one Upload button and a Download
+per image; every file is cleaned with everything removed, the report details stay hidden).
+The guide pages sit behind one settings-style icon in the header, like the game's. **No `<site-nav>`, no
 `<site-footer>`, no `css/style.css`, no sales sections**: the footer's one line
 "made by Ariyan Khan" is the only tie to the site.
 

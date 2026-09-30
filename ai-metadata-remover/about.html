@@ -111,18 +111,10 @@
         },
         {
           "@type": "Question",
-          "name": "What is the difference between the two modes?",
-          "acceptedAnswer": {
-            "@type": "Answer",
-            "text": "“Remove everything” strips every metadata block, including EXIF and GPS. “Keep camera EXIF” removes the AI and provenance blocks but leaves the EXIF block with camera, lens, exposure and date. Use the second only for real photographs, and remember EXIF can also hold GPS and a software name."
-          }
-        },
-        {
-          "@type": "Question",
           "name": "Can I clean many images at once?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Yes. Drop, paste or select as many files as you like. Each gets its own card and download button, and “Download all” saves them one after another. There is no daily quota, because the work happens on your device."
+            "text": "Yes. Drop, paste or select as many files as you like. Each gets its own Download button, and “Download all” saves them one after another. There is no daily quota, because the work happens on your device."
           }
         },
         {
@@ -167,11 +159,15 @@
     <header class="amrk-bar">
       <div class="amrk-bar-in">
         <a class="amrk-brand" href="/ai-metadata-remover/"><img src="/ai-metadata-remover/icon.svg" alt="" width="34" height="34" /><b>AI Metadata Remover</b></a>
-        <nav class="amrk-nav" aria-label="AI Metadata Remover">
-        <a href="/ai-metadata-remover/">Clean images</a>
-        <a href="/ai-metadata-remover/how-to-use.html">How to use</a>
-        <a href="/ai-metadata-remover/about.html" aria-current="page">About &amp; FAQ</a>
-        </nav>
+        <details class="amrk-menu">
+          <summary aria-label="Menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5 19.4 7.7v8.6L12 20.5 4.6 16.3V7.7z"/><circle cx="12" cy="12" r="3"/></svg></summary>
+          <nav aria-label="AI Metadata Remover">
+            <a href="/ai-metadata-remover/">Clean images</a>
+            <a href="/ai-metadata-remover/how-to-use.html">How to use</a>
+            <a href="/ai-metadata-remover/about.html" aria-current="page">About &amp; FAQ</a>
+            <a href="/ai-metadata-remover/privacy.html">Privacy</a>
+          </nav>
+        </details>
       </div>
     </header>
 
@@ -182,13 +178,13 @@
         <p class="amr-lede">A private, lossless way to take the hidden data out of an image, and an honest account of what that does and does not achieve.</p>
 
         <h2>What it is</h2>
-        <p>Modern image files carry far more than pixels. Generators, editors, phones and cameras all store extra information in side blocks of the file: who made it, with what, where, when, and increasingly a signed record saying it was made or edited with AI. AI Metadata Remover opens the file in your browser, keeps only what is needed to display the picture, and gives you back a clean copy with a report of what it removed.</p>
+        <p>Modern image files carry far more than pixels. Generators, editors, phones and cameras all store extra information in side blocks of the file: who made it, with what, where, when, and increasingly a signed record saying it was made or edited with AI. AI Metadata Remover opens the file in your browser, keeps only what is needed to display the picture, and gives you back a clean copy.</p>
 
         <h2>Why it exists</h2>
         <p>I edit YouTube videos for a living, and a normal week sends dozens of thumbnails, stills and map textures through Photoshop, many of them touched by a generative tool somewhere along the way. Real photos started getting “AI info” badges because a sky was extended by a few pixels. The tools I found were paid, limited to a few images a day, or uploaded the file to someone else’s server first, and thumbnails for unreleased videos are confidential. So I wrote a small parser that runs entirely in the browser.</p>
 
         <h2>How it works</h2>
-        <p>An image file is a container: a sequence of blocks, only some of which hold the picture. For JPEG those blocks are segments, for PNG chunks, for WebP RIFF chunks. The tool reads the blocks in order, copies the ones that carry the compressed picture and its colour profile exactly as they are, and leaves the metadata blocks out. Because the picture is never decoded and re-encoded, there is no quality loss. While it reads, it also scans the removed blocks for the signatures that known generators leave, which is how the report can say “ChatGPT” or “Stable Diffusion”.</p>
+        <p>An image file is a container: a sequence of blocks, only some of which hold the picture. For JPEG those blocks are segments, for PNG chunks, for WebP RIFF chunks. The tool reads the blocks in order, copies the ones that carry the compressed picture and its colour profile exactly as they are, and leaves the metadata blocks out. Because the picture is never decoded and re-encoded, there is no quality loss.</p>
 
         <h2>What it cannot do</h2>
         <ul>
@@ -224,12 +220,8 @@
           <p>Not for JPG, PNG or WebP. The picture data is never decoded or recompressed; only the metadata around it is removed, so the clean file looks identical and is usually smaller. The fallback for other formats re-encodes to PNG, which is lossless but larger.</p>
         </details>
         <details>
-          <summary>What is the difference between the two modes?</summary>
-          <p>“Remove everything” strips every metadata block, including EXIF and GPS. “Keep camera EXIF” removes the AI and provenance blocks but leaves the EXIF block with camera, lens, exposure and date. Use the second only for real photographs, and remember EXIF can also hold GPS and a software name.</p>
-        </details>
-        <details>
           <summary>Can I clean many images at once?</summary>
-          <p>Yes. Drop, paste or select as many files as you like. Each gets its own card and download button, and “Download all” saves them one after another. There is no daily quota, because the work happens on your device.</p>
+          <p>Yes. Drop, paste or select as many files as you like. Each gets its own Download button, and “Download all” saves them one after another. There is no daily quota, because the work happens on your device.</p>
         </details>
         <details>
           <summary>Is it legal to remove AI metadata?</summary>
@@ -245,14 +237,16 @@
     </main>
 
     <footer class="amrk-foot">
-      <div class="amrk-foot-in">
-        <p>AI Metadata Remover is a free tool made by <a href="https://ariyankhan.com/">Ariyan Khan</a>.</p>
-        <nav aria-label="More about AI Metadata Remover">
-          <a href="/ai-metadata-remover/how-to-use.html">How to use</a>
-          <a href="/ai-metadata-remover/about.html">About &amp; FAQ</a>
-          <a href="/ai-metadata-remover/privacy.html">Privacy</a>
-        </nav>
-      </div>
+      <p>AI Metadata Remover is a free tool made by <a href="https://ariyankhan.com/">Ariyan Khan</a>.</p>
     </footer>
+    <script>
+      // The menu closes on a click outside it or on Escape, like the game's settings.
+      (function () {
+        var m = document.querySelector('.amrk-menu');
+        if (!m) return;
+        document.addEventListener('click', function (e) { if (m.open && !m.contains(e.target)) m.open = false; });
+        document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && m.open) { m.open = false; m.querySelector('summary').focus(); } });
+      })();
+    </script>
   </body>
 </html>

@@ -97,11 +97,15 @@
     <header class="mmk-bar">
       <div class="mmk-bar-in">
         <a class="mmk-brand" href="/map-maker/"><img src="/map-maker/icon.svg" alt="" width="34" height="34" /><b>Map Maker</b></a>
-        <nav class="mmk-nav" aria-label="Map Maker">
-        <a href="/map-maker/">Make a map</a>
-        <a href="/map-maker/how-to-use.html">How to use</a>
-        <a href="/map-maker/about.html">About &amp; FAQ</a>
-        </nav>
+        <details class="mmk-menu">
+          <summary aria-label="Menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5 19.4 7.7v8.6L12 20.5 4.6 16.3V7.7z"/><circle cx="12" cy="12" r="3"/></svg></summary>
+          <nav aria-label="Map Maker">
+            <a href="/map-maker/">Make a map</a>
+            <a href="/map-maker/how-to-use.html">How to use</a>
+            <a href="/map-maker/about.html">About &amp; FAQ</a>
+            <a href="/map-maker/privacy.html" aria-current="page">Privacy</a>
+          </nav>
+        </details>
       </div>
     </header>
 
@@ -129,14 +133,16 @@
     </main>
 
     <footer class="mmk-foot">
-      <div class="mmk-foot-in">
-        <p>Map Maker is a free tool made by <a href="https://ariyankhan.com/">Ariyan Khan</a>.</p>
-        <nav aria-label="More about Map Maker">
-          <a href="/map-maker/how-to-use.html">How to use</a>
-          <a href="/map-maker/about.html">About &amp; FAQ</a>
-          <a href="/map-maker/privacy.html">Privacy</a>
-        </nav>
-      </div>
+      <p>Map Maker is a free tool made by <a href="https://ariyankhan.com/">Ariyan Khan</a>.</p>
     </footer>
+    <script>
+      // The menu closes on a click outside it or on Escape, like the game's settings.
+      (function () {
+        var m = document.querySelector('.mmk-menu');
+        if (!m) return;
+        document.addEventListener('click', function (e) { if (m.open && !m.contains(e.target)) m.open = false; });
+        document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && m.open) { m.open = false; m.querySelector('summary').focus(); } });
+      })();
+    </script>
   </body>
 </html>
