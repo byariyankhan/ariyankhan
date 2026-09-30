@@ -332,7 +332,6 @@
   }
   const hashStr = str => { let h = 2166136261; for (const ch of str) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; };
   // the daily board is the same country for everyone: picked from the canonical list, then found in the player's own order
-  const dailyPick = () => { const h = hashStr('aa-daily-' + dayKey()); const L = DATA.canon[h % DATA.canon.length]; return { key: dayKey(), idx: DATA.levels.indexOf(L), tier: 2 + (h >> 8) % 3, seed: 900000 + (h % 100000) }; };
   function mulberry32(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
   function scrollToGame() { window.scrollTo({ top: 0, behavior: 'smooth' }); }
   // the address names the board (#b-<id>), not its place in the list: the list is personal and the numbers are progress
@@ -1482,9 +1481,9 @@
     homeDrawn = true; tourReplace();
   }
 
-  // Today's Country used to be a row in Settings. The board itself is still here — dailyPick() decides it,
-  // a #daily link still opens it, and a cleared one is still recorded and synced — it simply no longer sits in
-  // Settings, where a board to play was the odd thing among rows that change a setting.
+  // Today's Country (the daily board) is gone. An old #daily link opens home, and the records already kept
+  // (daily:<day>, dailyStreak) stay on the device and the account as they were. `state.daily` is still the
+  // match's board: a race is played through the same path the daily board used.
 
   // ── Board masks ──
   // A level stores only its outline (`d`, absolute M/L/Z in a REF×REF box) and one scale per tier (`k`, cells per
@@ -7393,7 +7392,7 @@
       startLevel(j < 0 ? 0 : j);
     }
     else if (m) startLevel(+m[1] - 1);   // older links: position in the list
-    else if (location.hash === '#daily') { const d = dailyPick(); startLevel(d.idx, false, d); }
+    else if (location.hash === '#daily') setHash(-1);   // the daily board is gone: an old link lands on home
     // Where a league notification lands: the table it is about, not the lobby it happens to be reached through.
     else if (location.hash === '#league') openLeague();
   }).catch(err => { el.loading.hidden = true; el.error.textContent = `Could not load the levels (${err.message}). Check your connection and tap Play again.`; el.error.hidden = false; homeShown(); });

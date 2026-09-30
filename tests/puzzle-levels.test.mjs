@@ -355,4 +355,9 @@ test('the board is sized to the room really left on the screen, with a safe marg
   assert.ok(!/aa-board--tall/.test(css), 'no stylesheet guess at the height left');
 });
 
+test('the daily board is gone: nothing deals it, and an old #daily link lands on home', () => {
+  assert.ok(!/dailyPick/.test(js), 'no dailyPick');
+  assert.ok(/else if \(location\.hash === '#daily'\) setHash\(-1\);/.test(js), '#daily clears the address instead of opening a board');
+});
+
 console.log(process.exitCode ? `\nsome of ${tests} tests failed` : `\nall ${tests} tests passed`);

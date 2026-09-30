@@ -542,8 +542,8 @@ again at the deal its kept run was played at (`keptDeal`), whatever the ladder d
 a free life and leaving still carry on where they were;
 `TIER_OF()`; Try again keeps the same board, New layout takes the new grade; the
 tier is shown only on the Next button and in the start toast; the win card says nothing more about it), combo counter (taps within 1.8 s), a win streak (still counted, no longer
-announced on the card), milestones every 10 levels, a Today's Country bonus board (date-seeded, same for
-everyone, reached by `#daily` rather than from Settings), and clearing the board reveals the country for a
+announced on the card), milestones every 10 levels (the Today's Country daily board is gone: an old `#daily` link opens
+home, and records already kept stay), and clearing the board reveals the country for a
 3-option quiz plus capital/population/region. 197-country World Tour (every UN member state, plus Palestine, the Vatican, Kosovo and Taiwan: world-atlas 110m plus the 29 small states from the 10m file, minus dependencies and disputed areas) with sequential
 unlock (Skip for now from the third heart-out on a board), stars, best times and progress in
 `localStorage` (`aa:v1:*`) and, once signed in, on the account as well, so a new
@@ -1671,7 +1671,7 @@ links.
     Accept goes straight to what the link opened.
   - **Later opens**: the next quote from `QUOTES` (21 of them, rotating by `aa:v1:launches`) on every open;
     into home once the line has been read and home is drawn, never later than 2.64 s, waits included. A tap or a key goes to home at once. `resumeLive` still cuts it short for a match.
-  - **No opening** for a link (`#level-N`, `#b-…`, `#daily`, `#league`, `#m=…`, `#handoff=…`, `?handoff=`),
+  - **No opening** for a link (`#level-N`, `#b-…`, `#league`, `#m=…`, `#handoff=…`, `?handoff=`),
     a reload in the same session (`sessionStorage aa:splash`), a warm resume (the page is not reloaded), or
     reduced motion (whose first open shows the whole block at once, without typing or keys).
   - **Themes**: night and mint open in their own colours from the first frame, except where the phone's own

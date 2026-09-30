@@ -64,7 +64,7 @@ test('openingPlan: a later open through a link, a reload or with reduced motion 
   for (const k of ['deep', 'seen', 'calm']) assert.equal(openingPlan({ welcomed: 1, [k]: true }).show, false, k);
 });
 test('head script: every link into the game skips the opening, #handoff= and ?handoff= included', () => {
-  const links = ['#m=ABC123', '#b-380', '#b-disc:panda', '#daily', '#league', '#level-3', '#handoff=' + 'a1'.repeat(32)];
+  const links = ['#m=ABC123', '#b-380', '#b-disc:panda', '#league', '#level-3', '#handoff=' + 'a1'.repeat(32)];
   for (const hash of links) assert.equal(runHead({ hash, ls: { welcomed: 1 } }).o.plan.show, false, hash);
   assert.equal(runHead({ search: '?handoff=Zx_9-abcdefghijklmn', ls: { welcomed: 1 } }).o.plan.show, false, '?handoff=');
   for (const hash of ['', '#', '#top', '#m=']) assert.equal(runHead({ hash, ls: { welcomed: 1 } }).o.plan.show, true, hash || '(none)');
@@ -85,7 +85,8 @@ test('head script: a quote on every open, the rotation moving on each time', () 
 test('head script: classes for the first paint, and nothing at all without an opening', () => {
   assert.deepEqual(runHead().cls, ['is-opening', 'is-first']);
   assert.deepEqual(runHead({ ls: { welcomed: 1 } }).cls, ['is-opening']);
-  assert.deepEqual(runHead({ ls: { welcomed: 1 }, hash: '#daily' }).cls, []);
+  assert.deepEqual(runHead({ ls: { welcomed: 1 }, hash: '#league' }).cls, []);
+  assert.equal(runHead({ ls: { welcomed: 1 }, hash: '#daily' }).o.plan.show, true, 'the daily board is gone: an old #daily link opens like any other visit');
 });
 test('head script: a browser that refuses storage opens like a first visit, and does not throw', () => {
   const r = runHead({ broken: true });
@@ -105,7 +106,7 @@ test('head script: the theme from the first frame; on a paper native splash the 
   assert.equal(runHead({ ls: { welcomed: 1, theme: 'mint' } }).meta, '#E6F2EC', 'mint on the web from the first frame');
   assert.equal(runHead({ ls: { welcomed: 1, theme: 'paper' }, ua: UA_APP1 }).cls.includes('is-paper-first'), false);
   assert.equal(runHead({ ls: { welcomed: 1, theme: 'plaid' } }).theme, 'paper', 'an unknown theme is paper');
-  assert.equal(runHead({ ls: { welcomed: 1, theme: 'night' }, ua: UA_APP1, hash: '#daily' }).cls.includes('is-paper-first'), false, 'no opening, nothing to keep on paper');
+  assert.equal(runHead({ ls: { welcomed: 1, theme: 'night' }, ua: UA_APP1, hash: '#league' }).cls.includes('is-paper-first'), false, 'no opening, nothing to keep on paper');
 });
 
 // ── The typing ──
