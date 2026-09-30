@@ -4,7 +4,7 @@
 
   <url>
     <loc>https://ariyankhan.com/</loc>
-    <lastmod>2026-09-24</lastmod>
+    <lastmod>2026-09-30</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
     <image:image><image:loc>https://ariyankhan.com/images/puzzle-og.webp</image:loc></image:image>
@@ -12,7 +12,7 @@
 
   <url>
     <loc>https://ariyankhan.com/about.html</loc>
-    <lastmod>2026-08-16</lastmod>
+    <lastmod>2026-09-30</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
@@ -166,14 +166,14 @@
 
   <url>
     <loc>https://ariyankhan.com/blog/</loc>
-    <lastmod>2026-08-16</lastmod>
+    <lastmod>2026-09-30</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
 
   <url>
     <loc>https://ariyankhan.com/case-studies/</loc>
-    <lastmod>2026-08-18</lastmod>
+    <lastmod>2026-09-30</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
@@ -190,6 +190,13 @@
     <lastmod>2026-08-18</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
+  </url>
+
+  <url>
+    <loc>https://ariyankhan.com/blog/how-to-tell-if-an-image-is-ai-generated.html</loc>
+    <lastmod>2026-09-30</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
   </url>
 
   <url>
@@ -299,14 +306,14 @@
 
   <url>
     <loc>https://ariyankhan.com/blog/why-true-crime-youtube-videos-keep-people-watching.html</loc>
-    <lastmod>2026-08-17</lastmod>
+    <lastmod>2026-09-30</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
 
   <url>
     <loc>https://ariyankhan.com/blog/why-map-animation-makes-history-videos-more-watchable.html</loc>
-    <lastmod>2026-08-17</lastmod>
+    <lastmod>2026-09-30</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>

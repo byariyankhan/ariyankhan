@@ -245,7 +245,7 @@ try {
 
   // ── What the health check asks, from the other side ──
   //
-  // `health` in .github/scripts/arrow-atlas-vps.sh POSTs the honeypot value and wants a 200. That only works
+  // `health` in .github/scripts/puzzle-vps.sh POSTs the honeypot value and wants a 200. That only works
   // because the handler checks its own configuration *before* the honeypot short-circuits. These blocks hold
   // that contract up: a container missing a setting must answer 500, and a complete one must answer 200
   // without sending anything.
@@ -290,7 +290,7 @@ try {
     const standalone = readFileSync(join(root, 'deploy/docker-compose.standalone.yml'), 'utf8');
     const entry = readFileSync(join(root, 'deploy/web-entrypoint.sh'), 'utf8');
     const php = readFileSync(join(root, 'send-mail.php'), 'utf8');
-    const ops = readFileSync(join(root, '.github/scripts/arrow-atlas-vps.sh'), 'utf8');
+    const ops = readFileSync(join(root, '.github/scripts/puzzle-vps.sh'), 'utf8');
 
     for (const v of ['TO_EMAIL', 'FROM_EMAIL', 'FROM_NAME', 'SMTP_HOST', 'SMTP_USER', 'SMTP_PASS']) {
       ok(new RegExp(`^\\s+${v}: \\$\\{${v}`, 'm').test(compose), `docker-compose.yml passes ${v} through`);

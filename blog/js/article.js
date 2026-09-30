@@ -30,7 +30,7 @@
     const currentCategory = document.querySelector('[data-category]')?.dataset.category;
 
     try {
-      const res = await fetch('index.html');
+      const res = await fetch('/blog/');
       if (!res.ok) throw new Error('fetch failed');
 
       const doc = new DOMParser().parseFromString(await res.text(), 'text/html');

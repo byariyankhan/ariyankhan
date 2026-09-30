@@ -155,6 +155,7 @@ Fill out the contact form at https://ariyankhan.com/#contact with your project d
 ## Blog
 Practical articles on hiring, cost, and working with a video editor.
 - Blog Home: https://ariyankhan.com/blog/
+- How to Tell If an Image Is AI-Generated: https://ariyankhan.com/blog/how-to-tell-if-an-image-is-ai-generated.html
 - Will AI Replace Video Editors?: https://ariyankhan.com/blog/will-ai-replace-video-editors.html
 - Why Map Animation Makes History Watchable: https://ariyankhan.com/blog/why-map-animation-makes-history-videos-more-watchable.html
 - Why True Crime YouTube Videos Hook Viewers: https://ariyankhan.com/blog/why-true-crime-youtube-videos-keep-people-watching.html
