@@ -86,6 +86,9 @@ export const config = {
     // this long each, and no claim can come without a ticket asked for first. Fifteen seconds is shorter than
     // the rewarded advertisements the networks serve, so a player who watched one through never waits on it.
     adMinSeconds: num('PUZZLE_AD_MIN_SECONDS', 15),
+    // Until this moment a claim with no ticket at all -- from a page opened before tickets existed -- is still
+    // paid, one per adMinSeconds, under the daily cap (adticket.ts, adLegacyOk). Two weeks after the change.
+    adLegacyUntil: str('PUZZLE_AD_LEGACY_UNTIL', '2026-10-08T00:00:00Z'),
     // The tables a player can sit at. Five of them, three orders of magnitude apart at the top, so a new
     // account and one that has been winning for a month both have somewhere to play.
     stakes: str('PUZZLE_STAKES', '500,1000,10000,1000000,10000000').split(',').map(s => Number(s.trim())).filter(n => n > 0),

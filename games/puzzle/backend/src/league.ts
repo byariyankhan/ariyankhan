@@ -100,8 +100,10 @@ export interface Standing {
  * exists -- an account deleted, its stake gone from the ledger with it -- was paid by nobody, and is not
  * credited to anybody.
  *
- * A match counts in the week its room was opened, whole, so one played across midnight on a Monday is not a
- * stake in one week and a pot in the next.
+ * A match counts in the week it started, whole, so one played across midnight on a Monday is not a stake in
+ * one week and a pot in the next; a room that never started moved no gold that stays (every stake came back),
+ * and does not count at all. settleDue waits for the matches started in a week to finish before it pays it.
+ * A seat that left before the start (its stake refunded) was nobody's opponent.
  *
  * What losing does cost is the prize: settleDue pays only the players who are in front (see below), so a
  * quiet week still cannot pay five million gold to whoever lost the least, and only players who have played at
@@ -116,16 +118,16 @@ export async function table(sql: Sql, s: Season): Promise<Standing[]> {
   const { opponentCap, minOpponents } = config.league;
   const r = await query<{ user_id: number; name: string; pic: string; earning: string; opponents: number; eligible: boolean }>(sql, `
     WITH rows AS (
-      SELECT g.user_id, g.match_code AS mk, g.delta, g.created_at, m.started_at IS NOT NULL AS played
+      SELECT g.user_id, g.match_code AS mk, g.delta, g.created_at, true AS played, g.reason = 'leave_refund' AS gone
         FROM gold_ledger g JOIN matches m ON m.code = g.match_code
-       WHERE m.created_at >= $1 AND m.created_at < $2 AND g.reason = ANY($3::text[])
+       WHERE m.started_at >= $1 AND m.started_at < $2 AND g.reason = ANY($3::text[])
       UNION ALL
       -- play with no room to it (nothing writes one now) stands alone: its loss counts, and a gain is nobody's
-      SELECT g.user_id, 'row:' || g.id, g.delta, g.created_at, false
+      SELECT g.user_id, 'row:' || g.id, g.delta, g.created_at, false, false
         FROM gold_ledger g
        WHERE g.match_code IS NULL AND g.created_at >= $1 AND g.created_at < $2 AND g.reason = ANY($3::text[])
     ), net AS (
-      SELECT user_id, mk, SUM(delta)::numeric AS n, MAX(created_at) AS last_at, bool_or(played) AS played
+      SELECT user_id, mk, SUM(delta)::numeric AS n, MAX(created_at) AS last_at, bool_or(played) AS played, bool_or(gone) AS gone
         FROM rows GROUP BY user_id, mk
     ), side AS (
       SELECT mk, COALESCE(SUM(n) FILTER (WHERE n > 0), 0) AS won, COALESCE(-SUM(n) FILTER (WHERE n < 0), 0) AS lost
@@ -144,8 +146,8 @@ export async function table(sql: Sql, s: Season): Promise<Standing[]> {
         FROM net n JOIN side s ON s.mk = n.mk WHERE n.n < 0 GROUP BY n.user_id
     ), foes AS (
       SELECT a.user_id, COUNT(DISTINCT b.user_id)::int AS n
-        FROM net a JOIN net b ON b.mk = a.mk AND b.user_id <> a.user_id
-       WHERE a.played GROUP BY a.user_id
+        FROM net a JOIN net b ON b.mk = a.mk AND b.user_id <> a.user_id AND NOT b.gone
+       WHERE a.played AND NOT a.gone GROUP BY a.user_id
     ), line AS (
       SELECT p.user_id, MAX(p.last_at) AS last_at FROM net p GROUP BY p.user_id
     ), scored AS (
@@ -270,6 +272,14 @@ export async function settleDue(now: Date = new Date()): Promise<SettledSeason |
        ORDER BY ends_at ASC LIMIT 1 FOR UPDATE SKIP LOCKED`, [now]);
     const row = due.rows[0];
     if (!row) return null;
+    // A match started in the week still being played counts in that week (table above): the week waits for it,
+    // up to the longest a match can run, so its pot is not left out of every week.
+    const late = new Date(row.ends_at.getTime() + (config.game.matchHours + 1) * 3600_000);
+    if (now < late) {
+      const busy = await query(c, `SELECT 1 FROM matches WHERE state = 'playing' AND started_at >= $1 AND started_at < $2 LIMIT 1`,
+        [row.starts_at, row.ends_at]);
+      if (busy.rowCount) return null;
+    }
 
     const season: Season = { key: row.key, startsAt: row.starts_at, endsAt: row.ends_at };
     // The table now holds everyone who played, so the prizes take only the part of it that can be paid: in

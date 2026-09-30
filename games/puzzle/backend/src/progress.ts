@@ -51,7 +51,7 @@ export function levelIdOk(id: string, countries: ReadonlySet<string>): boolean {
   if (typeof id !== 'string' || !id || id.length > MAX_LEVEL_ID) return false;
   if (SIDE_BOARD.test(id)) return true;
   const country = id.startsWith('d:') ? id.slice(2) : id;
-  return countries.size ? countries.has(country) : /^\d{3}$/.test(country);
+  return countries.size ? countries.has(country) : /^(?:\d{3}|n:[A-Za-z0-9_-]{1,40})$/.test(country);   // n: boards have discovery boards too (d:n:kosovo)
 }
 // What a push may carry as its settings blob before it is refused outright. The blob is sanitised key by key
 // below, so this is only the line past which nothing a real client sends could reach -- a device sends its
@@ -223,7 +223,7 @@ const MAX_OTHER_BYTES = 4 * 1024;        // each
 // Puzzles of one round finished in one day. A round's puzzle takes the better part of a minute, so sixty is an
 // hour of one round, every round, in a day -- more than anybody plays, and small enough that a thousand days
 // of it cannot make the blob a burden to read.
-export const MAX_SERIALS = 60;
+export const MAX_SERIALS = 200;
 // What the account keeps of the whole blob, merged. Each push is capped on the way in (MAX_STATE_BYTES), but
 // the merge takes the union of every day ever sent, and a script sending a different week each time could
 // grow it to megabytes that every push then parses and writes back. Past this the oldest days are dropped

@@ -31,7 +31,7 @@ export const LIMITS = {
   // new Google accounts one connection can bring in an hour. Generous, because a carrier can put a whole
   // town behind one address.
   account_delete_ip: { name: 'account_delete_ip', limit: 5,  windowSeconds: 3600, by: 'ip', strict: true },
-  account_create:    { name: 'account_create',    limit: 10, windowSeconds: 3600, by: 'ip', strict: true },
+  account_create:    { name: 'account_create',    limit: 100, windowSeconds: 3600, by: 'ip', strict: true },   // a carrier's shared address is many honest people
   // An ad takes about thirty seconds to watch, and the daily cap is the real bound; this is only here to stop
   // a script hammering the endpoint between caps.
   ad_reward:     { name: 'ad_reward',     limit: 20,  windowSeconds: 600, by: 'user', strict: true },

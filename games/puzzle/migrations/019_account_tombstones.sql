@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS account_tombstones (
     PRIMARY KEY (provider, sub_hash)
 );
 
--- The league counts a match in the week its room was opened, so a match that straddles midnight on a Monday is
--- counted whole in one week rather than as a stake in one and a pot in the next. This is the index that finds
--- a week's rooms without reading the history.
-CREATE INDEX IF NOT EXISTS matches_created_idx ON matches (created_at);
+-- The league counts a match in the week it started, so a match that straddles midnight on a Monday is counted
+-- whole in one week rather than as a stake in one and a pot in the next. This is the index that finds a week's
+-- matches without reading the history.
+CREATE INDEX IF NOT EXISTS matches_started_idx ON matches (started_at);

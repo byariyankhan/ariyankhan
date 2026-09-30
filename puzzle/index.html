@@ -84,7 +84,7 @@
       var seen = false, calm = false, now = new Date(), day = now.getFullYear() + '-' + (now.getMonth() + 1) + '-' + now.getDate();
       try { seen = sessionStorage.getItem('aa:splash') === '1'; sessionStorage.setItem('aa:splash', '1'); } catch (e) { /* no session storage: every load is a new session */ }
       try { calm = matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { /* no media queries: motion as usual */ }
-      var deep = /^#(level-\d+|b-[\w:]+|daily|league|m=[A-Za-z0-9]+|handoff=[a-f0-9]+)$/.test(location.hash) || /[?&]handoff=/.test(location.search);
+      var deep = /^#(level-\d+|b-[\w:~]+|daily|league|m=[A-Za-z0-9]+|handoff=[a-f0-9]+)$/.test(location.hash) || /[?&]handoff=/.test(location.search);
       var plan = o.plan = openingPlan({ welcomed: !!get('welcomed'), deep: deep, seen: seen, calm: calm, day: day, quoteDay: get('quoteDay') });
       // The theme from the first frame, so a night or mint player never sees paper and then their colours. The
       // app draws its own splash before this page, though: build 1 always on paper, build 2 in the player's theme
@@ -95,8 +95,11 @@
       var themedSplash = !!app && +app[1] >= 2 && !!android && +android[1] >= 13;
       root.setAttribute('data-theme', theme);
       var meta = document.querySelector('meta[name="theme-color"]');
-      if (meta) meta.setAttribute('content', { paper: '#F4EDE0', night: '#0E0E10', mint: '#E6F2EC' }[theme]);
-      if (plan.show) root.className += ' is-opening' + (plan.first ? ' is-first' : '') + (app && !themedSplash && theme !== 'paper' ? ' is-paper-first' : '');
+      var paperFirst = plan.show && !!app && !themedSplash && theme !== 'paper';
+      // on a paper opening the bars stay paper too (the app reads this colour for its bar icons); the game sets
+      // the player's colour when the opening fades into home
+      if (meta) meta.setAttribute('content', paperFirst ? '#F4EDE0' : { paper: '#F4EDE0', night: '#0E0E10', mint: '#E6F2EC' }[theme]);
+      if (plan.show) root.className += ' is-opening' + (plan.first ? ' is-first' : '') + (paperFirst ? ' is-paper-first' : '');
       if (plan.line === 'quote') { var n = +get('launches') || 0; o.quote = n; set('launches', n + 1); set('quoteDay', day); }
     })();
     </script>
@@ -172,7 +175,7 @@
           "alternateName": ["Puzzle Train Your Brain", "Arrow Atlas"],
           "url": "https://ariyankhan.com/puzzle/",
           "image": "https://ariyankhan.com/images/puzzle-og.jpg",
-          "description": "A free brain-training game that plays in the browser. Daily Training is four short rounds every day on public-domain paintings: Restore the Canvas (memorise a painting, then rebuild it from its pieces), The Forgery (spot the differences in a forged copy), Gallery Memory (re-hang paintings in the order they hung) and The Curator’s Eye (pick the close-up that came from the painting you saw). Each round is scored out of 100 and the day’s Brain Score is their average. The arrow puzzle: tap an arrow to send it off the board if its path is clear; a blocked tap costs one of four hearts. Over 400 boards, the outlines of all 197 countries with picture boards between them, make a world tour whose difficulty, from Easy to Master, follows how well you play.",
+          "description": "A free brain-training game that plays in the browser. Daily Training is four short rounds every day on public-domain paintings: Restore the Canvas (memorise a painting, then rebuild it from its pieces), The Forgery (spot the differences in a forged copy), Gallery Memory (re-hang paintings in the order they hung) and The Curator’s Eye (pick the close-up that came from the painting you saw). Each round is scored out of 100 and the day’s Brain Score is their average. The arrow puzzle: tap an arrow to send it off the board if its path is clear; a blocked tap costs a heart. Over 400 boards, the outlines of all 197 countries with picture boards between them, make a world tour whose difficulty, from Easy to Master, follows how well you play.",
           "genre": ["Puzzle", "Brain training", "Memory game", "Logic puzzle", "Educational"],
           "keywords": "brain training, daily brain training, memory game, art memory game, painting puzzle, spot the difference, arrow puzzle, logic puzzle, geography puzzle",
           "gamePlatform": "Web browser",
@@ -192,7 +195,7 @@
             "247 public-domain paintings from The Metropolitan Museum of Art’s Open Access collection, each credited",
             "Difficulty that follows how well you play: every training round has five steps, and the arrow boards go from Easy to Master",
             "Arrow logic puzzle on over 400 boards: the outlines of all 197 countries, with animal, bird, landmark and picture boards between them",
-            "Four hearts per board, hints and combos",
+            "Hearts per board (four on Easy and Normal, fewer on the harder levels), hints and combos",
             "Country facts when a country is cleared: capital, population and region",
             "Play with Friends: online matches and a weekly league, with Google sign-in",
             "Solo play needs no account, can be added to the home screen, and its boards work offline once loaded"
@@ -210,7 +213,7 @@
             { "@type": "Question", "name": "Do I need to download anything or sign up?", "acceptedAnswer": { "@type": "Answer", "text": "No. Puzzle plays in your web browser on phones, tablets and computers, and you can add it to your home screen. Playing on your own needs no account; signing in with Google is only for Play with Friends and the weekly league." } },
             { "@type": "Question", "name": "What are the Daily Training games?", "acceptedAnswer": { "@type": "Answer", "text": "Four short rounds on real paintings: Restore the Canvas (rebuild a painting from its pieces), The Forgery (spot what is wrong in a forged copy), Gallery Memory (re-hang paintings in the order they hung) and The Curator’s Eye (pick the detail that came from the painting you saw)." } },
             { "@type": "Question", "name": "How is the Brain Score worked out?", "acceptedAnswer": { "@type": "Answer", "text": "Each round is scored from 0 to 100, and the day’s Brain Score is the average of the rounds you played that day. Play at least one round a day to keep your streak going. A round gets harder after a day you score 85 or more in it, and easier after a day under 50." } },
-            { "@type": "Question", "name": "How does the arrow puzzle work?", "acceptedAnswer": { "@type": "Answer", "text": "Every arrow slides the way it points. Tap an arrow and, if its path is clear, it flies off the board; if another arrow blocks it, you lose one of your four hearts. Clear every arrow to finish the board. A country board then tells you which country it was, with its capital, population and region." } },
+            { "@type": "Question", "name": "How does the arrow puzzle work?", "acceptedAnswer": { "@type": "Answer", "text": "Every arrow slides the way it points. Tap an arrow and, if its path is clear, it flies off the board; if another arrow blocks it, you lose a heart (four on Easy and Normal, fewer on the harder levels). Clear every arrow to finish the board. A country board then tells you which country it was, with its capital, population and region." } },
             { "@type": "Question", "name": "Where do the paintings come from?", "acceptedAnswer": { "@type": "Answer", "text": "They are 247 public-domain works from The Metropolitan Museum of Art’s Open Access collection, and every round credits the paintings it used." } }
           ]
         },
@@ -337,7 +340,7 @@
       go();
       // The game's script never came, or an older copy of it did (which knows nothing of this): let the page be
       // seen rather than hold the brain up for ever.
-      window.addEventListener('load', function () { if (!o.claimed) root.classList.remove('is-opening', 'is-first', 'is-paper-first'); });
+      window.addEventListener('load', function () { if (!o.claimed) { root.classList.remove('is-opening', 'is-first', 'is-paper-first'); var sp = document.getElementById('aaSplash'); if (sp) sp.hidden = true; } });   // a game script that never took the opening over (failed, or an old copy) must not leave it covering the page
     })();
     </script>
     <main class="aa-app" id="aaApp"><span id="top"></span>
@@ -578,7 +581,7 @@
               <h4>How is the Brain Score worked out?</h4>
               <p>Each round is scored from 0 to 100, and the day’s Brain Score is the average of the rounds you played that day. Play at least one round a day to keep your streak going. A round gets harder after a day you score 85 or more in it, and easier after a day under 50.</p>
               <h4>How does the arrow puzzle work?</h4>
-              <p>Every arrow slides the way it points. Tap an arrow and, if its path is clear, it flies off the board; if another arrow blocks it, you lose one of your four hearts. Clear every arrow to finish the board. A country board then tells you which country it was, with its capital, population and region.</p>
+              <p>Every arrow slides the way it points. Tap an arrow and, if its path is clear, it flies off the board; if another arrow blocks it, you lose a heart (four on Easy and Normal, fewer on the harder levels). Clear every arrow to finish the board. A country board then tells you which country it was, with its capital, population and region.</p>
               <h4>Where do the paintings come from?</h4>
               <p>They are 247 public-domain works from The Metropolitan Museum of Art’s Open Access collection, and every round credits the paintings it used.</p>
             </div>

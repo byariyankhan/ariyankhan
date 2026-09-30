@@ -54,3 +54,19 @@ export async function adTicketSpend(userId: number, ticket: string, minMs = conf
   try { spent = await redis.eval(SPEND, 1, keyOf(userId), raw!); } catch { return { ok: false, why: 'unavailable' }; }
   return Number(spent) === 1 ? { ok: true } : { ok: false, why: 'no_ticket' };
 }
+
+/**
+ * A claim from a page opened before tickets existed: it sends no ticket at all, and the app keeps a page open
+ * for days (it is not reloaded on resume). For a while after the change such a page is still paid -- under the
+ * same daily cap, and never twice within adMinSeconds, which one key set only if absent enforces -- so a player
+ * who has just watched a real advertisement on it is not told "try again" for ever. After
+ * config.game.adLegacyUntil (or without Redis) it is not.
+ */
+export async function adLegacyOk(userId: number, now = Date.now()): Promise<boolean> {
+  const until = Date.parse(config.game.adLegacyUntil);
+  if (!Number.isFinite(until) || now >= until) return false;
+  try {
+    const set = await redis.set(k('adlegacy', userId), '1', 'EX', Math.max(1, Math.round(config.game.adMinSeconds)), 'NX');
+    return set === 'OK';
+  } catch { return false; }
+}

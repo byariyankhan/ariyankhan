@@ -823,7 +823,7 @@
     { id: 'league', title: 'The league', body: () => `A new table every week, of the gold won in matches. The top ${numWord(league.data?.prizes?.length || 10)} are paid.`, target: () => el.league, pad: 6, when: () => !!el.league && !el.league.hidden },
     { id: 'friends', title: 'Play with Friends', body: () => 'Race friends and people online for gold. It needs a sign-in; playing alone never does.', target: () => el.friends },
     { id: 'settings', title: 'Settings', body: () => 'Your home country, sound, music and colours. This tour is there too, under Help.', target: () => $('#aaSettings'), pad: 6 },
-    { id: 'play', title: 'Play & Discover', body: () => store.get('coached', false) ? 'Start here: the next country on your world tour.' : 'Start here. Your first board shows you how the arrows work.', target: () => el.play, last: true },
+    { id: 'play', title: 'Play & Discover', body: () => store.get('coached', false) ? 'Start here: your next board on the world tour.' : 'Start here. Your first board shows you how the arrows work.', target: () => el.play, last: true },
   ];
   const TOUR_WAIT_MS = 30000;   // how long it looks for a free home screen once nobody is reading anything
   const tour = { on: false, id: '', box: null, wait: 0, since: 0, again: false, obs: null, raf: 0 };
@@ -955,7 +955,9 @@
   function closeTutorial() {
     if (tour.on) { tourEnd('skip'); return true; }
     if (coach.on) { coachEnd('skip'); return true; }
-    if (tcoach.on) { trainCoachEnd(true); return true; }
+    // a round's coach is the top layer only while it shows: held under a question, the ? card, an ad or the
+    // Paused veil (trainHold hides it), Back and Escape belong to what is over it
+    if (tcoach.on && tcoach.box && !tcoach.box.hidden) { trainCoachEnd(true); return true; }
     return false;
   }
   el.tourAgain?.addEventListener('click', () => {
@@ -1966,7 +1968,7 @@
     stopTimer(); stopProgressPoll(); heartbeatStop(); tourLeave(true); coachEnd(); deckStop();
     if (el.ranks) el.ranks.hidden = true;
     if (daily?.race) state.seedBump = 0;   // a race is that exact board: a stray reshuffle must not change it
-    else if (bumpSeed) state.seedBump++; else if (state.idx !== i || !!daily !== !!state.daily) { state.seedBump = 0; state.fails = 0; }
+    else if (bumpSeed) state.seedBump++; else if (state.idx !== i || !!daily !== !!state.daily) { state.seedBump = 0; state.fails = 0; state.lossRedo = false; }
     state.daily = daily; state.level = DATA.levels[i]; state.disc = state.level.disc ? state.level : null;
     // A scene board is one tier harder than the player's own: it is the long game, and the tier is the pace.
     state.idx = i; state.tier = daily ? daily.tier : keepTier >= 0 ? keepTier : tierFor(i); state.diff = DIFF_OF(state.tier);
@@ -2000,6 +2002,7 @@
     // reading of the screen: what to do, once, to somebody who has never played.
     if (!daily && coachStart()) { /* the tutorial says it all, one thing at a time */ }
     else if (resumed) toast('Carrying on where you left it.', 'good', 1800);
+    if (resumed && state.lives === 1) heartLost();   // carried on with the last heart: it beats, as it did when left
     else if (i === 0 && !cleared(0) && !daily) teach('tap', 'Tap an arrow to shoot it off the board. If another arrow is in its way, you lose a heart.');
   }
   // Nothing could be drawn at all, not even a tier down. The card says so and leads home, rather than a blank
@@ -2517,7 +2520,10 @@
     learnFrom(false, { daily: state.daily });   // the form moves on a loss, whether or not the card says so
     // The rank: some of the arrows still on the board come off it (lossFor), held until the player moves on.
     // The daily board and a race are not the tour and cost none.
-    const take = state.daily ? 0 : lossFor({ fails: state.fails, done: !!store.get('lv:' + state.level.id), left: state.left, arrows: state.pieces.length, rank: arrowsShot() });
+    // a loss whose charge a free life gave back is charged again when that life runs out (lossRedo): the free
+    // life carries the board on, it does not make the next loss free
+    const take = state.daily ? 0 : lossFor({ fails: state.lossRedo ? 1 : state.fails, done: !!store.get('lv:' + state.level.id), left: state.left, arrows: state.pieces.length, rank: arrowsShot() });
+    state.lossRedo = false;
     let rankLine = '';
     if (take > 0) {
       const was = arrowsShot(), now = was - take, rk = rankOf(now);
@@ -3822,6 +3828,7 @@
       ask({ title: 'Give the board up?', body: 'Your run ends here, and your stake goes to whoever clears it.',
         ok: 'Give it up', cancel: 'Keep playing', danger: true }).then(yes => {
         if (!yes) return;
+        if (clearPending(state.daily?.match?.code)) { goToLevels(); return; }   // a clear of it is already on its way
         el.card.innerHTML = '<h3>Sending…</h3>'; finishMatch(false, 0, true);
       });
     }
@@ -3849,7 +3856,7 @@
     state.elapsed = 0; state.startedAt = 0; state.raceBase = 0;
     state.hintsUsed = 0; state.hintsMax = HINTS_PER_LEVEL;
     state.checksUsed = 0; state.checksMax = CHECKS_PER_LEVEL;   // the same two lines as the hints, for the same reason
-    state.finished = false; state.wrong = 0; state.fails = 0; state.potGone = false;
+    state.finished = false; state.wrong = 0; state.fails = 0; state.lossRedo = false; state.potGone = false;
     state.combo = 0; state.bestCombo = 0; state.lastShot = 0; state.shown = new Set();
     state.daily = null; state.disc = null; state.replay = false;
     el.board.innerHTML = '';
@@ -4205,7 +4212,7 @@
       earn: 'Watch this through and the board carries on where it stopped, with one heart.',
       board: true,
       // The board carries on, so the loss it ended in is undone: the arrows it was about to take are given back.
-      grant() { state.lives = 1; state.moves++; state.finished = false; state.busy = false; el.overlay.hidden = true; renderHud(); startTimer(); heartLost(); const back = forgiveLoss(); keepRun(); toast(back ? `One heart, and your ${fmtN(back)} arrows back. Make it count.` : 'One heart. Make it count.', 'good'); },
+      grant() { state.lives = 1; state.moves++; state.finished = false; state.busy = false; el.overlay.hidden = true; renderHud(); startTimer(); heartLost(); const back = forgiveLoss(); if (back) state.lossRedo = true; keepRun(); toast(back ? `One heart, and your ${fmtN(back)} arrows back. Make it count.` : 'One heart. Make it count.', 'good'); },
     },
     trainhint: {
       earn: 'Watch this through for a hint in this round.',
@@ -5844,7 +5851,7 @@
     const boardFrac = () => (state.pieces.length ? (state.pieces.length - state.left) / state.pieces.length : 0);
     const myPct = () => { const n = R.boards?.length || 1; return Math.round((((R.bi | 0) + boardFrac()) / n) * 100); };
     const notePot = m => {
-      if (m?.winner && !state.potGone && !state.finished) {   // the pot is gone; the places behind it are not
+      if (m?.winner && !m.you_won && !state.potGone && !state.finished) {   // the pot is gone; the places behind it are not
         state.potGone = true;
         SFX.taken(); toast(`${m.winner} cleared it first. Play on for second place.`);
       }
@@ -5916,6 +5923,15 @@
     // opened twice, the back button — any of them used to restart the board under the player, which looked
     // like the game had pressed Try again for them. Getting back onto a board is a tap, and only a tap.
     if (state.daily?.race && state.daily.match?.code === m.code) return;
+    // A clear of this race still on its way to the server (told to wait, or kept from a closed page) is the
+    // player's result already: the board is not dealt again under it -- a second run could only end in a
+    // give-up that would land first and cost the pot -- and the time is sent, or goes on being sent.
+    if (clearPending(m.code)) {
+      closeSheets(); state.pendingMatch = null; stopMatchPoll();
+      toast('Your time for this race is on its way to the server.', 'hint', 4000);
+      if (!resultInFlight) void flushResult(false);
+      return;
+    }
     const boards = boardsOfMatch(m);
     // The board this account is on, wherever it last played: a run posted from another device says which.
     const bi = Math.max(0, Math.min(boards.length - 1, Number(m.your_run?.bi) | 0));
@@ -6127,6 +6143,7 @@
   async function leaveMatch() {
     const m = state.daily?.match;
     if (!m) return;
+    if (clearPending(m.code)) { goToLevels(); toast('Your time for this race is on its way to the server.'); return; }   // cleared: there is nothing to give up
     if (!await ask({ title: 'Leave the challenge?', body: `Your ${gfmt(m.stake)} gold stays in the pot and the others play on.`,
       ok: 'Leave the board', cancel: 'Keep playing', danger: true })) return;
     stopProgressPoll(); stopTimer();
@@ -6256,6 +6273,9 @@
   // is tried a few times, kept on the device if it still will not go, and sent again on the next visit. Only a
   // straight refusal from the server stops the retrying: asking again cannot change that answer.
   const PENDING = 'pendingResult';
+  // A clear of this match kept on the device and not yet taken by the server.
+  const clearPending = code => { const p = store.get(PENDING, null); return !!(code && p && p.code === code && p.cleared); };
+  let resultInFlight = 0;   // results being sent right now (finishMatch, flushResult): one is enough
   // The server counts a clear only once the match has run, on its own clock, as long as the fastest honest
   // clear of its boards takes; sooner, it answers too_early and says when. A player quicker than that, or a
   // device whose clock runs ahead, is not refused -- the result simply goes when it is told to, a breath after
@@ -6291,6 +6311,7 @@
     // still on its way when the page is closed or reloaded, and the next visit sends it (flushResult). The
     // server takes a result once, so sending one that did get through changes nothing.
     store.set(PENDING, sent);
+    resultInFlight++;
     try {
       const d = await sendResult(sent.code, sent.ms, sent.cleared, sent.gave_up);
       store.set(PENDING, null);
@@ -6311,13 +6332,14 @@
           <button type="button" class="aa-btn" data-act="levels">World Tour</button>
         </div>`;
       showCard();
-    }
+    } finally { resultInFlight--; }
   }
 
   // A time that never got through, tried again: on the next visit, or when the player asks.
   async function flushResult(loud) {
     const p = store.get(PENDING, null);
     if (!p?.code) return false;
+    resultInFlight++;
     try {
       const d = await sendResult(p.code, p.ms, p.cleared, p.gave_up);
       store.set(PENDING, null);
@@ -6328,7 +6350,7 @@
     } catch (err) {
       if (loud) { const n = $('.aa-card-lead', el.card); if (n) n.textContent = resultTrouble(err); }
       return false;
-    }
+    } finally { resultInFlight--; }
   }
 
   // Winning gold should land like winning gold: coins rain, the purse counts up, the badge pops.
@@ -6732,7 +6754,9 @@
   const THEMES = ['paper', 'night', 'mint'];
   // The same colours the inline script in puzzle/index.html sets before the first paint, and the app's own
   // (android/app/src/main/res/values/colors.xml): the opening's brain takes its colour from the stylesheet.
-  function applyTheme(t) { document.documentElement.dataset.theme = t; store.set('theme', t); $('meta[name="theme-color"]')?.setAttribute('content', t === 'night' ? '#0E0E10' : t === 'mint' ? '#E6F2EC' : '#F4EDE0'); renderThemes(); }
+  const themeBar = t => $('meta[name="theme-color"]')?.setAttribute('content', t === 'night' ? '#0E0E10' : t === 'mint' ? '#E6F2EC' : '#F4EDE0');
+  // on a paper opening (is-paper-first) the bars stay paper until it fades into home (the opening's leave)
+  function applyTheme(t) { document.documentElement.dataset.theme = t; store.set('theme', t); if (!document.documentElement.classList.contains('is-paper-first')) themeBar(t); renderThemes(); }
   // ── The build line, and the developer switch behind it ────────────────────────────────────────────
   //
   // The version is not hardcoded: it is the one the page asked for, read back off the script tag, so it can
@@ -6977,7 +7001,7 @@
         if (o.done || keyBus || !o.schedule || !soundLive()) return;
         keyBus = audio.createGain(); keyBus.connect(audio.destination);
         const now = performance.now();
-        for (const c of o.schedule.clicks) { const at = (o.startedAt + c.at - now) / 1000; if (at >= 0) SFX[c.kind](c.i, at, keyBus); }
+        for (const c of o.schedule.clicks) { const at = (o.startedAt + c.at - now) / 1000; if (at > -0.05) SFX[c.kind](c.i, Math.max(0, at), keyBus); /* the first key was due a hair ago by now */ }
       };
       play();
       if (!keyBus && audio && !state.muted) audio.resume?.().then(play, () => {});
@@ -7023,7 +7047,7 @@
       if (app) app.inert = false;
       // is-first and is-paper-first stay for the fade, so the terms and the paper fade with the rest.
       root.classList.remove('is-opening'); root.classList.add('is-leaving');
-      setTimeout(() => { root.classList.remove('is-leaving', 'is-first', 'is-paper-first'); el.splash.hidden = true; openedSignal(); }, calmer() ? 0 : T.fade);
+      setTimeout(() => { root.classList.remove('is-leaving', 'is-first', 'is-paper-first'); themeBar(root.dataset.theme); el.splash.hidden = true; openedSignal(); }, calmer() ? 0 : T.fade);
     };
     const leaveWithHome = cap => { Promise.race([homeReady, until(cap)]).then(leave); };
     if (plan.first) {

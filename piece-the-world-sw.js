@@ -67,15 +67,22 @@ self.addEventListener('fetch', event => {
     try {
       const res = await fetch(req);
       if (res.ok) { cache.put(req, res.clone()); return res; }
-      if (res.status >= 500) { const hit = await cache.match(req, { ignoreSearch: true }); if (hit) return hit; }
+      if (res.status >= 500) { const hit = await matchBest(cache, req); if (hit) return hit; }
       return res;
     } catch (err) {
-      const hit = await cache.match(req, { ignoreSearch: true });
+      const hit = await matchBest(cache, req);
       if (hit) return hit;
       throw err;
     }
   }));
 });
+
+/* The copy of exactly this address first (the script of this very version, the page the app opens), and only
+   then any copy of the same path: with ignoreSearch alone the first one stored wins, which is the unversioned
+   copy fetched at install -- an old script beside a new page. */
+async function matchBest(cache, req) {
+  return (await cache.match(req)) || cache.match(req, { ignoreSearch: true });
+}
 
 /* Opening the game: the network if it answers in time, the copy already here if it does not.
 
@@ -97,7 +104,7 @@ function openGame(event) {
   // The worker is kept alive until the late answer is stored, not only until the page has one.
   event.waitUntil(net.then(() => saved, () => {}));
   return (async () => {
-    const cached = () => caches.open(VERSION).then(cache => cache.match(req, { ignoreSearch: true }));
+    const cached = () => caches.open(VERSION).then(cache => matchBest(cache, req));
     const first = await Promise.race([net.catch(() => null), new Promise(r => setTimeout(r, NAV_WAIT_MS, null))]);
     if (first && (first.ok || first.status < 500)) return first;
     const hit = await cached();

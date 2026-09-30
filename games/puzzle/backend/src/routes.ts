@@ -8,7 +8,7 @@ import { API_PREFIX, config } from './config.js';
 import { pool, query, tx } from './db.js';
 import * as R from './rooms.js';
 import { adClaim, adUsed, balance } from './gold.js';
-import { adTicketSpend, adTicketStart, AD_TICKET_SECONDS } from './adticket.js';
+import { adLegacyOk, adTicketSpend, adTicketStart, AD_TICKET_SECONDS } from './adticket.js';
 import { deleteUser, endSession, googleVerify, handoffRedeem, handoffStart, providers, startSession, upsertUser, userExists, cleanName, validCode, validNonce, HANDOFF_SECONDS } from './auth.js';
 import { publish, publishToUser } from './events.js';
 import { boardPace, cleanDevice, cleanLevels, cleanState, cleanStats, difficulty, levelIdOk, mergeLevels, mergeStats, mergeState, PROGRESS_BODY_LIMIT, readAll, type Difficulty } from './progress.js';
@@ -283,7 +283,9 @@ const H = {
     const perDay = Math.max(0, Math.round(config.game.adGoldPerDay));
     if (amount <= 0 || perDay <= 0) { await noStore(res).code(503).send({ error: 'ads_off' }); return; }
 
-    const spent = await adTicketSpend(me.user.id, String(body(req).ticket ?? ''));
+    // A page from before tickets sends none at all (not even the key); for a while it is still paid (adLegacyOk).
+    const legacy = !('ticket' in body(req)) && await adLegacyOk(me.user.id);
+    const spent = legacy ? { ok: true as const } : await adTicketSpend(me.user.id, String(body(req).ticket ?? ''));
     if (!spent.ok) {
       if (spent.why === 'too_early') {
         const secs = Math.max(1, Math.ceil(spent.retryMs / 1000));
@@ -453,7 +455,8 @@ const H = {
     let reach: 'live' | 'push' | 'none' = 'live';
     if (!here) {
       reach = (await push.hasSubscription(pool, to)) ? 'push' : 'none';
-      if (reach === 'push' && await inviteRings(me.user.id, to)) void push.sendToUser(to, push.invitedNote(me.user.name, m.stake, m.code));
+      // a phone that was not rung this time (told a few minutes ago, or the day's rings spent) is not said to be
+      if (reach === 'push') { if (await inviteRings(me.user.id, to)) void push.sendToUser(to, push.invitedNote(me.user.name, m.stake, m.code)); else reach = 'none'; }
     }
     await noStore(res).send({ ok: true, delivered: here, reach });
   },
