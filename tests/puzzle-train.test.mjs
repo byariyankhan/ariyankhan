@@ -24,14 +24,16 @@ const common = [one('clamp100'), grab(/const TRAIN_ROUNDS = \[[\s\S]*?\n  \];/).
 const TODAY = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 const BACK = n => { const d = new Date(); d.setDate(d.getDate() - n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 
-test('the tier reads each day\'s first score of its free puzzle, not a best pushed up by replays', () => {
+test('the tier reads each day\'s first score of its free puzzle, not a best pushed up by replays; today moves it up at once', () => {
   const { m, ls, store } = makeStore();
   const f = new Function('store', 'localStorage', 'STORE', common + '\n' + one('TRAIN_TIERS') + '\n' + fn('trainTier') + '\nreturn { trainTier };')(store, ls, 'aa:v1:');
   for (let i = 1; i <= 3; i++) m.set('aa:v1:train:' + BACK(i), JSON.stringify({ r: 95, f1: { r: 40 }, g: 90 }));
   assert.equal(f.trainTier('r'), 0, 'three days of 95 best but 40 first: stays at the bottom');
   assert.equal(f.trainTier('g'), 3, 'a day kept before first scores were is read by its best, as before');
   m.set('aa:v1:train:' + TODAY(), JSON.stringify({ r: 100, f1: { r: 100 } }));
-  assert.equal(f.trainTier('r'), 0, 'today never counts');
+  assert.equal(f.trainTier('r'), 1, 'today counts, upward: a 100 today makes the next puzzle today a level harder');
+  m.set('aa:v1:train:' + TODAY(), JSON.stringify({ r: 30, f1: { r: 30 } }));
+  assert.equal(f.trainTier('r'), 0, 'and a poor score today never takes it down before tomorrow');
 });
 test('first scores merge by the lower per round: commutative, idempotent, junk dropped', () => {
   const { trainMergeF1 } = new Function(common + '\nreturn { trainMergeF1 };')();

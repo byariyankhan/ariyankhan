@@ -9,7 +9,7 @@ const data = JSON.parse(fs.readFileSync(path.join(root, 'games/data/puzzle.json'
 const html = fs.readFileSync(path.join(root, 'puzzle/index.html'), 'utf8');
 // Pull the pure pieces of the engine out of the IIFE so the exact production code is tested.
 const grab = re => { const m = js.match(re); if (!m) throw new Error('could not find ' + re); return m[0]; };
-const src = [grab(/const REF = \d+;/), grab(/function parsePath\(d\) \{[\s\S]*?\n  \}\n/), grab(/function insidePath\([\s\S]*?\n  \}\n/), grab(/function rasterise\([\s\S]*?\n  \}\n/), grab(/const DIRS = [^\n]+/), grab(/const PALETTE = [^\n]+/), grab(/const GRADE_UP = [^\n]+/), grab(/const FAST_SEC_PER_ARROW = [^\n]+/), grab(/const clampTier = [^\n]+/), grab(/const clampGrade = [^\n]+/), grab(/const clearPoints = [^\n]+/), grab(/const FORM0 = [^\n]+/), grab(/const gradeOf = [^\n]+/), grab(/const formOf = [^\n]+/), grab(/const nextForm = [\s\S]*?\n  \};\n/), grab(/const MAXLEN_OF = [^\n]+/), grab(/const KSCALE_OF = [^\n]+/), grab(/const CELL_CAP_OF = [^\n]+/), grab(/const SIDE_CAP = [^\n]+/), grab(/const NARROW_OF = [^\n]+/), grab(/const FAR_OF = [^\n]+/), grab(/const RAIL_OF = [^\n]+/), grab(/const HOLE_OF = [^\n]+/), grab(/const LANE_OF = [^\n]+/), grab(/const TIGHTEN_OF = [^\n]+/), grab(/const TRAP_OF = [^\n]+/), grab(/const GEN_OPTS = [^\n]+/), grab(/function mulberry32[^\n]+/), grab(/function generate\(mask, maxLen, seed[^)]*\) \{[\s\S]*?\n  \}\n/)].join('\n');
+const src = [grab(/const REF = \d+;/), grab(/function parsePath\(d\) \{[\s\S]*?\n  \}\n/), grab(/function insidePath\([\s\S]*?\n  \}\n/), grab(/function rasterise\([\s\S]*?\n  \}\n/), grab(/const DIRS = [^\n]+/), grab(/const PALETTE = [^\n]+/), grab(/const GRADE_UP = [^\n]+/), grab(/const LOCKED_IN = [^\n]+/), grab(/const FAST_SEC_PER_ARROW = [^\n]+/), grab(/const clampTier = [^\n]+/), grab(/const clampGrade = [^\n]+/), grab(/const clearPoints = [^\n]+/), grab(/const FORM0 = [^\n]+/), grab(/const gradeOf = [^\n]+/), grab(/const formOf = [^\n]+/), grab(/const nextForm = [\s\S]*?\n  \};\n/), grab(/const MAXLEN_OF = [^\n]+/), grab(/const KSCALE_OF = [^\n]+/), grab(/const CELL_CAP_OF = [^\n]+/), grab(/const SIDE_CAP = [^\n]+/), grab(/const NARROW_OF = [^\n]+/), grab(/const FAR_OF = [^\n]+/), grab(/const RAIL_OF = [^\n]+/), grab(/const HOLE_OF = [^\n]+/), grab(/const LANE_OF = [^\n]+/), grab(/const TIGHTEN_OF = [^\n]+/), grab(/const TRAP_OF = [^\n]+/), grab(/const GEN_OPTS = [^\n]+/), grab(/function mulberry32[^\n]+/), grab(/function generate\(mask, maxLen, seed[^)]*\) \{[\s\S]*?\n  \}\n/)].join('\n');
 const { generate, rasterise, nextForm, gradeOf, FORM0, MAXLEN_OF, GEN_OPTS, DIRS, KSCALE_OF, CELL_CAP_OF, SIDE_CAP } = new Function(src + '\nreturn { generate, rasterise, nextForm, gradeOf, FORM0, MAXLEN_OF, GEN_OPTS, DIRS, KSCALE_OF, CELL_CAP_OF, SIDE_CAP };')();
 // a sampling ramp for the board tests (the game itself picks the tier from the player's form, not the level)
 const BASE_TIER = i => i < 5 ? 0 : i < 15 ? 1 : i < 40 ? 2 : i < 80 ? 3 : 4;
@@ -67,7 +67,7 @@ test('boards are dense: Hard tour levels average over 90 arrows on the finer gri
   const avg = tier => { const idx = data.levels.map((_, i) => i).filter(i => BASE_TIER(i) === tier); return idx.reduce((n, i) => n + generate(maskFor(data.levels[i], tier), MAXLEN_OF[tier], (i + 1) * 1000).pieces.length, 0) / idx.length; };
   assert.ok(avg(1) > 35, `Normal averages ${avg(1)}`); assert.ok(avg(2) > 90, `Hard averages ${avg(2)}`);
 });
-test('difficulty follows form, not the level: grades 0-14, a first-try clear one up, a flawless fast one two, a scrappy or retried clear holds, a heart-out three down', () => {
+test('difficulty follows form, not the level: grades 0-14, a first-try clear one up, a flawless fast one two, a scrappy or retried clear holds, Locked in a whole tier, a heart-out three down', () => {
   const flawless = { firstTry: true, heartsLost: 0, hints: 0, secPerArrow: 0.9 }, slow = { firstTry: true, heartsLost: 0, hints: 0, secPerArrow: 2 }, oneEach = { firstTry: true, heartsLost: 1, hints: 1, secPerArrow: 0.9 };
   const twoHearts = { firstTry: true, heartsLost: 2, hints: 0, secPerArrow: 2.5 }, twoHints = { firstTry: true, heartsLost: 0, hints: 2, secPerArrow: 1 }, retry = { firstTry: false, heartsLost: 0, hints: 0, secPerArrow: 0.9 };
   let f = { ...FORM0 };
@@ -78,6 +78,10 @@ test('difficulty follows form, not the level: grades 0-14, a first-try clear one
   f = nextForm(f, true, twoHearts); assert.deepEqual(f, { grade: 4, tier: 1 }, 'two hearts lost: holds');
   f = nextForm(f, true, twoHints); assert.deepEqual(f, { grade: 4, tier: 1 }, 'two hints: holds');
   f = nextForm(f, true, retry); assert.deepEqual(f, { grade: 4, tier: 1 }, 'a clear after a retry holds, and resets nothing');
+  // the card's Focus reading, where the run carries it: Locked in (85+) is a whole tier; a Locked-in retry a step
+  f = nextForm(f, true, { ...slow, focus: 90 }); assert.deepEqual(f, { grade: 7, tier: 2 }, 'Locked in: a whole tier up');
+  f = nextForm(f, true, { ...retry, focus: 90 }); assert.deepEqual(f, { grade: 8, tier: 2 }, 'Locked in on the retry: a step');
+  f = { grade: 4, tier: 1 };
   f = nextForm(f, false, null); assert.deepEqual(f, { grade: 1, tier: 0 }, 'a heart-out: three grades down');
   for (let k = 0; k < 6; k++) f = nextForm(f, false, null); assert.deepEqual(f, { grade: 0, tier: 0 }, 'never below Easy');
   for (let k = 0; k < 12; k++) f = nextForm(f, true, flawless); assert.deepEqual(f, { grade: 14, tier: 4 }, 'never above the hardest deal of Master');

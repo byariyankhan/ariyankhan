@@ -31,7 +31,7 @@ function fakeStorage() {
   return ls;
 }
 const STORE_SRC = `const STORE = 'aa:v1:';\n` + grab(/  const store = \{[\s\S]*?\n  \};\n/);
-const LADDER_SRC = [one('GRADE_UP'), one('FAST_SEC_PER_ARROW'), one('clampTier'), one('clampGrade'), one('clearPoints'), one('FORM0'), one('gradeOf'), one('formOf'), multi('nextForm')].join('\n');
+const LADDER_SRC = [one('GRADE_UP'), one('LOCKED_IN'), one('FAST_SEC_PER_ARROW'), one('clampTier'), one('clampGrade'), one('clearPoints'), one('FORM0'), one('gradeOf'), one('formOf'), multi('nextForm')].join('\n');
 const ladder = new Function(LADDER_SRC + '\nreturn { nextForm, clearPoints, gradeOf, FORM0, GRADES };')();
 const mulberry32 = new Function(grab(/function mulberry32[^\n]+/) + '\nreturn mulberry32;')();
 
@@ -100,6 +100,12 @@ test('a heart-out is three grades, a clear one or two, a scrappy clear none: the
   assert.equal(clearPoints({ firstTry: true, heartsLost: 2, hints: 0, secPerArrow: 0.5 }), 0, 'two hearts: scrappy');
   assert.equal(clearPoints({ firstTry: true, heartsLost: 0, hints: 2, secPerArrow: 0.5 }), 0, 'two hints: scrappy');
   assert.equal(clearPoints({ firstTry: false, heartsLost: 0, hints: 0, secPerArrow: 0.5 }), 0, 'after a retry');
+  // the card's Focus reading: Locked in (85 and up) is a whole tier, and a Locked-in retry is a step
+  assert.equal(clearPoints({ firstTry: true, heartsLost: 0, hints: 0, secPerArrow: 0.5, focus: 92 }), 3, 'Locked in: a whole tier');
+  assert.equal(clearPoints({ firstTry: true, heartsLost: 1, hints: 0, secPerArrow: 0.5, focus: 88 }), 3, 'Locked in with a heart gone');
+  assert.equal(clearPoints({ firstTry: true, heartsLost: 2, hints: 0, secPerArrow: 0.5, focus: 90 }), 0, 'two hearts is still scrappy');
+  assert.equal(clearPoints({ firstTry: false, heartsLost: 0, hints: 0, secPerArrow: 0.5, focus: 90 }), 1, 'a Locked-in retry: a step');
+  assert.equal(clearPoints({ firstTry: false, heartsLost: 0, hints: 0, secPerArrow: 0.5, focus: 80 }), 0, 'any other retry holds');
   assert.deepEqual(nextForm({ grade: 7, tier: 2 }, false, null), { grade: 4, tier: 1 });
   assert.deepEqual(nextForm({ grade: 7, tier: 2 }, true, { firstTry: true, heartsLost: 2, hints: 2, secPerArrow: 9 }), { grade: 7, tier: 2 }, 'no reset: the grade stays');
 });
@@ -154,7 +160,7 @@ test('a scene is a whole tier up, the board after it the easiest deal of the pla
   k.store.set('form', { grade: 13, tier: 4 });
   assert.equal(k.gradeFor(1), 14, 'Master\'s scene is the hardest deal there is');
   const keep = fn('keepWin');
-  assert.ok(/if \(!prev\) \{ if \(L\.scene\) store\.set\('breather', true\); else store\.del\('breather'\); \}/.test(keep), 'a scene cleared sets the breather, the next new clear spends it');
+  assert.ok(/if \(!prev\) \{ if \(L\.scene && !\(run\.learn\?\.points >= GRADE_UP_TIER\)\) store\.set\('breather', true\); else store\.del\('breather'\); \}/.test(keep), 'a scene cleared sets the breather unless it was Locked in, and the next new clear spends it');
   assert.ok(/if \(state\.level\?\.scene\) store\.set\('breather', true\);/.test(js), 'a scene skipped earns one too');
   assert.ok(/One step harder: this scene is \$\{state\.diff\}\./.test(fn('startLevel')), 'a scene says on start that it is one step harder');
 });
@@ -168,13 +174,13 @@ test('a new player: never past Normal before five boards, never past Hard before
   assert.equal(k.gradeNow(), 5, 'the ceiling is the hardest deal of Normal');
   assert.equal(k.tierFor(1), 2, 'a scene is still a step above it');
   // the ladder itself is held at the ceiling, so the climb past it starts from its top, not from Master
-  const FORM_SRC = [STORE_SRC, LADDER_SRC, one('formNow'), one('GRADE_CAP'), fn('learnFrom')].join('\n');
+  const FORM_SRC = [STORE_SRC, LADDER_SRC, one('formNow'), one('GRADE_CAP'), one('PAR_SEC_PER_ARROW'), one('FOCUS_FLOOR'), fn('focusOf'), fn('learnFrom')].join('\n');
   const learn = done => { const localStorage = fakeStorage(); return new Function('localStorage', 'boardsDone', FORM_SRC + '\nreturn { store, learnFrom, formNow };')(localStorage, () => done); };
   const flawless = { fails: 0, lost: 0, hints: 0, t: 10_000, arrows: 22 };
   const a = learn(3); for (let n = 0; n < 6; n++) a.learnFrom(true, flawless);
   assert.deepEqual(a.formNow(), { grade: 5, tier: 1 }, 'six flawless clears among the first five boards: the top of Normal');
   const b = learn(5); b.store.set('form', { grade: 5, tier: 1 }); b.learnFrom(true, flawless);
-  assert.deepEqual(b.formNow(), { grade: 7, tier: 2 }, 'the sixth board goes on from there');
+  assert.deepEqual(b.formNow(), { grade: 8, tier: 2 }, 'the sixth board goes on from there: Locked in, a whole tier');
   const c = learn(3); c.store.set('form', { grade: 14, tier: 4 }); c.learnFrom(false, {});
   assert.deepEqual(c.formNow(), { grade: 2, tier: 0 }, 'a heart-out counts down from the grade as dealt');
   const d = learn(3); d.store.set('form', { tier: 4, wins: 0, losses: 0 }); d.learnFrom(true, flawless);
@@ -193,7 +199,7 @@ test('a new player: the brain, then the home country and its discovery, then a f
   const home = data.levels.find(L => L.a2 === 'BD').id;
   assert.deepEqual(ids.slice(0, 4), [F[0], home, 'd:' + home, F[1]], 'brain, Bangladesh, its discovery, the second focus board');
   assert.equal(new Set(ids).size, ids.length, 'every board once');
-  assert.equal(ids.length, 197 * 2 + Math.floor(197 / 4) + F.length, 'none lost');
+  assert.equal(ids.length, 197 + new Set(Object.values(DISC.boards).map(b => b.hex)).size + SCENEB.boards.length + F.length, 'none lost: every country, one discovery board per shape, each scene once');
   const at = F.map(id => ids.indexOf(id));
   assert.ok(at.every((j, n) => j === 3 * n), 'focus board n sits at slot 3n: two tour boards between each');
   assert.equal(tour.slice(0, at[F.length - 1]).filter(L => !L.focus).length, 2 * (F.length - 1), 'they run out after 2 x 25 tour boards');

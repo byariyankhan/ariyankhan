@@ -4,7 +4,7 @@
    for the game's own files; every other request is left to the network exactly as if no worker were
    installed. It used to be /piece-the-world-sw.js at the root, with the whole origin as its scope, named for
    a game since removed; js/puzzle.js unregisters that one where a device still has it (swStart). */
-const VERSION = 'puzzle-cache-v1';
+const VERSION = 'puzzle-cache-v2';
 const GAME_FILES = new Set([
   '/puzzle', '/puzzle/', '/css/puzzle.css', '/js/puzzle.js', '/puzzle/app.webmanifest', '/images/puzzle-brain-mark.svg', '/images/puzzle-brain-mark-rose.svg', '/images/puzzle-brain-mark-white.svg',
   // the game's own icon and its coin: installed from the home screen, with no network, the game still has a
