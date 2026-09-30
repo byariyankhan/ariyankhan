@@ -186,22 +186,14 @@ uploaded to that old name is not served.
 
 ## Service Pages
 
-**4 main pages:** `talking-head-video-editing.html`, `documentary-video-editing.html`, `short-form-video-editing.html`, `map-animation.html`
+**The 4 main pages are the only service pages:** `talking-head-video-editing.html`, `documentary-video-editing.html`, `short-form-video-editing.html`, `map-animation-video-editing.html`
 
-**8 SEO landing pages:**
-
-| File | Keyword | Portfolio feed |
-|------|---------|----------------|
-| `youtube-video-editor.html` | youtube video editor | talking-head |
-| `hire-youtube-video-editor.html` | hire youtube video editor | talking-head |
-| `freelance-video-editor.html` | freelance video editor | talking-head |
-| `youtube-video-editing-services.html` | youtube video editing services | talking-head |
-| `faceless-youtube-video-editor.html` | faceless youtube video editor | documentary |
-| `podcast-video-editor.html` | podcast video editor | talking-head |
-| `remote-video-editor.html` | remote video editor | talking-head |
-| `video-editing-services-for-creators.html` | video editing for creators | short-form |
-
-SEO pages are found via Google search only — not in site navigation.
+Everything that used to live under `/service/` (the 20 audience and SEO landing
+pages and the folder's index) was deleted after AdSense rejected the site for low
+value content. Each old URL 301-redirects, in one hop, to one of the four; the
+rules are at the top of `.htaccess`, the full map is in `service/README.md`, and
+`tests/service-redirects.test.mjs` checks both. Don't add service landing pages
+back, and don't link to a `/service/` URL.
 
 ---
 
@@ -242,7 +234,6 @@ Use one canonical person entity across the whole site:
 
 Every page: exactly **4 pills**, no self-link.  
 Main service pages: 3 other main services + 1 SEO page  
-SEO pages: 2 main services + 2 other SEO pages (unique mix per page)
 
 ---
 
@@ -333,8 +324,7 @@ Single auto-rotating testimonial card. Live on the 4 main service pages
 (`talking-head-video-editing.html`, `documentary-video-editing.html`,
 `short-form-video-editing.html`, `map-animation-video-editing.html`) — each
 showing that page's own niche reviews — and on `index.html`, which shows a
-shuffled mix pulled from all 4. Not yet on the 10 SEO landing pages under
-`/service/`.
+shuffled mix pulled from all 4.
 
 **Files:**
 - `css/review-card.css` → all visual design (both the `.service-testimonial`
