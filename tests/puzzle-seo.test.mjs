@@ -34,8 +34,12 @@ const blocks = [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?
 const ld = blocks.map(b => JSON.parse(b));
 const graph = ld[0]?.['@graph'] || [];
 const node = type => graph.find(n => [].concat(n['@type']).includes(type));
-// the visible block: Settings > About > About Puzzle & FAQ
-const about = (html.match(/<details class="aa-about-credit aa-about-game" id="aaAboutGame">([\s\S]*?)<\/details>/) || [])[1] || '';
+// the pages of their own that Settings > About links to, like the policies
+const aboutPage = read('puzzle/about.html');
+const howPage = read('puzzle/how-to-play.html');
+const about = (aboutPage.match(/<main class="aa-legal">([\s\S]*?)<\/main>/) || [])[1] || '';
+const how = (howPage.match(/<main class="aa-legal">([\s\S]*?)<\/main>/) || [])[1] || '';
+const aboutGraph = JSON.parse((aboutPage.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/) || [])[1] || '{}')['@graph'] || [];
 const settings = html.slice(html.indexOf('id="aaSheet"'), html.indexOf('<script src="/js/puzzle.js'));
 // every removed round, and the counts and claims the game no longer backs
 const GONE = /flag memory|flag match|capital sprint|three short rounds|over 450|tap[- ]away/i;
@@ -92,9 +96,10 @@ test('.htaccess sends the bare /puzzle to https …/puzzle/ in one hop, before t
 });
 
 console.log('\nThe structured data');
-test('one JSON-LD block, and it parses', () => { assert.equal(blocks.length, 1); assert.ok(graph.length >= 4); });
-test('WebPage, VideoGame + WebApplication, FAQPage and BreadcrumbList; no MobileApplication until the Play listing is public', () => {
-  for (const t of ['WebPage', 'VideoGame', 'WebApplication', 'FAQPage', 'BreadcrumbList']) assert.ok(node(t), t);
+test('one JSON-LD block, and it parses', () => { assert.equal(blocks.length, 1); assert.ok(graph.length >= 3); });
+test('WebPage, VideoGame + WebApplication and BreadcrumbList; the FAQPage lives on the About page; no MobileApplication until the Play listing is public', () => {
+  for (const t of ['WebPage', 'VideoGame', 'WebApplication', 'BreadcrumbList']) assert.ok(node(t), t);
+  assert.ok(!node('FAQPage'), 'the FAQPage is on /puzzle/about.html, where its questions are');
   assert.ok(!node('MobileApplication'), 'MobileApplication');
   assert.ok(!/android app|google play|play\.google\.com/i.test(shown), 'an Android app or Play claim');
   assert.ok(!/aggregateRating|"review"/.test(html), 'ratings that are not on the page');
@@ -129,18 +134,28 @@ test('the paintings count is the gallery\'s', () => {
 
 console.log('\nWhat a crawler reads in the page');
 test('the FAQPage quotes the visible questions and answers word for word', () => {
-  const shown = [...about.matchAll(/<h4>([\s\S]*?)<\/h4>\s*<p>([\s\S]*?)<\/p>/g)].map(m => [text(m[1]), text(m[2])]);
+  const shown = [...about.matchAll(/<h3>([\s\S]*?)<\/h3>\s*<p>([\s\S]*?)<\/p>/g)].map(m => [text(m[1]), text(m[2])]);
   assert.ok(shown.length >= 5, `${shown.length} questions shown`);
-  assert.deepEqual(node('FAQPage').mainEntity.map(q => [q.name, q.acceptedAnswer.text]), shown);
+  const faq = aboutGraph.find(n => n['@type'] === 'FAQPage');
+  assert.ok(faq, 'the About page has a FAQPage');
+  assert.deepEqual(faq.mainEntity.map(q => [q.name, q.acceptedAnswer.text]), shown);
 });
-test('About Puzzle & FAQ is a folded row of Settings > About: in the markup for every crawler, shut for every player', () => {
-  assert.ok(about, 'the block is there');
-  assert.ok(settings.includes('id="aaAboutGame"'), 'inside the Settings page');
-  assert.ok(!/<details[^>]*\sopen/.test(settings.match(/<details[^>]*id="aaAboutGame"[^>]*>/)[0]), 'folded shut');
-  assert.match(about, /<summary class="aa-row aa-row--link">[\s\S]*About Puzzle &amp; FAQ/);
-  assert.ok(!/\shidden\b|\sstyle=|sr-only|visually-hidden/.test(about), 'nothing in it is hidden by any other means');
-  for (const r of ROUNDS) assert.ok(text(about).includes(r), `it names ${r}`);
-  assert.ok(/\.aa-about-credit \+ \.aa-row\{/.test(css), 'the row after it keeps its divider');
+test('About Puzzle & FAQ and How to play are pages of their own, linked from Settings > About like the policies', () => {
+  for (const [page, href, label] of [['about.html', '/puzzle/about.html', 'About Puzzle &amp; FAQ'], ['how-to-play.html', '/puzzle/how-to-play.html', 'How to play']]) {
+    assert.match(settings, new RegExp(`<a class="aa-row aa-row--link" href="${href}">[\\s\\S]*?${label}`), `Settings links ${label}`);
+    const src = read('puzzle/' + page);
+    assert.ok(src.includes(`<link rel="canonical" href="https://ariyankhan.com${href}" />`), `${page}: canonical`);
+    assert.ok(sitemap.includes(`<loc>https://ariyankhan.com${href}</loc>`), `${page}: in the sitemap`);
+    assert.ok(src.includes('<a class="aa-legal-back" href="/puzzle/">'), `${page}: a way back to the game`);
+    const t = text(src.match(/<title>([^<]*)<\/title>/)[1]);
+    assert.ok(t.length <= 60, `${page}: title is ${t.length} characters`);
+    const d = src.match(/<meta name="description" content="([^"]*)"/)[1];
+    assert.ok(d.length <= 160, `${page}: description is ${d.length} characters`);
+  }
+  assert.ok(!/id="aaAboutGame"/.test(html), 'the folded block is gone from the app');
+  assert.ok(!/\shidden\b|\sstyle=|sr-only|visually-hidden/.test(about + how), 'nothing on the pages is hidden');
+  for (const r of ROUNDS) { assert.ok(text(about).includes(r), `About names ${r}`); assert.ok(text(how).includes(r), `How to play names ${r}`); }
+  assert.ok(/\.aa-about-credit \+ \.aa-row\{/.test(css), 'the row after Credits keeps its divider');
 });
 test('nothing sits under the game: the page foot is still gone', () => {
   const tail = html.slice(html.indexOf('</main>'), html.indexOf('<!-- ── SIGN IN'));
@@ -155,8 +170,8 @@ test('the h1 reads "Puzzle Train your brain." with a space', () => {
 });
 test('interface text stays out of snippets: data-nosnippet on the opening, sign-in sheet, session and developer groups, not on Settings', () => {
   for (const id of ['aaSplash', 'aaSignInSheet', 'aaSessionGroup', 'aaDevGroup']) assert.match(html, new RegExp(`<div[^>]*id="${id}"[^>]*\\sdata-nosnippet[\\s>]`), id);
-  assert.ok(!/<div[^>]*id="aaSheet"[^>]*data-nosnippet/.test(html), '#aaSheet holds the FAQ');
-  assert.ok(!/data-nosnippet/.test(about), 'nor anything in the FAQ');
+  assert.ok(!/<div[^>]*id="aaSheet"[^>]*data-nosnippet/.test(html), '#aaSheet links the FAQ');
+  assert.ok(!/data-nosnippet/.test(aboutPage + howPage), 'nor anything on the About and How to play pages');
 });
 
 console.log('\nEverywhere else the game is described');
@@ -166,7 +181,7 @@ test('the home card, llms.txt, llms-full.txt and the noscript name all four roun
     for (const r of ROUNDS) assert.ok(s.replace(/'/g, '’').includes(r.replace(/'/g, '’')), `${where}: ${r}`);
 });
 test('no removed round, stale count or borrowed name anywhere the game is described', () => {
-  for (const [where, s] of [['page', html], ['home', home], ['llms.txt', llms], ['llms-full.txt', llmsFull], ['manifest', manifest.description]])
+  for (const [where, s] of [['page', html], ['about', aboutPage], ['how to play', howPage], ['home', home], ['llms.txt', llms], ['llms-full.txt', llmsFull], ['manifest', manifest.description]])
     assert.ok(!GONE.test(s), `${where}: ${s.match(GONE)?.[0]}`);
 });
 test('llms-full.txt: the metadata remover\'s paragraph sits under its own line, not under Puzzle\'s', () => {
@@ -184,11 +199,11 @@ test('offline is claimed only for the solo boards, and the manifest describes th
   assert.ok(manifest.description.length <= 300);
 });
 test('no health or cognitive claims: the Brain Score is a game score', () => {
-  const all = [html, home, llms, llmsFull, manifest.description].join('\n');
+  const all = [html, aboutPage, howPage, home, llms, llmsFull, manifest.description].join('\n');
   assert.ok(!/improves? (your )?(memory|focus|brain)|clinically|proven to|scientifically|\bIQ\b|prevents? (decline|dementia)|cognitive (benefit|decline)/i.test(all));
 });
 test('The Met is a source, not a partner', () => {
-  const all = [html, home, llms, llmsFull].join('\n');
+  const all = [html, aboutPage, howPage, home, llms, llmsFull].join('\n');
   assert.ok(!/(partner(ship)?|in association|official) (with|of) (the )?(Met|Metropolitan)/i.test(all));
   assert.ok(!/<img[^>]*met(museum)?[-_ ]?logo/i.test(all));
 });

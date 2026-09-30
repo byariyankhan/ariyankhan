@@ -32,6 +32,20 @@
   </url>
 
   <url>
+    <loc>https://ariyankhan.com/puzzle/about.html</loc>
+    <lastmod>2026-09-30</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+
+  <url>
+    <loc>https://ariyankhan.com/puzzle/how-to-play.html</loc>
+    <lastmod>2026-09-30</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+
+  <url>
     <loc>https://ariyankhan.com/puzzle/privacy.html</loc>
     <lastmod>2026-09-24</lastmod>
     <changefreq>yearly</changefreq>

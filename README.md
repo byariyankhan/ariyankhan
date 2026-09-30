@@ -828,14 +828,16 @@ links.
   root `.htaccess` sends the bare `/puzzle` there in one https hop (mod_dir's own
   slash redirect answered `http://` from behind the proxy). No hreflang: one language.
   One JSON-LD block: WebPage, VideoGame + WebApplication (SinglePlayer and
-  MultiPlayer, "over 400 boards", no ratings), FAQPage and BreadcrumbList. There is
+  MultiPlayer, "over 400 boards", no ratings) and BreadcrumbList. There is
   no MobileApplication node and no "Android app" wording until the Play listing is
   public. The words a crawler reads are in the static HTML but nothing sits under the
-  game: Settings > About has an **"About Puzzle & FAQ"** row, a native `<details>`
-  folded shut like Credits (`#aaAboutGame`), with what Daily Training and the arrow
-  puzzle are and six questions. The FAQPage quotes those questions and answers word
-  for word, and `tests/puzzle-seo.test.mjs` fails if they drift apart, if a round is
-  renamed in `TRAIN_ROUNDS` without the page following, or if a removed round comes
+  game: Settings > About links two pages of their own, laid out like the policies:
+  **`/puzzle/about.html`** ("About Puzzle & FAQ": what Daily Training and the arrow
+  puzzle are and six questions, with the FAQPage quoting them word for word) and
+  **`/puzzle/how-to-play.html`** (the rules: arrows, hearts, hints, stars, Daily
+  Training, streak, matches). `tests/puzzle-seo.test.mjs` fails if the FAQ and its
+  FAQPage drift apart, if a round is renamed in `TRAIN_ROUNDS` without the pages
+  following, or if a removed round comes
   back in the copy. A `<noscript>` line says the same in one sentence. The gate, the
   splash, the sign-in sheet and the session and developer groups carry
   `data-nosnippet`, so interface text is never the search snippet. The homepage has a

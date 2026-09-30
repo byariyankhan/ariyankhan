@@ -146,7 +146,7 @@
          set these two when the backend moves to a host of its own and the client follows without a change:
          <meta name="puzzle-api" content="https://api.example.com" />
          <meta name="puzzle-ws"  content="wss://api.example.com" /> -->
-    <link rel="stylesheet" href="/css/puzzle.css?v=67" />
+    <link rel="stylesheet" href="/css/puzzle.css?v=68" />
     <link rel="preload" href="/games/data/puzzle.json?v=11" as="fetch" crossorigin="anonymous" />
 
     <!-- SCHEMA -->
@@ -203,19 +203,6 @@
           "potentialAction": { "@type": "PlayAction", "target": "https://ariyankhan.com/puzzle/" },
           "author": { "@id": "https://ariyankhan.com/about.html#person", "@type": "Person", "name": "Ariyan Khan" },
           "publisher": { "@id": "https://ariyankhan.com/about.html#person" }
-        },
-        {
-          "@type": "FAQPage",
-          "@id": "https://ariyankhan.com/puzzle/#faq",
-          "isPartOf": { "@id": "https://ariyankhan.com/puzzle/#webpage" },
-          "mainEntity": [
-            { "@type": "Question", "name": "Is Puzzle – Train Your Brain free?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. The four Daily Training rounds are free every day, and the arrow puzzle tour is free to play. Nothing in the game can be bought: there are no in-app purchases, and gold is only a number in the game. Any advertisement is optional and rewarded: you choose to watch one, for an extra hint, heart, gold or a new puzzle." } },
-            { "@type": "Question", "name": "Do I need to download anything or sign up?", "acceptedAnswer": { "@type": "Answer", "text": "No. Puzzle plays in your web browser on phones, tablets and computers, and you can add it to your home screen. Playing on your own needs no account; signing in with Google is only for Play with Friends and the weekly league." } },
-            { "@type": "Question", "name": "What are the Daily Training games?", "acceptedAnswer": { "@type": "Answer", "text": "Four short rounds on real paintings: Restore the Canvas (rebuild a painting from its pieces), The Forgery (spot what is wrong in a forged copy), Gallery Memory (re-hang paintings in the order they hung) and The Curator’s Eye (pick the detail that came from the painting you saw)." } },
-            { "@type": "Question", "name": "How is the Brain Score worked out?", "acceptedAnswer": { "@type": "Answer", "text": "Each round is scored from 0 to 100, and the day’s Brain Score is the average of the rounds you played that day. Play at least one round a day to keep your streak going. A round gets harder after a day you score 85 or more in it, and easier after a day under 50." } },
-            { "@type": "Question", "name": "How does the arrow puzzle work?", "acceptedAnswer": { "@type": "Answer", "text": "Every arrow slides the way it points. Tap an arrow and, if its path is clear, it flies off the board; if another arrow blocks it, you lose a heart (four on Easy and Normal, fewer on the harder levels). Clear every arrow to finish the board. A country board then tells you which country it was, with its capital, population and region." } },
-            { "@type": "Question", "name": "Where do the paintings come from?", "acceptedAnswer": { "@type": "Answer", "text": "They are 247 public-domain works from The Metropolitan Museum of Art’s Open Access collection, and every round credits the paintings it used." } }
-          ]
         },
         {
           "@type": "BreadcrumbList",
@@ -555,40 +542,9 @@
 
         <p class="aa-cap">About</p>
         <div class="aa-group">
-          <!-- What the game is, in words. Static HTML, so every crawler reads it without running script; folded shut
-               like Credits below, so no player scrolls past it and nothing sits under the game. The FAQPage in the
-               head quotes the Questions here word for word: change one, change the other
-               (tests/puzzle-seo.test.mjs holds them together). -->
-          <details class="aa-about-credit aa-about-game" id="aaAboutGame">
-            <summary class="aa-row aa-row--link"><span class="aa-row-ico">🧠</span><span class="aa-row-label">About Puzzle &amp; FAQ</span><span class="aa-row-chev">›</span></summary>
-            <div class="aa-about-credit-text aa-about-game-text">
-              <h3>Free daily brain training on real paintings</h3>
-              <p>Daily Training is four short games, free every day, played on public-domain paintings from The Metropolitan Museum of Art’s Open Access collection. Every round is scored out of 100, and together they make the day’s Brain Score.</p>
-              <ul>
-                <li><b>Restore the Canvas</b>: the painting hangs whole for a few seconds, then falls into pieces. Drag every piece back to its place.</li>
-                <li><b>The Forgery</b>: spot the differences. Patches of a forged copy are mirrored, recoloured or taken from elsewhere in the painting; tap them.</li>
-                <li><b>Gallery Memory</b>: paintings hang on the wall, numbered, for a moment. Hang them back in the same order.</li>
-                <li><b>The Curator’s Eye</b>: look at one painting, then, several times, pick which of four close-ups came from it.</li>
-              </ul>
-              <h3>An arrow logic puzzle on 197 countries</h3>
-              <p>Tap an arrow to send it off the board. Over 400 boards make a world tour that starts from your home country: the outlines of all 197 countries, with animal, bird, landmark and picture boards between them. Clearing a country tells you its capital, population and region, and the difficulty, from Easy to Master, follows how well you play.</p>
-              <h3>Play with friends</h3>
-              <p>Sign in with Google to race friends and other players online and to play in the weekly league. Playing on your own never needs an account.</p>
-              <h3>Questions</h3>
-              <h4>Is Puzzle – Train Your Brain free?</h4>
-              <p>Yes. The four Daily Training rounds are free every day, and the arrow puzzle tour is free to play. Nothing in the game can be bought: there are no in-app purchases, and gold is only a number in the game. Any advertisement is optional and rewarded: you choose to watch one, for an extra hint, heart, gold or a new puzzle.</p>
-              <h4>Do I need to download anything or sign up?</h4>
-              <p>No. Puzzle plays in your web browser on phones, tablets and computers, and you can add it to your home screen. Playing on your own needs no account; signing in with Google is only for Play with Friends and the weekly league.</p>
-              <h4>What are the Daily Training games?</h4>
-              <p>Four short rounds on real paintings: Restore the Canvas (rebuild a painting from its pieces), The Forgery (spot what is wrong in a forged copy), Gallery Memory (re-hang paintings in the order they hung) and The Curator’s Eye (pick the detail that came from the painting you saw).</p>
-              <h4>How is the Brain Score worked out?</h4>
-              <p>Each round is scored from 0 to 100, and the day’s Brain Score is the average of the rounds you played that day. Play at least one round a day to keep your streak going. A round gets harder after a day you score 85 or more in it, and easier after a day under 50.</p>
-              <h4>How does the arrow puzzle work?</h4>
-              <p>Every arrow slides the way it points. Tap an arrow and, if its path is clear, it flies off the board; if another arrow blocks it, you lose a heart (four on Easy and Normal, fewer on the harder levels). Clear every arrow to finish the board. A country board then tells you which country it was, with its capital, population and region.</p>
-              <h4>Where do the paintings come from?</h4>
-              <p>They are 247 public-domain works from The Metropolitan Museum of Art’s Open Access collection, and every round credits the paintings it used.</p>
-            </div>
-          </details>
+          <!-- What the game is, and how to play it: pages of their own, like the policies (tests/puzzle-seo.test.mjs) -->
+          <a class="aa-row aa-row--link" href="/puzzle/about.html"><span class="aa-row-ico">🧠</span><span class="aa-row-label">About Puzzle &amp; FAQ</span><span class="aa-row-chev">›</span></a>
+          <a class="aa-row aa-row--link" href="/puzzle/how-to-play.html"><span class="aa-row-ico">🎯</span><span class="aa-row-label">How to play</span><span class="aa-row-chev">›</span></a>
           <a class="aa-row aa-row--link" href="/puzzle/privacy.html"><span class="aa-row-ico">🔒</span><span class="aa-row-label">Privacy Policy</span><span class="aa-row-chev">›</span></a>
           <a class="aa-row aa-row--link" href="/puzzle/terms.html"><span class="aa-row-ico">📄</span><span class="aa-row-label">Terms of Service</span><span class="aa-row-chev">›</span></a>
           <!-- one row like the others; the licence text opens under it when tapped (a native details, so no script) -->
