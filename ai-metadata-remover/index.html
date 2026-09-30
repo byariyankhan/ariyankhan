@@ -40,7 +40,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="/css/ai-metadata-remover.css?v=6" />
+    <link rel="stylesheet" href="/css/ai-metadata-remover.css?v=7" />
 
     <script type="application/ld+json">
 {
@@ -127,7 +127,7 @@
     </header>
 
     <main class="amr-page amr-home">
-      <h1>Remove hidden data <span>from your images</span></h1>
+      <h1>Remove AI metadata <span>from your images</span></h1>
       <p class="amr-lede">Your images never leave your device.</p>
 
       <section class="amr-tool" aria-label="Clean images">
@@ -151,6 +151,38 @@
           </div>
         </div>
         <div class="amr-list" id="amrList"></div>
+      </section>
+
+      <!-- Below the tool, out of the way of the upload: what the page does, for people and for search -->
+      <section class="amr-section amr-explain" aria-labelledby="amr-explain-title">
+        <h2 id="amr-explain-title">What this AI metadata remover takes out</h2>
+        <div class="amr-grid">
+          <div class="amr-card"><h3>AI labels and Content Credentials</h3><p>The C2PA manifest that ChatGPT, Adobe Firefly, Photoshop and Microsoft Designer attach, and the IPTC and XMP tags that mark an image as AI-generated.</p></div>
+          <div class="amr-card"><h3>Location and camera details</h3><p>EXIF data such as GPS coordinates, the camera or phone model, its serial number and the time the photo was taken.</p></div>
+          <div class="amr-card"><h3>AI prompts and settings</h3><p>The prompt, seed and model that Stable Diffusion tools such as Automatic1111 and ComfyUI store inside PNG files.</p></div>
+          <div class="amr-card"><h3>Everything else hidden</h3><p>Editing history, comments, embedded thumbnails and data tucked after the end of the image. The picture itself is not touched.</p></div>
+        </div>
+
+        <h2>Questions</h2>
+        <div class="amr-faq">
+          <details>
+            <summary>Is it free, and are my images uploaded?</summary>
+            <p>It is free, with no sign-up and no limit. Your images are cleaned inside your browser and never sent to any server, so they never leave your device.</p>
+          </details>
+          <details>
+            <summary>Will it remove the “AI info” label on Instagram or Facebook?</summary>
+            <p>Those labels are mostly triggered by C2PA and IPTC metadata, which this tool removes, so an image labelled only because of its metadata will normally upload without the label. Platforms can also check the pixels themselves, so no tool can guarantee it.</p>
+          </details>
+          <details>
+            <summary>Does it lower the image quality?</summary>
+            <p>No. JPG, PNG and WebP files are rewritten without their metadata, and the picture data is copied exactly, so the clean file looks identical and is usually smaller.</p>
+          </details>
+          <details>
+            <summary>Can it remove invisible watermarks like Google SynthID?</summary>
+            <p>No. SynthID and similar marks are hidden in the pixels, not in the metadata, and this tool does not try to remove them.</p>
+          </details>
+        </div>
+        <p class="amr-links"><a class="amr-btn" href="/ai-metadata-remover/how-to-use.html">Full guide</a> <a class="amr-btn" href="/ai-metadata-remover/about.html">More questions</a></p>
       </section>
     </main>
 
