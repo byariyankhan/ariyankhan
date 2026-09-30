@@ -70,6 +70,8 @@
     <span class="footer-divider" aria-hidden="true">|</span>
     <a href="${root}ai-metadata-remover/">AI Metadata Remover</a>
     <span class="footer-divider" aria-hidden="true">|</span>
+    <a href="${root}ai-image-checker/">AI Image Checker</a>
+    <span class="footer-divider" aria-hidden="true">|</span>
     <a href="${root}map-maker/">Map Maker</a>
     <a href="${root}puzzle/">Puzzle – Train Your Brain</a>
     <span class="footer-divider" aria-hidden="true">|</span>

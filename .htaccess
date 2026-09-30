@@ -50,9 +50,10 @@ RewriteRule ^service/video-editor-for-military-history-channels\.html$          
 #    https for the same reason as the /service/ rules above, so http://www.… is still one hop. A Map Maker
 #    share link keeps working: its map lives after the #, which the browser carries across the redirect.
 RewriteCond %{HTTP_HOST} ^(?:www\.|youtube\.)?(.+)$ [NC]
-RewriteRule ^(?:map-maker|ai-metadata-remover)(?:\.html)?$ - [E=TOOL_HOST:%1]
+RewriteRule ^(?:map-maker|ai-metadata-remover|ai-image-checker)(?:\.html)?$ - [E=TOOL_HOST:%1]
 RewriteRule ^map-maker(?:\.html)?$             https://%{ENV:TOOL_HOST}/map-maker/ [R=301,L,NE]
 RewriteRule ^ai-metadata-remover(?:\.html)?$   https://%{ENV:TOOL_HOST}/ai-metadata-remover/ [R=301,L,NE]
+RewriteRule ^ai-image-checker(?:\.html)?$      https://%{ENV:TOOL_HOST}/ai-image-checker/ [R=301,L,NE]
 
 # ── Two thin blog posts retired: each → the fuller article on the same question, in one hop ──
 #    Both were short sales pitches for hiring an editor, and "When to Hire a Video Editor for YouTube" covers

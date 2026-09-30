@@ -409,8 +409,8 @@ before touching avatar/ring CSS:**
 
 ## Two tools with identities of their own
 
-Map Maker (`/map-maker/`) and AI Metadata Remover (`/ai-metadata-remover/`) are
-built like Puzzle: each is its own product, not a page of the portfolio. Each
+Map Maker (`/map-maker/`), AI Metadata Remover (`/ai-metadata-remover/`) and AI
+Image Checker (`/ai-image-checker/`) are built like Puzzle: each is its own product, not a page of the portfolio. Each
 folder holds the tool, a How to use guide, About & FAQ and Privacy; each has its
 own logo (`icon.svg`, also the favicon), share image (`og.png`), colours, fonts,
 header and footer, and loads only its own stylesheet. **The home page is the tool and
@@ -426,6 +426,13 @@ The guide pages sit behind one settings-style icon in the header, like the game'
 | Look | old atlas: paper `#F4EEE2`, sea blue `#1F5F8B`, ochre | clean lab: white, teal `#0B8A7A` |
 | Type | Fraunces + Inter | IBM Plex Sans + IBM Plex Mono |
 | Stylesheet | `css/map-maker.css` | `css/ai-metadata-remover.css` |
+
+**AI Image Checker** (indigo `#4F46E5`, Inter + JetBrains Mono, `css/ai-image-checker.css`) reads an
+image's metadata and says what it shows about how the image was made: an AI generator named in it, C2PA
+Content Credentials (and the app in their `claim_generator`), the IPTC AI source type, Stable Diffusion
+prompts, and EXIF camera, date and GPS. It loads `js/ai-metadata-remover.js` first and uses its parsers and
+`SIGNATURES` through `window.AMRCore`, so the two tools always agree on what a file holds; add a generator
+there and both learn it. Keep its wording honest: a clean result is "no AI metadata found", never "real".
 
 The old `map-maker.html` and `ai-metadata-remover.html` (and the bare folder
 names) 301 to the folders in one hop from the top of `.htaccess`. Script, data

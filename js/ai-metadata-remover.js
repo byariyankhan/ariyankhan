@@ -453,6 +453,10 @@
     };
   }
 
+  /* The same parsers and signatures drive AI Image Checker (/ai-image-checker/), which loads this file for them
+     and has none of the elements below, so the UI part returns straight away there. */
+  if (typeof window !== 'undefined') window.AMRCore = { processFile, sniff, SIGNATURES, detectSignatures, inflate, readPngText };
+
   /* ══════════════════════════════════════════════
      UI
      ══════════════════════════════════════════════ */

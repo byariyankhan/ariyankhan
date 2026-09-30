@@ -13,6 +13,7 @@ const ok = (cond, name) => { tests++; if (cond) { console.log(`  ✓ ${name}`); 
 const TOOLS = [
   { dir: 'map-maker', css: 'css/map-maker.css', js: 'js/map-maker.js', body: 'mmk' },
   { dir: 'ai-metadata-remover', css: 'css/ai-metadata-remover.css', js: 'js/ai-metadata-remover.js', body: 'amrk' },
+  { dir: 'ai-image-checker', css: 'css/ai-image-checker.css', js: 'js/ai-image-checker.js', body: 'aick' },
 ];
 const PAGES = ['index', 'how-to-use', 'about', 'privacy'];
 const ht = read('.htaccess');
@@ -52,7 +53,7 @@ for (const t of TOOLS) {
 
 console.log('\nThe redirects are one hop from any variant');
 const first = ht.indexOf('RewriteRule ^map-maker');
-ok(/^RewriteCond %\{HTTP_HOST\} \^\(\?:www\\\.\|youtube\\\.\)\?\(\.\+\)\$ \[NC\]\nRewriteRule \^\(\?:map-maker\|ai-metadata-remover\)\(\?:\\\.html\)\?\$ - \[E=TOOL_HOST:%1\]$/m.test(ht), 'the target host is the canonical one');
+ok(/^RewriteCond %\{HTTP_HOST\} \^\(\?:www\\\.\|youtube\\\.\)\?\(\.\+\)\$ \[NC\]\nRewriteRule \^\(\?:map-maker\|ai-metadata-remover\|ai-image-checker\)\(\?:\\\.html\)\?\$ - \[E=TOOL_HOST:%1\]$/m.test(ht), 'the target host is the canonical one');
 ok(first > 0 && first < ht.indexOf('RewriteRule ^ https://%1%{REQUEST_URI}') && first < ht.indexOf('RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI}'), 'and the rules run before the www and HTTPS rules');
 ok(!/\/map-maker\.html|\/ai-metadata-remover\.html/.test(sitemap), 'the sitemap has no old address');
 
@@ -66,7 +67,7 @@ const files = [];
     if (statSync(p).isDirectory()) { if (!SKIP.has(name)) walk(p); } else if (/\.(html|php|js|mjs|txt|xml|json|webmanifest)$/.test(name)) files.push(p);
   }
 })(root);
-const old = /(?:^|["'(\s/=])(?:map-maker|ai-metadata-remover)\.html/m;
+const old = /(?:^|["'(\s/=])(?:map-maker|ai-metadata-remover|ai-image-checker)\.html/m;
 const linking = files.map(p => relative(root, p)).filter(f => !ALLOWED.has(f) && old.test(readFileSync(join(root, f), 'utf8')));
 ok(linking.length === 0, linking.length ? `no links to the old pages — found in: ${linking.join(', ')}` : `none of ${files.length} files links to an old address`);
 ok(/href="\$\{root\}map-maker\/"/.test(read('js/site-footer.js')) && /href="\$\{root\}ai-metadata-remover\/"/.test(read('js/site-footer.js')), 'the site footer links to the folders');
