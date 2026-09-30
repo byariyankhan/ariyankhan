@@ -58,7 +58,10 @@
         entry.target.classList.add('is-visible');
         revealObserver.unobserve(entry.target);
       });
-    }, { threshold: 0.15 });
+    // Reveal as soon as the top edge is on screen. A ratio threshold (it was 0.15) never fires for a section taller
+    // than about seven screens: with 18 articles the grid is ~5,500 px on a phone, so it could show at most 15% of
+    // itself and stayed invisible, a blank page, until the reader had scrolled far down.
+    }, { threshold: 0, rootMargin: '0px 0px -8% 0px' });
 
     revealEls.forEach(el => revealObserver.observe(el));
   }

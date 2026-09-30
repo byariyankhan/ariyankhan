@@ -175,3 +175,9 @@ body.amrk{ margin:0; background:var(--bg); color:var(--ink); font-family:var(--s
   .amr-home .amr-drop{ padding:44px 16px; }
 }
 @media(prefers-reduced-motion:reduce){ .amr-drop, .amr-drop-icon{ transition:none; animation:none !important; } }
+
+/* Short pages (the tool before anything is uploaded, the privacy page) still end at the bottom of the screen:
+   the page is at least one screen tall and the main area takes up the slack, so the footer sits at the bottom. */
+body.amrk{ display:flex; flex-direction:column; min-height:100vh; min-height:100dvh; }
+body.amrk > main{ flex:1 0 auto; width:100%; }
+body.amrk > header, body.amrk > footer{ flex-shrink:0; }
