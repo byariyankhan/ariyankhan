@@ -356,44 +356,8 @@ test('the notification question: after the first result, a board\'s or a round\'
   assert.ok(show.indexOf('askAfterResult') > raceClose && raceClose > raceEnd, 'not on a race\'s card');
 });
 
-// ── 5. The cards say where the ladder stands ──
-test('the cards show the tier, the steps to the next one, and why a Next is easier than the board just cleared', () => {
-  const SRC = ['const GRADES = 15;', one('DIFF_OF'), one('GRADE_CAP'), fn('ladderMeter'), fn('ladderWin'), fn('ladderLoss')].join('\n');
-  const kit = (grade, done = 99) => new Function('gradeNow', 'boardsDone', 'TIER_OF', SRC + '\nreturn { ladderMeter, ladderWin, ladderLoss };')(() => grade, () => done, () => Math.floor(grade / 3));
-  const text = h => h.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-  assert.match(text(kit(4).ladderMeter()), /^Normal Hard 2 steps to Hard/);
-  assert.equal((kit(4).ladderMeter().match(/is-on/g) || []).length, 1, 'one of three steps filled');
-  assert.match(text(kit(14).ladderMeter()), /Master · the top of the ladder/);
-  assert.match(text(kit(8, 7).ladderMeter()), /Expert opens after 12 cleared boards/, 'a new player held under the ceiling is told when it lifts');
-  const f = (g, t) => ({ grade: g, tier: t });
-  // the case that started this: a heart-out on a Hard board, then a clear on the retry, and a Next on Normal
-  const retry = { tier: 2, fails: 1, level: {}, learn: { before: f(4, 1), after: f(4, 1), points: 0 } };
-  assert.match(text(kit(4).ladderWin(retry)), /The heart-out earlier on this board set you back to Normal\. Normal Hard/);
-  assert.match(text(kit(6).ladderWin({ tier: 1, fails: 0, level: {}, learn: { before: f(5, 1), after: f(6, 2), points: 1 } })), /^Level up: Hard ?!/);
-  assert.equal(kit(4).ladderWin({ replay: true, learn: { before: f(4, 1), after: f(4, 1) } }), '', 'a replay does not move the ladder and says nothing of it');
-  assert.equal(kit(4).ladderWin({ daily: {}, learn: null }), '', 'nor the daily board');
-  assert.match(text(kit(4).ladderLoss({ before: f(6, 2), after: f(4, 1) })), /^Hard → Normal/);
-  assert.match(text(kit(6).ladderLoss({ before: f(8, 2), after: f(6, 2) })), /^Hard Expert 3 steps to Expert/, 'a loss inside the tier shows the meter');
-  assert.equal(kit(4).ladderLoss(null), '');
-  const show = fn('showResult'), fail = fn('failLevel');
-  assert.ok(/\$\{last \? '' : ladderWin\(run\)\}/.test(show) && show.indexOf('ladderWin') < show.indexOf('data-act="next"'), 'the win card says it above the Next button');
-  assert.ok(/const learned = learnFrom\(false,/.test(fail) && /\$\{ladderLoss\(learned\)\}/.test(fail), 'the out-of-hearts card says it too');
-});
-
-test('the win card says how near Locked in was, the next milestone, and the streak on the first clear of a day', () => {
-  const SRC = [one('LOCKED_IN'), "const FLAME = '<svg></svg>';", one('NEAR'), fn('nearLine'), fn('goalLine')].join('\n');
-  const { nearLine, goalLine } = new Function(SRC + '\nreturn { nearLine, goalLine };')();
-  const text = h => h.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-  assert.equal(text(nearLine(83)), '2 short of Locked in (85)');
-  assert.equal(nearLine(85), '', 'Locked in is not near it'); assert.equal(nearLine(74), '', 'more than ten short says nothing');
-  assert.equal(text(goalLine({ n: 176, day: { counted: false, count: 5 } })), 'Next milestone: level 180 · 4 to go');
-  assert.equal(text(goalLine({ n: 170, day: null })), 'Next milestone: level 180 · 10 to go', 'a milestone just passed points at the next one');
-  assert.equal(text(goalLine({ n: 176, day: { counted: true, count: 5 } })), '5-day streak · Next milestone: level 180 · 4 to go', 'the first clear of a day');
-  assert.equal(text(goalLine({ n: 176, day: { counted: true, count: 7, milestone: 7 } })), 'Next milestone: level 180 · 4 to go', 'a streak milestone has its own line already');
-  assert.equal(text(goalLine({ n: 176, day: { counted: true, count: 1 } })), 'Next milestone: level 180 · 4 to go', 'a one-day streak is not a streak yet');
-  assert.equal(goalLine({ daily: {}, n: 3 }), '', 'not on the daily board');
-  const show = fn('showResult');
-  assert.ok(show.indexOf('nearLine(focus)') < show.indexOf('ladderWin(run)') && show.indexOf('ladderWin(run)') < show.indexOf('goalLine(run)') && show.indexOf('goalLine(run)') < show.indexOf('data-act="next"'), 'under the Focus bar, in that order, above Next');
+test('the win card says nothing about the ladder beyond the tier on its Next button', () => {
+  assert.ok(!/ladderWin|ladderLoss|ladderMeter|goalLine|nearLine|Level up:|Next milestone|steps to/.test(js), 'no ladder lines, no milestone line, no "short of Locked in"');
 });
 
 console.log(process.exitCode ? `\nsome of ${tests} tests failed` : `\nall ${tests} tests passed`);

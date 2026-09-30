@@ -525,12 +525,7 @@ board: `clearPoints` is +2 for a flawless fast first-try clear (no heart, no hin
 `FAST_SEC_PER_ARROW` 1.2 s per arrow), +1 for any other first-try clear, 0 for a scrappy one (two
 hearts or two hints gone); a Focus of 85+ ("Locked in") is +3 on a first try, and on a retry +2 (85+),
 +1 (`STEADY`, 70+) or 0; every heart-out is −2 (`GRADE_DOWN`) but stops at the floor of its tier, so only a
-heart-out already on a tier's first step costs the tier. The win card shows where the grade stands
-(`ladderWin`/`ladderMeter`: this tier, three steps, the next tier; "Level up" when a tier is crossed, and a line
-when a heart-out earlier on the same board is why the Next is easier), and the out-of-hearts card shows a tier
-lost (`ladderLoss`). Under the Focus bar the win card also says how near Locked in was when it was within
-ten (`nearLine`), and under the ladder the next milestone and, on the first clear of a day, the streak
-(`goalLine`); nothing on the card counts down or warns. The board itself is sized by `fitBoard()` to the
+heart-out already on a tier's first step costs the tier. The board itself is sized by `fitBoard()` to the
 room really left on the screen (the column's height less everything above the board and a safe margin:
 52px top under the zoom buttons, 16px each side, 20px at the bottom), so no country, however long or flat,
 runs under the buttons or off the glass. The result is a
@@ -545,7 +540,7 @@ board for everyone, and the pace line is shown only for a hardest deal. A board 
 again at the deal its kept run was played at (`keptDeal`), whatever the ladder did since, so a heart-out,
 a free life and leaving still carry on where they were;
 `TIER_OF()`; Try again keeps the same board, New layout takes the new grade; the
-tier is shown on the Next button, in the start toast and on the win card's ladder line), combo counter (taps within 1.8 s), a win streak (still counted, no longer
+tier is shown only on the Next button and in the start toast; the win card says nothing more about it), combo counter (taps within 1.8 s), a win streak (still counted, no longer
 announced on the card), milestones every 10 levels, a Today's Country bonus board (date-seeded, same for
 everyone, reached by `#daily` rather than from Settings), and clearing the board reveals the country for a
 3-option quiz plus capital/population/region. 197-country World Tour (every UN member state, plus Palestine, the Vatican, Kosovo and Taiwan: world-atlas 110m plus the 29 small states from the 10m file, minus dependencies and disputed areas) with sequential
