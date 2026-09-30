@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import path from 'node:path';
 const root = path.resolve(new URL('.', import.meta.url).pathname, '..');
 const read = f => fs.readFileSync(path.join(root, f), 'utf8');
-const js = read('js/puzzle.js'), html = read('puzzle/index.html'), css = read('css/puzzle.css'), sw = read('piece-the-world-sw.js');
+const js = read('js/puzzle.js'), html = read('puzzle/index.html'), css = read('css/puzzle.css'), sw = read('puzzle/sw.js');
 const RES = 'android/app/src/main/res/';
 const colorsXml = read(RES + 'values/colors.xml'), themesXml = read(RES + 'values/themes.xml'), layoutXml = read(RES + 'layout/activity_main.xml');
 const keepXml = read(RES + 'raw/keep.xml'), manifestXml = read('android/app/src/main/AndroidManifest.xml'), gradle = read('android/app/build.gradle');

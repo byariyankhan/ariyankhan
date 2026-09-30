@@ -161,10 +161,7 @@ uploaded to that old name is not served.
 | `css/ai-metadata-remover.css` | The tool's whole look, self-contained (no `style.css`): header, drop zone, result cards, guide pages, footer |
 | `map-maker/` | Map Maker, its own product like `puzzle/`: `index.html` (the tool), `how-to-use.html`, `about.html` (About & FAQ), `privacy.html`, `icon.svg`, `og.png` — see "Map Maker" section below |
 | `js/map-maker.js`, `css/map-maker.css` | Map Maker engine (d3-geo projections, export, share links) + its whole look, self-contained (no `style.css`) |
-| `piece-the-world.html` | Geography jigsaw game page — see "Piece the World" section below |
-| `js/piece-the-world.js`, `css/piece-the-world.css` | Game engine (drag/snap, modes, timer, stars, bests) + page styles |
-| `games/data/*.json`, `games/build-data.mjs` | Level data (piece paths per continent) and the script that builds it from Natural Earth |
-| `games/piece-the-world.webmanifest`, `piece-the-world-sw.js` | PWA manifest + service worker for both games (offline levels, installable) |
+| `puzzle/sw.js` | Puzzle's service worker, scope `/puzzle/` (offline boards, installable, web push). It replaced the root `piece-the-world-sw.js`, which `js/puzzle.js` unregisters where a device still has it (`swStart`) |
 | `puzzle/index.html`, `js/puzzle.js`, `css/puzzle.css` | Tap-away arrow puzzle game on country maps, served at `/puzzle/` — see "Puzzle – Train Your Brain" section below |
 | `games/data/puzzle.json`, `games/build-puzzle-boards.mjs`, `puzzle/app.webmanifest` | Its level data (outlines + tier scales for 197 countries; masks are rasterised in the browser), build script and PWA manifest |
 | `games/puzzle/` | Its backend service, which is a project of its own: Node 22 + TypeScript + Fastify, PostgreSQL, Redis and a WebSocket, with its migrations, test suites, compose file, backup and restore scripts and nginx snippet — see `games/puzzle/README.md` |
@@ -316,6 +313,12 @@ self-service review submission (`review.html`, `reviews.php`) and the `mcp.php`
 endpoint were removed in September 2026. The review card now shows curated
 quotes only. If any of it is ever needed again, it lives in git history before
 that removal.
+
+Piece the World, the geography jigsaw (`piece-the-world.html`, its JS, CSS,
+manifest, test, `games/build-data.mjs` and the continent level data in
+`games/data/`), was removed on 30 September 2026. `.htaccess` answers its old
+addresses with 410 Gone, and the files were deleted from the live document root
+with the `web-prune` ops mode (`deploy/retired-files.txt`). Its service worker file, which had become Puzzle's, moved to `puzzle/sw.js`.
 
 ---
 
@@ -487,43 +490,6 @@ SVG, share by link. All client-side.
 - **Rule**: keep the disputed-borders FAQ honest (Natural Earth de facto policy)
   and never call the maps "official".
 
-## Piece the World (geography jigsaw game)
-
-`piece-the-world.html` is the first game: drag continents (World level) or
-countries (Europe, Asia, Africa, North America, South America, Oceania) onto an
-outline board against the clock. Easy / Normal / Hard, misses + hints → accuracy →
-1–3 stars, personal bests per level+mode in `localStorage` (`ptw:v1:*`), share
-text, `#level-mode` deep links (`#africa-hard`). English only, continuous play
-(no daily challenge), transcontinental countries filed by capital.
-
-- **Engine**: `js/piece-the-world.js` (no libraries), styles in
-  `css/piece-the-world.css` (`.ptw-` prefix). The board is one `<svg>` with the
-  level's `viewBox`; every piece path is already in board coordinates, so a
-  piece is "home" at translate(0,0). Dragging draws a ghost at true board scale
-  in a fixed full-viewport `<svg>` and converts the drop point through
-  `getScreenCTM()`; a drop within `tolerance(piece)` of the centroid snaps.
-  Mobile also supports tap-piece-then-tap-board.
-- **Data**: `games/data/<level>.json` (`{ board, pieces[], auto[], sphere? }`),
-  ~1.1 MB total, built by `games/build-data.mjs` from Natural Earth 1:50m on an
-  azimuthal equal-area projection (so piece sizes are honest). `auto` = countries
-  under 14 board units in either direction, drawn pre-placed. IDs are ISO numeric
-  codes, or a name slug where Natural Earth has `-99` (France, Norway, Kosovo…).
-  Files are requested with `?v=<DATA_VERSION>` and `games/data/.htaccess` marks
-  them immutable — bump `DATA_VERSION` in the JS (and the preload in the HTML)
-  whenever you rebuild.
-- **Adding a level** (e.g. states of a country): add an entry to `LEVELS` in
-  `games/build-data.mjs` (or write the JSON by hand in the same shape), rebuild,
-  then add `{ id, name, pieces, tag, blurb }` to `LEVELS` in the JS and a row to
-  the levels table in the HTML. No engine changes needed.
-- **PWA**: `games/piece-the-world.webmanifest` + `piece-the-world-sw.js` (root
-  scope, but its fetch handler only answers for the game's own files; everything
-  else passes through untouched). `.htaccess` serves the worker with `no-cache`
-  so edges never pin an old version. Wrap it as an Android app later with
-  Bubblewrap/PWABuilder (Trusted Web Activity) — no code changes.
-- **Tests**: `node tests/piece-the-world.test.mjs` validates the data against the
-  level cards and page copy. Browser drag/tap/finish flow was checked with
-  Playwright on desktop and a Pixel 5 profile.
-
 ## Puzzle – Train Your Brain (tap-away arrow puzzle on country maps)
 
 `puzzle/index.html` is the second game: the casual, addictive one. It is a
@@ -623,7 +589,7 @@ links.
   data files. Versioned with `MAP_VERSION`. There is no Restart button in the game any more (back out or
   fail and retry).
 - **Notifications** (`games/puzzle/backend/src/push.ts`, `migrations/008_push.sql`,
-  the `push` handlers at the end of `piece-the-world-sw.js`, and the switch in
+  the `push` handlers at the end of `puzzle/sw.js`, and the switch in
   Settings): Web Push, for the two things that happen to somebody who is not
   looking at the game — a friend asking them to a match, and the league paying
   out on Sunday night. Nothing else is ever sent. An invitation only pushes when
@@ -855,7 +821,7 @@ links.
   root `.htaccess` sends the bare `/puzzle` there in one https hop (mod_dir's own
   slash redirect answered `http://` from behind the proxy). No hreflang: one language.
   One JSON-LD block: WebPage, VideoGame + WebApplication (SinglePlayer and
-  MultiPlayer, "over 400 boards", no ratings) and BreadcrumbList. There is
+  MultiPlayer, "nearly 300 boards", no ratings) and BreadcrumbList. There is
   no MobileApplication node and no "Android app" wording until the Play listing is
   public. The words a crawler reads are in the static HTML but nothing sits under the
   game: Settings > About links two pages of their own, laid out like the policies:
@@ -1718,8 +1684,8 @@ links.
   `DATA_VERSION`; served immutable by `games/data/.htaccess`.
 - **Adding countries**: append to `TOUR` and `CAPITALS`, rebuild, bump
   `DATA_VERSION`. Tiers by level index are in `TIER_OF` in the JS.
-- **PWA**: `puzzle/app.webmanifest` (and `games/arrow-atlas.webmanifest`, kept so copies installed under the old name update in place); the shared worker
-  `piece-the-world-sw.js` also caches this game's files. Opening the game (`openGame`) gives the network 2 s:
+- **PWA**: `puzzle/app.webmanifest` (and `games/arrow-atlas.webmanifest`, kept so copies installed under the old name update in place); the worker
+  `puzzle/sw.js` (scope `/puzzle/`; the requests the game's pages make go through it wherever they point) caches this game's files. It was `/piece-the-world-sw.js` at the root until 30 September 2026: `swStart` in `js/puzzle.js` registers the new one, moves a browser's push subscription to it (same key, posted to the server, the old endpoint dropped) and unregisters the old one; its `ptw-cache-*` caches are deleted when the new worker activates, and the old address answers 410. Opening the game (`openGame`) gives the network 2 s:
   an answer in time is used as before, and after that the cached page is served while the network's answer
   still goes into the cache, so a connection that is up but barely moving no longer holds the app's splash.
 - **Tests**: `node tests/puzzle.test.mjs` runs the production `generate()` on

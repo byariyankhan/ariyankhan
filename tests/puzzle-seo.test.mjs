@@ -121,11 +121,13 @@ test('the game names all four rounds, and its alternate names are names, not key
   for (const r of ROUNDS) { assert.ok(g.description.includes(r), `description: ${r}`); assert.ok(g.featureList.some(f => f.startsWith(r + ':')), `featureList: ${r}`); }
   assert.ok(g.alternateName.length <= 3, g.alternateName.join(', '));
 });
-test('the board count claimed is true: "over 400 boards" and there are more than 400', () => {
-  const n = f => Object.keys(JSON.parse(read(`games/data/${f}.json`)).boards).length;
-  const boards = JSON.parse(read('games/data/puzzle.json')).levels.length + n('discover-boards') + n('scene-boards') + n('focus-boards');
-  assert.ok(boards > 400, `${boards} boards`);
-  assert.ok(/over 400 boards/i.test(html));
+test('the board count claimed is true: "nearly 300 boards", counting each board the tour deals once (one discovery board per shape, each scene once)', () => {
+  const disc = new Set(Object.values(JSON.parse(read('games/data/discover-boards.json')).boards).map(b => b.hex)).size;
+  const n = f => JSON.parse(read(`games/data/${f}.json`)).boards.length;
+  const boards = JSON.parse(read('games/data/puzzle.json')).levels.length + disc + n('focus-boards') + n('scene-boards');
+  assert.ok(boards >= 280 && boards < 300, `${boards} boards`);
+  assert.ok(/nearly 300 boards/i.test(html));
+  for (const [where, s] of [['page', html], ['about', aboutPage], ['llms.txt', llms], ['llms-full.txt', llmsFull]]) assert.ok(!/over 400 boards/i.test(s), where);
 });
 test('the paintings count is the gallery\'s', () => {
   const works = JSON.parse(read('games/data/art.json')).works.length;

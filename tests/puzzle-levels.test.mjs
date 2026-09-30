@@ -39,26 +39,36 @@ const tourKit = () => {
 };
 const canonData = () => ({ ...data, canon: data.levels.slice() });
 
-test('every tour id is unique: each lap of a scene is its own board, the first lap keeps the bare id', () => {
+test('no board comes round twice: one discovery board per shape, the scenes once, every id unique', () => {
+  const shapes = new Set(Object.values(DISC.boards).map(b => b.hex)).size;
   for (const home of ['BD', 'IN', 'US', 'BR', 'IT', '']) {
     const { tourFor } = tourKit();
-    const ids = tourFor(canonData(), home).map(L => L.id);
+    const tour = tourFor(canonData(), home), ids = tour.map(L => L.id);
     assert.equal(new Set(ids).size, ids.length, `home ${home || 'none'}: ${ids.length - new Set(ids).size} ids repeat`);
-    assert.equal(ids.length, 197 * 2 + Math.floor(197 / 4) + FOCUSB.boards.length, `home ${home || 'none'}: ${ids.length} slots`);
+    assert.equal(ids.length, 197 + shapes + SCENEB.boards.length + FOCUSB.boards.length, `home ${home || 'none'}: ${ids.length} slots`);
+    const disc = tour.filter(L => L.disc);
+    assert.equal(new Set(disc.map(L => L.hex)).size, disc.length, 'no discovery shape twice');
     const scenes = ids.filter(id => id.startsWith('s:'));
-    assert.equal(scenes.length, 49);
-    assert.deepEqual(scenes.slice(0, SCENEB.boards.length), SCENEB.boards.map(b => 's:' + b.id), 'lap one keeps the ids the clears were saved under');
-    assert.equal(scenes[SCENEB.boards.length], 's:' + SCENEB.boards[0].id + '~2', 'lap two is ~2');
-    assert.equal(scenes[48], 's:' + SCENEB.boards[0].id + '~5', 'The Tower comes round a fifth time as ~5');
+    assert.deepEqual(scenes, SCENEB.boards.map(b => 's:' + b.id), 'each scene once, under the id its clears were saved under');
   }
 });
+test('a board already cleared stays in the tour, a repeated shape or a later lap alike, so no level count goes down', () => {
+  const kit = tourKit(), fresh = kit.tourFor(canonData(), 'BD');
+  // a discovery board the new rule would not deal (its shape came earlier), and a scene's third lap, both cleared before
+  const shown = new Set(fresh.filter(L => L.disc).map(L => L.id));
+  const hidden = canonData().canon.map(C => 'd:' + C.id).find(id => DISC.boards[canonData().canon.find(C => 'd:' + C.id === id).a2] && !shown.has(id));
+  assert.ok(hidden, 'there is a repeat to drop');
+  kit.store.set('lv:' + hidden, { t: 1, stars: 3, at: 1 }); kit.store.set('lv:s:diamond~3', { t: 1, stars: 3, at: 2 });
+  const tour = kit.tourFor(canonData(), 'BD').map(L => L.id);
+  assert.ok(tour.includes(hidden), 'the cleared repeat is kept');
+  assert.ok(tour.includes('s:diamond~3'), 'the cleared lap is kept');
+  assert.ok(!tour.includes('s:diamond~2'), 'a lap never cleared is not dealt');
+  assert.equal(new Set(tour).size, tour.length);
+  assert.match(js, /const find = F && !DATA\.levels\.includes\(F\)/, 'a country whose find is not dealt tells it on its own card');
+});
 test('a lap is the same board to look up: baseId drops the lap, the shape is shared', () => {
-  const { tourFor, baseId } = tourKit();
-  const tour = tourFor(canonData(), 'BD');
+  const { baseId } = tourKit();
   assert.equal(baseId('s:diamond~3'), 's:diamond'); assert.equal(baseId('s:diamond'), 's:diamond'); assert.equal(baseId('d:050'), 'd:050'); assert.equal(baseId('050'), '050');
-  const laps = tour.filter(L => baseId(L.id) === 's:diamond');
-  assert.equal(laps.length, 4);
-  assert.ok(laps.every(L => L.scene && L.name === laps[0].name && L.d === laps[0].d), 'every lap is the same shape and name');
   assert.ok(/mb = \/\^#b-\(\[\\w:~\]\+\)\$\//.test(js), 'a #b- link may carry the lap');
   assert.ok(/L\.id === baseId\(mb\[1\]\)/.test(js), 'a lap the tour does not have opens the scene itself');
   assert.ok(/const key = baseId\(L\.id\) \+ ':' \+ tier/.test(js), 'the mask is the shape\'s, whatever the lap');
@@ -155,7 +165,7 @@ test('the header: a fresh board reads Level N with N the training chip\'s number
 
 // ── The win, kept at once ──
 // a veteran's ceiling (boardsDone): the new player's cap is tests/puzzle-habits.test.mjs's
-const FORM_SRC = [STORE_SRC, one('GRADE_UP'), one('FAST_SEC_PER_ARROW'), one('clampTier'), one('clampGrade'), one('clearPoints'), one('FORM0'), one('gradeOf'), one('formOf'), grab(/  const nextForm = [\s\S]*?\n  \};\n/), one('formNow'), one('GRADE_CAP'), 'const boardsDone = () => 99;', fn('learnFrom')].join('\n');
+const FORM_SRC = [STORE_SRC, one('GRADE_UP'), one('LOCKED_IN'), one('FAST_SEC_PER_ARROW'), one('clampTier'), one('clampGrade'), one('clearPoints'), one('FORM0'), one('gradeOf'), one('formOf'), grab(/  const nextForm = [\s\S]*?\n  \};\n/), one('formNow'), one('GRADE_CAP'), 'const boardsDone = () => 99;', one('PAR_SEC_PER_ARROW'), one('FOCUS_FLOOR'), fn('focusOf'), fn('learnFrom')].join('\n');
 const formKit = form => {
   const localStorage = fakeStorage();
   const k = new Function('localStorage', FORM_SRC + '\nreturn { store, learnFrom, formNow };')(localStorage);
@@ -169,7 +179,11 @@ test('learnFrom reads the run it is handed, never the live board: a Back tap dur
   assert.deepEqual(got.after, { grade: 5, tier: 1 }, 'a scrappy slow clear holds the grade (an old Normal form is read as grade 5), as the run says');
   // the same call with an emptied board (what clearRun leaves) would have been 2 grades; the run is what counts
   const k2 = formKit({ tier: 1, wins: 0, losses: 0 });
-  assert.deepEqual(k2.learnFrom(true, { fails: 0, lost: 0, hints: 0, t: 30_000, arrows: 40 }).after, { grade: 7, tier: 2 }, 'a flawless fast clear is two grades up');
+  assert.deepEqual(k2.learnFrom(true, { fails: 0, lost: 0, hints: 0, t: 30_000, arrows: 40 }).after, { grade: 8, tier: 2 }, 'a flawless fast clear reads Locked in: a whole tier up');
+  const k3 = formKit({ grade: 5, tier: 1 });
+  assert.deepEqual(k3.learnFrom(true, { fails: 1, lost: 0, hints: 0, t: 30_000, arrows: 40 }).after, { grade: 6, tier: 2 }, 'a Locked-in clear on the retry is a step up, not a hold');
+  const k4 = formKit({ grade: 5, tier: 1 });
+  assert.deepEqual(k4.learnFrom(true, { fails: 1, lost: 1, hints: 1, t: 200_000, arrows: 40 }).after, { grade: 5, tier: 1 }, 'a slow retry holds');
   assert.equal(k2.learnFrom(true, { daily: { key: 'x' }, fails: 0, lost: 0, hints: 0, t: 1, arrows: 40 }), null, 'the daily board moves nothing');
 });
 test('a replay never promotes the ladder', () => {

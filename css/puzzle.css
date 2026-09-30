@@ -694,6 +694,8 @@ html.is-first .aa-splash.is-terms .aa-splash-terms{ visibility:visible; opacity:
 .aa-stats span{ display:flex; flex-direction:column; align-items:center; text-align:center; font-size:10px; letter-spacing:1px; text-transform:uppercase; color:var(--muted); background:var(--bg2); border-radius:12px; padding:10px 4px; }
 .aa-stats b{ font-size:20px; font-weight:900; color:var(--ink); letter-spacing:0; text-transform:none; margin-bottom:2px; font-variant-numeric:tabular-nums; }
 .aa-facts{ font-size:14px; color:var(--muted); margin:0 0 12px; line-height:1.5; }
+/* a country's find, where its own discovery board is not dealt (tourFor): under its facts, a little smaller */
+.aa-facts--find{ margin-top:-6px; font-size:13px; }
 /* The focus reading, as a bar anybody can read: red at one end, green at the other, and a brain sitting where
    this run landed. It sits on the card itself rather than in a panel of its own — a box around it only made
    the card busier, and the bar is loud enough without one. */

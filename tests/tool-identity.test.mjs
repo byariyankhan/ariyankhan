@@ -57,8 +57,7 @@ ok(first > 0 && first < ht.indexOf('RewriteRule ^ https://%1%{REQUEST_URI}') && 
 ok(!/\/map-maker\.html|\/ai-metadata-remover\.html/.test(sitemap), 'the sitemap has no old address');
 
 console.log('\nNothing links to the old addresses');
-// Piece the World is left exactly as it is for now (its two links go through the redirect); nothing else may.
-const ALLOWED = new Set(['piece-the-world.html']);
+const ALLOWED = new Set();
 const SKIP = new Set(['.git', 'node_modules', 'tests', 'deploy', 'vendor', 'android', 'images']);
 const files = [];
 (function walk(dir) {

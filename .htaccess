@@ -4,6 +4,7 @@
 
 Options -Indexes
 ErrorDocument 404 /404.html
+ErrorDocument 410 /404.html
 
 RewriteEngine On
 
@@ -89,6 +90,13 @@ RewriteRule ^arrow-atlas-terms\.html$    https://%{HTTP_HOST}/puzzle/terms.html 
 #    as the rules above. Not on the youtube subdomain, which has no game to send anybody to.
 RewriteCond %{HTTP_HOST} !^youtube\. [NC]
 RewriteRule ^puzzle$                     https://%{HTTP_HOST}/puzzle/ [R=301,L,NE]
+
+# ── Piece the World is gone (removed 30 September 2026): 410 Gone ──
+#    The geography jigsaw was deleted, page, code and level data. Its addresses answer 410, which tells a
+#    search engine the page is gone for good and not just missing, and is not sent to another page, which
+#    Google would read as a soft 404. The same list is deploy/retired-files.txt, which the web-prune ops
+#    mode deletes from the live document root; this rule still answers if a copy were ever put back.
+RewriteRule ^(?:piece-the-world\.html|css/piece-the-world\.css|js/piece-the-world\.js|games/piece-the-world\.webmanifest|piece-the-world-sw\.js|games/data/(?:world|africa|asia|europe|north-america|oceania|south-america)\.json)$ - [G,L]
 
 # ── Never serve deploy/test tooling ──────────────
 RedirectMatch 404 ^/(deploy|tests)(/|$)
@@ -208,7 +216,7 @@ RewriteRule ^ - [R=404,L]
   </FilesMatch>
 
   # Service worker: browsers re-check it on every page load, so the edge must not pin it for a year
-  <Files "piece-the-world-sw.js">
+  <Files "sw.js">
     Header set Cache-Control "no-cache, must-revalidate"
   </Files>
 </IfModule>
