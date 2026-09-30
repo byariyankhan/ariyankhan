@@ -47,7 +47,7 @@ site changes.
 
 **Hero**
 - `data-typewriter` span — cycles through a word list (`editing`, `storytelling`, `pacing`, `color`, `sound design`) defined at the top of `blog.js`.
-- `data-count="N"` on the three stat numbers — animates 0→N on scroll into view. **`Core Topics` is always `4`** (Documentary / Talking Head / Editing / Maps — the four filter categories, not the article count). `Latest Articles` and `Published Articles` should both equal the current total number of published articles.
+- `data-count="N"` on the three stat numbers — animates 0→N on scroll into view. **`Core Topics` is always `5`** (Documentary / Talking Head / Editing / Maps / World — the five filter categories, not the article count). `world` is the Geography & History category: written companions to Ariyan's own documentaries on the channel. Those articles embed their video (`.article-video`), link the channel instead of a service page (no `data-service-link`), and are generated from the video's script. Finished ones wait in `drafts/blog/` (a 404 on the web) until their publishing week; moving one into `blog/` (and its cover from `drafts/blog/images/` into `blog/images/`), with the date set to that day, is what publishes it; then add its card, schema entries, sitemap URL and llms.txt line like any other article. Publish one or two a week, not all at once. `Latest Articles` and `Published Articles` should both equal the current total number of published articles.
 - `.blog-topic-nav` links (`data-topic-filter="..."`) jump to `#latest` and pre-select that category filter.
 
 **Article grid**
@@ -127,7 +127,7 @@ Add a row here if a 5th service page or blog category ever exists — nothing el
 - [ ] Add a new `<article class="blog-article-card" data-category="...">` card at the **top** of `.blog-article-grid` (newest first). Include the cover image if you have one; the reading-time span stays empty (`<span data-card-reading-time></span>`) — never hardcode a number there.
 - [ ] Add a `BlogPosting` entry to the `blogPost` array (top of the array = newest)
 - [ ] Add a `ListItem` entry to the `ItemList.itemListElement` array, renumbering `position` for every item so it stays sequential
-- [ ] Bump `data-count` on **both** `Latest Articles` and `Published Articles` (top of the hero) to the new total. **Do not touch `Core Topics` — it stays `4` forever.**
+- [ ] Bump `data-count` on **both** `Latest Articles` and `Published Articles` (top of the hero) to the new total. **Do not touch `Core Topics` — it stays `5` unless a category is added.**
 
 ### Then update the site root:
 
@@ -148,7 +148,7 @@ Every blog-specific class is prefixed `.blog-` (listing page) or `.article-` (ar
 ## Known Gotchas
 
 - **`fetch()`-based features need a real server.** Reading-time badges on the listing page and the related-articles block on article pages will silently do nothing (not error, just stay empty/hidden) when opened via `file://`. Always verify on the deployed site.
-- **`Core Topics` is a fixed `4`**, not derived from anything — don't let it drift when bumping the other two stats.
+- **`Core Topics` is a fixed `5`**, not derived from anything — don't let it drift when bumping the other two stats.
 - **Renumber `ItemList` positions** every time you add or reorder an article — stale/duplicate `position` values are invalid schema.
 - **Don't hand-write a reading time anywhere a human will see it** — both the listing card and the article header pull from live word counts. If a number looks wrong, the actual article content is the source of truth; fix the words, not the number.
 

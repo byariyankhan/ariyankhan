@@ -196,6 +196,25 @@
     linear-gradient(160deg, #151300 0%, #0d0d0d 55%, #0a0a0a 100%);
 }
 
+/* ── Embedded documentary (Geography & History articles) ── */
+.article-video {
+  position: relative;
+  margin: 18px 0 8px;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: #0a0a0a;
+}
+
+.article-video iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
 .article-frame img {
   position: relative;
   z-index: 1;

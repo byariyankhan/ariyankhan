@@ -98,8 +98,9 @@ RewriteRule ^puzzle$                     https://%{HTTP_HOST}/puzzle/ [R=301,L,N
 #    mode deletes from the live document root; this rule still answers if a copy were ever put back.
 RewriteRule ^(?:piece-the-world\.html|css/piece-the-world\.css|js/piece-the-world\.js|games/piece-the-world\.webmanifest|piece-the-world-sw\.js|games/data/(?:world|africa|asia|europe|north-america|oceania|south-america)\.json)$ - [G,L]
 
-# ── Never serve deploy/test tooling ──────────────
-RedirectMatch 404 ^/(deploy|tests)(/|$)
+# ── Never serve deploy/test tooling, or drafts ──────────────
+#    drafts/ holds finished articles waiting for their publishing week; moving one into blog/ is what publishes it.
+RedirectMatch 404 ^/(deploy|tests|drafts)(/|$)
 RedirectMatch 404 ^/games/build-[a-z-]+\.mjs$
 #    Markdown is the repository's own notes (README.md at the root, in service/, blog/, games/puzzle/, android/
 #    and vendor/), not pages: a 404 on the web, however it is cased, while the files stay in git.
