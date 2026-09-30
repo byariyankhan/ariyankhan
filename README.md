@@ -523,10 +523,15 @@ and within the tier which of the board's candidate deals is dealt (`grade % 3`: 
 middle one, 2 the narrowest, `bestBoard(mask, tier, seed, pick)`); `nextForm` moves it on every tour
 board: `clearPoints` is +2 for a flawless fast first-try clear (no heart, no hint, ≤
 `FAST_SEC_PER_ARROW` 1.2 s per arrow), +1 for any other first-try clear, 0 for a scrappy one (two
-hearts or two hints gone) or a clear after a retry, and every heart-out is −3 (`GRADE_DOWN`): a
+hearts or two hints gone); a Focus of 85+ ("Locked in") is +3 on a first try, and on a retry +2 (85+),
++1 (`STEADY`, 70+) or 0; every heart-out is −2 (`GRADE_DOWN`) but stops at the floor of its tier, so only a
+heart-out already on a tier's first step costs the tier. The win card shows where the grade stands
+(`ladderWin`/`ladderMeter`: this tier, three steps, the next tier; "Level up" when a tier is crossed, and a line
+when a heart-out earlier on the same board is why the Next is easier), and the out-of-hearts card shows a tier
+lost (`ladderLoss`). The result is a
 weighted staircase that settles near three clears in four, where the old two-up/two-down rule on the
 hardest deal settled near a coin flip (`tests/puzzle-habits.test.mjs` simulates both for three
-kinds of player: 37–46 % of tries failed before, about 21 % now). A form from before grades is read
+kinds of player: 37–46 % of tries failed before, about 26–28 % now). A form from before grades is read
 as its tier's hardest deal (`gradeOf`: `tier * 3 + 2`). A new player is never dealt past Normal before
 5 boards are cleared nor past Hard before 12 (`GRADE_CAP`, on `boardsDone()`), and the ladder itself
 is held there (a higher grade from elsewhere — the account, the old ladder — is left as it is by a win
@@ -535,8 +540,7 @@ board for everyone, and the pace line is shown only for a hardest deal. A board 
 again at the deal its kept run was played at (`keptDeal`), whatever the ladder did since, so a heart-out,
 a free life and leaving still carry on where they were;
 `TIER_OF()`; Try again keeps the same board, New layout takes the new grade; the
-tier is never explained on the win card, only shown on the Next button and in
-the start toast), combo counter (taps within 1.8 s), a win streak (still counted, no longer
+tier is shown on the Next button, in the start toast and on the win card's ladder line), combo counter (taps within 1.8 s), a win streak (still counted, no longer
 announced on the card), milestones every 10 levels, a Today's Country bonus board (date-seeded, same for
 everyone, reached by `#daily` rather than from Settings), and clearing the board reveals the country for a
 3-option quiz plus capital/population/region. 197-country World Tour (every UN member state, plus Palestine, the Vatican, Kosovo and Taiwan: world-atlas 110m plus the 29 small states from the 10m file, minus dependencies and disputed areas) with sequential

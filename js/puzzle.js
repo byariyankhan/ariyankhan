@@ -114,22 +114,22 @@
   // Difficulty follows the player, never the level number. The player's form is a grade, 0 to 14: three grades a
   // tier (0 Easy … 4 Master), and within the tier which of the board's candidate deals they get -- the easiest,
   // the middle one or the hardest (bestBoard). It moves on every tour board: a first-try clear is one grade up,
-  // a flawless and fast one two; a scrappy clear (two hearts or two hints gone) or a clear after a retry holds;
-  // every heart-out is three grades down. Three down for one up is a staircase that settles where about three
-  // tries in four are cleared -- the old rule (two up, two down, always the hardest deal) settled near a coin
-  // flip, and players spent close to half their tries losing.
+  // a flawless and fast one two; a scrappy clear (two hearts or two hints gone) holds; every heart-out is two
+  // grades down, but never a whole tier at once: a loss stops at the floor of the tier it was played in, and
+  // only a loss already on that floor goes down a tier. One bad board never turns Hard into Normal.
   //
   // The result card shows the run as a Focus bar out of 100 (focusOf). A clear it reads as "Locked in" (85 and
   // up) is a whole tier: players who cleared a board at 90 and were then handed an Easy one -- because a heart-out
   // earlier had taken them down three grades and a clear only ever brought back one -- rightly read that as the
-  // game not watching. And a board cleared on its retry used to hold the grade whatever the retry was like; a
-  // Locked-in retry is a step up now (the loss before it has already cost its three).
-  const GRADE_UP = 1, GRADE_UP_CLEAN = 2, GRADE_UP_TIER = 3, GRADE_DOWN = 3, GRADES = 15;
-  const LOCKED_IN = 85;             // the Focus reading that is a whole tier (FOCUS_BANDS: "Locked in")
+  // game not watching. A board cleared on its retry is read the same way: Locked in is two steps, a steady retry
+  // (70 and up) one, and only a scrappier one holds. The card shows where the grade stands (ladderWin), so a
+  // good reading followed by an easier Next is never left unexplained.
+  const GRADE_UP = 1, GRADE_UP_CLEAN = 2, GRADE_UP_TIER = 3, GRADE_DOWN = 2, GRADES = 15;
+  const LOCKED_IN = 85, STEADY = 70;   // Focus readings: "Locked in" is a whole tier; a retry at STEADY or up is a step
   const FAST_SEC_PER_ARROW = 1.2;   // level 1 (~22 arrows) in under ~26 s counts as fast
   const clampTier = t => Math.max(0, Math.min(4, t));
   const clampGrade = g => Math.max(0, Math.min(GRADES - 1, Math.round(g) || 0));
-  const clearPoints = ({ firstTry, heartsLost, hints, secPerArrow, focus = 0 }) => !firstTry ? (focus >= LOCKED_IN ? GRADE_UP : 0) : heartsLost >= 2 || hints >= 2 ? 0 : focus >= LOCKED_IN ? GRADE_UP_TIER : heartsLost === 0 && hints === 0 && secPerArrow <= FAST_SEC_PER_ARROW ? GRADE_UP_CLEAN : GRADE_UP;
+  const clearPoints = ({ firstTry, heartsLost, hints, secPerArrow, focus = 0 }) => !firstTry ? (focus >= LOCKED_IN ? GRADE_UP_CLEAN : focus >= STEADY ? GRADE_UP : 0) : heartsLost >= 2 || hints >= 2 ? 0 : focus >= LOCKED_IN ? GRADE_UP_TIER : heartsLost === 0 && hints === 0 && secPerArrow <= FAST_SEC_PER_ARROW ? GRADE_UP_CLEAN : GRADE_UP;
   // form = { grade, tier }: the tier rides along (floor(grade / 3)) for a device still on the old rule, which
   // reads only the tier. A form from before grades, or one such a device has written since, is taken at the
   // hardest deal of its tier: exactly what that device was dealing.
@@ -137,8 +137,9 @@
   const gradeOf = f => { const t = clampTier(Number(f?.tier) | 0), g = Number(f?.grade); return Number.isFinite(g) && clampGrade(g) === g && Math.floor(g / 3) === t ? g : t * 3 + 2; };
   const formOf = g => ({ grade: clampGrade(g), tier: Math.floor(clampGrade(g) / 3) });
   const nextForm = (f, won, run) => {
-    const g = gradeOf(f);
-    return formOf(won ? g + clearPoints(run) : g - GRADE_DOWN);
+    const g = gradeOf(f), floor = g - g % 3;
+    if (won) return formOf(g + clearPoints(run));
+    return formOf(g > floor ? Math.max(floor, g - GRADE_DOWN) : g - GRADE_DOWN);
   };
   const formNow = () => { const f = store.get('form', null); return f && typeof f === 'object' ? f : { ...FORM0 }; };
   // A new player is not taken past Normal before five boards are cleared, nor past Hard before twelve, however
@@ -2464,6 +2465,36 @@
   const ICON_SHUFFLE = ICO('<path d="M16 3.5h4.5V8"/><path d="M3.5 20.5l17-17"/><path d="M20.5 16v4.5H16"/><path d="M14.5 14.5l6 6"/><path d="M3.5 3.5l5 5"/>');
   const ICON_SKIP  = ICO('<path d="M5 5.5l9 6.5-9 6.5z"/><path d="M18.5 5.5v13"/>');
   const FLAME = '<svg class="aa-flame" viewBox="0 0 24 24" aria-hidden="true"><path d="M12.2 2c.7 3.3-1.3 5.2-3 7.1C7.6 10.9 6 12.8 6 15.6 6 19.2 8.7 22 12 22s6-2.7 6-6.3c0-2.6-1.2-4.6-2.8-6.2-.1 1.6-.8 2.8-2 3.4.6-3.9 0-7.5-1-10.9z"/></svg>';
+  // ── Where the ladder stands, on the cards ──
+  //
+  // The grade moves on every board, and the card used to say nothing of it but the tier on the Next button. A
+  // Focus of 83 over a Next that reads Normal -- after a heart-out earlier on the same Hard board -- looked like
+  // the game not watching. So the card says what happened and how far the next tier is: three steps a tier, the
+  // grade within the tier filled in. A win that crossed a tier says so; a win after a heart-out that cost the
+  // tier says that the heart-out did it; a loss that cost a tier says so on the out-of-hearts card.
+  function ladderMeter() {
+    const g = gradeNow(), t = Math.floor(g / 3), n = boardsDone();
+    if (g >= GRADES - 1) return `<p class="aa-ladder"><b>${DIFF_OF(t)}</b> · the top of the ladder</p>`;
+    const at = g % 3, need = 3 - at, up = DIFF_OF(t + 1);
+    const dots = [0, 1, 2].map(k => `<i${k < at ? ' class="is-on"' : ''}></i>`).join('');
+    const note = g >= GRADE_CAP(n) ? `${up} opens after ${n < 5 ? 5 : 12} cleared boards`
+      : `${need} step${need === 1 ? '' : 's'} to ${up} · Locked in (85+) goes straight up`;
+    return `<p class="aa-ladder" role="img" aria-label="${DIFF_OF(t)}, ${at} of 3 steps to ${up}"><b>${DIFF_OF(t)}</b><span class="aa-ladder-dots" aria-hidden="true">${dots}</span><b>${up}</b></p>
+      <p class="aa-ladder-note">${note}</p>`;
+  }
+  function ladderWin(run) {
+    const learn = run.learn;
+    if (run.daily || run.replay || !learn) return '';
+    const t = TIER_OF();
+    if (learn.after.tier > learn.before.tier) return `<p class="aa-ladder is-up">Level up: <b>${DIFF_OF(t)}</b>!</p>${ladderMeter()}`;
+    const lead = run.fails > 0 && !run.level?.scene && t < run.tier ? `<p class="aa-ladder-note is-down">The heart-out earlier on this board set you back to ${DIFF_OF(t)}.</p>` : '';
+    return lead + ladderMeter();
+  }
+  function ladderLoss(learn) {
+    if (!learn) return '';
+    if (learn.after.tier < learn.before.tier) return `<p class="aa-ladder is-down"><b>${DIFF_OF(learn.before.tier)}</b> → <b>${DIFF_OF(learn.after.tier)}</b></p><p class="aa-ladder-note">Clear boards well to climb back.</p>`;
+    return ladderMeter();
+  }
   // What a day played did to the streak, on the card that follows it: a milestone passed (3, 7, 14, 30, 50 and
   // 100 days), a freeze spent on a missed day, a freeze earned. An ordinary day says nothing here: the flame on
   // the home screen already has the count.
@@ -2657,6 +2688,7 @@
         </div>
         <p class="aa-focus-vs" id="aaFocusVs"></p>
       </div>
+      ${last ? '' : ladderWin(run)}
       <div class="aa-actions aa-actions--stack">
         ${last || run.daily ? '' : `<button type="button" class="aa-btn aa-btn--primary" data-act="next">Next: Level ${levelNo(nj)} · ${DIFF_OF(tierFor(nj))}${ICON_NEXT}</button>`}
         <button type="button" class="aa-btn" data-act="again">${ICON_AGAIN}Play again</button>
@@ -2697,7 +2729,7 @@
     // the run is over: what comes after it is a free life (which keeps it again) or a fresh start
     if (!state.daily) { countBoard(baseId(state.level.id), { f: 1 }); dropRun(state.level.id); }
     SFX.lose(); renderHud();
-    learnFrom(false, { daily: state.daily });   // the form moves on a loss, whether or not the card says so
+    const learned = learnFrom(false, { daily: state.daily });   // the form moves on a loss; the card says where it stands
     // The rank: some of the arrows still on the board come off it (lossFor), held until the player moves on.
     // The daily board and a race are not the tour and cost none.
     // a loss whose charge a free life gave back is charged again when that life runs out (lossRedo): the free
@@ -2726,6 +2758,7 @@
       <div class="aa-fail-bar" role="img" aria-label="${pct}% of the board cleared"><i></i></div>
       <p class="aa-card-lead aa-fail-lead">${pct}% cleared · ${fmtN(state.left)} arrow${state.left === 1 ? '' : 's'} to go</p>
       ${rankLine}
+      ${ladderLoss(learned)}
       ${state.daily?.race && sayOnce('race-retry') ? '<p class="aa-adapt">Try again puts you back on the same board with your hearts back. Nothing is lost until somebody else clears it.</p>' : ''}
       <div class="aa-actions aa-actions--stack aa-actions--out">
         ${adCanOffer('heart') ? `<button type="button" class="aa-btn aa-btn--ad aa-btn--big" data-act="adheart">Get a free life${ads.isAd() ? ICON_AD : ''}</button>` : ''}
