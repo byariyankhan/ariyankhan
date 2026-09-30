@@ -7224,7 +7224,7 @@
   // handover to home.
   //
   //   a first open    the quote types, then the terms and Accept fade in under it; Accept fades into home
-  //   a later open    the quote once a day, "Train your brain." otherwise; into home when it is typed and
+  //   a later open    the next quote in the rotation, every time; into home when it is typed and
   //                   home is drawn, and never later than the old 2.64 s whatever happens
   //   none at all     a link into the game, a reload in the same session, a warm resume, reduced motion
   //

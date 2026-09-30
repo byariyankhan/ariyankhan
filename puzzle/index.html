@@ -64,7 +64,7 @@
     <!-- The opening, decided before anything is painted. It has to be here, above the stylesheets: the first
          frame must already be the opening (the brain where the app's own splash left it, in the right colours)
          and not the home screen that the game's 418 KB script would otherwise cover a moment later. It reads
-         what this device remembers -- the theme, whether the terms were accepted, the day the quote was last
+         what this device remembers -- the theme, whether the terms were accepted, how many quotes it has
          typed -- and every read is guarded, so a browser that refuses storage opens like a first visit.
          The rest of the opening is the script after #aaSplash below and "The opening" in js/puzzle.js. -->
     <script>
@@ -74,18 +74,18 @@
       function set(k, v) { try { localStorage.setItem('aa:v1:' + k, JSON.stringify(v)); } catch (e) { /* private mode: nothing is remembered */ } }
       // What the opening is. A first open always gets the terms; the line is typed unless a link brought the
       // player (it is somewhere to go, not a moment to set), the page was only reloaded, or motion is turned down
-      // (then the whole block at once). Later opens: the quote once a day, the tagline otherwise, and nothing at
+      // (then the whole block at once). Later opens: the next quote in the rotation, every time, and nothing at
       // all for a link, a reload in the same session, or reduced motion. A warm resume never reloads the page.
       function openingPlan(s) {
         if (!s.welcomed) return { show: true, first: true, line: s.deep || s.seen ? '' : 'quote', typing: !(s.deep || s.seen || s.calm) };
         if (s.deep || s.seen || s.calm) return { show: false, first: false, line: '', typing: false };
-        return { show: true, first: false, line: s.quoteDay === s.day ? 'tagline' : 'quote', typing: true };
+        return { show: true, first: false, line: 'quote', typing: true };
       }
-      var seen = false, calm = false, now = new Date(), day = now.getFullYear() + '-' + (now.getMonth() + 1) + '-' + now.getDate();
+      var seen = false, calm = false;
       try { seen = sessionStorage.getItem('aa:splash') === '1'; sessionStorage.setItem('aa:splash', '1'); } catch (e) { /* no session storage: every load is a new session */ }
       try { calm = matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { /* no media queries: motion as usual */ }
       var deep = /^#(level-\d+|b-[\w:~]+|daily|league|m=[A-Za-z0-9]+|handoff=[a-f0-9]+)$/.test(location.hash) || /[?&]handoff=/.test(location.search);
-      var plan = o.plan = openingPlan({ welcomed: !!get('welcomed'), deep: deep, seen: seen, calm: calm, day: day, quoteDay: get('quoteDay') });
+      var plan = o.plan = openingPlan({ welcomed: !!get('welcomed'), deep: deep, seen: seen, calm: calm });
       // The theme from the first frame, so a night or mint player never sees paper and then their colours. The
       // app draws its own splash before this page, though: build 1 always on paper, build 2 in the player's theme
       // where Android lets it (13 and up). The opening starts on whatever was on the glass a moment ago, and a
@@ -100,7 +100,7 @@
       // the player's colour when the opening fades into home
       if (meta) meta.setAttribute('content', paperFirst ? '#F4EDE0' : { paper: '#F4EDE0', night: '#0E0E10', mint: '#E6F2EC' }[theme]);
       if (plan.show) root.className += ' is-opening' + (plan.first ? ' is-first' : '') + (paperFirst ? ' is-paper-first' : '');
-      if (plan.line === 'quote') { var n = +get('launches') || 0; o.quote = n; set('launches', n + 1); set('quoteDay', day); }
+      if (plan.line === 'quote') { var n = +get('launches') || 0; o.quote = n; set('launches', n + 1); }
     })();
     </script>
     <link rel="canonical" href="https://ariyankhan.com/puzzle/" />
@@ -254,7 +254,20 @@
         'Attention is a muscle. Every board you clear is one more rep.',
         'Cannot sit with one thing for ten minutes any more? Start with one board tonight.',
         'Play a board before bed instead of the feed. Wind down, then sleep well.',
-        'Look before you tap. Patience clears more boards than speed.'
+        'Look before you tap. Patience clears more boards than speed.',
+        'Every map hides a way out. Your job is to find the order.',
+        'Slow is smooth, smooth is fast. Read the board before you move.',
+        'One board a day keeps the fog away. Small steps, sharp mind.',
+        'You do not need more time. You need thirty minutes without the phone pulling at you.',
+        'A mind that waits for the right move is a mind that is getting stronger.',
+        'Put the feed down for a few minutes. Give your brain a real puzzle to chew on.',
+        'Memory fades when it is not used. Look closely today and remember more tomorrow.',
+        'Every country you clear is a little proof that you can still focus.',
+        'The world is a big map. Solve it one country, one clear path at a time.',
+        'Mistakes are part of the board. Stop, think, and tap again.',
+        'Train your brain the way you train your body: a little, every single day.',
+        'Quiet mind, clear eyes, steady hands. That is how hard boards fall.',
+        'Day 1 feels slow. Day 21 feels sharp. Keep showing up.'
       ];
       // Every duration in the opening, in ms. A later open never takes longer than the 2.64 s the old splash
       // held the screen for: cap + fade for the quote, capShort + fade for the tagline, the waits included.
