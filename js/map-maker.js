@@ -226,7 +226,7 @@
   function groupOf(id) { return state.groups.find(g => g.ids.includes(id)) || null; }
   function colorOf(id) { const g = groupOf(id); return g ? (state.colors[id] || g.color) : null; }
 
-  function render(target = svg, { interactive = true, only = false, scale = 1 } = {}) {
+  function render(target = svg, { interactive = true, only = false, scale = 1, bg = null } = {}) {
     // scale: a cropped export is enlarged, so its lines and labels are drawn thinner and smaller to come out
     // at the same size as on a full-canvas export.
     const bw = state.borderWidth * scale, ls = state.labelSize * scale;
@@ -237,6 +237,8 @@
     while (target.firstChild) target.removeChild(target.firstChild);
 
     const def = PROJECTIONS[state.projection];
+    // bg: a cropped export's own frame [x, y, w, h], filled with the background colour behind everything.
+    if (bg) target.appendChild(el('rect', { x: bg[0], y: bg[1], width: bg[2], height: bg[3], fill: state.ocean }));
     // "Only the selected countries" leaves out the ocean, the other countries, the borders mesh and the grid.
     if (!only) {
       if (!state.oceanTransparent) target.appendChild(el('rect', { x: 0, y: 0, width: W, height: H, fill: state.ocean }));
@@ -478,6 +480,8 @@
     return [Math.round(W * mult), Math.round(H * mult)];
   }
   const onlySelected = () => $('#mmOnlySel').checked;
+  // What is behind a cropped export: the map's background colour, the surrounding map, or nothing.
+  const cropBg = () => $('#mmCropBg').value;
   // The export: the canvas as it is, or, with "only the selected countries", those countries alone on a
   // transparent background, cropped to them (and their labels) with the margin setting as a safe area.
   function exportFrame() {
@@ -516,7 +520,9 @@
     const { vb, w, h, scale } = exportFrame();
     s.setAttribute('xmlns', SVG_NS);
     s.setAttribute('width', w); s.setAttribute('height', h);
-    render(s, { interactive: false, only: onlySelected(), scale });
+    const crop = onlySelected(), mode = cropBg();
+    const fill = crop && (mode === 'color' || (mode === 'map' && !state.oceanTransparent));
+    render(s, { interactive: false, only: crop && mode !== 'map', scale, bg: fill ? vb : null });
     s.setAttribute('viewBox', vb.map(n => +n.toFixed(2)).join(' '));
     return s;
   }
@@ -545,7 +551,7 @@
     if (onlySelected() && !selectedFeatures().length) { showError('Select at least one country, or untick "Only the selected countries".'); return false; }
     return true;
   }
-  $('#mmOnlySel').addEventListener('change', showExportDims);
+  $('#mmOnlySel').addEventListener('change', () => { $('#mmCropBgRow').hidden = !onlySelected(); showExportDims(); });
   function showExportDims() {
     if (onlySelected() && world && selectedFeatures().length) { const { w, h } = exportFrame(); $('#mmExportDims').textContent = `${w} × ${h}`; }
     else $('#mmExportDims').textContent = exportSize().join(' × ');

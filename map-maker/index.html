@@ -40,7 +40,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,600;0,9..144,700;1,9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="/css/map-maker.css?v=5" />
+    <link rel="stylesheet" href="/css/map-maker.css?v=6" />
     <link rel="preload" href="/js/vendor/countries-110m.json" as="fetch" crossorigin="anonymous" />
 
     <script type="application/ld+json">
@@ -213,7 +213,14 @@
           </div>
 
           <div class="mm-export">
-              <label class="mm-check mm-only"><input type="checkbox" id="mmOnlySel" /> Only the selected countries (cropped, transparent background)</label>
+              <label class="mm-check mm-only"><input type="checkbox" id="mmOnlySel" /> Only the selected countries (cropped)</label>
+              <div class="mm-row" id="mmCropBgRow" hidden><label for="mmCropBg">Background</label>
+                <select id="mmCropBg">
+                  <option value="color">Map background colour</option>
+                  <option value="map">Surrounding map</option>
+                  <option value="none">Transparent</option>
+                </select>
+              </div>
               <button type="button" class="mm-btn mm-btn--primary mm-btn--wide" id="mmDownloadPng">Download PNG</button>
               <p class="mm-export-dims"><span id="mmExportDims">3840 × 2160</span> px · nothing is uploaded</p>
           </div>
@@ -272,7 +279,7 @@
           </details>
           <details>
             <summary>What sizes can I export?</summary>
-            <p>A PNG at 1×, 2× or 4× the canvas, up to 7680 × 4320 (8K) on 16:9, or an SVG that scales to any size. Canvases come in 16:9, 9:16, 1:1, 4:3 and 21:9. Tick “Only the selected countries” to download just those countries, cropped with a margin on a transparent background, ready to place over footage.</p>
+            <p>A PNG at 1×, 2× or 4× the canvas, up to 7680 × 4320 (8K) on 16:9, or an SVG that scales to any size. Canvases come in 16:9, 9:16, 1:1, 4:3 and 21:9. Tick “Only the selected countries” to download just those countries, cropped with a margin, on the map’s background colour, with the surrounding map, or on a transparent background to place over footage.</p>
           </details>
           <details>
             <summary>Which projections can I use?</summary>
@@ -303,6 +310,6 @@
     <script src="/js/vendor/d3-geo.min.js"></script>
     <script src="/js/vendor/d3-geo-projection.min.js"></script>
     <script src="/js/vendor/topojson-client.min.js"></script>
-    <script src="/js/map-maker.js?v=7"></script>
+    <script src="/js/map-maker.js?v=8"></script>
   </body>
 </html>
