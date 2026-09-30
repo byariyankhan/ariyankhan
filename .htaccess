@@ -43,6 +43,31 @@ RewriteRule ^arrow-atlas-terms\.html$    https://%{HTTP_HOST}/puzzle/terms.html 
 RewriteCond %{HTTP_HOST} !^youtube\. [NC]
 RewriteRule ^puzzle$                     https://%{HTTP_HOST}/puzzle/ [R=301,L,NE]
 
+# ── The niche service pages are gone: each → the main service page it was a variant of ──
+#    service/video-editor-for-*.html were audience variants of the four main service pages, and they came
+#    out of the index and the sitemap together. The target is the one each page named itself in its own
+#    <service-profile service="…">, so a bookmark or a backlink lands on the same service it was already
+#    selling. Written in full for the same reason as the rules above. The files are deleted; these rules
+#    are what still answers for them, so they stay.
+RewriteRule ^service/video-editor-for-authors-and-speakers\.html$                  https://%{HTTP_HOST}/talking-head-video-editing.html [R=301,L,NE]
+RewriteRule ^service/video-editor-for-coaches\.html$                               https://%{HTTP_HOST}/talking-head-video-editing.html [R=301,L,NE]
+RewriteRule ^service/video-editor-for-finance-and-investing-channels\.html$        https://%{HTTP_HOST}/talking-head-video-editing.html [R=301,L,NE]
+RewriteRule ^service/video-editor-for-founders\.html$                              https://%{HTTP_HOST}/talking-head-video-editing.html [R=301,L,NE]
+RewriteRule ^service/video-editor-for-healthcare-professionals\.html$              https://%{HTTP_HOST}/talking-head-video-editing.html [R=301,L,NE]
+RewriteRule ^service/video-editor-for-podcasters\.html$                            https://%{HTTP_HOST}/talking-head-video-editing.html [R=301,L,NE]
+RewriteRule ^service/video-editor-for-real-estate-agents\.html$                    https://%{HTTP_HOST}/talking-head-video-editing.html [R=301,L,NE]
+RewriteRule ^service/video-editor-for-business-documentary-channels\.html$         https://%{HTTP_HOST}/documentary-video-editing.html [R=301,L,NE]
+RewriteRule ^service/video-editor-for-faceless-youtube-channels\.html$             https://%{HTTP_HOST}/documentary-video-editing.html [R=301,L,NE]
+RewriteRule ^service/video-editor-for-nonprofit-organizations\.html$               https://%{HTTP_HOST}/documentary-video-editing.html [R=301,L,NE]
+RewriteRule ^service/video-editor-for-true-crime-youtube-channels\.html$           https://%{HTTP_HOST}/documentary-video-editing.html [R=301,L,NE]
+RewriteRule ^service/video-editor-for-wildlife-and-nature-documentaries\.html$     https://%{HTTP_HOST}/documentary-video-editing.html [R=301,L,NE]
+RewriteRule ^service/video-editor-for-fitness-creators\.html$                      https://%{HTTP_HOST}/short-form-video-editing.html [R=301,L,NE]
+RewriteRule ^service/video-editor-for-social-media-promo-clips\.html$              https://%{HTTP_HOST}/short-form-video-editing.html [R=301,L,NE]
+RewriteRule ^service/video-editor-for-economics-and-trade-explainer-channels\.html$ https://%{HTTP_HOST}/map-animation-video-editing.html [R=301,L,NE]
+RewriteRule ^service/video-editor-for-geography-and-country-explainer-channels\.html$ https://%{HTTP_HOST}/map-animation-video-editing.html [R=301,L,NE]
+RewriteRule ^service/video-editor-for-history-and-geopolitics-channels\.html$      https://%{HTTP_HOST}/map-animation-video-editing.html [R=301,L,NE]
+RewriteRule ^service/video-editor-for-military-history-channels\.html$             https://%{HTTP_HOST}/map-animation-video-editing.html [R=301,L,NE]
+
 # ── Never serve deploy/test tooling ──────────────
 RedirectMatch 404 ^/(deploy|tests)(/|$)
 RedirectMatch 404 ^/games/build-[a-z-]+\.mjs$

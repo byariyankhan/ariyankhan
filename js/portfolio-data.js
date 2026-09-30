@@ -102,12 +102,12 @@ const SERVICE_META = {
   'true-crime': {
     label: 'True Crime',
     icon:  '🔎',
-    page:  'service/video-editor-for-true-crime-youtube-channels.html',
+    page:  'documentary-video-editing.html',
   },
   'finance': {
     label: 'Finance & Investing',
     icon:  '📈',
-    page:  'service/video-editor-for-finance-and-investing-channels.html',
+    page:  'talking-head-video-editing.html',
   },
 };
 

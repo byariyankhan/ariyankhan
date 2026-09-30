@@ -30,13 +30,9 @@ existing page instead, or write a blog article (`../blog/`) targeting that keywo
 ```
 service/
 ├── README.md                              ← this file
-├── video-editor-for-founders.html         ← Founders & Personal Brands (variant of talking-head)
-├── video-editor-for-coaches.html          ← Online Coaches & Course Creators (variant of talking-head)
 ├── corporate-video-editing.html           ← Corporate / Internal Teams (variant of talking-head)
-├── video-editor-for-podcasters.html       ← Podcasters going to YouTube (variant of talking-head)
-├── video-editor-for-healthcare-professionals.html ← Doctors & healthcare professionals (variant of talking-head)
-├── video-editor-for-fitness-creators.html ← Fitness & wellness creators (variant of short-form)
-└── (future pages, one per audience segment)
+├── remote-video-editor.html               ← Clients hiring remotely (variant of talking-head)
+└── index.php                              ← internal directory of this folder (noindex)
 ```
 
 No dedicated `css/` or `js/` here — every page reuses the site-wide bundles:
@@ -98,19 +94,32 @@ Every page here is one level deep (`service/<page>.html`), so:
 
 | Page | Audience | Variant of |
 |---|---|---|
-| `video-editor-for-founders.html` | Startup founders, LinkedIn creators, SaaS/B2B, coaches & consultants | `talking-head-video-editing.html` |
-| `video-editor-for-coaches.html` | Online coaches, course creators, educational YouTube channels | `talking-head-video-editing.html` |
 | `corporate-video-editing.html` | HR/L&D teams, marketing departments, company leadership, internal comms | `talking-head-video-editing.html` |
-| `video-editor-for-podcasters.html` | Interview/panel podcast hosts and networks turning episodes into YouTube uploads | `talking-head-video-editing.html` |
-| `video-editor-for-healthcare-professionals.html` | Physicians, dentists, nurse practitioners, therapists making patient-education content | `talking-head-video-editing.html` |
-| `video-editor-for-fitness-creators.html` | Personal trainers, fitness influencers, yoga/wellness coaches, gym & studio brands | `short-form-video-editing.html` |
+| `remote-video-editor.html` | Clients hiring an editor remotely, across time zones | `talking-head-video-editing.html` |
 
-**Note on the healthcare page:** a full opportunity-research pass flagged this one as
-overlapping `video-editor-for-coaches.html`'s "Educational Channels" audience closely
-enough to recommend folding it into that page instead of shipping a separate URL.
-It was built as a standalone page anyway per explicit direction. If it doesn't earn
-its own search traffic over time, revisit folding it into the coaches page as
-originally recommended.
+## Removed: the `video-editor-for-*.html` pages
+
+The 18 `video-editor-for-*.html` audience pages were deleted after AdSense rejected the
+site for **low value content**: templated variants of the same four services read as
+doorway pages, and several (history, military history, geography, economics) shared
+20–30% of their wording. They came out of `../sitemap.xml`, `../llms.txt` and
+`../llms-full.txt`, every internal link to them now points at the main page instead,
+and none of their copy was merged into the main pages.
+
+Each old URL **301-redirects** (rules in the root `.htaccess`) to the main service page
+it named in its own `<service-profile service="…">`:
+
+| Old pages | Redirect to |
+|---|---|
+| authors-and-speakers, coaches, finance-and-investing-channels, founders, healthcare-professionals, podcasters, real-estate-agents | `talking-head-video-editing.html` |
+| business-documentary-channels, faceless-youtube-channels, nonprofit-organizations, true-crime-youtube-channels, wildlife-and-nature-documentaries | `documentary-video-editing.html` |
+| fitness-creators, social-media-promo-clips | `short-form-video-editing.html` |
+| economics-and-trade-explainer-channels, geography-and-country-explainer-channels, history-and-geopolitics-channels, military-history-channels | `map-animation-video-editing.html` |
+
+Keep those redirect rules even though the files are gone — they are what answers for
+old bookmarks, backlinks and search results. Don't bring back a page at one of those
+URLs, and think twice before adding a new audience page here: the rule below is what
+the removed pages were meant to follow, and the review still judged them thin.
 
 Every page's "Explore More Services" links **only to the 4 main service pages**
 (with `../` prefix) — never to another niche page in this folder, and the 4 main
