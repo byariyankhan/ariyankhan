@@ -678,19 +678,21 @@ links.
   boards remembered their arrows counts as a typical board of its tier,
   `ARROWS_GUESS`). So a phone and a tablet agree on it, a fresh device gets it back
   with the account, and clearing the same board twice does not count it twice.
-  Fourteen steps: Newbie 0, Normal 40, Learner 120, Thinker 250, Solver 450,
-  Skilled 700, Sharp 1,000, Expert 1,400, Master 1,900, Genius 2,500, Grandmaster
-  3,300, Legend 4,200, Immortal 5,200, **GOAT 6,236** — about a hundred boards at
-  the difficulty the game deals by then. The brain fills with the arrows of the
+  Fourteen titles: Newbie 0, Starter 160, Learner 480, Thinker 1,000, Solver 1,800,
+  Skilled 2,800, Sharp 4,000, Ace 5,600, Mastermind 7,600, Genius 10,000, Grandmaster
+  13,200, Legend 16,800, Immortal 20,800, **GOAT 25,000** — most of the tour (nearly
+  300 boards, about a hundred arrows each from Hard on). No title shares a name with a
+  difficulty: Normal, Expert and Master used to, and "Expert" beside a Hard board said
+  two things with one word. The brain fills with the arrows of the
   rank in hand, **from the bottom up**, and GOAT lights the lot in green. Under it:
   the rank name and, under it, `Level n` — two words and no more; how far the next
   rank is, the brain itself shows, and the card after a board says what it added
   or cost. The rank is the headline and it is not the level — a level says where
   a player is on the tour, a rank says what they have done. **A rank is earned
-  and lost:** a board cleared adds its arrows — the most it has ever paid, so a
+  and kept:** a board cleared adds its arrows — the most it has ever paid, so a
   replay at a lower tier takes nothing away (`recordFor`; the server keeps
-  `GREATEST(arrows)` too) — and a board lost (hearts gone) takes some of the arrows
-  still on it (`lossFor`): only on the first loss since the board was started fresh
+  `GREATEST(arrows)` too) — and a board lost takes nothing any more (`lossFor` is 0).
+  It used to take some of the arrows still on it: only on the first loss since the board was started fresh
   (a retry of a board being fought for costs nothing more), never on a board already
   cleared, never on the daily board or in a race, at most half the board and never
   more than the rank holds (`loseArrows` clamps, so nobody owes arrows). The loss is
@@ -703,7 +705,8 @@ links.
   blob: a device's own count only grows, so devices merge by the larger per
   device (`adoptTour`) and the total is the sum — a single shared number could
   not have been merged, and a refund would be undone by the next sync. The
-  out-of-hearts card says `−N arrows · Rank` or `Rank down: …`. Offline play counts the same and goes
+  hold, settle and per-device count stay for a loss held before the change, which is
+  still taken once; nothing new is held, so the out-of-hearts card has no rank line. Offline play counts the same and goes
   up with the next sync once the player is online and signed in. The win card
   has no rank line (it used to say `+N arrows · Rank`); the arrows still count and
   the brain on home shows the rank. The share text names the rank.
@@ -1043,9 +1046,8 @@ links.
   the page what is under the header). Once (`homeTour: 'done'`): finished, skipped, Back, or walked out of
   into a sheet or a board. A header that changes under it (the league chip, the purse, a face) moves the
   spotlight (a `MutationObserver`), and on a short screen the page is scrolled by as little as clears the card.
-- **The brain has a rank** (`RANKS`, `arrowsShot`, `rankOf`, `loseArrows`, `.aa-card-rank`): Newbie to
-  GOAT at 6,236 arrows, fourteen steps, earned by the arrows on cleared boards and lost by some of the arrows
-  left on lost ones (the first loss of a fresh start, at most half the board, given back by a free life), synced with the account, and separate from the level — see "The brain on the home screen"
+- **The brain has a rank** (`RANKS`, `arrowsShot`, `rankOf`): Newbie to
+  GOAT at 25,000 arrows, fourteen titles, earned by the arrows on cleared boards and never taken away, synced with the account, and separate from the level — see "The brain on the home screen"
   above. Under the brain: the rank and `Level n`, nothing else.
 - **The home corner is the player** (`renderHomeCorner`, `.aa-home-face`): signed in, the settings button
   in the top-right corner shows the player's own picture (their initial without one) and still opens
@@ -1179,16 +1181,15 @@ links.
   climb it; a day kept before first scores were is read by its best. Step 1 → 5: the canvas 3×3 → 5×5 pieces
   (allowance 90 s → 200 s), the forgery 3 → 5 patches, smaller and closer in colour, the gallery 5 → 8
   paintings shown for 5 → 4 seconds, the curator 3 → 5 questions with smaller details after 6 → 4 seconds.
-  **Every training puzzle finished is a level on the main count** -- the same count as the home card's "Level
-  N" and the boards' numbers (`levelNo`): a puzzle is a round's serial of the day (0 the free one, then each
+  **Training puzzles are not levels**: the main count (`levelNo`, the home card's "Level N") is boards only.
+  A puzzle is a round's serial of the day (0 the free one, then each
   Play next), its first clear is kept with its time (`train:<day>.cl`, round → serial → when; `trainSave`,
-  `trainCleared`) and takes its place among the boards by that time (`trainClearTimes`). A clear asks for a
+  `trainCleared`). A clear asks for a
   score of 50 (`TRAIN_PASS`): a round finished under it keeps its score but is no level, and its result says
   "Score 50 or more to clear this puzzle" with Play again first. Play again replays the same serial, so it is
   never a second level, and deals it anew (`trainSalt`: a new shuffle, new lies, new options, a new order on the
   wall, salted with the round's starts that day). A round scored before clears were kept counts its free puzzle,
-  at the day's last save. The round's bar shows the level finishing it will be (`levelChip`, `.aa-train-lv`,
-  nothing on a replay), the result the level it was. The clears sync with the rest of the day (the server keeps
+  at the day's last save. Neither the round's bar nor its result shows a level. The clears sync with the rest of the day (the server keeps
   the union, the earliest time of each: `cleanTrainDay`, `mergeTrainDay`; the first scores `f1` by the lower per
   round, on the account and on the device, `trainMergeF1`). Every round ends with the work's credit (`artCredit`, behind the `?`). Every round has a **Hint**
   (`trainHint`): one free a day (`TRAIN_FREE_HINTS`, `train:<day>.h`, counted on the round's own day), then an

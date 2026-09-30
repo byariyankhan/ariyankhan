@@ -338,9 +338,9 @@
   function setHash(i) { if (history.replaceState) history.replaceState(null, '', location.pathname + location.search + (i >= 0 ? `#b-${DATA.levels[i].id}` : '')); }
   // Level numbers count the player's own journey: cleared boards in the order they were cleared, then the board in
   // hand. The tour list only decides what comes next, so a player who cleared 63 countries before the discovery
-  // boards existed is on level 65, not back on level 4 because Bhutan's animal sits fourth in the list. A daily
-  // training puzzle finished is a level too, in its place by time among the boards (trainClearTimes), so the
-  // count is everything the player has cleared; i < 0 asks for the next level, whatever is played for it.
+  // boards existed is on level 65, not back on level 4 because Bhutan's animal sits fourth in the list. Daily
+  // Training is not counted: a level is a board, and "Level 112" on home meaning boards plus paintings was one
+  // word for two things. i < 0 asks for the next level.
   let numCache = null;
   const forgetNums = () => { numCache = null; };
   // Each board is counted once, by its id: a board the list holds twice is still one clear.
@@ -349,7 +349,6 @@
       const seen = new Set(), done = [];
       DATA.levels.forEach((L, j) => { if (seen.has(L.id)) return; seen.add(L.id); const rec = cleared(j); if (rec) done.push({ id: L.id, j, at: rec.at || 0 }); });
       const boards = done.length;
-      for (const at of trainClearTimes()) done.push({ id: null, j: -1, at });
       done.sort((a, b) => (a.at - b.at) || (a.j - b.j));
       const of = new Map(); done.forEach((x, k) => { if (x.id) of.set(x.id, k + 1); });
       numCache = { n: done.length, of, boards };
@@ -1209,10 +1208,12 @@
   // the player cleared, on the tour or on the daily, counted from the records the tour already syncs. So a
   // phone and a tablet agree on it, a fresh device gets it back with the account, and clearing the same board
   // twice does not count it twice. It is not the level. A level says where a player is on the tour; a rank says
-  // what they have done, and it is theirs to keep. Fourteen steps, from two Easy boards to GOAT at 6,236 arrows
-  // -- about a hundred boards at the difficulty the game deals by then.
-  const RANKS = [['Newbie', 0], ['Normal', 40], ['Learner', 120], ['Thinker', 250], ['Solver', 450], ['Skilled', 700], ['Sharp', 1000],
-    ['Expert', 1400], ['Master', 1900], ['Genius', 2500], ['Grandmaster', 3300], ['Legend', 4200], ['Immortal', 5200], ['GOAT', 6236]];
+  // what they have done, and it is theirs to keep. Fourteen titles, the last of them GOAT at 25,000 arrows -- most of the tour
+  // (nearly 300 boards, about a hundred arrows each from Hard on), so the last title is near the end of the
+  // game, not a third of the way in. No title shares a name with a difficulty (Normal, Expert and Master used to):
+  // a card that read "Expert" beside a Hard board said two different things with one word.
+  const RANKS = [['Newbie', 0], ['Starter', 160], ['Learner', 480], ['Thinker', 1000], ['Solver', 1800], ['Skilled', 2800], ['Sharp', 4000],
+    ['Ace', 5600], ['Mastermind', 7600], ['Genius', 10000], ['Grandmaster', 13200], ['Legend', 16800], ['Immortal', 20800], ['GOAT', 25000]];
   const ARROWS_GUESS = [22, 40, 55, 80, 100];   // a record saved before boards remembered their arrows counts the tier's typical board
   const fmtN = n => Number(n || 0).toLocaleString('en-US');
   const recArrows = r => (r && typeof r === 'object' && (r.arrows || ARROWS_GUESS[clampTier(r.tier || 0)])) || 0;
@@ -1233,7 +1234,10 @@
   // they were closest to giving up, while the board pays only once. Nothing on a board already cleared, where a
   // replay has nothing at stake. At most half the board, and never more than the rank holds. (The daily board
   // and races take nothing; the caller leaves them out.)
-  const lossFor = ({ fails, done, left, arrows, rank }) => fails !== 1 || done ? 0 : Math.max(0, Math.min(left, Math.floor(arrows / 2), rank));
+  // A lost board takes nothing any more: a title, once earned, is kept. It used to take up to half the arrows
+  // still on the board, and "Rank down" on the card after a loss read as a punishment on top of the loss. The
+  // hold and settle below stay for a loss held before this change, which is still taken once.
+  const lossFor = () => 0;
   // Those arrows are held while the card still offers a free life, which carries the board on and gives them
   // back; they are taken once the player moves on -- Try again, another board, home -- or at the next start if
   // the app was closed on the card. Taking them at once and handing them back would not hold: a device's loss
@@ -2638,7 +2642,6 @@
       <h3>${escapeHtml(L.name)}</h3>
       ${facts ? `<p class="aa-facts">${facts}</p>` : ''}
       ${find ? `<p class="aa-facts aa-facts--find">${find}</p>` : ''}
-      <p class="aa-stars" aria-label="${s} of 3 stars">${'★'.repeat(s)}${'☆'.repeat(3 - s)}</p>
       <div class="aa-stats"><span><b>${fmtTime(t, true)}</b>time</span><span><b>${run.lost}</b>hearts lost</span><span><b>${run.hints}</b>hints</span><span><b>x${run.combo}</b>best combo</span></div>
       ${streakNews(run.day)}
       <div class="aa-focus" id="aaFocus" role="img" aria-label="Focus ${focus} out of 100 — ${band.name}">
@@ -2800,7 +2803,6 @@
   // screen and the boards show, one more than is cleared -- unless this puzzle was finished already today (Play
   // again), which is no new level. The round's own difficulty step (trainTier) is not shown: it is how hard the
   // round is dealt, not a level anybody plays for.
-  const levelChip = id => trainCleared(trainDay(train.day || dayKey()), id, train.serial | 0) ? '' : `<b class="aa-train-lv">Level ${levelNo(-1)}</b>`;
   // free: everywhere advertising is off; the day's round; a round unlocked today; and a round scored today,
   // so "Play again" is never an advertisement, not even for a round started before midnight and finished after
   // a start costs nothing unless it asks for a NEW puzzle where advertising is on
@@ -2845,7 +2847,7 @@
   const trainScore = t => { const v = TRAIN_ROUNDS.map(r => t[r.id]).filter(x => typeof x === 'number'); return v.length ? Math.round(v.reduce((a, b) => a + b, 0) / v.length) : null; };
   const clamp100 = v => Math.max(0, Math.min(100, Math.round(v)));
   // A round finished: its score (the day's best stands), and -- the first time this puzzle is finished -- a
-  // clear, which is a level on the main count (trainClearTimes, levelNo). A puzzle is the round's serial of the
+  // clear. A puzzle is the round's serial of the
   // day: 0 the free one, 1, 2... each "Play next". Play again replays the same serial, so it is never a second
   // level. A clear asks for a score of TRAIN_PASS: a round answered at random, tapped all over or hinted
   // through is still played and its score kept, but it is not a level -- Play again is the way to one.
@@ -2854,7 +2856,7 @@
   function trainSave(k, score) {
     const day = train.day || dayKey(), t = trainDay(day), serial = train.serial | 0; score = clamp100(score);
     // a round scored before clears were kept has its free puzzle cleared at a fixed time (noon of its day, as
-    // trainClearTimes reads it): written down now, before this save moves the day's last-save time
+    // the clears are kept by): written down now, before this save moves the day's last-save time
     for (const r of TRAIN_ROUNDS) if (trainLegacy(t, r.id)) {
       t.cl = t.cl && typeof t.cl === 'object' ? t.cl : {};
       (t.cl[r.id] = t.cl[r.id] && typeof t.cl[r.id] === 'object' ? t.cl[r.id] : {})['0'] = trainLegacyAt(day);
@@ -2900,24 +2902,6 @@
   // A clear kept without its time -- a round scored before clears were kept -- is put at noon of its day: the
   // same on every device, and still, where the day's last-save time would move with every save.
   const trainLegacyAt = day => Date.parse(day + 'T12:00:00') || 0;
-  // Every training puzzle ever finished, as the time it was finished: each is a level on the main count, in
-  // its place among the boards by time.
-  function trainClearTimes() {
-    const out = [];
-    try {
-      for (const key of Object.keys(localStorage)) {
-        if (!key.startsWith(STORE + 'train:')) continue;
-        const day = key.slice(STORE.length + 6), t = trainDay(day), dayAt = trainLegacyAt(day);
-        for (const r of TRAIN_ROUNDS) {
-          const m = t.cl && t.cl[r.id] && typeof t.cl[r.id] === 'object' ? t.cl[r.id] : {};
-          const serials = new Set(Object.keys(m).filter(x => /^(0|[1-9]\d{0,3})$/.test(x)));
-          if (trainLegacy(t, r.id)) serials.add('0');   // a round scored before clears were kept
-          for (const x of serials) { const v = Number(m[x]); out.push(Number.isFinite(v) && v > 0 ? v : dayAt); }
-        }
-      }
-    } catch { /* storage can be unreadable in a private window */ }
-    return out;
-  }
   // Where today stands, in words: how many of the four are done until all of them are -- "done for today"
   // with a round still to play read as if the day were finished -- and the run of days after it. With all
   // four done, the day is congratulated, and the list says how to go on: a new puzzle with an advertisement
@@ -3436,7 +3420,6 @@
     trainStop(); const pass = clamp100(score) >= TRAIN_PASS, fresh = trainSave(kind, score), news = train.news; train.news = null;
     const lead = pass || had;   // Play next leads, unless this very puzzle is still to clear
     trainHead('');
-    const lvl = fresh ? levelNo(-1) - 1 : 0;   // the level this clear was: the latest on the main count
     const box = $('#aaTrainGame', el.trainBody); if (!box) return;
     const day = train.day || dayKey(), t = trainDay(day);   // the round's own day, if it was finished after midnight
     // under the pass the way on is the same puzzle again, dealt anew: that button leads
@@ -3445,7 +3428,7 @@
     // the painting's name, painter and source sit behind a ? -- there for whoever wants them, in nobody's way
     const credit = work ? artCredit(work) : works ? `<p class="aa-art-credit">${works.map((w, i) => `${i + 1}. <b>${escapeHtml(w.title)}</b> \u2014 ${escapeHtml(w.artist)}`).join('<br>')}<br>The Met, public domain</p>` : '';
     box.innerHTML = `<div class="aa-train-res">
-      <p class="aa-card-kicker">${TRAIN_ROUNDS.find(r => r.id === kind).name}${lvl ? ` <b class="aa-train-lv">Level ${lvl}</b>` : ''}${credit ? ' <button type="button" class="aa-train-info" data-train-info aria-label="About the painting" aria-expanded="false">?</button>' : ''}</p>
+      <p class="aa-card-kicker">${TRAIN_ROUNDS.find(r => r.id === kind).name}${credit ? ' <button type="button" class="aa-train-info" data-train-info aria-label="About the painting" aria-expanded="false">?</button>' : ''}</p>
       <p class="aa-train-big${pass ? '' : ' is-short'}">${clamp100(score)}</p>
       <p class="aa-train-sub">${lines}</p>
       ${lead ? '' : `<p class="aa-train-sub aa-train-short">Score ${TRAIN_PASS} or more to clear this puzzle. Play it again: it is dealt anew.</p>`}
@@ -3665,7 +3648,7 @@
   const TRAIN_TICK = 200;
   const ICON_EYE = ICO('<path d="M2.5 12s3.5-6.5 9.5-6.5 9.5 6.5 9.5 6.5-3.5 6.5-9.5 6.5S2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/>');
   const ICON_CLOCK = ICO('<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>');
-  const trainHud = id => `<div class="aa-train-hud">${levelChip(id)}<span class="aa-train-stat" id="aaTrainStat"></span><span class="aa-train-drain" hidden><i></i></span>${hintBtnHtml()}</div>`;
+  const trainHud = id => `<div class="aa-train-hud"><span class="aa-train-stat" id="aaTrainStat"></span><span class="aa-train-drain" hidden><i></i></span>${hintBtnHtml()}</div>`;
   function trainStat(html) { const s = el.trainBody && $('#aaTrainStat', el.trainBody); if (s && s.dataset.v !== html) { s.dataset.v = html; s.innerHTML = html; } }
   // the look: its seconds, and the bar draining with them; answers what is left of it (ms). Its last three
   // seconds tick (SFX.tick, a buzz), once each, the way the online room counts in: the painting is about to
@@ -4104,7 +4087,7 @@
     const n = new Set(DATA.levels.map(L => L.id)).size, done = clearedLevels().length;
     const D = state.disc, rec = state.daily ? store.get(`daily:${state.daily.key}`) : cleared(state.idx);
     const what = D ? `${D.country.name}'s ${KIND_WORD[D.kind]}, the ${state.level.name}` : state.level.name;
-    const text = `Puzzle – Train Your Brain: I cleared ${what} (${state.daily ? 'daily board ' + state.daily.key : 'level ' + levelNo(state.idx)}) in ${fmtTime(rec?.t ?? state.elapsed, true)} ${'★'.repeat(rec?.stars || stars())} and ${done}/${n} boards so far. Rank: ${rankOf(arrowsShot()).name} (${fmtN(arrowsShot())} arrows).\nYour turn: https://ariyankhan.com/puzzle/${state.daily ? '#daily' : '#b-' + baseId(state.level.id)}`;
+    const text = `Puzzle – Train Your Brain: I cleared ${what} (${state.daily ? 'daily board ' + state.daily.key : 'level ' + levelNo(state.idx)}) in ${fmtTime(rec?.t ?? state.elapsed, true)} and ${done}/${n} boards so far. Rank: ${rankOf(arrowsShot()).name} (${fmtN(arrowsShot())} arrows).\nYour turn: https://ariyankhan.com/puzzle/${state.daily ? '#daily' : '#b-' + baseId(state.level.id)}`;
     const flash = $('.aa-flash', el.card);
     try {
       if (shell.on && shell.bridge() && (await shell.ask('share ' + text, 8000)).ok) return;   // the phone's own share sheet
@@ -6019,7 +6002,6 @@
     const RR = state.raceReading?.code && state.raceReading.code === m.code ? state.raceReading : null;
     const band = RR ? focusBand(RR.focus) : null;
     const reading = !RR ? '' : `
-      <p class="aa-stars" aria-label="${RR.stars} of 3 stars">${'★'.repeat(RR.stars)}${'☆'.repeat(3 - RR.stars)}</p>
       <div class="aa-stats"><span><b>${RR.lost}</b>hearts lost</span><span><b>${RR.hints}</b>hints</span><span><b>x${RR.combo}</b>best combo</span></div>
       <div class="aa-focus" id="aaFocus" role="img" aria-label="Focus ${RR.focus} out of 100 — ${band.name}">
         <p class="aa-focus-cap">Your focus level<b class="aa-focus-num">0</b></p>

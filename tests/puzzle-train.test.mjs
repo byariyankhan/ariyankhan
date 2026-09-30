@@ -47,22 +47,17 @@ test('first scores merge by the lower per round: commutative, idempotent, junk d
 test('a finish under 50 is kept and is not a clear; 50 is; the first score of the free puzzle stays the first', () => {
   const { m, ls, store } = makeStore();
   const env = { store, localStorage: ls, STORE: 'aa:v1:', train: { day: '', serial: 0 }, renderTrainPill() {}, renderBrain() {}, forgetNums() {}, syncTour: () => Promise.resolve(), syncOwed: false, bumpDay: () => null };
-  const f = new Function(...Object.keys(env), common + '\n' + grab(/const TRAIN_PASS = \d+;/) + '\n' + fn('trainSave') + '\n' + fn('trainClearTimes') + '\nreturn { trainSave, trainClearTimes, TRAIN_PASS };')(...Object.values(env));
+  const f = new Function(...Object.keys(env), common + '\n' + grab(/const TRAIN_PASS = \d+;/) + '\n' + fn('trainSave') + '\nreturn { trainSave, TRAIN_PASS };')(...Object.values(env));
   assert.equal(f.TRAIN_PASS, 50);
   env.train.day = TODAY();
   assert.equal(f.trainSave('e', 30), false, 'a 30 is no clear');
   let t = JSON.parse(m.get('aa:v1:train:' + TODAY()));
   assert.equal(t.e, 30); assert.deepEqual(t.f1, { e: 30 }); assert.ok(!(t.cl && t.cl.e), 'no clear written');
-  assert.equal(f.trainClearTimes().length, 0, 'and it is no level on the main count');
   assert.equal(f.trainSave('e', 49.4), false, '49 is still under');
   assert.equal(f.trainSave('e', 80), true, 'the replay at 80 clears it');
   t = JSON.parse(m.get('aa:v1:train:' + TODAY()));
   assert.equal(t.e, 80); assert.equal(t.f1.e, 30, 'the first score stays the first'); assert.ok('0' in t.cl.e);
   assert.equal(f.trainSave('e', 100), false, 'played again: never a second clear');
-  assert.equal(f.trainClearTimes().length, 1);
-  // a day from before clears were kept still counts its free puzzle, and a new save there keeps it
-  m.set('aa:v1:train:' + BACK(2), JSON.stringify({ r: 20, g: 90 }));
-  assert.equal(f.trainClearTimes().length, 3, 'legacy rounds are clears, whatever they scored');
   // the Play next serial: no first score from it
   env.train.serial = 1; assert.equal(f.trainSave('f', 60), true);
   t = JSON.parse(m.get('aa:v1:train:' + TODAY())); assert.ok(!('f' in t.f1), 'serial 1 is not the free puzzle'); assert.ok('1' in t.cl.f);
