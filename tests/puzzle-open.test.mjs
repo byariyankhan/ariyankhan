@@ -57,11 +57,8 @@ test('openingPlan: a first open through a link or a reload gets the terms and no
 test('openingPlan: a first open with reduced motion gets the whole block at once', () => {
   assert.deepEqual(openingPlan({ welcomed: false, calm: true }), { show: true, first: true, line: 'quote', typing: false });
 });
-test('openingPlan: a later open types the quote once a day and the tagline otherwise', () => {
-  assert.equal(openingPlan({ welcomed: 1, day: '2026-9-24', quoteDay: '2026-9-23' }).line, 'quote');
-  assert.equal(openingPlan({ welcomed: 1, day: '2026-9-24', quoteDay: null }).line, 'quote');
-  const p = openingPlan({ welcomed: 1, day: '2026-9-24', quoteDay: '2026-9-24' });
-  assert.deepEqual(p, { show: true, first: false, line: 'tagline', typing: true });
+test('openingPlan: every later open types the next quote', () => {
+  assert.deepEqual(openingPlan({ welcomed: 1 }), { show: true, first: false, line: 'quote', typing: true });
 });
 test('openingPlan: a later open through a link, a reload or with reduced motion has no opening', () => {
   for (const k of ['deep', 'seen', 'calm']) assert.equal(openingPlan({ welcomed: 1, [k]: true }).show, false, k);
@@ -79,14 +76,11 @@ test('head script: once per session, and the session is marked', () => {
   assert.equal(a.o.plan.show, true); assert.equal(a.session.get('aa:splash'), '1');
   assert.equal(runHead({ ls: { welcomed: 1 }, ss: { 'aa:splash': '1' } }).o.plan.show, false);
 });
-test('head script: the quote once a day, across midnight, with the rotation moving on', () => {
-  const eve = new Date(2026, 8, 24, 23, 59, 50), morning = new Date(2026, 8, 25, 0, 0, 5);
-  const a = runHead({ ls: { welcomed: 1, launches: 6, quoteDay: '2026-9-23' }, now: eve });
-  assert.equal(a.o.plan.line, 'quote'); assert.equal(a.o.quote, 6);
-  assert.equal(a.store.get('aa:v1:launches'), '7'); assert.equal(a.store.get('aa:v1:quoteDay'), JSON.stringify(dayOf(eve)));
-  const b = runHead({ ls: { welcomed: 1, launches: 7, quoteDay: dayOf(eve) }, now: eve });
-  assert.equal(b.o.plan.line, 'tagline'); assert.equal(b.store.get('aa:v1:launches'), '7', 'the tagline does not move the rotation');
-  assert.equal(runHead({ ls: { welcomed: 1, launches: 7, quoteDay: dayOf(eve) }, now: morning }).o.plan.line, 'quote');
+test('head script: a quote on every open, the rotation moving on each time', () => {
+  const a = runHead({ ls: { welcomed: 1, launches: 6 } });
+  assert.equal(a.o.plan.line, 'quote'); assert.equal(a.o.quote, 6); assert.equal(a.store.get('aa:v1:launches'), '7');
+  const b = runHead({ ls: { welcomed: 1, launches: 7 } });
+  assert.equal(b.o.plan.line, 'quote'); assert.equal(b.o.quote, 7); assert.equal(b.store.get('aa:v1:launches'), '8');
 });
 test('head script: classes for the first paint, and nothing at all without an opening', () => {
   assert.deepEqual(runHead().cls, ['is-opening', 'is-first']);
@@ -117,8 +111,9 @@ test('head script: the theme from the first frame; on a paper native splash the 
 // ── The typing ──
 const LINES = QUOTES.map(q => q + '\n— Puzzle');
 const sched = (text, budget, step = 34, calm = false) => typeSchedule(text, { budget, step, gap: 45, calm });
-test('the quotes are the eight the splash already showed, each typed with "— Puzzle"', () => {
-  assert.equal(QUOTES.length, 8);
+test('21 quotes, one per open in turn, each typed with "— Puzzle"', () => {
+  assert.equal(QUOTES.length, 21);
+  assert.equal(new Set(QUOTES).size, QUOTES.length, 'no quote twice');
   assert.ok(QUOTES.every(q => q.length >= 50 && q.length <= 120 && !q.includes('\n')));
 });
 test('budgets: a first open types every quote in 1.8 s, a later one in 1.5 s, the tagline in 0.4 s', () => {

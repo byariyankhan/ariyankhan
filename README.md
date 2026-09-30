@@ -1664,9 +1664,8 @@ links.
     phone the stage slides up to make room). Accept (`aa:v1:welcomed`) fades straight into home. A tap or a
     key finishes the typing and shows the terms at once. Through a link: the terms, nothing typed, and
     Accept goes straight to what the link opened.
-  - **Later opens**: the quote once a day (`aa:v1:quoteDay`), "Train your brain." otherwise; into home once
-    the line has been read and home is drawn, never later than 2.64 s (the quote) or 1.3 s (the tagline),
-    waits included. A tap or a key goes to home at once. `resumeLive` still cuts it short for a match.
+  - **Later opens**: the next quote from `QUOTES` (21 of them, rotating by `aa:v1:launches`) on every open;
+    into home once the line has been read and home is drawn, never later than 2.64 s, waits included. A tap or a key goes to home at once. `resumeLive` still cuts it short for a match.
   - **No opening** for a link (`#level-N`, `#b-…`, `#daily`, `#league`, `#m=…`, `#handoff=…`, `?handoff=`),
     a reload in the same session (`sessionStorage aa:splash`), a warm resume (the page is not reloaded), or
     reduced motion (whose first open shows the whole block at once, without typing or keys).
