@@ -527,20 +527,30 @@ same shell we will wrap for Android/iOS (TWA / Capacitor). Each level is a
 country's outline filled with arrows; tap an arrow to shoot it off the board if its
 run to the edge is clear, a blocked tap costs one heart, no clock (time is still recorded for the result card), 4 hearts and 3 hints per
 level on Easy and Normal, 3 hearts and 2 hints on Hard, 2 hearts and 2 hints on Expert, 2 hearts and 1 hint on Master (`LIVES_OF`, `HINTS_OF`: the top tiers are meant to be lost and taken again), difficulty that follows the player and never the level number (one
-tier 0 Easy / 1 Normal / 2 Hard / 3 Expert / 4 Master lives in `aa:v1:form` as
-`{tier, wins, losses}`; `nextForm` moves it on form alone: a cleared board earns
-`clearPoints` towards the next step, 2 for a flawless fast first-try clear (no
-heart, no hint, ≤ `FAST_SEC_PER_ARROW` 1.2 s per arrow) so a strong player steps
-up after a single level, 1 for any other first-try clear so two in a row step up
-whatever hearts and hints were spent, 0 after a retry (resets); two lost boards
-in a row step it down;
-`TIER_OF()`; Try again keeps the same board, New layout takes the new tier; the
+grade 0–14 lives in `aa:v1:form` as `{grade, tier}`: three grades a tier (0 Easy / 1 Normal /
+2 Hard / 3 Expert / 4 Master, `tier = floor(grade / 3)`, written alongside for an older client),
+and within the tier which of the board's candidate deals is dealt (`grade % 3`: 0 the widest, 1 the
+middle one, 2 the narrowest, `bestBoard(mask, tier, seed, pick)`); `nextForm` moves it on every tour
+board: `clearPoints` is +2 for a flawless fast first-try clear (no heart, no hint, ≤
+`FAST_SEC_PER_ARROW` 1.2 s per arrow), +1 for any other first-try clear, 0 for a scrappy one (two
+hearts or two hints gone) or a clear after a retry, and every heart-out is −3 (`GRADE_DOWN`): a
+weighted staircase that settles near three clears in four, where the old two-up/two-down rule on the
+hardest deal settled near a coin flip (`tests/puzzle-habits.test.mjs` simulates both for three
+kinds of player: 37–46 % of tries failed before, about 21 % now). A form from before grades is read
+as its tier's hardest deal (`gradeOf`: `tier * 3 + 2`). A new player is never dealt past Normal before
+5 boards are cleared nor past Hard before 12 (`GRADE_CAP`, on `boardsDone()`), and the ladder itself
+is held there (a higher grade from elsewhere — the account, the old ladder — is left as it is by a win
+under the ceiling). A race and the daily board are always the hardest deal, so a shared board is the same
+board for everyone, and the pace line is shown only for a hardest deal. A board left mid-play is dealt
+again at the deal its kept run was played at (`keptDeal`), whatever the ladder did since, so a heart-out,
+a free life and leaving still carry on where they were;
+`TIER_OF()`; Try again keeps the same board, New layout takes the new grade; the
 tier is never explained on the win card, only shown on the Next button and in
 the start toast), combo counter (taps within 1.8 s), a win streak (still counted, no longer
 announced on the card), milestones every 10 levels, a Today's Country bonus board (date-seeded, same for
 everyone, reached by `#daily` rather than from Settings), and clearing the board reveals the country for a
 3-option quiz plus capital/population/region. 197-country World Tour (every UN member state, plus Palestine, the Vatican, Kosovo and Taiwan: world-atlas 110m plus the 29 small states from the 10m file, minus dependencies and disputed areas) with sequential
-unlock (skip allowed after two fails), stars, best times and progress in
+unlock (Skip for now from the third heart-out on a board), stars, best times and progress in
 `localStorage` (`aa:v1:*`) and, once signed in, on the account as well, so a new
 phone picks the tour up where the last one left it; share text, `#level-N` deep
 links.
@@ -645,10 +655,11 @@ links.
   title and the two buttons have had theirs" — which is what keeps the whole home
   screen on one screen from a 360×560 phone to a tablet, and the two buttons at
   the bottom where a thumb is. The three tiles under the map (boards, countries,
-  day streak — days this player cleared any board, not days they opened the daily
-  board, which is what it counted at first and why somebody a hundred boards in
-  was told zero; it counts only while it is alive, played today or yesterday,
-  because nothing decays the stored record; all three counted in
+  day streak — the one streak, days with a board cleared or a training round
+  scored, not days they opened the daily board, which is what it counted at first
+  and why somebody a hundred boards in was told zero; it counts only while it is
+  alive, played today or yesterday (or the day before, with a freeze to cover
+  yesterday: `streakNow`), because nothing decays the stored record; all three counted in
   `renderHomeStats` so a map that failed to load does not leave a hundred-board
   player looking at three zeroes) are the win card's own
   tiles. Clearing a board sets `showBrainNext`, so the player comes home to the
@@ -906,9 +917,11 @@ links.
   reference pages: a tall shape filled edge to edge with long winding arrows. In the
   game one is `{ id: 's:<id>', name, d, k, scene: true }`; `tourFor` puts one after
   every fourth country (`SCENE_EVERY`), in order, and it is played **one tier
-  harder** than the player's form (`tierFor`: `clampTier(TIER_OF() + 1)`), so a Hard player
+  harder** than the player's form (`gradeFor`: three grades up, the same deal within the tier), so a Hard player
   meets The Tower at Expert (~140 arrows) and an Expert player Twin Towers at Master
-  (~160). There are 49 scene slots and 12 scenes, so the list comes round again, and
+  (~160); it says so as it starts ("One step harder: this scene is Expert."), and the
+  board after it, cleared or skipped, is a **breather**: the easiest deal of the
+  player's own tier (store `breather`, spent by the next new clear). There are 49 scene slots and 12 scenes, so the list comes round again, and
   **every lap is a board of its own**: the first lap keeps `s:<id>` (the clears already
   made stay valid), later laps are `s:<id>~2`, `s:<id>~3`, … (`sceneLevelFor`). One id in
   four slots used to count one clear as four levels and leave every scene slot after
@@ -985,11 +998,16 @@ links.
   the same rose-to-coral gradient, a faint rose brain sits behind the home screen in every theme, and the
   opening's brain turns to the rose (`--mark-to`) as its line types, everywhere but Night. There is no
   separate Brain theme: the brain is in Paper.
-- **The out-of-hearts card, as drawn:** "Get a free life" first and biggest, orange with the play icon
+- **The out-of-hearts card, as drawn:** how close it was, honestly — a bar and "91% cleared · 12 arrows
+  to go" from the board's own counts, rounded down (`.aa-fail-bar`, `.aa-fail-lead`); then "Get a free life"
+  first and biggest, orange with the play icon
   and an AD pill on the right when it is a real advertisement (no pill in free mode); "Try again" under it
-  in a soft rose tint; nothing under them (`.aa-actions--out`, `.aa-btn--big`, `.aa-btn--soft`,
-  `.aa-ad-pill`): the corner arrow is the way back to the tour. A challenge keeps "Give the board up". The
-  home buttons carry no subtitle: the icon says it.
+  in a soft rose tint (`.aa-actions--out`, `.aa-btn--big`, `.aa-btn--soft`, `.aa-ad-pill`). On a tour
+  board, from the second heart-out on it, **New layout** (the `shuffle` action: the same board dealt anew at
+  the grade the ladder has just stepped down to, its tier named under it), and from the third **Skip for
+  now** (the `skip` action: the slot after it opens, the board stays on the map to come back to), side by
+  side under them (`.aa-actions--alt`); the corner arrow is the way back to the tour. A challenge keeps
+  "Give the board up". The home buttons carry no subtitle: the icon says it.
 - **The tutorial** (`COACH_STEPS`, `coachStart`, `#aaCoach`): on the first board somebody opens, five
   things one at a time, each under a spotlight cut out of a dark scrim by one enormous box-shadow, with a card
   at the bottom and Skip on every step. Step one glows a free arrow (`.is-coach`, the hint's glow) and
@@ -1042,8 +1060,11 @@ links.
   is one row: the picture, the name, the gold to its right (`.aa-me-id`). "Get a free life" stays orange.
 - **The app asks for notifications once** (`notifyFirstAsk`): the phone's own dialog, once (`pushAsked`);
   the answer is kept, and the switch in Settings stays. Never on the way in: it used to be the moment the app
-  was up (Accept, and a timer at boot), over the opening; see "The opening". Browsers are never asked
-  unprompted. **No card before a system dialog**, in the app or the browser: the switch is the question.
+  was up (Accept, and a timer at boot), over the opening; see "The opening". It is asked **after the first
+  result** instead (`askAfterResult`: 1.2 s after a board's result card or a training round's result, and
+  only while that result is still on screen), the first moment a reminder has something to remind about.
+  Browsers are never asked unprompted. **No card before a system dialog**, in the app or the browser: the
+  switch is the question.
 - **Buttons carry the logo's brain** (`.aa-btn::after`: the white mark, faint, on the right, as Play &
   Discover does). **The home brain's arrows are always the rose** — GOAT is the whole brain lit, not a
   green one — and **lit arrows keep moving** (`aabrainflow`: a small step along each arrow's own direction
@@ -1076,8 +1097,10 @@ links.
   done. You can keep training by watching an ad." (on the site, where Play next is free: "…with Play next");
   the result says the same in short ("✓ 1 of 4 done today", "✓ Congratulations! Today's brain training is
   done."), and "Brain Score today" once there are two. With a streak alive and nothing played yet it says "3
-  days in a row · play today" in rose. The streak counts a day with one round scored (`trainDone`); `trainAll`
-  is the bonus of all four; the per-round bar counts days that round was played, in all (`trainRun`: cumulative). The home pill is
+  days in a row · play today" in rose. The streak is **the game's one streak** (`playStreak`, `streakNow`):
+  a round scored counts its day (`trainSave` → `bumpDay`) exactly as a board cleared does, so the sheet and
+  the flame on the home screen say the same number; `trainAll` is the bonus of all four, and the first time
+  all four are scored in a day it earns a streak freeze; the per-round bar counts days that round was played, in all (`trainRun`: cumulative). The home pill is
   a dot until something is scored, then the day's Brain Score. In a round and on its result the corner button
   is ← back to the list (`trainScreen`, a capture-phase handler before `closeSheets`; the phone's back button
   does the same in `backPressed`); on the list it is ✕. **The round marks
@@ -1177,7 +1200,8 @@ links.
   as `train:<day>` (best of the day per round, `h` hints used, `p` rounds played), pushed in the state blob
   as `train` and merged by the better score per round and the larger `h`/`p`, on the account
   (`combineState`) and on the device (`adoptTour`), so a round played on the phone shows on the website and a
-  second device gets no second free round; the streaks merge as runs of days (`mergeStreak`), and a push carries
+  second device gets no second free round; the streaks merge as runs of days (`mergeStreak`; the freezes held
+  are the later day's, the more of the two on the same day), and a push carries
   the last 120 days (`STATE_SEND_DAYS`), 400 after a long gap; the sheet shows the score, seven days of bars and the streak of days
   done. The page's title, description and keywords say brain training first.
 - **A sweep for dead and doubled code** (September 2026): gone from `js/puzzle.js` are three icons nothing
@@ -1222,11 +1246,35 @@ links.
 - **The evening nudge needs no account.** Notifications are offered signed out too (`renderNotify` no
   longer waits for `auth.user`); a token or subscription is posted with no user, with the device's own
   nudge answer (`remindOn()`, `reminder` in the post, `store 'remind'`), and the 7 pm sweep reaches those
-  rows by zone with a note that carries no name (`deviceTargets`, `dailyNote('')` → "It's time to train
-  your brain"). Signing in posts the same token again and the row takes the account; signing out posts it
+  rows by zone with a note that carries no name (`deviceTargets`, `dailyNote('')`). Signing in posts the same token again and the row takes the account; signing out posts it
   again with none (`notifyRelease`), so the nudge keeps coming while the account's invitations and league
   stop. Backend: migration `017_anon_push.sql` (nullable `user_id`, `reminder` per row), `/push/*` routes
   open to strangers under the address limit, `/push/reminder` by token or endpoint when signed out.
+- **The evening nudge fits the evening** (`reminder.ts`, `push.ts`). Nobody who has played today is told
+  (`targets`: no `playStreak.last` and no training round scored on the zone's date, from `users.state`).
+  What it says fits where they are: a streak still alive (played yesterday, or the day before with a freeze
+  to cover it: `aliveStreak`) hears "Your N-day streak ends at midnight"; anyone else what is waiting
+  ("Today's four rounds are ready"), never that a streak they no longer have is at stake (`dailyNote(name,
+  {kind, streak, tmpl})`, five wordings of each, `NUDGES`, taken in turn per player: the last one used is
+  kept in Redis, `tmpl:<id>`, `nextTemplate`). It backs off (`nudgeKind`, counted from the last day played:
+  the latest of the streak's day, the last training day and `last_played_at`; for a device with no account,
+  the day it last opened the game): every evening for the first three days away, then every third day, one
+  last "We'll stop reminding you" note at 15–21 days (once an absence, `nudgebye:<id>:<day>`), then nothing
+  until the player plays again. `last_played_at` moves only when a push brought something new — a board, a
+  count, a training round, a streak day (`mergeLevels`/`mergeStats` rows moved, `playedIn`) — not on the
+  sync every open of the app makes; a delivered push no longer counts as the device being seen.
+- **One streak, with freezes** (`bumpDay`, `stepStreak`, `streakNow`, `playStreak`): a day counts when a
+  board is cleared (`keepWin`) or a training round is scored (`trainSave`, the round's own day), one number
+  for the home screen, the training sheet and the evening nudge. `playStreak` is `{count, last, freeze}`:
+  0–2 streak freezes held, earned by the first time all four rounds are scored in a day and by every seventh
+  day of a streak, never bought, spent by themselves when the player comes back after exactly one missed day
+  (the covered day counts, so the run stays one stretch of the calendar and two devices' runs still join);
+  a second missed day ends the streak and keeps the freeze. A **flame and the count** sit in the home bar
+  (`#aaStreak`, `renderStreak`), rose while today is still to play, the freezes on its corner; a tap says the
+  rule. The result card and the training result say a milestone (3, 7, 14, 30, 50, 100 days) and a freeze
+  spent or earned (`streakNews`). Merged on both sides (`mergeStreak`): the freezes are the later day's, the
+  more of the two on the same day; commutative and idempotent. On a crowded phone bar (signed in, a streak and
+  the league, under 420 px) the gaps close and the league chip shows its trophy only.
 - **The build line is hidden where players are.** "Build N" under the credit shows only on localhost or
   in the debug app (`el.build.hidden = !devAllowed()`), the same places the seven taps work; a player's
   Settings ends at the credit line.
@@ -1273,13 +1321,19 @@ links.
   cut out of the **shape** — two rings with a gap — rather than masked out of the
   grid afterwards, so the split is there at every size, the home screen's outline
   included. In the game one is `{ id:
-  'f:<id>', name, d, k, focus: true }`. `tourFor` puts the whole block at the
+  'f:<id>', name, d, k, focus: true }`. `tourFor` starts them at the
   **frontier**, right after the last board the player has cleared (`frontierOf`;
   not in front of the first board without a record, which for a player who had
-  passed the scene slots added behind them was a hole a hundred levels back): a new
-  player's level 1 is the brain, and a player who has already cleared a hundred
-  countries meets them next rather than never (appending) or behind a wall
-  (putting them first would lock the country they were on). Their progress stays
+  passed the scene slots added behind them was a hole a hundred levels back), and
+  **deals them in among the tour**, one after every two tour boards, until they run
+  out: a new player plays the brain, then the home country and its discovery board,
+  then the next focus board, and so on (26 abstract shapes in a row used to keep a new
+  player off the map and the countries' discoveries for an hour). The ones already
+  cleared stay together behind the frontier, so a player who has passed them all
+  meets the tour exactly as before. The list is built again on every load and sync, so
+  where the rhythm stands is read off the first-clear times (the tour boards cleared
+  since the last focus board), and the next board is the same before and after a
+  reload; a focus board put off with Skip for now (`focusLater`) comes after the rest. Their progress stays
   on the device (`isLocalOnly`): the account's progress is a list of country ids
   and a board that is not a country has no place in it. They are counted out of
   "N countries discovered" on the map, and the win card gives them **no facts

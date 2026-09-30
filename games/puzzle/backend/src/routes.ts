@@ -242,12 +242,16 @@ const H = {
     const stats = cleanStats(b.stats, known), device = cleanDevice(b.device);
     const userId = me.user.id;
     const merged = await tx(async c => {
-      await mergeLevels(c, userId, levels);
-      if (state) await mergeState(c, userId, state);
-      if (device && Object.keys(stats).length) await mergeStats(c, userId, device, stats);
-      // A board posted is a player playing: the evening nudge leaves alone anyone seen in the last few hours.
+      const moved = await mergeLevels(c, userId, levels);
+      const played = state ? await mergeState(c, userId, state) : false;
+      const counted = device && Object.keys(stats).length ? await mergeStats(c, userId, device, stats) : 0;
+      // A board posted is a player playing: the evening nudge leaves alone anyone seen in the last few hours,
+      // and counts the days away from it (reminder.ts). Only a push that brought something new -- a board, a
+      // count, a round, a streak day -- is play: the app syncs on every open, and opening it is not playing.
       // Written at most once in ten minutes, so a busy session is not a write per level.
-      await query(c, `UPDATE users SET last_played_at = now() WHERE id = $1 AND last_played_at < now() - interval '10 minutes'`, [userId]);
+      if (moved > 0 || played || counted > 0) {
+        await query(c, `UPDATE users SET last_played_at = now() WHERE id = $1 AND last_played_at < now() - interval '10 minutes'`, [userId]);
+      }
       return readAll(c, userId);
     });
     await noStore(res).send(merged);

@@ -9,8 +9,8 @@ const data = JSON.parse(fs.readFileSync(path.join(root, 'games/data/puzzle.json'
 const html = fs.readFileSync(path.join(root, 'puzzle/index.html'), 'utf8');
 // Pull the pure pieces of the engine out of the IIFE so the exact production code is tested.
 const grab = re => { const m = js.match(re); if (!m) throw new Error('could not find ' + re); return m[0]; };
-const src = [grab(/const REF = \d+;/), grab(/function parsePath\(d\) \{[\s\S]*?\n  \}\n/), grab(/function insidePath\([\s\S]*?\n  \}\n/), grab(/function rasterise\([\s\S]*?\n  \}\n/), grab(/const DIRS = [^\n]+/), grab(/const PALETTE = [^\n]+/), grab(/const STEP_POINTS = [^\n]+/), grab(/const FAST_SEC_PER_ARROW = [^\n]+/), grab(/const clampTier = [^\n]+/), grab(/const clearPoints = [^\n]+/), grab(/const FORM0 = [^\n]+/), grab(/const nextForm = [\s\S]*?\n  \};\n/), grab(/const MAXLEN_OF = [^\n]+/), grab(/const KSCALE_OF = [^\n]+/), grab(/const CELL_CAP_OF = [^\n]+/), grab(/const SIDE_CAP = [^\n]+/), grab(/const NARROW_OF = [^\n]+/), grab(/const FAR_OF = [^\n]+/), grab(/const RAIL_OF = [^\n]+/), grab(/const HOLE_OF = [^\n]+/), grab(/const LANE_OF = [^\n]+/), grab(/const TIGHTEN_OF = [^\n]+/), grab(/const TRAP_OF = [^\n]+/), grab(/const GEN_OPTS = [^\n]+/), grab(/function mulberry32[^\n]+/), grab(/function generate\(mask, maxLen, seed[^)]*\) \{[\s\S]*?\n  \}\n/)].join('\n');
-const { generate, rasterise, nextForm, FORM0, MAXLEN_OF, GEN_OPTS, DIRS, KSCALE_OF, CELL_CAP_OF, SIDE_CAP } = new Function(src + '\nreturn { generate, rasterise, nextForm, FORM0, MAXLEN_OF, GEN_OPTS, DIRS, KSCALE_OF, CELL_CAP_OF, SIDE_CAP };')();
+const src = [grab(/const REF = \d+;/), grab(/function parsePath\(d\) \{[\s\S]*?\n  \}\n/), grab(/function insidePath\([\s\S]*?\n  \}\n/), grab(/function rasterise\([\s\S]*?\n  \}\n/), grab(/const DIRS = [^\n]+/), grab(/const PALETTE = [^\n]+/), grab(/const GRADE_UP = [^\n]+/), grab(/const FAST_SEC_PER_ARROW = [^\n]+/), grab(/const clampTier = [^\n]+/), grab(/const clampGrade = [^\n]+/), grab(/const clearPoints = [^\n]+/), grab(/const FORM0 = [^\n]+/), grab(/const gradeOf = [^\n]+/), grab(/const formOf = [^\n]+/), grab(/const nextForm = [\s\S]*?\n  \};\n/), grab(/const MAXLEN_OF = [^\n]+/), grab(/const KSCALE_OF = [^\n]+/), grab(/const CELL_CAP_OF = [^\n]+/), grab(/const SIDE_CAP = [^\n]+/), grab(/const NARROW_OF = [^\n]+/), grab(/const FAR_OF = [^\n]+/), grab(/const RAIL_OF = [^\n]+/), grab(/const HOLE_OF = [^\n]+/), grab(/const LANE_OF = [^\n]+/), grab(/const TIGHTEN_OF = [^\n]+/), grab(/const TRAP_OF = [^\n]+/), grab(/const GEN_OPTS = [^\n]+/), grab(/function mulberry32[^\n]+/), grab(/function generate\(mask, maxLen, seed[^)]*\) \{[\s\S]*?\n  \}\n/)].join('\n');
+const { generate, rasterise, nextForm, gradeOf, FORM0, MAXLEN_OF, GEN_OPTS, DIRS, KSCALE_OF, CELL_CAP_OF, SIDE_CAP } = new Function(src + '\nreturn { generate, rasterise, nextForm, gradeOf, FORM0, MAXLEN_OF, GEN_OPTS, DIRS, KSCALE_OF, CELL_CAP_OF, SIDE_CAP };')();
 // a sampling ramp for the board tests (the game itself picks the tier from the player's form, not the level)
 const BASE_TIER = i => i < 5 ? 0 : i < 15 ? 1 : i < 40 ? 2 : i < 80 ? 3 : 4;
 // the mask the game plays, finer grid of the top tiers included (see maskFor in the engine)
@@ -67,17 +67,26 @@ test('boards are dense: Hard tour levels average over 90 arrows on the finer gri
   const avg = tier => { const idx = data.levels.map((_, i) => i).filter(i => BASE_TIER(i) === tier); return idx.reduce((n, i) => n + generate(maskFor(data.levels[i], tier), MAXLEN_OF[tier], (i + 1) * 1000).pieces.length, 0) / idx.length; };
   assert.ok(avg(1) > 35, `Normal averages ${avg(1)}`); assert.ok(avg(2) > 90, `Hard averages ${avg(2)}`);
 });
-test('difficulty follows form, not the level: a flawless fast clear steps up at once, two first-try clears step up, two losses step down, a retry clear resets', () => {
-  const flawless = { firstTry: true, heartsLost: 0, hints: 0, secPerArrow: 0.9 }, scrappy = { firstTry: true, heartsLost: 3, hints: 3, secPerArrow: 2.5 }, slow = { firstTry: true, heartsLost: 0, hints: 0, secPerArrow: 2 }, retry = { firstTry: false, heartsLost: 0, hints: 0, secPerArrow: 0.9 };
+test('difficulty follows form, not the level: grades 0-14, a first-try clear one up, a flawless fast one two, a scrappy or retried clear holds, a heart-out three down', () => {
+  const flawless = { firstTry: true, heartsLost: 0, hints: 0, secPerArrow: 0.9 }, slow = { firstTry: true, heartsLost: 0, hints: 0, secPerArrow: 2 }, oneEach = { firstTry: true, heartsLost: 1, hints: 1, secPerArrow: 0.9 };
+  const twoHearts = { firstTry: true, heartsLost: 2, hints: 0, secPerArrow: 2.5 }, twoHints = { firstTry: true, heartsLost: 0, hints: 2, secPerArrow: 1 }, retry = { firstTry: false, heartsLost: 0, hints: 0, secPerArrow: 0.9 };
   let f = { ...FORM0 };
-  f = nextForm(f, true, flawless); assert.deepEqual(f, { tier: 1, wins: 0, losses: 0 }, 'level 1 flawless and fast: level 2 is already Normal');
-  f = nextForm(f, true, scrappy); assert.deepEqual(f, { tier: 1, wins: 1, losses: 0 }, 'a scrappy first-try clear is half a step');
-  f = nextForm(f, true, slow); assert.deepEqual(f, { tier: 2, wins: 0, losses: 0 }, 'two first-try clears in a row step up, hearts and hints spent or not');
-  f = nextForm(f, true, scrappy); f = nextForm(f, false, null); assert.deepEqual(f, { tier: 2, wins: 0, losses: 1 }, 'one loss keeps the tier and breaks the run');
-  f = nextForm(f, true, retry); assert.deepEqual(f, { tier: 2, wins: 0, losses: 0 }, 'a clear after a retry resets both counters');
-  f = nextForm(f, false, null); f = nextForm(f, false, null); assert.deepEqual(f, { tier: 1, wins: 0, losses: 0 }, 'two losses in a row step down');
-  for (let k = 0; k < 6; k++) f = nextForm(f, false, null); assert.equal(f.tier, 0, 'never below Easy');
-  for (let k = 0; k < 6; k++) f = nextForm(f, true, flawless); assert.equal(f.tier, 4, 'never above Master');
+  assert.deepEqual(f, { grade: 0, tier: 0 }, 'a new player starts on the easiest deal of Easy');
+  f = nextForm(f, true, flawless); assert.deepEqual(f, { grade: 2, tier: 0 }, 'flawless and fast: two grades, the hardest deal of Easy');
+  f = nextForm(f, true, slow); assert.deepEqual(f, { grade: 3, tier: 1 }, 'any other clean first-try clear: one grade, and grade 3 is Normal');
+  f = nextForm(f, true, oneEach); assert.deepEqual(f, { grade: 4, tier: 1 }, 'a heart and a hint gone is still a clear');
+  f = nextForm(f, true, twoHearts); assert.deepEqual(f, { grade: 4, tier: 1 }, 'two hearts lost: holds');
+  f = nextForm(f, true, twoHints); assert.deepEqual(f, { grade: 4, tier: 1 }, 'two hints: holds');
+  f = nextForm(f, true, retry); assert.deepEqual(f, { grade: 4, tier: 1 }, 'a clear after a retry holds, and resets nothing');
+  f = nextForm(f, false, null); assert.deepEqual(f, { grade: 1, tier: 0 }, 'a heart-out: three grades down');
+  for (let k = 0; k < 6; k++) f = nextForm(f, false, null); assert.deepEqual(f, { grade: 0, tier: 0 }, 'never below Easy');
+  for (let k = 0; k < 12; k++) f = nextForm(f, true, flawless); assert.deepEqual(f, { grade: 14, tier: 4 }, 'never above the hardest deal of Master');
+  // a form kept before grades (or written since by a device on the old rule) is its tier's hardest deal
+  assert.equal(gradeOf({ tier: 2, wins: 1, losses: 0 }), 8); assert.equal(gradeOf({ tier: 0 }), 2); assert.equal(gradeOf({ tier: 4, wins: 0, losses: 1 }), 14);
+  assert.equal(gradeOf({ grade: 4, tier: 1 }), 4, 'a grade and its tier agree: the grade');
+  assert.equal(gradeOf({ grade: 4, tier: 3 }), 11, 'an old device moved the tier since: the tier wins');
+  assert.deepEqual(nextForm({ tier: 3, wins: 1, losses: 0 }, true, slow), { grade: 12, tier: 4 }, 'and the ladder moves on from there');
+  assert.deepEqual(nextForm({ grade: 'x', tier: 9 }, false, null), { grade: 11, tier: 3 }, 'junk is read as the nearest tier');
 });
 test('narrow play: on Hard tour boards fewer than 20% of the arrows are free at the start (the game then keeps the best of 8)', () => {
   const freeAtStart = b => b.pieces.filter(p => { const [dr, dc] = DIRS[p.dir]; let [y, x] = p.cells[0]; y += dr; x += dc; while (y >= 0 && y < b.H && x >= 0 && x < b.W) { if (b.occ[y][x] >= 0) return false; y += dr; x += dc; } return true; }).length;

@@ -132,6 +132,15 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-card-rank.is-up{ font-size:16px; color:var(--ink); animation:aapop .45s ease-out; }
 .aa-card-rank.is-down{ font-size:15px; color:var(--ink); }
 .aa-card-rank.is-down b{ color:var(--bad); }
+/* what the day did to the streak: a milestone, a freeze spent or earned (streakNews) */
+.aa-streak-news{ margin:8px 0 0; font-size:13px; font-weight:800; line-height:1.45; color:var(--muted); text-align:center; }
+.aa-streak-news b{ color:var(--ink); font-weight:900; }
+.aa-streak-news .aa-flame{ width:17px; height:17px; margin-right:4px; vertical-align:-3px; }
+.aa-train-res .aa-streak-news{ margin:6px 0 10px; }
+/* the out-of-hearts card: how much of the board went, as a bar and in words */
+.aa-fail-bar{ --at:0%; position:relative; height:8px; margin:6px 12px 8px; border-radius:999px; background:var(--bg2); overflow:hidden; }
+.aa-fail-bar i{ position:absolute; inset:0 auto 0 0; width:var(--at); border-radius:999px; background:var(--accent2); }
+.aa-fail-lead{ font-variant-numeric:tabular-nums; }
 /* the home corner: the player's own face once signed in, in place of the settings mark */
 .aa-icon.has-face{ padding:3px; }
 .aa-home-face{ width:36px; height:36px; font-size:16px; box-shadow:0 1px 3px rgba(0,0,0,.18); }
@@ -308,6 +317,28 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
   font-weight:900; font-size:13px; font-variant-numeric:tabular-nums; transition:transform .12s, filter .15s; }
 .aa-chip--league:hover{ filter:brightness(1.04); }
 .aa-chip--league:active{ transform:scale(.95); }
+/* The streak in the home bar: a flame and the count, lit once today is played, rose (the colour of the training
+   dot still to do) while it is not; the freezes held sit on its corner in ice blue, as the training pill sits
+   on its button, so they take no room. Compact: the bar still has to hold the purse and the league. */
+.aa-chip--streak{ position:relative; display:inline-flex; align-items:center; gap:2px; border:none; cursor:pointer; color:var(--ink); font-weight:900; font-size:15px; line-height:1; padding:7px 10px 7px 6px; font-variant-numeric:tabular-nums; flex:none; }
+.aa-chip--streak:active{ transform:scale(.95); }
+.aa-flame{ width:19px; height:19px; fill:var(--expert); flex:none; }
+.aa-chip--streak.is-due .aa-flame{ fill:var(--accent2); }
+.aa-streak-fz{ position:absolute; right:-5px; top:-10px; display:inline-flex; align-items:center; gap:1px; height:16px; padding:0 4px 0 3px; border-radius:8px; background:#3B8FD6; color:#fff; font-size:10px; box-shadow:0 0 0 2px var(--bg); }
+.aa-streak-fz svg{ width:10px; height:10px; fill:none; stroke:currentColor; stroke-width:2.6; stroke-linecap:round; stroke-linejoin:round; }
+/* A full bar -- signed in (the purse) and a streak beside the league -- on a phone: the gaps close up and the
+   league chip keeps its trophy and says its name in its label only, so the row still fits from 320 pixels up. */
+@media (max-width:420px){
+  .aa-home-top:has(#aaPurse:not([hidden])):has(#aaStreak:not([hidden])){ gap:5px; }
+  .aa-home-top:has(#aaPurse:not([hidden])):has(#aaStreak:not([hidden])) .aa-chip--league{ padding:9px 10px; }
+  .aa-home-top:has(#aaPurse:not([hidden])):has(#aaStreak:not([hidden])) #aaLeagueEnds{ display:none; }
+}
+@media (max-width:360px){
+  .aa-home-top:has(#aaPurse:not([hidden])):has(#aaStreak:not([hidden])){ gap:4px; }
+  .aa-home-top:has(#aaPurse:not([hidden])):has(#aaStreak:not([hidden])) .aa-chip--streak{ padding:7px 8px 7px 5px; }
+  .aa-home-top:has(#aaPurse:not([hidden])):has(#aaStreak:not([hidden])) .aa-chip--purse{ padding:8px 9px; gap:4px; }
+  .aa-home-top:has(#aaPurse:not([hidden])):has(#aaStreak:not([hidden])) .aa-purse-add{ margin-left:2px; }
+}
 .aa-lg-cta{ margin:0 0 14px; text-align:center; }
 /* One line at the top: the week's clock, where you stand, and the way to last week's result. */
 .aa-lg-bar{ display:flex; align-items:center; gap:10px; margin:2px 0 12px; padding:0 2px; }
@@ -713,6 +744,12 @@ html.is-first .aa-splash.is-terms .aa-splash-terms{ visibility:visible; opacity:
 /* the out-of-hearts card, as drawn: the free life first and biggest, Try again under it in a soft tint, and the
    rest as links -- one decision on top, the others a glance below */
 .aa-actions--out{ grid-template-columns:1fr; gap:10px; }
+/* under them, from the second heart-out on one board: a new layout, and from the third, leaving it for later */
+.aa-actions--alt{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:10px; }
+.aa-actions--alt .aa-btn{ width:100%; min-width:0; padding:12px 8px; gap:6px; font-size:14px; white-space:normal; line-height:1.2; }
+.aa-actions--alt .aa-btn:only-child{ grid-column:1 / -1; }
+.aa-alt-label{ display:inline-flex; flex-direction:column; align-items:flex-start; line-height:1.15; text-align:left; }
+.aa-alt-label small{ font-size:11px; font-weight:800; letter-spacing:.3px; opacity:.72; }
 .aa-btn--big{ grid-column:1 / -1; position:relative; padding:16px 44px !important; font-size:18px; border-radius:18px; }
 .aa-actions .aa-btn--soft{ background:color-mix(in srgb, var(--accent2) 12%, var(--card)); color:var(--accent2); box-shadow:none; }
 .aa-ad-pill{ position:absolute; right:14px; top:50%; transform:translateY(-50%); background:rgba(255,255,255,.88); color:var(--accent); font-size:11px; font-weight:900; letter-spacing:.6px; padding:3px 9px; border-radius:999px; }

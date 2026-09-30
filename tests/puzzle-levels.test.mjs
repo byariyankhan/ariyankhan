@@ -154,7 +154,8 @@ test('the header: a fresh board reads Level N with N the training chip\'s number
 });
 
 // ── The win, kept at once ──
-const FORM_SRC = [STORE_SRC, one('STEP_POINTS'), one('FAST_SEC_PER_ARROW'), one('clampTier'), one('clearPoints'), one('FORM0'), grab(/  const nextForm = [\s\S]*?\n  \};\n/), one('formNow'), fn('learnFrom')].join('\n');
+// a veteran's ceiling (boardsDone): the new player's cap is tests/puzzle-habits.test.mjs's
+const FORM_SRC = [STORE_SRC, one('GRADE_UP'), one('FAST_SEC_PER_ARROW'), one('clampTier'), one('clampGrade'), one('clearPoints'), one('FORM0'), one('gradeOf'), one('formOf'), grab(/  const nextForm = [\s\S]*?\n  \};\n/), one('formNow'), one('GRADE_CAP'), 'const boardsDone = () => 99;', fn('learnFrom')].join('\n');
 const formKit = form => {
   const localStorage = fakeStorage();
   const k = new Function('localStorage', FORM_SRC + '\nreturn { store, learnFrom, formNow };')(localStorage);
@@ -165,10 +166,10 @@ test('learnFrom reads the run it is handed, never the live board: a Back tap dur
   assert.ok(!/state\./.test(body('learnFrom')), 'learnFrom does not touch state');
   const k = formKit({ tier: 1, wins: 0, losses: 0 });
   const got = k.learnFrom(true, { fails: 0, lost: 2, hints: 1, t: 120_000, arrows: 40 });
-  assert.deepEqual(got.after, { tier: 1, wins: 1, losses: 0 }, 'a scrappy slow clear is half a step, as the run says');
-  // the same call with an emptied board (what clearRun leaves) would have been 2 points; the run is what counts
+  assert.deepEqual(got.after, { grade: 5, tier: 1 }, 'a scrappy slow clear holds the grade (an old Normal form is read as grade 5), as the run says');
+  // the same call with an emptied board (what clearRun leaves) would have been 2 grades; the run is what counts
   const k2 = formKit({ tier: 1, wins: 0, losses: 0 });
-  assert.deepEqual(k2.learnFrom(true, { fails: 0, lost: 0, hints: 0, t: 30_000, arrows: 40 }).after, { tier: 2, wins: 0, losses: 0 }, 'a flawless fast clear steps up');
+  assert.deepEqual(k2.learnFrom(true, { fails: 0, lost: 0, hints: 0, t: 30_000, arrows: 40 }).after, { grade: 7, tier: 2 }, 'a flawless fast clear is two grades up');
   assert.equal(k2.learnFrom(true, { daily: { key: 'x' }, fails: 0, lost: 0, hints: 0, t: 1, arrows: 40 }), null, 'the daily board moves nothing');
 });
 test('a replay never promotes the ladder', () => {
@@ -184,7 +185,7 @@ test('winLevel keeps everything at once; only the card waits, and leaving cancel
   const win = body('winLevel'), keep = body('keepWin'), show = body('showResult'), clear = body('clearRun');
   assert.ok(/const run = keepWin\(\);[\s\S]*state\.resultTimer = setTimeout\(\(\) => \{ state\.resultTimer = 0; showResult\(run\); \}, 700\);/.test(win), 'the card is drawn from the kept run, 700 ms later');
   assert.ok(win.indexOf('keepWin()') < win.indexOf('setTimeout'), 'the saving comes first');
-  for (const k of ["store.set('lv:' + lid, rec)", 'pushOne(lid, rec)', "store.set('playStreak'", 'countBoard(baseId(lid)', 'learnFrom(true, run)', 'finishMatch(true', 'dropRun(lid)'])
+  for (const k of ["store.set('lv:' + lid, rec)", 'pushOne(lid, rec)', 'run.day = bumpDay()', 'countBoard(baseId(lid)', 'learnFrom(true, run)', 'finishMatch(true', 'dropRun(lid)'])
     assert.ok(keep.includes(k), `keepWin does ${k}`);
   for (const k of ['store.set(', 'learnFrom(', 'pushOne(', 'countBoard(', 'finishMatch(', 'state.pieces', 'state.elapsed', 'state.lives', 'state.hintsUsed', 'state.daily', 'stars()'])
     assert.ok(!show.includes(k), `showResult no longer reads or saves ${k}`);

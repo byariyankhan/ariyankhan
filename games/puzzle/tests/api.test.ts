@@ -316,6 +316,27 @@ section('Two devices on one account: a Master board, the training and the streak
   eq(big.status, 413, 'a 100 KB body to another route is refused');
 }
 
+section('Opening the app is not playing: only a sync that brings something new moves last_played_at');
+{
+  const p = await mint('apiPlayedAt', 1_000);
+  const day = new Date().toISOString().slice(0, 10);
+  const long = async () => { await query(pool, `UPDATE users SET last_played_at = now() - interval '3 days' WHERE id = $1`, [p.id]); };
+  const played = async () => (await query<{ fresh: boolean }>(pool, `SELECT last_played_at > now() - interval '1 minute' AS fresh FROM users WHERE id = $1`, [p.id])).rows[0]?.fresh;
+  await call('/progress', { token: p.token, body: { levels: { '050': { cleared: true, stars: 2, ms: 60_000, tier: 1, arrows: 40 } }, device: 'devPlayed1', stats: { '050': { p: 1, c: 1 } }, state: { playStreak: { count: 1, last: day }, home: 'BD' } } });
+  await long();
+  const same = await call('/progress', { token: p.token, body: { levels: { '050': { cleared: true, stars: 2, ms: 60_000, tier: 1, arrows: 40 } }, device: 'devPlayed1', stats: { '050': { p: 1, c: 1 } }, state: { playStreak: { count: 1, last: day }, home: 'IN' } } });
+  eq(same.status, 200, 'the same sync again, as every open makes it');
+  eq(await played(), false, 'moves nothing: the evening nudge still counts the days away');
+  await call('/progress', { token: p.token, body: { state: { train: { [day]: { r: 72, p: 1, pp: { r: 1 } } } } } });
+  eq(await played(), true, 'a training round scored is play');
+  await long();
+  await call('/progress', { token: p.token, body: { levels: {}, device: 'devPlayed1', stats: { '050': { p: 2, c: 1, f: 1 } } } });
+  eq(await played(), true, 'and so is a board started again and lost');
+  await long();
+  await call('/progress', { token: p.token, body: { levels: { '356': { cleared: true, stars: 3, ms: 40_000, tier: 1, arrows: 38 } } } });
+  eq(await played(), true, 'and a board cleared');
+}
+
 section('A link cannot delete somebody\u2019s account');
 {
   // Reported by a review bot on PR #82, and it was real: the compatibility shim mounted every action for GET

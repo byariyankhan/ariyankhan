@@ -1,7 +1,7 @@
 // A player's tour, and the one property that makes syncing it safe: nothing a device pushes can ever take
 // something away. Two phones, opened in any order, converge on the better of what each has seen.
 import { pool, query } from '../backend/src/db.js';
-import { cleanDevice, cleanLevels, cleanState, cleanStats, cleanStreak, combineState, difficulty, levelIdOk, MAX_BLOB_BYTES, MAX_SERIALS, MAX_STAT_DEVICES, mergeLevels, mergeState, mergeStats, mergeStreak, nextDay, readAll, readLevels, readState, STATE_KEEP_DAYS } from '../backend/src/progress.js';
+import { cleanDevice, cleanLevels, cleanState, cleanStats, cleanStreak, combineState, difficulty, levelIdOk, MAX_BLOB_BYTES, MAX_SERIALS, MAX_STAT_DEVICES, mergeLevels, mergeState, mergeStats, mergeStreak, nextDay, playedIn, readAll, readLevels, readState, STATE_KEEP_DAYS } from '../backend/src/progress.js';
 import { deleteUser } from '../backend/src/auth.js';
 import { boardIdSet, releasePlayer } from '../backend/src/rooms.js';
 import { eq, finish, ok, player, reset, section } from './helpers.js';
@@ -286,6 +286,41 @@ section('Streaks from two devices join up');
   await mergeState(pool, p.id, { playStreak: s(2, back(1)) });
   await mergeState(pool, p.id, { playStreak: s(1, today) });
   same(((await readState(pool, p.id)) as Record<string, any>).playStreak, s(3, today), 'on the account as well');
+}
+
+section('Streak freezes travel with the streak');
+{
+  const f = (count: number, last: string, freeze?: number) => (freeze ? { count, last, freeze } : { count, last });
+  eq(cleanStreak({ count: 4, last: today, freeze: 1 }), f(4, today, 1), 'a freeze held is kept');
+  eq(cleanStreak({ count: 4, last: today, freeze: 9 }), f(4, today, 2), 'two at most');
+  eq(cleanStreak({ count: 4, last: today, freeze: -1 }), f(4, today), 'nothing that is not a count');
+  eq(cleanStreak({ count: 4, last: today, freeze: 0 }), f(4, today), 'and none held is no field at all, as a streak always read');
+  eq(mergeStreak(f(2, '2026-09-20', 1), f(4, '2026-09-23')), f(5, '2026-09-23'), 'the device that played later spent it: none held, the run joined');
+  eq(mergeStreak(f(5, '2026-09-23'), f(3, '2026-09-23', 2)), f(5, '2026-09-23', 2), 'the same last day: the more held');
+  eq(mergeStreak(f(3, '2026-09-10', 2), f(1, '2026-09-23')), f(1, '2026-09-23'), 'a later streak on a device that never heard of them: the later day decides');
+  const runs = [f(2, '2026-09-20', 1), f(4, '2026-09-23'), f(3, '2026-09-23', 2), f(6, '2026-09-22', 1), f(1, '2026-09-18', 2)];
+  for (const a of runs) for (const b of runs) {
+    const ab = mergeStreak(a, b);
+    same(ab, mergeStreak(b, a), `order does not matter: ${JSON.stringify([a, b])}`);
+    same(mergeStreak(ab, a), ab, `merging again changes nothing: ${JSON.stringify([a, b])}`);
+  }
+  const p = await player('progFreeze');
+  await mergeState(pool, p.id, { playStreak: f(6, back(2), 1) });
+  await mergeState(pool, p.id, { playStreak: f(8, today) });
+  same(((await readState(pool, p.id)) as Record<string, any>).playStreak, f(8, today), 'on the account: the phone came back after a missed day and spent the freeze');
+  await mergeState(pool, p.id, { playStreak: f(8, today, 1) });
+  same(((await readState(pool, p.id)) as Record<string, any>).playStreak, f(8, today, 1), 'and the website earned one the same day');
+}
+
+section('What counts as having played, for the evening nudge');
+{
+  const was = { train: { [today]: { r: 60, p: 1, pp: { r: 1 }, at: 5 } }, playStreak: { count: 2, last: today }, home: 'BD' };
+  const again = combineState(was, { train: { [today]: { at: 5, pp: { r: 1 }, p: 1, r: 60 } }, playStreak: { count: 1, last: today }, home: 'IN' });
+  ok(!playedIn(was, again), 'the same records sent back again, in another order, and a setting changed: not play');
+  ok(playedIn(was, combineState(was, { train: { [today]: { r: 60, f: 40 } } })), 'a round scored is');
+  ok(playedIn(was, combineState(was, { playStreak: { count: 3, last: today, freeze: 1 } })), 'a freeze earned is');
+  ok(playedIn(was, combineState(was, { loss: { dev1: 12 } })), 'a board lost is');
+  ok(playedIn({}, combineState({}, { daily: { [today]: { t: 50_000, stars: 2 } } })), 'a daily board is');
 }
 
 section('The daily board, the rank and the settings merge by their own rules');
