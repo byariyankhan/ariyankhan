@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="en-US">
+  <head>
+    <!-- Google AdSense: site verification only. No ad units and no Auto ads are enabled. -->
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1570944160084395" crossorigin="anonymous"></script>
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-8ZPSNG5X37"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag() {
+        dataLayer.push(arguments);
+      }
+      gtag("js", new Date());
+      gtag("config", "G-8ZPSNG5X37");
+    </script>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <title>About AI Metadata Remover &amp; FAQ – How It Works, Its Limits</title>
+    <meta name="description" content="What AI Metadata Remover is, how it rewrites image files without touching the pixels, what it cannot do, how to use it responsibly, and answers to common questions." />
+    <meta name="author" content="Ariyan Khan" />
+    <meta name="robots" content="index, follow, max-image-preview:large" />
+    <meta name="theme-color" content="#FFFFFF" />
+    <link rel="canonical" href="https://ariyankhan.com/ai-metadata-remover/about.html" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://ariyankhan.com/ai-metadata-remover/about.html" />
+    <meta property="og:title" content="About AI Metadata Remover &amp; FAQ – How It Works, Its Limits" />
+    <meta property="og:description" content="What AI Metadata Remover is, how it rewrites image files without touching the pixels, what it cannot do, how to use it responsibly, and answers to common questions." />
+    <meta property="og:image" content="https://ariyankhan.com/ai-metadata-remover/og.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:site_name" content="AI Metadata Remover" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="About AI Metadata Remover &amp; FAQ – How It Works, Its Limits" />
+    <meta name="twitter:description" content="What AI Metadata Remover is, how it rewrites image files without touching the pixels, what it cannot do, how to use it responsibly, and answers to common questions." />
+    <meta name="twitter:image" content="https://ariyankhan.com/ai-metadata-remover/og.png" />
+
+    <link rel="icon" type="image/svg+xml" href="/ai-metadata-remover/icon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/css/ai-metadata-remover.css?v=5" />
+
+    <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebPage",
+      "@id": "https://ariyankhan.com/ai-metadata-remover/about.html#webpage",
+      "url": "https://ariyankhan.com/ai-metadata-remover/about.html",
+      "name": "About AI Metadata Remover & FAQ – How It Works, Its Limits",
+      "description": "What AI Metadata Remover is, how it rewrites image files without touching the pixels, what it cannot do, how to use it responsibly, and answers to common questions.",
+      "inLanguage": "en-US",
+      "datePublished": "2026-09-15",
+      "dateModified": "2026-09-30",
+      "author": {
+        "@id": "https://ariyankhan.com/about.html#person"
+      },
+      "breadcrumb": {
+        "@id": "https://ariyankhan.com/ai-metadata-remover/about.html#breadcrumb"
+      },
+      "about": {
+        "@id": "https://ariyankhan.com/ai-metadata-remover/#app"
+      }
+    },
+    {
+      "@type": "FAQPage",
+      "@id": "https://ariyankhan.com/ai-metadata-remover/about.html#faq",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "Does this tool upload my images anywhere?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "No. The tool is a JavaScript file that runs in your browser tab. Your image is read into memory, rewritten without its metadata and handed back as a download. There is no upload endpoint, no account and nothing is logged. Once the page has loaded you can disconnect from the internet and it still works."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Which image formats are supported?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "JPG/JPEG, PNG and WebP are cleaned losslessly: the file is rewritten and the compressed picture is copied byte for byte. Other formats your browser can open (AVIF, GIF, BMP, and HEIC on Safari) are redrawn into a new PNG, which also drops every tag but does not keep animation or the original compression."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Will this remove the “AI info” label on Instagram and Facebook?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Meta applies that label mainly from metadata: C2PA Content Credentials and IPTC/XMP source-type tags. This tool removes those, so an image labelled only because of its metadata will normally upload without the label. Platforms can also run their own checks on the pixels and change their policies at any time, so no tool can guarantee a result."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Does it remove Google SynthID or other invisible watermarks?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "No. SynthID and similar watermarks are part of the pixels, not metadata. Removing metadata does not touch them, and this tool does not try to. The same goes for detectors that judge the image content rather than its tags."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Does it reduce image quality?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Not for JPG, PNG or WebP. The picture data is never decoded or recompressed; only the metadata around it is removed, so the clean file looks identical and is usually smaller. The fallback for other formats re-encodes to PNG, which is lossless but larger."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "What is the difference between the two modes?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "“Remove everything” strips every metadata block, including EXIF and GPS. “Keep camera EXIF” removes the AI and provenance blocks but leaves the EXIF block with camera, lens, exposure and date. Use the second only for real photographs, and remember EXIF can also hold GPS and a software name."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Can I clean many images at once?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes. Drop, paste or select as many files as you like. Each gets its own card and download button, and “Download all” saves them one after another. There is no daily quota, because the work happens on your device."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Is it legal to remove AI metadata?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Removing metadata from your own files is generally legal, and most social networks already strip it on upload. What can be restricted is what you do next: some platforms require you to disclose realistic AI-generated or AI-altered content, and laws such as the EU AI Act set transparency duties for certain uses. Use the tool for privacy, clean deliverables and false labels, not to mislead people about what an image is."
+          }
+        }
+      ]
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://ariyankhan.com/ai-metadata-remover/about.html#breadcrumb",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Ariyan Khan",
+          "item": "https://ariyankhan.com/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "AI Metadata Remover",
+          "item": "https://ariyankhan.com/ai-metadata-remover/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "About & FAQ",
+          "item": "https://ariyankhan.com/ai-metadata-remover/about.html"
+        }
+      ]
+    }
+  ]
+}
+    </script>
+  </head>
+  <body class="amrk">
+    <header class="amrk-bar">
+      <div class="amrk-bar-in">
+        <a class="amrk-brand" href="/ai-metadata-remover/"><img src="/ai-metadata-remover/icon.svg" alt="" width="34" height="34" /><b>AI Metadata Remover</b></a>
+        <nav class="amrk-nav" aria-label="AI Metadata Remover">
+        <a href="/ai-metadata-remover/">Clean images</a>
+        <a href="/ai-metadata-remover/how-to-use.html">How to use</a>
+        <a href="/ai-metadata-remover/about.html" aria-current="page">About &amp; FAQ</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="amr-page">
+      <article class="amrk-doc">
+        <p class="amrk-kicker">about</p>
+        <h1>About AI Metadata Remover &amp; FAQ</h1>
+        <p class="amr-lede">A private, lossless way to take the hidden data out of an image, and an honest account of what that does and does not achieve.</p>
+
+        <h2>What it is</h2>
+        <p>Modern image files carry far more than pixels. Generators, editors, phones and cameras all store extra information in side blocks of the file: who made it, with what, where, when, and increasingly a signed record saying it was made or edited with AI. AI Metadata Remover opens the file in your browser, keeps only what is needed to display the picture, and gives you back a clean copy with a report of what it removed.</p>
+
+        <h2>Why it exists</h2>
+        <p>I edit YouTube videos for a living, and a normal week sends dozens of thumbnails, stills and map textures through Photoshop, many of them touched by a generative tool somewhere along the way. Real photos started getting “AI info” badges because a sky was extended by a few pixels. The tools I found were paid, limited to a few images a day, or uploaded the file to someone else’s server first, and thumbnails for unreleased videos are confidential. So I wrote a small parser that runs entirely in the browser.</p>
+
+        <h2>How it works</h2>
+        <p>An image file is a container: a sequence of blocks, only some of which hold the picture. For JPEG those blocks are segments, for PNG chunks, for WebP RIFF chunks. The tool reads the blocks in order, copies the ones that carry the compressed picture and its colour profile exactly as they are, and leaves the metadata blocks out. Because the picture is never decoded and re-encoded, there is no quality loss. While it reads, it also scans the removed blocks for the signatures that known generators leave, which is how the report can say “ChatGPT” or “Stable Diffusion”.</p>
+
+        <h2>What it cannot do</h2>
+        <ul>
+          <li><strong>It cannot remove pixel watermarks.</strong> Google SynthID and similar marks are part of the image itself and survive metadata removal by design. The tool does not attempt to defeat them.</li>
+          <li><strong>It cannot fool detectors that look at pixels.</strong> Classifiers that judge texture and noise do not read tags at all.</li>
+          <li><strong>It cannot decide platform policy.</strong> Treat the result as “metadata-clean”, not “undetectable”.</li>
+          <li><strong>It does not handle video.</strong> It cleans still images only.</li>
+        </ul>
+
+        <h2 id="responsible">Use it responsibly</h2>
+        <p>Metadata is yours to remove, but the duty to be honest about synthetic media is not removed with it. YouTube’s altered-content disclosure, Meta’s rules on realistic AI content and the EU AI Act’s transparency requirements apply whatever a file’s tags say. Clean files for privacy, quality and accuracy, and disclose AI-generated content where a platform or the law asks you to.</p>
+
+        <h2>Questions</h2>
+        <div class="amr-faq">
+        <details>
+          <summary>Does this tool upload my images anywhere?</summary>
+          <p>No. The tool is a JavaScript file that runs in your browser tab. Your image is read into memory, rewritten without its metadata and handed back as a download. There is no upload endpoint, no account and nothing is logged. Once the page has loaded you can disconnect from the internet and it still works.</p>
+        </details>
+        <details>
+          <summary>Which image formats are supported?</summary>
+          <p>JPG/JPEG, PNG and WebP are cleaned losslessly: the file is rewritten and the compressed picture is copied byte for byte. Other formats your browser can open (AVIF, GIF, BMP, and HEIC on Safari) are redrawn into a new PNG, which also drops every tag but does not keep animation or the original compression.</p>
+        </details>
+        <details>
+          <summary>Will this remove the “AI info” label on Instagram and Facebook?</summary>
+          <p>Meta applies that label mainly from metadata: C2PA Content Credentials and IPTC/XMP source-type tags. This tool removes those, so an image labelled only because of its metadata will normally upload without the label. Platforms can also run their own checks on the pixels and change their policies at any time, so no tool can guarantee a result.</p>
+        </details>
+        <details>
+          <summary>Does it remove Google SynthID or other invisible watermarks?</summary>
+          <p>No. SynthID and similar watermarks are part of the pixels, not metadata. Removing metadata does not touch them, and this tool does not try to. The same goes for detectors that judge the image content rather than its tags.</p>
+        </details>
+        <details>
+          <summary>Does it reduce image quality?</summary>
+          <p>Not for JPG, PNG or WebP. The picture data is never decoded or recompressed; only the metadata around it is removed, so the clean file looks identical and is usually smaller. The fallback for other formats re-encodes to PNG, which is lossless but larger.</p>
+        </details>
+        <details>
+          <summary>What is the difference between the two modes?</summary>
+          <p>“Remove everything” strips every metadata block, including EXIF and GPS. “Keep camera EXIF” removes the AI and provenance blocks but leaves the EXIF block with camera, lens, exposure and date. Use the second only for real photographs, and remember EXIF can also hold GPS and a software name.</p>
+        </details>
+        <details>
+          <summary>Can I clean many images at once?</summary>
+          <p>Yes. Drop, paste or select as many files as you like. Each gets its own card and download button, and “Download all” saves them one after another. There is no daily quota, because the work happens on your device.</p>
+        </details>
+        <details>
+          <summary>Is it legal to remove AI metadata?</summary>
+          <p>Removing metadata from your own files is generally legal, and most social networks already strip it on upload. What can be restricted is what you do next: some platforms require you to disclose realistic AI-generated or AI-altered content, and laws such as the EU AI Act set transparency duties for certain uses. Use the tool for privacy, clean deliverables and false labels, not to mislead people about what an image is.</p>
+        </details>
+        </div>
+
+        <p class="amr-links">
+          <a class="amr-btn amr-btn--primary" href="/ai-metadata-remover/">Clean images now</a>
+          <a class="amr-btn" href="/ai-metadata-remover/how-to-use.html">How to use</a>
+        </p>
+      </article>
+    </main>
+
+    <footer class="amrk-foot">
+      <div class="amrk-foot-in">
+        <p>AI Metadata Remover is a free tool made by <a href="https://ariyankhan.com/">Ariyan Khan</a>.</p>
+        <nav aria-label="More about AI Metadata Remover">
+          <a href="/ai-metadata-remover/how-to-use.html">How to use</a>
+          <a href="/ai-metadata-remover/about.html">About &amp; FAQ</a>
+          <a href="/ai-metadata-remover/privacy.html">Privacy</a>
+        </nav>
+      </div>
+    </footer>
+  </body>
+</html>

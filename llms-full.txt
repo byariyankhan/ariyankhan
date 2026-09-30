@@ -113,7 +113,7 @@ Fill out the contact form at https://ariyankhan.com/#contact with your project d
 - Upwork: https://www.upwork.com/freelancers/ariyankhan
 
 ## Free Tools
-- Map Maker: https://ariyankhan.com/map-maker.html
+- Map Maker: https://ariyankhan.com/map-maker/
   Free, browser-only map generator for creators and teachers. Highlight countries by clicking or
   searching (aliases like UK/USA/Burma work), up to six colour groups with labels, eight projections
   including an orthographic globe, region presets (Europe, South Asia, Middle East…), "zoom to selection",
@@ -121,7 +121,7 @@ Fill out the contact form at https://ariyankhan.com/#contact with your project d
   Exports PNG at 1×/2×/4× (up to 8K on 16:9) or SVG; a share link encodes the whole map. Borders are
   Natural Earth (public domain, de facto boundaries; 1:110m by default, optional 1:50m with 241
   territories). Built by Ariyan Khan, who does map animation for YouTube channels professionally.
-- AI Metadata Remover: https://ariyankhan.com/ai-metadata-remover.html
+- AI Metadata Remover: https://ariyankhan.com/ai-metadata-remover/
   Free, browser-only tool that removes C2PA / JUMBF Content Credentials, XMP, IPTC, EXIF (camera, GPS,
   software), JPEG comments, PNG text chunks (Stable Diffusion "parameters", ComfyUI "prompt"/"workflow"),
   WebP EXIF/XMP/C2PA chunks and hidden trailing data from JPG, PNG and WebP images. The file container is
@@ -167,12 +167,12 @@ Practical articles on hiring, cost, and working with a video editor.
 ## All Pages
 - Home: https://ariyankhan.com/
 - About: https://ariyankhan.com/about.html
-- AI Metadata Remover (free tool): https://ariyankhan.com/ai-metadata-remover.html
+- AI Metadata Remover (free tool): https://ariyankhan.com/ai-metadata-remover/
 - Piece the World (free geography game): https://ariyankhan.com/piece-the-world.html
 - Puzzle – Train Your Brain (free daily brain training and arrow puzzle game): https://ariyankhan.com/puzzle/
 - About Puzzle & FAQ: https://ariyankhan.com/puzzle/about.html
 - How to play Puzzle: https://ariyankhan.com/puzzle/how-to-play.html
-- Map Maker (free tool): https://ariyankhan.com/map-maker.html
+- Map Maker (free tool): https://ariyankhan.com/map-maker/
 - Talking Head Video Editing: https://ariyankhan.com/talking-head-video-editing.html
 - Documentary Video Editing: https://ariyankhan.com/documentary-video-editing.html
 - Short Form Video Editing: https://ariyankhan.com/short-form-video-editing.html

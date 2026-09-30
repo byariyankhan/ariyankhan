@@ -116,7 +116,7 @@
   const cache = {};
   async function loadWorld(detail) {
     if (cache[detail]) return cache[detail];
-    const res = await fetch(`js/vendor/countries-${detail}.json`);
+    const res = await fetch(`/js/vendor/countries-${detail}.json`);
     if (!res.ok) throw new Error('Could not load map data');
     const topo = await res.json();
     const fc = topojson.feature(topo, topo.objects.countries);
@@ -294,7 +294,7 @@
       box.innerHTML = `
         <div class="mm-group-head">
           <button type="button" class="mm-group-pick" data-i="${i}" aria-label="Make this the active group" title="Click a country on the map to add it to the active group">
-            <span class="mm-swatch" style="background:${g.color}"></span>
+            <span class="mm-swatch" data-color="${g.color}"></span>
           </button>
           <input type="color" value="${g.color}" data-i="${i}" class="mm-color" aria-label="Group colour">
           <input type="text" value="${escapeAttr(g.label)}" data-i="${i}" class="mm-label" placeholder="Label" aria-label="Group label" maxlength="40">
@@ -303,6 +303,7 @@
         </div>
         <div class="mm-chips">${g.ids.map(id => `<span class="mm-chip">${escapeHtml(world.byId.get(id)?.properties.name || id)}<button type="button" data-rm="${id}" aria-label="Remove">×</button></span>`).join('') || '<span class="mm-chips-empty">Click countries on the map or use the search box.</span>'}</div>`;
       groupsEl.appendChild(box);
+      paintSwatches(box);
     });
     $('#mmAddGroup').hidden = state.groups.length >= GROUP_COLORS.length;
   }
@@ -343,9 +344,10 @@
       const b = document.createElement('button');
       b.type = 'button'; b.dataset.id = f.id;
       const inGroup = groupOf(f.id);
-      b.innerHTML = `${escapeHtml(f.properties.name)}${inGroup ? ` <span class="mm-swatch" style="background:${inGroup.color}"></span>` : ''}`;
+      b.innerHTML = `${escapeHtml(f.properties.name)}${inGroup ? ` <span class="mm-swatch" data-color="${inGroup.color}"></span>` : ''}`;
       results.appendChild(b);
     }
+    paintSwatches(results);
     results.hidden = false;
   }
   search.addEventListener('input', runSearch);
@@ -527,6 +529,8 @@
   function setBusy(on, msg) { $('#mmStatus').textContent = on ? msg : ''; $('#mmStatus').hidden = !on; document.body.classList.toggle('mm-busy', on); }
   function showError(msg) { const e = $('#mmError'); e.textContent = msg; e.hidden = false; clearTimeout(showError.t); showError.t = setTimeout(() => (e.hidden = true), 6000); }
   function flash(msg) { const e = $('#mmFlash'); e.textContent = msg; e.hidden = false; clearTimeout(flash.t); flash.t = setTimeout(() => (e.hidden = true), 2500); }
+  // Swatch colours come from data-color: the CSP refuses style="" in markup, but a CSSOM write is allowed.
+  function paintSwatches(root) { root.querySelectorAll('.mm-swatch[data-color]').forEach(el => { el.style.background = el.dataset.color; }); }
   function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
   function escapeAttr(s) { return escapeHtml(s); }
 

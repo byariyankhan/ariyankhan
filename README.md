@@ -156,11 +156,11 @@ uploaded to that old name is not served.
 | `js/review-card.js` | Auto-rotating testimonial card behavior — see "Review Card" section below |
 | `js/reviews-data.js` | Curated review text (`window.CURATED_REVIEWS`), single source of truth |
 | `css/review-card.css` | Review card + testimonial section design, shared across pages |
-| `ai-metadata-remover.html` | Free SEO tool page: strips C2PA/XMP/IPTC/EXIF/PNG-text metadata from images in the browser — see "AI Metadata Remover" section below |
+| `ai-metadata-remover/` | AI Metadata Remover, its own product like `puzzle/`: `index.html` (the tool), `how-to-use.html`, `about.html` (About & FAQ), `privacy.html`, `icon.svg`, `og.png` — see "AI Metadata Remover" section below |
 | `js/ai-metadata-remover.js` | The byte-level JPEG/PNG/WebP metadata stripper + page UI (no server, no upload) |
-| `css/ai-metadata-remover.css` | Tool page layout, drop zone, result cards, content sections |
-| `map-maker.html` | Free SEO tool page: highlight countries on a world map, export PNG/SVG — see "Map Maker" section below |
-| `js/map-maker.js`, `css/map-maker.css` | Map Maker engine (d3-geo projections, export, share links) + page styles |
+| `css/ai-metadata-remover.css` | The tool's whole look, self-contained (no `style.css`): header, drop zone, result cards, guide pages, footer |
+| `map-maker/` | Map Maker, its own product like `puzzle/`: `index.html` (the tool), `how-to-use.html`, `about.html` (About & FAQ), `privacy.html`, `icon.svg`, `og.png` — see "Map Maker" section below |
+| `js/map-maker.js`, `css/map-maker.css` | Map Maker engine (d3-geo projections, export, share links) + its whole look, self-contained (no `style.css`) |
 | `piece-the-world.html` | Geography jigsaw game page — see "Piece the World" section below |
 | `js/piece-the-world.js`, `css/piece-the-world.css` | Game engine (drag/snap, modes, timer, stars, bests) + page styles |
 | `games/data/*.json`, `games/build-data.mjs` | Level data (piece paths per continent) and the script that builds it from Natural Earth |
@@ -404,13 +404,33 @@ before touching avatar/ring CSS:**
 
 ---
 
-## AI Metadata Remover (free tool page)
+## Two tools with identities of their own
 
-`ai-metadata-remover.html` is an organic-traffic page: a free, in-browser tool that
-removes AI/provenance metadata from images, wrapped in SEO content (what it
-removes, generator table, honest limits, FAQ with `FAQPage` schema, `WebApplication`
-schema). Linked from the shared footer on every page, listed in `sitemap.xml`,
-`llms.txt` and `llms-full.txt`.
+Map Maker (`/map-maker/`) and AI Metadata Remover (`/ai-metadata-remover/`) are
+built like Puzzle: each is its own product, not a page of the portfolio. Each
+folder holds the tool, a How to use guide, About & FAQ and Privacy; each has its
+own logo (`icon.svg`, also the favicon), share image (`og.png`), colours, fonts,
+header and footer, and loads only its own stylesheet. **No `<site-nav>`, no
+`<site-footer>`, no `css/style.css`, no sales sections**: the footer's one line
+"made by Ariyan Khan" is the only tie to the site.
+
+| | Map Maker | AI Metadata Remover |
+|---|---|---|
+| Look | old atlas: paper `#F4EEE2`, sea blue `#1F5F8B`, ochre | clean lab: white, teal `#0B8A7A` |
+| Type | Fraunces + Inter | IBM Plex Sans + IBM Plex Mono |
+| Stylesheet | `css/map-maker.css` | `css/ai-metadata-remover.css` |
+
+The old `map-maker.html` and `ai-metadata-remover.html` (and the bare folder
+names) 301 to the folders in one hop from the top of `.htaccess`. Script, data
+and stylesheet paths in these pages are root-absolute, because the pages are one
+folder deep. `tests/tool-identity.test.mjs` guards all of it.
+
+## AI Metadata Remover
+
+A free, in-browser tool that removes AI/provenance metadata from images, with a
+guide (what it removes, generator table, how to verify), About & FAQ (`FAQPage`
+schema) and a privacy page. Listed in `sitemap.xml`, `llms.txt` and `llms-full.txt`,
+linked from the site footer and the homepage's games and tools section.
 
 **How it works (`js/ai-metadata-remover.js`):** the file is read with the File API
 and the *container* is rewritten — pixel data is copied byte-for-byte, never
@@ -437,9 +457,9 @@ output parses clean. Needs Node only (no browser).
 (SynthID etc.), cannot beat pixel-based detectors, and does nothing for video.
 Don't market it as "make AI images undetectable".
 
-## Map Maker (free tool page)
+## Map Maker
 
-`map-maker.html` is the second organic-traffic tool: highlight countries in colour
+Highlight countries in colour
 groups, pick a projection, zoom to a region/selection, export PNG (1×/2×/4×) or
 SVG, share by link. All client-side.
 
@@ -458,6 +478,8 @@ SVG, share by link. All client-side.
 - **Export** serialises a fresh non-interactive SVG (`render(target, {interactive:false})`)
   and rasterises it through an `<img>` + canvas. Labels use `Inter, Segoe UI,
   Arial` so the PNG matches what the browser has.
+- **Swatch colours** are set from `data-color` by `paintSwatches()`: the CSP refuses a `style=""`
+  attribute in markup (it left every colour square blank), but a CSSOM write is allowed.
 - **Rule**: keep the disputed-borders FAQ honest (Natural Earth de facto policy)
   and never call the maps "official".
 

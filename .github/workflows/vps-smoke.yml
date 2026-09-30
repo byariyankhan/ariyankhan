@@ -97,7 +97,7 @@ jobs:
           echo
           echo "== the origin, over real TLS"
           check "home"                              200 "https://$DOMAIN/"                          "${RESOLVE[@]}" "${TLS[@]}"
-          check "ai-metadata-remover page"          200 "https://$DOMAIN/ai-metadata-remover.html"  "${RESOLVE[@]}" "${TLS[@]}"
+          check "ai-metadata-remover page"          200 "https://$DOMAIN/ai-metadata-remover/"  "${RESOLVE[@]}" "${TLS[@]}"
           check "static js"                         200 "https://$DOMAIN/js/ai-metadata-remover.js" "${RESOLVE[@]}" "${TLS[@]}"
           check "php runs (send-mail rejects GET)"  405 "https://$DOMAIN/send-mail.php"             "${RESOLVE[@]}" "${TLS[@]}"
           check "missing page -> 404"               404 "https://$DOMAIN/nope-123.html"             "${RESOLVE[@]}" "${TLS[@]}"
