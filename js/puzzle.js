@@ -2804,6 +2804,20 @@
   const trainDay = d => { const t = store.get(trainKey(d), null); return t && typeof t === 'object' ? t : {}; };
   // a day is done with one round scored -- the free one, or one the player chose to unlock; all four is a bonus
   const trainDone = t => TRAIN_ROUNDS.some(r => typeof t[r.id] === 'number');
+  // Daily Training kept its own run of days before the one streak (playStreak) counted training too. A player
+  // who trained every day and cleared no board would have seen that run drop to nothing on the update, so it
+  // is carried over once: the run of training days up to today or yesterday, where it is longer than the
+  // streak already kept (joined to a board cleared today, if there was one).
+  function adoptTrainStreak() {
+    if (store.get('streakFromTrain', false)) return;
+    store.set('streakFromTrain', true);
+    const today = dayKey(), from = trainDone(trainDay(today)) ? 0 : 1;
+    let n = 0; while (n < 3660 && trainDone(trainDay(dayKeyBack(from + n)))) n++;
+    if (!n) return;
+    const last = dayKeyBack(from), had = streakOf(store.get('playStreak', null)), now = streakNow();
+    const rec = had.last === today && last === dayKeyBack(1) ? { count: n + 1, last: today, freeze: had.freeze } : { count: n, last, freeze: had.freeze };
+    if (rec.count > now.count) { store.set('playStreak', streakRec(rec)); renderStreak(); }
+  }
   const trainAll = t => TRAIN_ROUNDS.every(r => typeof t[r.id] === 'number');
   const trainScore = t => { const v = TRAIN_ROUNDS.map(r => t[r.id]).filter(x => typeof x === 'number'); return v.length ? Math.round(v.reduce((a, b) => a + b, 0) / v.length) : null; };
   const clamp100 = v => Math.max(0, Math.min(100, Math.round(v)));
@@ -7297,6 +7311,7 @@
   loadData().then(() => {
     el.loading.hidden = true;
     settleLoss();   // the app was closed on a lost board's card: the player did not take the free life
+    adoptTrainStreak();
     renderSelect();
     homeShown();   // the opening may hand over now
     // the purse and the account row from the first paint, not only once Play with Friends has been tapped, and
