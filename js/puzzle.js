@@ -2566,7 +2566,6 @@
       finishMatch(true, (R.elapsedBase || 0) + run.t).finally(() => { run.sending = false; });
       return run;
     }
-    run.arrowsWas = arrowsShot();   // the rank before this board is saved, so the card can say if it moved
     const before = levelNo(-1) - 1;
     // The streak on the home screen is a streak of days this player played: any cleared board keeps it alive,
     // and so does a training round (bumpDay). What it did today -- a milestone, a freeze -- the card says.
@@ -2596,7 +2595,6 @@
     // it away would throw away every player's, permanently. It is simply not announced on the card any more.
     store.set('streak', store.get('streak', 0) + 1);
     run.n = levelNo(i); run.milestone = !daily && crossedTen(before, levelNo(-1) - 1);
-    run.arrowsNow = arrowsShot();
     return run;
   }
   // The card, drawn from the kept run: nothing here reads the board, which may be gone by now.
@@ -2632,13 +2630,8 @@
     // else added underneath only when the server has enough players to make it true.
     const focus = focusOf(t, run.arrows, run.lost, run.hints);
     const band = focusBand(focus);
-    // The rank line: what this board added and where that leaves the player. A new rank is the card's news; a
-    // board cleared again adds nothing and says so by saying only the rank.
-    const was = run.arrowsWas, now = run.arrowsNow, rk = rankOf(now), gain = now - was;
-    const toNext = rk.top ? '' : ` · ${fmtN(rk.hi - now)} to ${rk.next}`;
-    const rankLine = rk.i > rankOf(was).i ? `<p class="aa-card-rank is-up">New rank: <b>${rk.name}</b> · ${fmtN(now)} arrows</p>`
-      : gain > 0 ? `<p class="aa-card-rank">+${fmtN(gain)} arrows · <b>${rk.name}</b>${toNext}</p>`
-      : `<p class="aa-card-rank"><b>${rk.name}</b> · ${fmtN(now)} arrows${toNext}</p>`;
+    // No rank line: the arrows a board added are counted all the same (arrowsShot, the brain on home shows the
+    // rank), but a line of them under the stars was one more number on a card that already has four.
     el.card.innerHTML = `
       <p class="aa-card-kicker">${milestone ? `Milestone · level ${n} · ` : ''}You cleared</p>
       <h3>${escapeHtml(L.name)}</h3>
@@ -2646,7 +2639,6 @@
       ${find ? `<p class="aa-facts aa-facts--find">${find}</p>` : ''}
       <p class="aa-stars" aria-label="${s} of 3 stars">${'★'.repeat(s)}${'☆'.repeat(3 - s)}</p>
       <div class="aa-stats"><span><b>${fmtTime(t, true)}</b>time</span><span><b>${run.lost}</b>hearts lost</span><span><b>${run.hints}</b>hints</span><span><b>x${run.combo}</b>best combo</span></div>
-      ${rankLine}
       ${streakNews(run.day)}
       <div class="aa-focus" id="aaFocus" role="img" aria-label="Focus ${focus} out of 100 — ${band.name}">
         <p class="aa-focus-cap">Your focus level<b class="aa-focus-num">0</b></p>
