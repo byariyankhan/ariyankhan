@@ -166,7 +166,7 @@
           </div>
 
           <div class="mm-block">
-            <h3>View</h3>
+            <h3>Map</h3>
             <div class="mm-row"><label for="mmProjection">Projection</label><select id="mmProjection"></select></div>
             <div class="mm-row"><label for="mmRegion">Region</label>
               <select id="mmRegion">
@@ -194,13 +194,6 @@
                 <option value="21:9">21:9 · Ultrawide (2560×1080)</option>
               </select>
             </div>
-            <div class="mm-row"><label for="mmZoom">Zoom</label><input type="range" id="mmZoom" min="0.5" max="6" step="0.1" value="1" /><span class="mm-val" id="mmZoomVal">1.0×</span></div>
-            <div class="mm-row"><label for="mmPadding">Margin</label><input type="range" id="mmPadding" min="0" max="20" step="1" value="6" /></div>
-            <div class="mm-row"><label class="mm-check"><input type="checkbox" id="mmDetail" /> High-detail borders (241 countries &amp; territories, ~700 KB)</label></div>
-          </div>
-
-          <div class="mm-block">
-            <h3>Style</h3>
             <div class="mm-presets">
               <button type="button" class="mm-preset" data-preset="dark">Dark</button>
               <button type="button" class="mm-preset" data-preset="light">Light</button>
@@ -208,31 +201,46 @@
               <button type="button" class="mm-preset" data-preset="slate">Slate</button>
               <button type="button" class="mm-preset" data-preset="paper">Paper</button>
             </div>
-            <div class="mm-row"><label for="mmLand">Land</label><input type="color" id="mmLand" value="#2a2a2a" /><label for="mmOcean">Ocean</label><input type="color" id="mmOcean" value="#0d0d0d" /></div>
-            <div class="mm-row"><label class="mm-check"><input type="checkbox" id="mmOceanTransparent" /> Transparent ocean/background</label></div>
-            <div class="mm-row"><label for="mmBorder">Borders</label><input type="color" id="mmBorder" value="#000000" /><input type="range" id="mmBorderWidth" min="0" max="3" step="0.1" value="0.6" aria-label="Border width" /></div>
-            <div class="mm-row"><label class="mm-check"><input type="checkbox" id="mmSphere" checked /> Globe/sphere outline</label></div>
-            <div class="mm-row"><label class="mm-check"><input type="checkbox" id="mmGrat" /> Grid lines (graticule)</label><input type="color" id="mmGratColor" value="#333333" aria-label="Grid colour" /></div>
-            <div class="mm-row"><label class="mm-check"><input type="checkbox" id="mmLabels" checked /> Labels on highlighted countries</label></div>
-            <div class="mm-row"><label for="mmLabelColor">Label</label><input type="color" id="mmLabelColor" value="#ffffff" /><input type="range" id="mmLabelSize" min="10" max="72" step="1" value="22" aria-label="Label size" /></div>
           </div>
 
-          <div class="mm-block">
-            <h3>Export</h3>
-            <div class="mm-row"><label for="mmExportScale">PNG size</label>
-              <select id="mmExportScale">
-                <option value="1">1× (HD)</option>
-                <option value="2" selected>2× (4K on 16:9)</option>
-                <option value="4">4× (8K on 16:9)</option>
-              </select>
-            </div>
-            <div class="mm-export">
+          <div class="mm-export">
               <button type="button" class="mm-btn mm-btn--primary mm-btn--wide" id="mmDownloadPng">Download PNG</button>
-              <button type="button" class="mm-btn mm-btn--wide" id="mmDownloadSvg">Download SVG</button>
-              <button type="button" class="mm-btn mm-btn--wide" id="mmCopyPng">Copy PNG to clipboard</button>
               <p class="mm-export-dims"><span id="mmExportDims">3840 × 2160</span> px · nothing is uploaded</p>
-            </div>
           </div>
+
+          <details class="mm-more">
+            <summary>More options</summary>
+            <div class="mm-block">
+              <h3>Framing</h3>
+              <div class="mm-row"><label for="mmZoom">Zoom</label><input type="range" id="mmZoom" min="0.5" max="6" step="0.1" value="1" /><span class="mm-val" id="mmZoomVal">1.0×</span></div>
+              <div class="mm-row"><label for="mmPadding">Margin</label><input type="range" id="mmPadding" min="0" max="20" step="1" value="6" /></div>
+              <div class="mm-row"><label class="mm-check"><input type="checkbox" id="mmDetail" /> High-detail borders (241 countries &amp; territories, ~700 KB)</label></div>
+            </div>
+            <div class="mm-block">
+              <h3>Colours &amp; labels</h3>
+              <div class="mm-row"><label for="mmLand">Land</label><input type="color" id="mmLand" value="#2a2a2a" /><label for="mmOcean">Ocean</label><input type="color" id="mmOcean" value="#0d0d0d" /></div>
+              <div class="mm-row"><label class="mm-check"><input type="checkbox" id="mmOceanTransparent" /> Transparent ocean/background</label></div>
+              <div class="mm-row"><label for="mmBorder">Borders</label><input type="color" id="mmBorder" value="#000000" /><input type="range" id="mmBorderWidth" min="0" max="3" step="0.1" value="0.6" aria-label="Border width" /></div>
+              <div class="mm-row"><label class="mm-check"><input type="checkbox" id="mmSphere" checked /> Globe/sphere outline</label></div>
+              <div class="mm-row"><label class="mm-check"><input type="checkbox" id="mmGrat" /> Grid lines (graticule)</label><input type="color" id="mmGratColor" value="#333333" aria-label="Grid colour" /></div>
+              <div class="mm-row"><label class="mm-check"><input type="checkbox" id="mmLabels" checked /> Labels on highlighted countries</label></div>
+              <div class="mm-row"><label for="mmLabelColor">Label</label><input type="color" id="mmLabelColor" value="#ffffff" /><input type="range" id="mmLabelSize" min="10" max="72" step="1" value="22" aria-label="Label size" /></div>
+            </div>
+            <div class="mm-block">
+              <h3>Export</h3>
+              <div class="mm-row"><label for="mmExportScale">PNG size</label>
+                <select id="mmExportScale">
+                  <option value="1">1× (HD)</option>
+                  <option value="2" selected>2× (4K on 16:9)</option>
+                  <option value="4">4× (8K on 16:9)</option>
+                </select>
+              </div>
+              <div class="mm-export">
+                <button type="button" class="mm-btn mm-btn--wide" id="mmDownloadSvg">Download SVG</button>
+                <button type="button" class="mm-btn mm-btn--wide" id="mmCopyPng">Copy PNG to clipboard</button>
+              </div>
+            </div>
+          </details>
         </aside>
       </section>
     </main>
