@@ -1,0 +1,20 @@
+# Files removed from the site that the live document root may still hold.
+# web-revive copies the checkout over /var/www/html and never deletes, so a file removed from the
+# repository stays served until the web-prune ops mode (confirm=DELETE) deletes the paths listed here.
+# One path per line, relative to the document root. web-prune refuses a path that is still in the
+# checkout, that leaves the document root, or that is not a plain file. Lines starting with # are notes.
+
+# Piece the World, the geography jigsaw, removed 30 September 2026 (.htaccess answers these with 410)
+piece-the-world.html
+css/piece-the-world.css
+js/piece-the-world.js
+games/piece-the-world.webmanifest
+games/build-data.mjs
+tests/piece-the-world.test.mjs
+games/data/world.json
+games/data/africa.json
+games/data/asia.json
+games/data/europe.json
+games/data/north-america.json
+games/data/oceania.json
+games/data/south-america.json

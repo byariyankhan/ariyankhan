@@ -2394,10 +2394,53 @@ mode_stats() {
   note "for names, charts and the full list: games/puzzle/tools/hardest.py, or GET /api/puzzle/v1/boards/difficulty"
 }
 
+# The files removed from the site that the live document root still holds. web-revive copies the checkout over
+# /var/www/html and never deletes, so a file taken out of the repository stays served until this deletes it. It
+# deletes exactly the paths in deploy/retired-files.txt of the checkout that arrived, and refuses any path that
+# is still in that checkout, that is not a plain relative path, or that is not a regular file (a link, a folder).
+# Nothing else in the document root is touched: mail-config.local.php and the rest that live only there stay.
+mode_web_prune() {
+  echo "Deleting retired files from the live site  ($(hostname), $(date -u))"
+  have ariyankhan-web || { bad "no ariyankhan-web container here"; return; }
+  W=ariyankhan-web
+  TGZ=/tmp/puzzle-site.tgz
+  [ -s "$TGZ" ] || { bad "no checkout arrived; the list comes from it"; return; }
+  rm -rf /tmp/aa-prune && mkdir -p /tmp/aa-prune && tar -xzf "$TGZ" -C /tmp/aa-prune
+  LIST=/tmp/aa-prune/deploy/retired-files.txt
+  [ -f "$LIST" ] || { bad "the checkout has no deploy/retired-files.txt"; return; }
+  say "1. the list"
+  n=0; gone=0
+  while IFS= read -r line || [ -n "$line" ]; do
+    p=$(printf '%s' "$line" | sed 's/#.*//; s/^[[:space:]]*//; s/[[:space:]]*$//')
+    [ -n "$p" ] || continue
+    n=$((n + 1))
+    case "$p" in
+      /*|*..*|*//*) bad "refused: $p (not a plain relative path)"; continue ;;
+      *[!A-Za-z0-9._/-]*) bad "refused: $p (a character that has no business in a site path)"; continue ;;
+    esac
+    if [ -e "/tmp/aa-prune/$p" ]; then bad "refused: $p is still in the checkout"; continue; fi
+    if docker exec "$W" test -L "/var/www/html/$p"; then bad "refused: $p is a link"; continue; fi
+    if docker exec "$W" test -f "/var/www/html/$p"; then
+      docker exec "$W" rm -f -- "/var/www/html/$p" && { ok "deleted $p"; gone=$((gone + 1)); } || bad "could not delete $p"
+    elif docker exec "$W" test -e "/var/www/html/$p"; then
+      bad "refused: $p is not a plain file"
+    else
+      note "not there: $p"
+    fi
+  done < "$LIST"
+  note "$n on the list, $gone deleted now"
+  rm -rf /tmp/aa-prune
+  say "2. from outside"
+  for path in / /puzzle/ /piece-the-world.html /js/piece-the-world.js; do
+    printf '      %-26s %s\n' "$path" "$(curl -so /dev/null -w '%{http_code}' -m 10 "https://$DOMAIN$path")"
+  done
+}
+
 case "$MODE" in
   inspect)       mode_inspect ;;
   logs)          mode_logs ;;
   web-revive)    mode_web_revive ;;
+  web-prune)     mode_web_prune ;;
   web-look)      mode_web_look ;;
   git-access)    mode_git_access ;;
   git-sync)      mode_git_sync ;;

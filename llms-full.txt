@@ -132,7 +132,6 @@ Fill out the contact form at https://ariyankhan.com/#contact with your project d
   Firefly, Midjourney, Stable Diffusion/ComfyUI, Microsoft Designer). Honest limits: it cannot remove
   pixel-level watermarks such as Google SynthID, cannot fool pixel-based AI detectors and handles still
   images only (no video). Built by Ariyan Khan for his own thumbnail / B-roll workflow.
-- Piece the World (geography jigsaw game): https://ariyankhan.com/piece-the-world.html
 - Puzzle – Train Your Brain (daily brain training and arrow puzzle game): https://ariyankhan.com/puzzle/
   Free brain-training game that plays in the browser; no download, and solo play needs no account.
   Daily Training is four short rounds every day on 247 public-domain paintings from The Metropolitan
@@ -168,7 +167,6 @@ Practical articles on hiring, cost, and working with a video editor.
 - Home: https://ariyankhan.com/
 - About: https://ariyankhan.com/about.html
 - AI Metadata Remover (free tool): https://ariyankhan.com/ai-metadata-remover.html
-- Piece the World (free geography game): https://ariyankhan.com/piece-the-world.html
 - Puzzle – Train Your Brain (free daily brain training and arrow puzzle game): https://ariyankhan.com/puzzle/
 - About Puzzle & FAQ: https://ariyankhan.com/puzzle/about.html
 - How to play Puzzle: https://ariyankhan.com/puzzle/how-to-play.html
