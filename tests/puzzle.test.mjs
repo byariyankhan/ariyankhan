@@ -164,15 +164,16 @@ test('focus boards generate and are solvable at every tier', () => {
     for (let t = 0; t < 5; t++) { const board = generate(rasterise(b.d, b.k[t]), MAXLEN_OF[t], 2500 + i * 10 + t, GEN_OPTS(t)); assert.ok(board.pieces.length >= 15, `${b.id} tier ${t}: ${board.pieces.length} arrows`); assert.ok(solvable(board), `${b.id} tier ${t} not solvable`); }
   });
 });
-test('the rank ladder: fourteen steps rising to GOAT at 6,236 arrows, and rankOf places every count', () => {
+test('the rank ladder: fourteen titles rising to GOAT at 25,000 arrows, none named like a difficulty, and rankOf places every count', () => {
   const src = [grab(/const clampTier = [^\n]+/), grab(/const RANKS = \[[\s\S]*?\]\];\n/), grab(/const ARROWS_GUESS = [^\n]+/), grab(/const recArrows = [^\n]+/), grab(/function rankOf\(n\) \{[\s\S]*?\n  \}\n/)].join('\n');
   const { RANKS, rankOf, recArrows } = new Function(src + '\nreturn { RANKS, rankOf, recArrows };')();
   assert.equal(RANKS.length, 14);
-  assert.equal(RANKS[0][1], 0); assert.equal(RANKS[RANKS.length - 1][0], 'GOAT'); assert.equal(RANKS[RANKS.length - 1][1], 6236);
+  assert.equal(RANKS[0][1], 0); assert.equal(RANKS[RANKS.length - 1][0], 'GOAT'); assert.equal(RANKS[RANKS.length - 1][1], 25000);
+  for (const d of ['Easy', 'Normal', 'Hard', 'Expert', 'Master']) assert.ok(!RANKS.some(r => r[0] === d), `no title is called ${d}`);
   for (let i = 1; i < RANKS.length; i++) assert.ok(RANKS[i][1] > RANKS[i - 1][1], `${RANKS[i][0]} is not above ${RANKS[i - 1][0]}`);
   assert.equal(new Set(RANKS.map(r => r[0])).size, RANKS.length, 'rank names repeat');
-  assert.deepEqual([rankOf(0).name, rankOf(39).name, rankOf(40).name, rankOf(6235).name, rankOf(6236).name, rankOf(99999).name], ['Newbie', 'Newbie', 'Normal', 'Immortal', 'GOAT', 'GOAT']);
-  assert.equal(rankOf(1500).next, 'Master'); assert.equal(rankOf(1500).hi, 1900); assert.equal(rankOf(6236).top, true); assert.equal(rankOf(6236).hi, null);
+  assert.deepEqual([rankOf(0).name, rankOf(159).name, rankOf(160).name, rankOf(24999).name, rankOf(25000).name, rankOf(99999).name], ['Newbie', 'Newbie', 'Starter', 'Immortal', 'GOAT', 'GOAT']);
+  assert.equal(rankOf(6000).next, 'Mastermind'); assert.equal(rankOf(6000).hi, 7600); assert.equal(rankOf(25000).top, true); assert.equal(rankOf(25000).hi, null);
   // a record from before boards remembered their arrows counts as a typical board of its tier, never as nothing
   assert.equal(recArrows({ arrows: 57, tier: 2 }), 57); assert.equal(recArrows({ tier: 4 }), 100); assert.equal(recArrows({}), 22); assert.equal(recArrows(null), 0);
 });

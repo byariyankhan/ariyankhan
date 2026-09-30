@@ -1016,8 +1016,6 @@ body.aa-dragging .aa-train-coach .aa-coach-card{ pointer-events:none; opacity:.3
 .aa-gal-piece.is-locked{ outline:3px solid var(--good); outline-offset:-3px; }
 .aa-gal-piece.is-ghost{ opacity:.25; }
 .aa-gal-slots, .aa-gal-tray, .aa-gal-piece{ touch-action:none; -webkit-user-select:none; user-select:none; }
-.aa-train-lv{ display:inline-block; margin-right:6px; padding:1px 6px; border-radius:7px; font-size:11px; font-weight:900; color:var(--accent2); background:color-mix(in srgb, var(--accent2) 12%, transparent); vertical-align:middle; }
-.aa-train-hud .aa-train-lv{ flex:none; margin:0; }
 .aa-art-thumb{ display:block; width:100%; aspect-ratio:1; border-radius:8px; background:var(--bg2) center/cover no-repeat; }
 .aa-art.is-peek{ outline:3px solid var(--accent2); outline-offset:2px; }
 .aa-curator-opts{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:0 auto; }

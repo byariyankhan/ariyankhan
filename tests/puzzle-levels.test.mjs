@@ -123,16 +123,17 @@ test('Play, the map and Next go forward: the first open board at or after the fr
   assert.ok(/const nextIdx = nextOpen\(\);\n    el\.play\.dataset\.level/.test(js), 'Play & Discover deals nextOpen()');
   assert.ok(/if \(!daily && !unlocked\(i\)\) i = nextOpen\(\);/.test(js), 'a locked board falls back to nextOpen()');
 });
-test('level numbers count each id once, training clears included; the next number is levelNo(-1)', () => {
+test('level numbers count each board id once, and Daily Training is not counted; the next number is levelNo(-1)', () => {
   // an old tour: one scene id in four slots
   const T = { id: 's:tower', scene: true, name: 'The Tower' };
   const levels = [{ id: 'f:brain' }, { id: '050' }, T, { id: '356' }, T, { id: '524' }, T];
   const k = flowKit(levels, [15, 25]);
   k.store.set('lv:f:brain', { at: 10 }); k.store.set('lv:050', { at: 20 }); k.store.set('lv:s:tower', { at: 30 });
-  assert.equal(k.levelNo(-1), 6, 'three boards and two training clears: the next is level 6');
-  assert.equal(k.levelNo(2), 5, 'The Tower is level 5');
-  assert.equal(k.levelNo(4), 5, 'wherever the list holds it');
-  assert.equal(k.levelNo(3), 6, 'an open board is the next level');
+  assert.equal(k.levelNo(-1), 4, 'three boards and two training clears: the next is level 4, training not counted');
+  assert.equal(k.levelNo(2), 3, 'The Tower is level 3');
+  assert.equal(k.levelNo(4), 3, 'wherever the list holds it');
+  assert.equal(k.levelNo(3), 4, 'an open board is the next level');
+  assert.ok(!/trainClearTimes/.test(fn('levelNo')), 'levelNo reads the boards only');
   assert.equal(k.clearedLevels().length, 3, 'three boards cleared, not five');
   assert.ok(/el\.statBoards\.textContent = String\(cleared_\.length\)/.test(js) && /const cleared_ = clearedLevels\(\);/.test(js), 'the home count uses the same');
   assert.ok(/const n = new Set\(DATA\.levels\.map\(L => L\.id\)\)\.size, done = clearedLevels\(\)\.length;/.test(js), 'so does the share text');
@@ -238,14 +239,10 @@ test('a board\'s record: the best run\'s time, stars and tier, the most arrows i
 const RANK_SRC = [STORE_SRC, `const DEVICE = 'dev1'; const state = { lossHeld: 0 }; let syncOwed = false; const syncTour = () => Promise.resolve(false);`,
   one('clampTier'), one('ARROWS_GUESS'), one('recArrows'), one('lossMap'), one('lossTotal'), fn('loseArrows'), one('lossFor'), fn('holdLoss'), fn('forgiveLoss'), fn('settleLoss'), fn('arrowsShot')].join('\n');
 const rankKit = () => { const localStorage = fakeStorage(); return new Function('localStorage', RANK_SRC + '\nreturn { store, state, lossFor, holdLoss, forgiveLoss, settleLoss, arrowsShot, loseArrows, get owed() { return syncOwed; } };')(localStorage); };
-test('what a lost board costs: the first loss of a fresh start only, never a cleared board, at most half, never past zero', () => {
+test('a lost board takes nothing: a title, once earned, is kept', () => {
   const { lossFor } = rankKit();
-  assert.equal(lossFor({ fails: 1, done: false, left: 12, arrows: 140, rank: 900 }), 12, 'the arrows still on it');
-  assert.equal(lossFor({ fails: 1, done: false, left: 100, arrows: 140, rank: 900 }), 70, 'at most half the board');
-  assert.equal(lossFor({ fails: 1, done: false, left: 15, arrows: 22, rank: 0 }), 0, 'nothing when there is no rank to take from');
-  assert.equal(lossFor({ fails: 1, done: false, left: 15, arrows: 40, rank: 6 }), 6, 'never more than the rank holds');
-  assert.equal(lossFor({ fails: 2, done: false, left: 12, arrows: 140, rank: 900 }), 0, 'Try again and lose again: nothing more');
-  assert.equal(lossFor({ fails: 1, done: true, left: 12, arrows: 140, rank: 900 }), 0, 'a replay puts nothing at stake');
+  for (const o of [{ fails: 1, done: false, left: 12, arrows: 140, rank: 900 }, { fails: 1, done: false, left: 100, arrows: 140, rank: 900 }, { fails: 2, done: false, left: 12, arrows: 140, rank: 900 }])
+    assert.equal(lossFor(o), 0, JSON.stringify(o));
   const fail = body('failLevel');
   assert.ok(/const take = state\.daily \? 0 : lossFor\(/.test(fail), 'the daily board and races cost nothing');
   assert.ok(!/loseArrows\(state\.left\)/.test(fail), 'the old charge of every arrow left on every loss is gone');
