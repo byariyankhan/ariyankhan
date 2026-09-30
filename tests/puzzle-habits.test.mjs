@@ -360,4 +360,9 @@ test('the win card says nothing about the ladder beyond the tier on its Next but
   assert.ok(!/ladderWin|ladderLoss|ladderMeter|goalLine|nearLine|Level up:|Next milestone|steps to/.test(js), 'no ladder lines, no milestone line, no "short of Locked in"');
 });
 
+test('the win card carries no arrows-and-rank line', () => {
+  const show = fn('showResult');
+  assert.ok(!/aa-card-rank|rankLine/.test(show), 'no "+N arrows · Rank" under the stars');
+});
+
 console.log(process.exitCode ? `\nsome of ${tests} tests failed` : `\nall ${tests} tests passed`);

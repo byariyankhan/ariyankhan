@@ -703,9 +703,9 @@ links.
   device (`adoptTour`) and the total is the sum — a single shared number could
   not have been merged, and a refund would be undone by the next sync. The
   out-of-hearts card says `−N arrows · Rank` or `Rank down: …`. Offline play counts the same and goes
-  up with the next sync once the player is online and signed in. The result card
-  carries a line too (`.aa-card-rank`): `+N arrows · Rank · M to Next`, or `New
-  rank: …` when the board moved it; a race has none. The share text names the rank.
+  up with the next sync once the player is online and signed in. The win card
+  has no rank line (it used to say `+N arrows · Rank`); the arrows still count and
+  the brain on home shows the rank. The share text names the rank.
   Redrawn only when the tier or the lit count changes (`brainKey`), and the fade-in
   wave is skipped under `prefers-reduced-motion`.
 - **Every mode gets the same board**: what the game offers on a board does not
