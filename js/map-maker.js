@@ -102,6 +102,9 @@
     land: '#2a2a2a', ocean: '#0d0d0d', oceanTransparent: false, border: '#000000', borderWidth: 0.6,
     graticule: false, graticuleColor: '#333333', labels: true, labelColor: '#ffffff', labelSize: 22, sphereOutline: true,
     groups: [{ color: GROUP_COLORS[0], label: 'Highlighted', ids: [] }],
+    colors: {},              // country id → its own colour, overriding its group's
+    hiOpacity: 1,            // opacity of the highlighted countries
+    mapOpacity: 1,           // opacity of every other country and of the borders
     active: 0,
   };
   let world = null;          // { features, borders, byId }
@@ -221,8 +224,12 @@
     return n;
   }
   function groupOf(id) { return state.groups.find(g => g.ids.includes(id)) || null; }
+  function colorOf(id) { const g = groupOf(id); return g ? (state.colors[id] || g.color) : null; }
 
-  function render(target = svg, { interactive = true } = {}) {
+  function render(target = svg, { interactive = true, only = false, scale = 1 } = {}) {
+    // scale: a cropped export is enlarged, so its lines and labels are drawn thinner and smaller to come out
+    // at the same size as on a full-canvas export.
+    const bw = state.borderWidth * scale, ls = state.labelSize * scale;
     if (!world) return;
     buildProjection();
     const [W, H] = canvasSize();
@@ -230,51 +237,58 @@
     while (target.firstChild) target.removeChild(target.firstChild);
 
     const def = PROJECTIONS[state.projection];
-    // Background / ocean
-    if (!state.oceanTransparent) {
-      if (def.rect) target.appendChild(el('rect', { x: 0, y: 0, width: W, height: H, fill: state.ocean }));
-      else {
-        target.appendChild(el('rect', { x: 0, y: 0, width: W, height: H, fill: state.ocean }));
+    // "Only the selected countries" leaves out the ocean, the other countries, the borders mesh and the grid.
+    if (!only) {
+      if (!state.oceanTransparent) target.appendChild(el('rect', { x: 0, y: 0, width: W, height: H, fill: state.ocean }));
+      if (!def.rect) {
+        // Sphere fill = ocean, so a transparent background still shows the map's ocean shape
+        target.appendChild(el('path', { d: path({ type: 'Sphere' }), fill: state.oceanTransparent ? 'none' : state.ocean, stroke: state.sphereOutline ? state.border : 'none', 'stroke-width': bw * 1.5 }));
+      }
+      if (state.graticule) {
+        target.appendChild(el('path', { d: path(d3.geoGraticule10()), fill: 'none', stroke: state.graticuleColor, 'stroke-width': 0.5, 'stroke-opacity': 0.8 }));
       }
     }
-    if (!def.rect) {
-      // Sphere fill = ocean, so a transparent background still shows the map's ocean shape
-      target.appendChild(el('path', { d: path({ type: 'Sphere' }), fill: state.oceanTransparent ? 'none' : state.ocean, stroke: state.sphereOutline ? state.border : 'none', 'stroke-width': state.borderWidth * 1.5 }));
-    }
-    if (state.graticule) {
-      target.appendChild(el('path', { d: path(d3.geoGraticule10()), fill: 'none', stroke: state.graticuleColor, 'stroke-width': 0.5, 'stroke-opacity': 0.8 }));
-    }
-    // Countries
+    // The other countries, then the borders, then the highlighted countries on top with their own outline,
+    // so dimming the map never dims what is highlighted.
+    const dim = state.mapOpacity < 1 ? state.mapOpacity : null;
     const gLand = el('g', { id: 'countries' });
+    const gSel = el('g', { id: 'highlighted', 'fill-opacity': state.hiOpacity < 1 ? state.hiOpacity : null });
     for (const f of world.features) {
+      const fill = colorOf(f.id);
+      if (only && !fill) continue;
       const d = path(f);
       if (!d) continue;
-      const grp = groupOf(f.id);
-      const p = el('path', { d, fill: grp ? grp.color : state.land, 'data-id': f.id });
+      const p = el('path', fill
+        ? { d, fill, 'data-id': f.id, stroke: state.border, 'stroke-width': bw, 'stroke-linejoin': 'round', 'stroke-opacity': bw > 0 ? null : 0 }
+        : { d, fill: state.land, 'data-id': f.id, 'fill-opacity': dim });
       if (interactive) {
         p.classList.add('mm-country');
         if (f.id === hoverId) p.classList.add('is-hover');
       }
-      gLand.appendChild(p);
+      (fill ? gSel : gLand).appendChild(p);
     }
-    target.appendChild(gLand);
-    // Borders
-    target.appendChild(el('path', { d: path(world.borders), fill: 'none', stroke: state.border, 'stroke-width': state.borderWidth, 'stroke-linejoin': 'round' }));
-    target.appendChild(el('path', { d: path(world.outline), fill: 'none', stroke: state.border, 'stroke-width': state.borderWidth, 'stroke-linejoin': 'round' }));
+    if (!only) {
+      target.appendChild(gLand);
+      const gB = el('g', { 'stroke-opacity': dim });
+      gB.appendChild(el('path', { d: path(world.borders), fill: 'none', stroke: state.border, 'stroke-width': bw, 'stroke-linejoin': 'round' }));
+      gB.appendChild(el('path', { d: path(world.outline), fill: 'none', stroke: state.border, 'stroke-width': bw, 'stroke-linejoin': 'round' }));
+      target.appendChild(gB);
+    }
+    target.appendChild(gSel);
     // Labels
     if (state.labels) {
-      const gT = el('g', { id: 'labels', 'font-family': "Inter, 'Segoe UI', Arial, sans-serif", 'font-weight': '700', 'font-size': state.labelSize, 'text-anchor': 'middle', fill: state.labelColor, 'paint-order': 'stroke', stroke: 'rgba(0,0,0,.65)', 'stroke-width': Math.max(2, state.labelSize / 7), 'stroke-linejoin': 'round' });
+      const gT = el('g', { id: 'labels', 'font-family': "Inter, 'Segoe UI', Arial, sans-serif", 'font-weight': '700', 'font-size': ls, 'text-anchor': 'middle', fill: state.labelColor, 'paint-order': 'stroke', stroke: 'rgba(0,0,0,.65)', 'stroke-width': Math.max(2 * scale, ls / 7), 'stroke-linejoin': 'round' });
       for (const f of selectedFeatures()) {
         const c = labelPoint(f);
         if (!c || !isFinite(c[0]) || !isFinite(c[1])) continue;
-        if (c[0] < 0 || c[1] < 0 || c[0] > W || c[1] > H) continue;
-        if (!labelFits(f, f.properties.name, state.labelSize)) continue;
+        if (!only && (c[0] < 0 || c[1] < 0 || c[0] > W || c[1] > H)) continue;
+        if (!labelFits(f, f.properties.name, ls)) continue;
         if (def.globe) {
           // Skip countries on the far side of the globe (their clipped centroid can still land on-canvas).
           const r = projection.rotate();
           if (d3.geoDistance(d3.geoCentroid(largestPolygon(f)), [-r[0], -r[1]]) > Math.PI / 2 - 0.3) continue;
         }
-        const t = el('text', { x: c[0].toFixed(1), y: (c[1] + state.labelSize / 3).toFixed(1) });
+        const t = el('text', { x: c[0].toFixed(1), y: (c[1] + ls / 3).toFixed(1) });
         t.textContent = f.properties.name;
         gT.appendChild(t);
       }
@@ -301,20 +315,29 @@
           <span class="mm-count">${g.ids.length}</span>
           ${state.groups.length > 1 ? `<button type="button" class="mm-x" data-del="${i}" aria-label="Remove group">×</button>` : ''}
         </div>
-        <div class="mm-chips">${g.ids.map(id => `<span class="mm-chip">${escapeHtml(world.byId.get(id)?.properties.name || id)}<button type="button" data-rm="${id}" aria-label="Remove">×</button></span>`).join('') || '<span class="mm-chips-empty">Click countries on the map or use the search box.</span>'}</div>`;
+        <div class="mm-chips">${g.ids.map(id => { const name = escapeHtml(world.byId.get(id)?.properties.name || id); return `<span class="mm-chip"><input type="color" class="mm-chip-color" data-id="${id}" value="${colorOf(id)}" aria-label="Colour of ${name}" title="Give ${name} its own colour">${name}<button type="button" data-rm="${id}" aria-label="Remove">×</button></span>`; }).join('') || '<span class="mm-chips-empty">Click countries on the map or use the search box.</span>'}</div>`;
       groupsEl.appendChild(box);
       paintSwatches(box);
     });
     $('#mmAddGroup').hidden = state.groups.length >= GROUP_COLORS.length;
+    $('#mmSelBar').hidden = !state.groups.some(g => g.ids.length);
   }
   groupsEl.addEventListener('click', e => {
     const pick = e.target.closest('.mm-group-pick'); const del = e.target.closest('[data-del]'); const rm = e.target.closest('[data-rm]');
     if (pick) { state.active = +pick.dataset.i; renderGroups(); }
     else if (del) { state.groups.splice(+del.dataset.del, 1); state.active = Math.min(state.active, state.groups.length - 1); update(); }
-    else if (rm) { for (const g of state.groups) g.ids = g.ids.filter(id => id !== rm.dataset.rm); update(); }
+    else if (rm) { for (const g of state.groups) g.ids = g.ids.filter(id => id !== rm.dataset.rm); delete state.colors[rm.dataset.rm]; update(); }
   });
   groupsEl.addEventListener('input', e => {
-    if (e.target.classList.contains('mm-color')) { state.groups[+e.target.dataset.i].color = e.target.value; e.target.closest('.mm-group').querySelector('.mm-swatch').style.background = e.target.value; render(); saveHash(); }
+    if (e.target.classList.contains('mm-color')) {
+      const g = state.groups[+e.target.dataset.i];
+      g.color = e.target.value;
+      // A new group colour applies to every country in the group, including ones given their own colour.
+      for (const id of g.ids) delete state.colors[id];
+      e.target.closest('.mm-group').querySelectorAll('.mm-chip-color').forEach(c => { c.value = g.color; });
+      e.target.closest('.mm-group').querySelector('.mm-swatch').style.background = e.target.value; render(); saveHash();
+    }
+    if (e.target.classList.contains('mm-chip-color')) { state.colors[e.target.dataset.id] = e.target.value; render(); saveHash(); }
     if (e.target.classList.contains('mm-label')) { state.groups[+e.target.dataset.i].label = e.target.value; saveHash(); }
   });
   $('#mmAddGroup').addEventListener('click', () => {
@@ -323,10 +346,24 @@
     state.active = state.groups.length - 1; update();
   });
 
+  // Random colours: evenly spaced hues from a random start, so neighbours in the list never look alike.
+  function hslHex(h, s, l) {
+    const k = n => (n + h / 30) % 12, a = s * Math.min(l, 1 - l);
+    const f = n => Math.round(255 * (l - a * Math.max(-1, Math.min(k(n) - 3, 9 - k(n), 1)))).toString(16).padStart(2, '0');
+    return `#${f(0)}${f(8)}${f(4)}`;
+  }
+  $('#mmRandom').addEventListener('click', () => {
+    const ids = state.groups.flatMap(g => g.ids);
+    const start = Math.random() * 360;
+    ids.forEach((id, i) => { state.colors[id] = hslHex((start + i * 137.508) % 360, 0.62 + Math.random() * 0.2, 0.52 + Math.random() * 0.1); });
+    update();
+  });
+  $('#mmResetColors').addEventListener('click', () => { state.colors = {}; update(); });
+
   function toggleCountry(id) {
     const g = state.groups[state.active];
-    if (g.ids.includes(id)) g.ids = g.ids.filter(x => x !== id);
-    else { for (const o of state.groups) o.ids = o.ids.filter(x => x !== id); g.ids.push(id); }
+    if (g.ids.includes(id)) { g.ids = g.ids.filter(x => x !== id); delete state.colors[id]; }
+    else { for (const o of state.groups) o.ids = o.ids.filter(x => x !== id); delete state.colors[id]; g.ids.push(id); }
     update();
   }
 
@@ -388,6 +425,7 @@
     mmLand: ['land', v => v], mmOcean: ['ocean', v => v], mmBorder: ['border', v => v], mmBorderWidth: ['borderWidth', Number],
     mmLabelColor: ['labelColor', v => v], mmLabelSize: ['labelSize', Number], mmGratColor: ['graticuleColor', v => v],
     mmZoom: ['zoom', Number], mmPadding: ['padding', Number],
+    mmHiOpacity: ['hiOpacity', Number], mmMapOpacity: ['mapOpacity', Number],
   };
   const checks = { mmLabels: 'labels', mmGrat: 'graticule', mmOceanTransparent: 'oceanTransparent', mmSphere: 'sphereOutline' };
   for (const [id, [key, cast]] of Object.entries(controls)) {
@@ -400,7 +438,7 @@
   }
   $('#mmFitSelection').addEventListener('click', () => { state.fit = 'selection'; state.zoom = 1; $('#mmZoom').value = 1; update(false); });
   $('#mmFitWorld').addEventListener('click', () => { state.fit = 'region'; state.region = 'world'; $('#mmRegion').value = 'world'; state.zoom = 1; $('#mmZoom').value = 1; update(false); });
-  $('#mmClear').addEventListener('click', () => { state.groups.forEach(g => g.ids = []); update(); });
+  $('#mmClear').addEventListener('click', () => { state.groups.forEach(g => g.ids = []); state.colors = {}; update(); });
   $('#mmDetail').addEventListener('change', async e => {
     state.detail = e.target.checked ? '50m' : '110m';
     setBusy(true, e.target.checked ? 'Loading detailed borders (about 700 KB)…' : 'Loading…');
@@ -414,6 +452,11 @@
     for (const [id, key] of Object.entries(checks)) { const i = $('#' + id); if (i) i.checked = state[key]; }
     $('#mmDetail').checked = state.detail === '50m';
     $('#mmZoomVal').textContent = `${state.zoom.toFixed(1)}×`;
+    showOpacity();
+  }
+  function showOpacity() {
+    $('#mmHiOpacityVal').textContent = `${Math.round(state.hiOpacity * 100)}%`;
+    $('#mmMapOpacityVal').textContent = `${Math.round(state.mapOpacity * 100)}%`;
   }
 
   /* Style presets */
@@ -434,20 +477,53 @@
     const mult = Number($('#mmExportScale').value) || 1;
     return [Math.round(W * mult), Math.round(H * mult)];
   }
-  function buildExportSvg() {
-    const s = document.createElementNS(SVG_NS, 'svg');
+  const onlySelected = () => $('#mmOnlySel').checked;
+  // The export: the canvas as it is, or, with "only the selected countries", those countries alone on a
+  // transparent background, cropped to them (and their labels) with the margin setting as a safe area.
+  function exportFrame() {
     const [W, H] = canvasSize();
     const [ew, eh] = exportSize();
+    if (!onlySelected()) return { vb: [0, 0, W, H], w: ew, h: eh, scale: 1 };
+    buildProjection();
+    const sel = selectedFeatures();
+    const [[sx0, sy0], [sx1, sy1]] = path.bounds({ type: 'FeatureCollection', features: sel });
+    const long = Math.max(ew, eh), px = ew / W;          // output px per canvas unit on a normal export
+    let scale = px / (long / Math.max(sx1 - sx0, sy1 - sy0, 1));
+    let frame;
+    for (let pass = 0; pass < 2; pass++) {               // labels widen the box, which changes the scale a little
+      let x0 = sx0, y0 = sy0, x1 = sx1, y1 = sy1;
+      const size = state.labelSize * scale;
+      if (state.labels) {
+        for (const f of sel) {
+          const c = labelPoint(f);
+          if (!c || !isFinite(c[0]) || !labelFits(f, f.properties.name, size)) continue;
+          const half = f.properties.name.length * size * 0.3;
+          x0 = Math.min(x0, c[0] - half); x1 = Math.max(x1, c[0] + half);
+          y0 = Math.min(y0, c[1] - size); y1 = Math.max(y1, c[1] + size);
+        }
+      }
+      const pad = Math.max(x1 - x0, y1 - y0) * Math.max(state.padding, 2) / 100 + state.borderWidth * scale;
+      const vb = [x0 - pad, y0 - pad, x1 - x0 + 2 * pad, y1 - y0 + 2 * pad];
+      const k = long / Math.max(vb[2], vb[3]);
+      frame = { vb, w: Math.round(vb[2] * k), h: Math.round(vb[3] * k), scale };
+      scale = px / k;
+    }
+    frame.scale = scale;
+    return frame;
+  }
+  function buildExportSvg() {
+    const s = document.createElementNS(SVG_NS, 'svg');
+    const { vb, w, h, scale } = exportFrame();
     s.setAttribute('xmlns', SVG_NS);
-    s.setAttribute('width', ew); s.setAttribute('height', eh);
-    render(s, { interactive: false });
-    s.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    s.setAttribute('width', w); s.setAttribute('height', h);
+    render(s, { interactive: false, only: onlySelected(), scale });
+    s.setAttribute('viewBox', vb.map(n => +n.toFixed(2)).join(' '));
     return s;
   }
   function svgString() { return new XMLSerializer().serializeToString(buildExportSvg()); }
   async function toPngBlob() {
     const str = svgString();
-    const [ew, eh] = exportSize();
+    const { w: ew, h: eh } = exportFrame();
     const url = URL.createObjectURL(new Blob([str], { type: 'image/svg+xml;charset=utf-8' }));
     try {
       const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error('Could not rasterise the map')); i.src = url; });
@@ -463,20 +539,41 @@
   }
   function fileBase() {
     const names = selectedFeatures().slice(0, 3).map(f => f.properties.name.replace(/[^a-z0-9]+/gi, '-').toLowerCase());
-    return `map-${names.length ? names.join('-') : 'world'}-${state.aspect.replace(':', 'x')}`;
+    return onlySelected() && names.length ? `map-${names.join('-')}-only` : `map-${names.length ? names.join('-') : 'world'}-${state.aspect.replace(':', 'x')}`;
+  }
+  function canExport() {
+    if (onlySelected() && !selectedFeatures().length) { showError('Select at least one country, or untick "Only the selected countries".'); return false; }
+    return true;
+  }
+  $('#mmOnlySel').addEventListener('change', showExportDims);
+  function showExportDims() {
+    if (onlySelected() && world && selectedFeatures().length) { const { w, h } = exportFrame(); $('#mmExportDims').textContent = `${w} × ${h}`; }
+    else $('#mmExportDims').textContent = exportSize().join(' × ');
+  }
+  // A cropped export shows the countries much larger than the canvas does, so it always uses the
+  // high-detail borders, loaded for the export and put back afterwards.
+  async function withExportDetail(fn) {
+    if (!onlySelected() || state.detail === '50m') return fn();
+    const shown = world;
+    setBusy(true, 'Loading detailed borders…');
+    try { world = await loadWorld('50m'); return await fn(); } finally { world = shown; }
   }
   $('#mmDownloadPng').addEventListener('click', async () => {
+    if (!canExport()) return;
     setBusy(true, 'Rendering PNG…');
-    try { download(await toPngBlob(), `${fileBase()}.png`); } catch (e) { showError(e.message); }
+    try { await withExportDetail(async () => download(await toPngBlob(), `${fileBase()}.png`)); } catch (e) { showError(e.message); }
     setBusy(false);
   });
   $('#mmDownloadSvg').addEventListener('click', () => {
-    download(new Blob([svgString()], { type: 'image/svg+xml;charset=utf-8' }), `${fileBase()}.svg`);
+    if (!canExport()) return;
+    withExportDetail(() => download(new Blob([svgString()], { type: 'image/svg+xml;charset=utf-8' }), `${fileBase()}.svg`))
+      .catch(e => showError(e.message)).finally(() => setBusy(false));
   });
   $('#mmCopyPng').addEventListener('click', async () => {
     if (!navigator.clipboard || typeof ClipboardItem === 'undefined') { showError('Clipboard images are not supported in this browser. Use Download PNG.'); return; }
+    if (!canExport()) return;
     setBusy(true, 'Copying…');
-    try { await navigator.clipboard.write([new ClipboardItem({ 'image/png': await toPngBlob() })]); flash('Copied to clipboard'); }
+    try { const blob = await withExportDetail(toPngBlob); await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]); flash('Copied to clipboard'); }
     catch (e) { showError('Clipboard blocked by the browser. Use Download PNG.'); }
     setBusy(false);
   });
@@ -495,7 +592,7 @@
   const DEFAULTS = JSON.parse(JSON.stringify(state));
   const HEX = { land: 'l', ocean: 'o', border: 'b', graticuleColor: 'gc', labelColor: 'lc' };
   const FLAGS = { oceanTransparent: 't', graticule: 'gr', labels: 'lb', sphereOutline: 'so' };
-  const NUMS = { zoom: 'z', padding: 'pd', borderWidth: 'bw', labelSize: 'ls' };
+  const NUMS = { zoom: 'z', padding: 'pd', borderWidth: 'bw', labelSize: 'ls', hiOpacity: 'o', mapOpacity: 'mo' };
   const defaultLabel = i => (i === 0 ? DEFAULTS.groups[0].label : `Group ${i + 1}`);
   const defaultColor = i => GROUP_COLORS[i % GROUP_COLORS.length];
   function saveHash() {
@@ -520,6 +617,9 @@
       if (gs[0].color.toLowerCase() !== defaultColor(0).toLowerCase()) put('k', gs[0].color.slice(1).toLowerCase());
       if (gs[0].label !== defaultLabel(0)) put('n', gs[0].label.replace(/_/g, ' '));
     }
+    // A country's own colour: cc=250-ff0000.276-00aa55
+    const own = Object.entries(state.colors).filter(([id]) => groupOf(id)).map(([id, c]) => `${id}-${c.slice(1).toLowerCase()}`);
+    if (own.length) put('cc', own.join('.'));
     history.replaceState(null, '', q.length ? `#${q.join('&')}` : location.pathname + location.search);
   }
   function loadHash() {
@@ -539,6 +639,10 @@
     state.padding = num('pd', 0, 20) ?? state.padding;
     state.borderWidth = num('bw', 0, 4) ?? state.borderWidth;
     state.labelSize = num('ls', 8, 80) ?? state.labelSize;
+    state.hiOpacity = num('o', 0.05, 1) ?? state.hiOpacity;
+    state.mapOpacity = num('mo', 0, 1) ?? state.mapOpacity;
+    state.colors = {};
+    for (const pair of (q.get('cc') || '').split('.')) { const [id, c] = pair.split('-'); if (/^\d+$/.test(id || '') && hex(c)) state.colors[id] = hex(c); }
     for (const [k, key] of Object.entries(HEX)) state[k] = hex(q.get(key)) || state[k];
     for (const [k, key] of Object.entries(FLAGS)) if (q.has(key)) state[k] = q.get(key) === '1';
     const ids = q.has('c') ? q.get('c').split('_') : [''];
@@ -592,12 +696,13 @@
     // Drop ids that don't exist in the current detail level (110m lacks tiny states)
     for (const g of state.groups) g.ids = g.ids.filter(id => world.byId.has(id));
     $('#mmZoomVal').textContent = `${state.zoom.toFixed(1)}×`;
-    $('#mmExportDims').textContent = exportSize().join(' × ');
+    showExportDims();
+    showOpacity();
     render();
     if (groupsToo) renderGroups();
     saveHash();
   }
-  $('#mmExportScale').addEventListener('change', () => { $('#mmExportDims').textContent = exportSize().join(' × '); });
+  $('#mmExportScale').addEventListener('change', showExportDims);
 
   /* ══════════════════════════════════════════════
      Boot
