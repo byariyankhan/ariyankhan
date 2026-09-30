@@ -85,7 +85,8 @@ address is the `Reply-To`, so replying to an enquiry goes to them and not to thi
 **Proxy note:** `.htaccess` forces HTTPS via `%{HTTPS}` *or*
 `X-Forwarded-Proto`, so any proxy that sets that header (all of them do) works
 without a redirect loop. `RedirectMatch 404 ^/(deploy|tests)` keeps the tooling
-directories unreachable over the web. Behind that proxy Apache only sees plain
+directories unreachable over the web. Markdown files (every `README.md`,
+any case) are a 404 on the web too: they are notes for this repository, not pages. Behind that proxy Apache only sees plain
 HTTP, so its own slash redirect for a folder (mod_dir) answers `http://`: the
 game's bare `/puzzle` therefore has a rule of its own that goes straight to
 `https://…/puzzle/`, one hop, like the old `/arrow-atlas*.html` addresses.

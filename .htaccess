@@ -82,6 +82,9 @@ RewriteRule ^puzzle$                     https://%{HTTP_HOST}/puzzle/ [R=301,L,N
 # ── Never serve deploy/test tooling ──────────────
 RedirectMatch 404 ^/(deploy|tests)(/|$)
 RedirectMatch 404 ^/games/build-[a-z-]+\.mjs$
+#    Markdown is the repository's own notes (README.md at the root, in service/, blog/, games/puzzle/, android/
+#    and vendor/), not pages: a 404 on the web, however it is cased, while the files stay in git.
+RedirectMatch 404 (?i)\.(md|markdown)$
 
 # ── youtube.ariyankhan.com ───────────────────────
 #    One container, two sites. The subdomain's document root is /youtube (the
