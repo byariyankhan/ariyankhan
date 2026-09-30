@@ -167,27 +167,35 @@ test('a scene is a whole tier up, the board after it the easiest deal of the pla
   assert.ok(/if \(state\.level\?\.scene\) store\.set\('breather', true\);/.test(js), 'a scene skipped earns one too');
   assert.ok(/One step harder: this scene is \$\{state\.diff\}\./.test(fn('startLevel')), 'a scene says on start that it is one step harder');
 });
-test('a new player: never past Normal before five boards, never past Hard before twelve, whatever the ladder says', () => {
+test('Easy and Normal for the first two boards only; from the third, never below Hard; never past Hard before twelve', () => {
   const levels = [{ id: '050' }, { id: 's:tower', scene: true }];
-  for (const [done, tier] of [[0, 1], [4, 1], [5, 2], [11, 2], [12, 4]]) {
+  for (const [done, tier] of [[0, 1], [1, 1], [2, 2], [11, 2], [12, 4]]) {
     const k = dealKit(levels, done); k.store.set('form', { grade: 14, tier: 4 });
     assert.equal(k.TIER_OF(), tier, `${done} boards cleared: tier ${tier}`);
   }
-  const k = dealKit(levels, 3); k.store.set('form', { grade: 14, tier: 4 });
+  for (const done of [2, 5, 40, 300]) {
+    const low = dealKit(levels, done); low.store.set('form', { grade: 0, tier: 0 });
+    assert.equal(low.gradeNow(), 6, `${done} boards cleared, a form on Easy: dealt Hard's easiest deal`);
+  }
+  const k = dealKit(levels, 1); k.store.set('form', { grade: 14, tier: 4 });
   assert.equal(k.gradeNow(), 5, 'the ceiling is the hardest deal of Normal');
   assert.equal(k.tierFor(1), 2, 'a scene is still a step above it');
   // the ladder itself is held at the ceiling, so the climb past it starts from its top, not from Master
   const FORM_SRC = [STORE_SRC, LADDER_SRC, one('formNow'), one('GRADE_CAP'), one('PAR_SEC_PER_ARROW'), one('FOCUS_FLOOR'), fn('focusOf'), fn('learnFrom')].join('\n');
   const learn = done => { const localStorage = fakeStorage(); return new Function('localStorage', 'boardsDone', FORM_SRC + '\nreturn { store, learnFrom, formNow };')(localStorage, () => done); };
   const flawless = { fails: 0, lost: 0, hints: 0, t: 10_000, arrows: 22 };
-  const a = learn(3); for (let n = 0; n < 6; n++) a.learnFrom(true, flawless);
-  assert.deepEqual(a.formNow(), { grade: 5, tier: 1 }, 'six flawless clears among the first five boards: the top of Normal');
-  const b = learn(5); b.store.set('form', { grade: 5, tier: 1 }); b.learnFrom(true, flawless);
-  assert.deepEqual(b.formNow(), { grade: 8, tier: 2 }, 'the sixth board goes on from there: Locked in, a whole tier');
-  const c = learn(3); c.store.set('form', { grade: 14, tier: 4 }); c.learnFrom(false, {});
+  const a = learn(1); for (let n = 0; n < 6; n++) a.learnFrom(true, flawless);
+  assert.deepEqual(a.formNow(), { grade: 5, tier: 1 }, 'six flawless clears within the first two boards: the top of Normal');
+  const b = learn(2); b.store.set('form', { grade: 5, tier: 1 }); b.learnFrom(true, flawless);
+  assert.deepEqual(b.formNow(), { grade: 8, tier: 2 }, 'the third board goes on from there: Locked in, a whole tier');
+  const c = learn(1); c.store.set('form', { grade: 14, tier: 4 }); c.learnFrom(false, {});
   assert.deepEqual(c.formNow(), { grade: 3, tier: 1 }, 'a heart-out counts down from the grade as dealt');
-  const d = learn(3); d.store.set('form', { tier: 4, wins: 0, losses: 0 }); d.learnFrom(true, flawless);
+  const d = learn(1); d.store.set('form', { tier: 4, wins: 0, losses: 0 }); d.learnFrom(true, flawless);
   assert.deepEqual(d.formNow(), { grade: 14, tier: 4 }, 'a win under the ceiling leaves a grade from elsewhere (a reinstall before the sync, the old ladder) where it was');
+  const e = learn(5); e.store.set('form', { grade: 6, tier: 2 }); e.learnFrom(false, {}); e.learnFrom(false, {});
+  assert.deepEqual(e.formNow(), { grade: 6, tier: 2 }, 'past the first two boards a heart-out never drops below Hard');
+  const f = learn(5); f.store.set('form', { grade: 3, tier: 1 }); f.learnFrom(true, { fails: 0, lost: 2, hints: 2, t: 90_000, arrows: 40 });
+  assert.deepEqual(f.formNow(), { grade: 6, tier: 2 }, 'a form left on Normal is lifted to the floor by the next board');
   assert.ok(/levelNo\(-1\); return numCache\.boards;/.test(one('boardsDone')) && /const boards = done\.length;/.test(fn('levelNo')), 'boards cleared are counted with the level numbers, each id once, training not counted');
 });
 

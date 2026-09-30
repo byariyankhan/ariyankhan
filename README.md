@@ -532,8 +532,9 @@ runs under the buttons or off the glass. The result is a
 weighted staircase that settles near three clears in four, where the old two-up/two-down rule on the
 hardest deal settled near a coin flip (`tests/puzzle-habits.test.mjs` simulates both for three
 kinds of player: 37–46 % of tries failed before, about 26–28 % now). A form from before grades is read
-as its tier's hardest deal (`gradeOf`: `tier * 3 + 2`). A new player is never dealt past Normal before
-5 boards are cleared nor past Hard before 12 (`GRADE_CAP`, on `boardsDone()`), and the ladder itself
+as its tier's hardest deal (`gradeOf`: `tier * 3 + 2`). Easy and Normal are dealt on the first two boards only: from the third board on nothing is
+dealt below Hard's easiest deal, grade 6 (`GRADE_FLOOR`), and a heart-out stops there. A new player is never dealt past Normal before
+2 boards are cleared nor past Hard before 12 (`GRADE_CAP`, on `boardsDone()`), and the ladder itself
 is held there (a higher grade from elsewhere — the account, the old ladder — is left as it is by a win
 under the ceiling). A race and the daily board are always the hardest deal, so a shared board is the same
 board for everyone, and the pace line is shown only for a hardest deal. A board left mid-play is dealt
