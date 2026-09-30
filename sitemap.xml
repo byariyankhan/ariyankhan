@@ -81,6 +81,34 @@
   </url>
 
   <url>
+    <loc>https://ariyankhan.com/ai-image-checker/</loc>
+    <lastmod>2026-09-30</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.9</priority>
+  </url>
+
+  <url>
+    <loc>https://ariyankhan.com/ai-image-checker/how-to-use.html</loc>
+    <lastmod>2026-09-30</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <url>
+    <loc>https://ariyankhan.com/ai-image-checker/about.html</loc>
+    <lastmod>2026-09-30</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+
+  <url>
+    <loc>https://ariyankhan.com/ai-image-checker/privacy.html</loc>
+    <lastmod>2026-09-30</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+  </url>
+
+  <url>
     <loc>https://ariyankhan.com/ai-metadata-remover/</loc>
     <lastmod>2026-09-30</lastmod>
     <changefreq>monthly</changefreq>

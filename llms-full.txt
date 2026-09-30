@@ -127,11 +127,16 @@ Fill out the contact form at https://ariyankhan.com/#contact with your project d
   WebP EXIF/XMP/C2PA chunks and hidden trailing data from JPG, PNG and WebP images. The file container is
   rewritten and pixel data is copied byte-for-byte, so quality is untouched and the file is usually smaller.
   Nothing is uploaded — there is no server endpoint, no account and no quota; batch, drag-and-drop and
-  clipboard paste are supported. Two modes: "Remove everything" (recommended) or "Keep camera EXIF".
-  The report names the AI generator signature it found (ChatGPT/DALL·E, Google Gemini/Imagen, Adobe
-  Firefly, Midjourney, Stable Diffusion/ComfyUI, Microsoft Designer). Honest limits: it cannot remove
+  clipboard paste are supported. One click removes everything; the colour profile is kept. To see what a
+  file holds before cleaning it, including which AI generator left a signature (ChatGPT/DALL·E, Google
+  Gemini/Imagen, Adobe Firefly, Midjourney, Stable Diffusion/ComfyUI, Microsoft Designer), use AI Image
+  Checker, below. Honest limits: it cannot remove
   pixel-level watermarks such as Google SynthID, cannot fool pixel-based AI detectors and handles still
   images only (no video). Built by Ariyan Khan for his own thumbnail / B-roll workflow.
+- AI Image Checker: https://ariyankhan.com/ai-image-checker/
+  Free, browser-only companion to the remover: it reads an image’s metadata and reports what it says about
+  how the image was made (AI generators named in it, C2PA Content Credentials, the IPTC AI source type,
+  Stable Diffusion prompts, camera, date and GPS). Nothing is uploaded; a clean result is not proof an image is real.
 - Puzzle – Train Your Brain (daily brain training and arrow puzzle game): https://ariyankhan.com/puzzle/
   Free brain-training game that plays in the browser; no download, and solo play needs no account.
   Daily Training is four short rounds every day on 247 public-domain paintings from The Metropolitan
@@ -165,6 +170,7 @@ Practical articles on hiring, cost, and working with a video editor.
 - Home: https://ariyankhan.com/
 - About: https://ariyankhan.com/about.html
 - AI Metadata Remover (free tool): https://ariyankhan.com/ai-metadata-remover/
+- AI Image Checker (free tool): https://ariyankhan.com/ai-image-checker/
 - Puzzle – Train Your Brain (free daily brain training and arrow puzzle game): https://ariyankhan.com/puzzle/
 - About Puzzle & FAQ: https://ariyankhan.com/puzzle/about.html
 - How to play Puzzle: https://ariyankhan.com/puzzle/how-to-play.html
