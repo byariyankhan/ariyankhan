@@ -4,7 +4,8 @@ import { pool, query, tx } from '../backend/src/db.js';
 import { give, idem } from '../backend/src/gold.js';
 import { config } from '../backend/src/config.js';
 import { startSession } from '../backend/src/auth.js';
-import { eq, finish, ok, reset, section } from './helpers.js';
+import { begun, eq, finish, ok, reset, section } from './helpers.js';
+import { spend, WS_BURST, WS_DEBT, WS_PER_USER, WS_RATE } from '../backend/src/ws.js';
 
 const BASE = process.env.AA_TEST_BASE ?? 'http://127.0.0.1:8760';
 const WS_URL = BASE.replace(/^http/, 'ws') + '/ws/puzzle';
@@ -154,6 +155,7 @@ section('A finish reaches the room and closes it out');
   const watcher = open(b.token); await watcher.ready; await watcher.waitFor('hello');
   watcher.send({ type: 'watch', code });
   await watcher.waitFor('state');
+  await begun(code);                           // past the floor on how fast a board can be cleared
   await api(`/matches/${code}/result`, a.token, { ms: 3_000, cleared: true });
   const fin = await watcher.waitFor('player_finished');
   eq(fin.code, code, 'the room is told somebody finished');
@@ -161,6 +163,73 @@ section('A finish reaches the room and closes it out');
   const done = await watcher.waitFor('match_finished');
   eq(done.code, code, 'and told when the match is over');
   watcher.close();
+}
+
+// ── What one socket may ask of the server ──
+// Every message but progress used to be free, and a watch alone is several queries and a message to the room:
+// one socket sending thousands a second could hold every database connection there is.
+
+section('A socket has an allowance, and one far past it is closed');
+{
+  const t0 = 1_000_000;
+  const c = { tokens: WS_BURST, filled: t0 };
+  const first = Array.from({ length: WS_BURST }, () => spend(c, t0));
+  ok(first.every(v => v === 'ok'), `a burst of ${WS_BURST} goes through`);
+  eq(spend(c, t0), 'drop', 'the next is dropped');
+  eq(spend(c, t0 + 1_000), 'ok', `and a second later ${WS_RATE} more are allowed`);
+  let v = '';
+  for (let i = 0; i < WS_RATE + WS_DEBT + 5 && v !== 'close'; i++) v = spend(c, t0 + 1_000);
+  eq(v, 'close', 'a socket that keeps going far past it is closed');
+
+  const flood = open(b.token); await flood.ready; await flood.waitFor('hello');
+  const closed = new Promise<number>(res => flood.ws.addEventListener('close', e => res(e.code)));
+  for (let i = 0; i < 200; i++) flood.send({ type: 'ping' });
+  eq(await closed, 1008, 'two hundred messages at once close the socket as a policy violation');
+}
+
+section('Only a room still going has a feed, and watching it twice is watching it once');
+{
+  const s = open(a.token); await s.ready; await s.waitFor('hello');
+  s.send({ type: 'watch', code });                 // the match above, finished
+  const shut = await s.waitFor('closed');
+  eq([shut.code, shut.state], [code, 'done'], 'a finished match is answered with its end, not a feed');
+  ok(!s.seen.some(m => m.type === 'state'), 'and no state is read for it');
+
+  const made2 = await api('/matches', a.token, { stake: 500, open_to_all: false, tier: 2 }) as { match: { code: string } };
+  const code2 = made2.match.code;
+  s.send({ type: 'watch', code: code2 });
+  await s.waitFor('state');
+  s.send({ type: 'watch', code: code2 });
+  await new Promise(r => setTimeout(r, 700));
+  eq(s.seen.filter(m => m.type === 'state').length, 1, 'asking to watch the room it is already watching reads nothing again');
+
+  // A resync on every event is what the client does; the room is read at most once in two seconds, and the
+  // last ask of a burst is answered at the end of them.
+  for (let i = 0; i < 6; i++) s.send({ type: 'resync' });
+  await new Promise(r => setTimeout(r, 2_600));
+  const resyncs = s.seen.filter(m => m.type === 'state' && m.reason === 'resync').length;
+  eq(resyncs, 2, 'six resyncs at once are answered twice: now, and once more two seconds on');
+  await api(`/matches/${code2}/leave`, a.token, {});
+  s.close();
+}
+
+section('One account holds a handful of sockets, not a thousand');
+{
+  const many = await mint('wsMany');
+  const socks = [];
+  for (let i = 0; i < WS_PER_USER; i++) { const s = open(many.token); await s.ready; await s.waitFor('hello'); socks.push(s); }
+  eq(socks.length, WS_PER_USER, `${WS_PER_USER} sockets open: tabs and a phone`);
+  const extra = new WebSocket(`${WS_URL}?token=${encodeURIComponent(many.token)}`);
+  const refused = await new Promise<boolean>(res => {
+    extra.addEventListener('error', () => res(true));
+    extra.addEventListener('open', () => { extra.close(); res(false); });
+  });
+  ok(refused, 'one more is refused at the door');
+  for (const s of socks) s.close();
+  await new Promise(r => setTimeout(r, 300));
+  const again = open(many.token); await again.ready;
+  ok(!!(await again.waitFor('hello')), 'and once they close, the account can connect again');
+  again.close();
 }
 
 await finish();

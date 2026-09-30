@@ -28,6 +28,31 @@ export type PlayerState = Record<string, unknown>;
 
 export const MAX_LEVELS_PER_PUSH = 600;   // the whole tour is 197 countries plus their discovery boards
 const MAX_LEVEL_ID = 64;
+/**
+ * Boards one account may hold: every country, its discovery board, every focus and scene board and years of
+ * laps round the scenes fit many times over. A push past it still updates the boards already held; only new
+ * ids beyond the line are dropped. Without it every push could add six hundred invented ids, every push was
+ * answered with all of them, and an account could be grown until reading it ran the server out of memory.
+ */
+export const MAX_LEVEL_ROWS = 5_000;
+/** Devices whose counts one account keeps in level_stats; a new one past this replaces the one quietest longest. */
+export const MAX_STAT_DEVICES = 16;
+
+/**
+ * Could this be a board of the game? A country from the tour's own list (the file the server deals matches
+ * from), or one of the boards that live beside the tour: a discovery board (d:<country>), a focus board
+ * (f:), a scene board (s:, with an optional ~lap when the tour has gone round the scenes again) or n:. Those
+ * are checked by shape rather than by list, because a new one ships in the client's data before this list
+ * could know it, and a board a player cleared must not be refused for being new. With no country list at all
+ * (the file could not be read) a country is three digits, which is what every one of them is.
+ */
+const SIDE_BOARD = /^(?:[fn]:[A-Za-z0-9_-]{1,40}|s:[A-Za-z0-9_-]{1,40}(?:~[1-9]\d{0,3})?)$/;
+export function levelIdOk(id: string, countries: ReadonlySet<string>): boolean {
+  if (typeof id !== 'string' || !id || id.length > MAX_LEVEL_ID) return false;
+  if (SIDE_BOARD.test(id)) return true;
+  const country = id.startsWith('d:') ? id.slice(2) : id;
+  return countries.size ? countries.has(country) : /^(?:\d{3}|n:[A-Za-z0-9_-]{1,40})$/.test(country);   // n: boards have discovery boards too (d:n:kosovo)
+}
 // What a push may carry as its settings blob before it is refused outright. The blob is sanitised key by key
 // below, so this is only the line past which nothing a real client sends could reach -- a device sends its
 // last STATE_SEND_DAYS days of daily boards and training, a few hundred bytes a day.
@@ -75,7 +100,12 @@ export function cleanLevels(raw: unknown, known?: (id: string) => boolean): Leve
 /** What one device has counted on one board: starts, clears, hearts run out, and what the clears cost. */
 export interface LevelStat { plays: number; clears: number; fails: number; hints: number; hearts: number; ms: number }
 export type Stats = Record<string, LevelStat>;
-const MAX_STAT = 1_000_000;
+// What one device can believably have counted on one board: ten thousand starts of the same board is years of
+// doing nothing else. Anything past it is not a count, and is dropped the way a negative one is -- these rows
+// are summed into the board-tuning report, and one invented million would outweigh every honest player.
+const MAX_STAT = 10_000;
+// An hour a clear, on average, is the most time a device's clears can have cost: past that it is not a time.
+const MAX_MS_PER_CLEAR = 3_600_000;
 
 /** A device's own id, made once on the phone: letters and digits, short. */
 export function cleanDevice(raw: unknown): string {
@@ -97,8 +127,9 @@ export function cleanStats(raw: unknown, known?: (id: string) => boolean): Stats
     const s: LevelStat = {
       plays: int(r.p ?? r.plays, 0, MAX_STAT, 0), clears: int(r.c ?? r.clears, 0, MAX_STAT, 0),
       fails: int(r.f ?? r.fails, 0, MAX_STAT, 0), hints: int(r.h ?? r.hints, 0, MAX_STAT, 0),
-      hearts: int(r.l ?? r.hearts, 0, MAX_STAT, 0), ms: int(r.ms, 0, 1_000_000_000_000, 0),
+      hearts: int(r.l ?? r.hearts, 0, MAX_STAT, 0), ms: 0,
     };
+    s.ms = int(r.ms, 0, Math.max(1, s.clears) * MAX_MS_PER_CLEAR, 0);
     if (!s.plays && !s.clears && !s.fails) continue;
     out[id] = s;
     n++;
@@ -113,6 +144,16 @@ export function cleanStats(raw: unknown, known?: (id: string) => boolean): Stats
 export async function mergeStats(c: Sql, userId: number, device: string, stats: Stats): Promise<number> {
   const ids = Object.keys(stats);
   if (!ids.length || !device) return 0;
+  // A device id is whatever the phone made up, so a script could send a new one with every push and grow the
+  // account by six hundred rows a time. Past MAX_STAT_DEVICES, the device the account has heard from least
+  // recently makes room: a new phone replaces the one in a drawer, and the rows stay bounded.
+  const devs = await query<{ device: string }>(c,
+    `SELECT device FROM level_stats WHERE user_id = $1 GROUP BY device ORDER BY max(updated_at) DESC, device`, [userId]);
+  const known = devs.rows.map(d => d.device);
+  if (!known.includes(device) && known.length >= MAX_STAT_DEVICES) {
+    await query(c, `DELETE FROM level_stats WHERE user_id = $1 AND device = ANY($2::text[])`,
+      [userId, known.slice(MAX_STAT_DEVICES - 1)]);
+  }
   const r = await query<{ moved: boolean }>(c, `
     INSERT INTO level_stats (user_id, device, level_id, plays, clears, fails, hints, hearts, ms)
     SELECT $1, $2, u.level_id, u.plays, u.clears, u.fails, u.hints, u.hearts, u.ms
@@ -160,11 +201,13 @@ export async function difficulty(c: Sql, minPlayers = 1): Promise<Difficulty[]> 
 // and the website each saw only their own training and their own streak, forever. So the keys that are records
 // of play are merged here the way the boards are: commutative, idempotent, never taking anything away.
 //
-//   train   day -> { r, f, g, e, h, p, pp, nx, cl, at }  each round's best score; plays, hints and counts the
-//           larger; cl, the puzzles finished (round -> serial -> when), the union with the earliest time of each
+//   train   day -> { r, f, g, e, h, p, pp, nx, cl, f1, at }  each round's best score; plays, hints and counts
+//           the larger; cl, the puzzles cleared (round -> serial -> when), the union with the earliest time of
+//           each; f1, each round's first score of its free puzzle (what its difficulty reads), the lower
 //   daily   day -> { t, stars, quiz, tier, arrows, at } the better run: more stars, then the faster time
 //   loss    device -> arrows                            the larger per device (each device's count only grows)
-//   playStreak, dailyStreak  { count, last }           the later day; two runs that meet are joined
+//   playStreak, dailyStreak  { count, last, freeze }   the later day; two runs that meet are joined; the
+//           freezes held (0-2) are the later day's, the more of the two on the same day
 //
 // Anything else (home, form) is a setting and the last device to say it wins, as before.
 
@@ -178,7 +221,15 @@ export const STATE_SEND_DAYS = 120;
 export const STATE_KEEP_DAYS = 1000;
 const MAX_OTHER_KEYS = 16;               // settings other than the records of play
 const MAX_OTHER_BYTES = 4 * 1024;        // each
-const MAX_SERIALS = 200;                 // puzzles of one round finished in one day
+// Puzzles of one round finished in one day. A round's puzzle takes the better part of a minute, so sixty is an
+// hour of one round, every round, in a day -- more than anybody plays, and small enough that a thousand days
+// of it cannot make the blob a burden to read.
+export const MAX_SERIALS = 200;
+// What the account keeps of the whole blob, merged. Each push is capped on the way in (MAX_STATE_BYTES), but
+// the merge takes the union of every day ever sent, and a script sending a different week each time could
+// grow it to megabytes that every push then parses and writes back. Past this the oldest days are dropped
+// first: the newest are the ones another device is missing, if any.
+export const MAX_BLOB_BYTES = 512 * 1024;
 const MAX_DEVICES = 256;                 // entries in `loss`: every browser and every install is a device, for years
 const TRAIN_IDS = ['r', 'f', 'g', 'e'] as const;
 const PLAY_KEYS = new Set(['train', 'daily', 'loss', 'playStreak', 'dailyStreak']);
@@ -239,6 +290,13 @@ function cleanTrainDay(raw: unknown): Rec | undefined {
     }
     if (Object.keys(cl).length) out.cl = cl;
   }
+  // the first finish of each round's free puzzle that day, whatever it scored: the client's difficulty step
+  // reads it (trainTier) instead of the day's best, which replays can push up
+  if (isObj(raw.f1)) {
+    const f1: Rec = {};
+    for (const id of TRAIN_IDS) { const v = num((raw.f1 as Rec)[id], 0, 100); if (v !== undefined) f1[id] = Math.round(v); }
+    if (Object.keys(f1).length) out.f1 = f1;
+  }
   const at = num(raw.at, 0, EPOCH_MAX); if (at !== undefined) out.at = Math.floor(at);
   return Object.keys(out).some(k => k !== 'at') ? out : undefined;
 }
@@ -262,6 +320,10 @@ function mergeTrainDay(a: Rec | undefined, b: Rec | undefined): Rec | undefined 
     if (keep.length) cl[id] = Object.fromEntries(keep.map(x => [x, o[x]!]));
   }
   if (Object.keys(cl).length) out.cl = cl;
+  // the first scores: the lower of the two, per round -- the same whichever way round, and again if merged twice
+  const fa = (a.f1 as Rec | undefined) ?? {}, fb = (b.f1 as Rec | undefined) ?? {}, f1: Rec = {};
+  for (const id of TRAIN_IDS) { const x = fa[id] as number | undefined, y = fb[id] as number | undefined; if (x !== undefined || y !== undefined) f1[id] = Math.min(x ?? 101, y ?? 101); }
+  if (Object.keys(f1).length) out.f1 = f1;
   return out;
 }
 
@@ -320,18 +382,28 @@ function cleanLoss(raw: unknown): Record<string, number> {
   return topLoss(out);
 }
 
-/** A streak: how many days in a row, and the last of them. */
-export interface Streak { count: number; last: string }
+/**
+ * A streak: how many days in a row, the last of them, and the streak freezes held. A freeze (0 to 2, earned in
+ * the game, never bought) stands in for one missed day; the client spends it, and a day it covered counts as a
+ * day of the run, so a streak is always one unbroken stretch of the calendar. Kept only when there is one, so a
+ * streak without reads as it always has.
+ */
+export const FREEZE_MAX = 2;
+export interface Streak { count: number; last: string; freeze?: number }
 export function cleanStreak(raw: unknown, now = new Date()): Streak | undefined {
   if (!isObj(raw) || typeof raw.last !== 'string' || !inWindow(raw.last, dayWindow(now))) return undefined;   // no day ahead of the calendar
   const count = cnt(raw.count); if (!count) return undefined;
-  return { count, last: raw.last };
+  const freeze = Math.min(FREEZE_MAX, cnt(raw.freeze) ?? 0);
+  return freeze ? { count, last: raw.last, freeze } : { count, last: raw.last };
 }
 /**
  * Two devices' streaks of the same player, as one. A streak is a run of days, `count` of them ending on `last`,
  * so two of them are two runs on the calendar: if they overlap or meet, they are one run from the earlier start
  * to the later end -- the phone played Monday and Tuesday, the website Tuesday to Thursday, and that is four
  * days in a row. If there is a gap between them, the later run is the streak.
+ *
+ * The freezes held are the later run's: the device that played last has seen every freeze spent and earned
+ * before its day. On the same last day, the more of the two. Commutative and idempotent, like the rest.
  */
 export function mergeStreak(a: Streak | undefined, b: Streak | undefined): Streak | undefined {
   if (!a) return b; if (!b) return a;
@@ -339,7 +411,8 @@ export function mergeStreak(a: Streak | undefined, b: Streak | undefined): Strea
   const [later, le, earlier, ee] = ea >= eb ? [a, ea, b, eb] : [b, eb, a, ea];
   const ls = le - later.count + 1, es = ee - earlier.count + 1;
   const count = ee >= ls - 1 ? le - Math.min(ls, es) + 1 : later.count;
-  return { count, last: later.last };
+  const freeze = ea === eb ? Math.max(a.freeze ?? 0, b.freeze ?? 0) : later.freeze ?? 0;
+  return freeze ? { count, last: later.last, freeze } : { count, last: later.last };
 }
 
 /**
@@ -391,6 +464,20 @@ export function combineState(a: PlayerState, b: PlayerState, now = new Date()): 
   for (const k of ['playStreak', 'dailyStreak'] as const) {
     const st = mergeStreak(cleanStreak(A[k], now), cleanStreak(B[k], now)); if (st) out[k] = st;
   }
+  return trimBlob(out);
+}
+
+/** The blob within MAX_BLOB_BYTES, the oldest days of training and daily boards going first. */
+function trimBlob(out: PlayerState, max = MAX_BLOB_BYTES): PlayerState {
+  let size = JSON.stringify(out).length;
+  if (size <= max) return out;
+  const train = (out.train ?? {}) as Record<string, Rec>, daily = (out.daily ?? {}) as Record<string, Rec>;
+  for (const day of [...new Set([...Object.keys(train), ...Object.keys(daily)])].sort()) {
+    if (size <= max) break;
+    for (const m of [train, daily]) if (m[day]) { size -= JSON.stringify(m[day]).length + day.length + 4; delete m[day]; }
+  }
+  if (!Object.keys(train).length) delete out.train;
+  if (!Object.keys(daily).length) delete out.daily;
   return out;
 }
 
@@ -424,6 +511,12 @@ export async function readLevels(c: Sql, userId: number): Promise<Levels> {
  * Nobody is named and nothing identifies a row: what comes back is a count and a percentage.
  */
 export const PACE_FLOOR = 20;
+/**
+ * The quickest a board can believably be cleared, per arrow. A run faster than this many milliseconds an arrow
+ * is not a run anybody played, and counting it would push every honest player's "you beat X%" down: a record
+ * says how many arrows its board had, and a time of one millisecond used to be counted like any other.
+ */
+export const PACE_MS_PER_ARROW = 150;
 
 export interface BoardPace {
   n: number;                 // recorded clears of this board at this difficulty, this player's own excluded
@@ -435,7 +528,8 @@ export async function boardPace(c: Sql, levelId: string, tier: number, ms: numbe
     SELECT count(*) AS n, count(*) FILTER (WHERE ms > $3) AS slower
       FROM progress
      WHERE level_id = $1 AND tier = $2 AND cleared AND ms IS NOT NULL
-       AND ($4::bigint IS NULL OR user_id <> $4)`, [levelId, tier, ms, exceptUser]);
+       AND arrows > 0 AND ms >= arrows * $5
+       AND ($4::bigint IS NULL OR user_id <> $4)`, [levelId, tier, ms, exceptUser, PACE_MS_PER_ARROW]);
   const n = Number(r.rows[0]?.n ?? 0);
   if (n < PACE_FLOOR) return { n };
   return { n, beats_pct: Math.round((Number(r.rows[0]!.slower) / n) * 100) };
@@ -450,8 +544,16 @@ export async function readState(c: Sql, userId: number): Promise<PlayerState> {
  * Merge a batch in. Returns how many rows the push actually moved, which is what the tests assert on: pushing
  * the same batch twice must report a change the first time and none the second.
  */
-export async function mergeLevels(c: Sql, userId: number, levels: Levels): Promise<number> {
-  const ids = Object.keys(levels);
+export async function mergeLevels(c: Sql, userId: number, levels: Levels, maxRows = MAX_LEVEL_ROWS): Promise<number> {
+  let ids = Object.keys(levels);
+  if (ids.length === 0) return 0;
+  // Boards already on the account always merge; new ones only while the account is under its line.
+  const have = await query<{ n: number; held: string[] | null }>(c,
+    `SELECT count(*)::int AS n, array_agg(level_id) FILTER (WHERE level_id = ANY($2::text[])) AS held
+       FROM progress WHERE user_id = $1`, [userId, ids]);
+  const held = new Set(have.rows[0]?.held ?? []);
+  let room = Math.max(0, maxRows - (have.rows[0]?.n ?? 0));
+  ids = ids.filter(id => held.has(id) || room-- > 0);
   if (ids.length === 0) return 0;
 
   // One statement for the whole batch: unnest turns the arrays into rows, and the ON CONFLICT decides, per
@@ -479,12 +581,14 @@ export async function mergeLevels(c: Sql, userId: number, levels: Levels): Promi
       tier    = CASE WHEN EXCLUDED.stars > progress.stars
                        OR (EXCLUDED.stars = progress.stars AND progress.ms IS NOT NULL AND EXCLUDED.ms IS NOT NULL AND EXCLUDED.ms < progress.ms)
                      THEN EXCLUDED.tier ELSE progress.tier END,
-      arrows  = CASE WHEN progress.arrows = 0 THEN EXCLUDED.arrows ELSE progress.arrows END,
+      -- the most the board has ever paid, whichever run it was: a replay at a lower tier, or a device that only
+      -- saw that replay, must not take arrows off the rank (the rank is the sum of these)
+      arrows  = GREATEST(progress.arrows, EXCLUDED.arrows),
       at      = now()
-    WHERE (progress.cleared, progress.skipped, progress.quiz, progress.stars, progress.ms)
+    WHERE (progress.cleared, progress.skipped, progress.quiz, progress.stars, progress.arrows, progress.ms)
        IS DISTINCT FROM
           (progress.cleared OR EXCLUDED.cleared, progress.skipped OR EXCLUDED.skipped, progress.quiz OR EXCLUDED.quiz,
-           GREATEST(progress.stars, EXCLUDED.stars),
+           GREATEST(progress.stars, EXCLUDED.stars), GREATEST(progress.arrows, EXCLUDED.arrows),
            CASE
              WHEN EXCLUDED.ms IS NULL THEN progress.ms
              WHEN progress.ms IS NULL THEN EXCLUDED.ms
@@ -518,12 +622,24 @@ export async function mergeLevels(c: Sql, userId: number, levels: Levels): Promi
  * together would each wait on the other's inserts -- a deadlock. NO KEY UPDATE does not conflict with KEY
  * SHARE and still makes a second push wait for the first, then read what the first one wrote.
  */
-export async function mergeState(c: Sql, userId: number, state: PlayerState): Promise<void> {
-  if (!state || Object.keys(state).length === 0) return;
+export async function mergeState(c: Sql, userId: number, state: PlayerState): Promise<boolean> {
+  if (!state || Object.keys(state).length === 0) return false;
   const r = await query<{ state: PlayerState }>(c, `SELECT state FROM users WHERE id = $1 FOR NO KEY UPDATE`, [userId]);
-  if (!r.rows[0]) return;
+  if (!r.rows[0]) return false;
   const merged = combineState(r.rows[0].state ?? {}, state);
   await query(c, `UPDATE users SET state = $2::jsonb WHERE id = $1`, [userId, JSON.stringify(merged)]);
+  return playedIn(r.rows[0].state ?? {}, merged);
+}
+/**
+ * Whether the records of play moved: a training round, a daily board, a streak day, a board lost. What the
+ * evening nudge counts as having played (routes.ts, last_played_at) -- a sync that only brought the same
+ * records back again, which every open of the app makes, is not a game.
+ */
+export function playedIn(before: PlayerState, after: PlayerState): boolean {
+  // keys sorted all the way down: a merge writes a day's fields in its own order, and that is not play
+  const canon = (v: unknown): string => JSON.stringify(v, (_k, x: unknown) => (isObj(x) ? Object.fromEntries(Object.keys(x).sort().map(k => [k, x[k]])) : x));
+  const pick = (s: PlayerState) => canon([...PLAY_KEYS].sort().map(k => (s as Rec)[k] ?? null));
+  return pick(cleanState(before, new Date(), false) ?? {}) !== pick(after);
 }
 
 /** Everything a device needs to show this player's tour. */

@@ -30,7 +30,17 @@ export async function finish(): Promise<never> {
 export async function reset(): Promise<void> {
   await migrate();
   // TRUNCATE rather than DROP: it keeps the schema the migrations built, which is what we mean to test against.
-  await query(pool, 'TRUNCATE push_tokens, push_subscriptions, league_prizes, league_seasons, progress, gold_ledger, match_players, matches, sessions, users RESTART IDENTITY CASCADE');
+  await query(pool, 'TRUNCATE push_tokens, push_subscriptions, league_prizes, league_seasons, progress, level_stats, mutes, account_tombstones, gold_ledger, match_players, matches, sessions, users RESTART IDENTITY CASCADE');
+}
+
+/**
+ * Wind a started match's clock back, so a clear posted now is past the floor on how fast a board can be
+ * cleared (rooms.ts, submitResult) -- which is the only way to test a result without waiting for real. Five
+ * minutes: past the floor of any length of match, and short of anything the sweeper counts as idle, which
+ * reads when each seat was last heard from rather than when the match began.
+ */
+export async function begun(code: string, seconds = 300): Promise<void> {
+  await query(pool, `UPDATE matches SET started_at = started_at - ($2 || ' seconds')::interval WHERE code = $1`, [code, String(seconds)]);
 }
 
 /** A signed-in player with gold to spend, without going anywhere near Google. */

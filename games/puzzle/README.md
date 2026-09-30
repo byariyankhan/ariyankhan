@@ -108,6 +108,32 @@ containers racing — all of them write the second attempt into a unique-violati
 `users.gold` is the running total; the ledger is what it is made of. The two must always agree, and every test
 suite checks that before it is allowed to pass.
 
+### What the server does not take on trust
+
+The ledger makes sure gold is never paid twice; these make sure it is not paid for nothing.
+
+* **A clear is believed only once it could have happened.** Whether a board was cleared is the client's word,
+  and it decides the pot. `submitResult` counts a clear only once `now() - started_at`, on the server's own
+  clock, is at least `boards × PUZZLE_MIN_BOARD_MS` (default 6,000: the easiest board has about 22 arrows, and
+  a quarter of a second an arrow is quicker than any honest clear). Sooner, nothing is written and the answer
+  is `409 too_early` with `retry_after` (seconds) and `retry_after_ms`; the client keeps the result on the
+  device (`aa:v1:pendingResult`) and sends it again when told, across a reload too. Lag only makes a result
+  later, so an honest player is never refused. A loss can be reported at any moment. What this does not stop is
+  a bot that plays the board at a believable pace: that needs the server to rebuild the board and replay the
+  moves, which is a project of its own.
+* **The welcome gold is once per Google account.** Deleting an account leaves a row in `account_tombstones`
+  (`019_account_tombstones.sql`): the provider and `sha256('puzzle-tombstone:' + provider + ':' + sub)`, never
+  the id itself, plus the day's advertisement claims. A sign-in that makes a new account for a hash found there
+  makes it with 0 gold (`gold_granted` says so), and the day's advertisement cap carries over. Sign-ins that
+  would make an account and account deletions are also limited per address (`account_create`,
+  `account_delete_ip`).
+* **Advertisement gold needs a ticket.** `POST /ads/start` hands out one (Redis, ten minutes, one open per
+  account, and `429 ad_cap` instead when the day is spent, so nobody watches for nothing); `POST /ads/reward
+  {ticket}` spends it, once, and not before `PUZZLE_AD_MIN_SECONDS` (15) since it was issued (`409 too_early`
+  otherwise). A claim with no ticket is `400 no_ticket`. Rewarded advertisements on the web cannot be
+  verified, so this is a bound, not proof; the daily cap (`PUZZLE_AD_GOLD_PER_DAY`) is counted from
+  `date_trunc('day', now(), 'UTC')`, whatever the session's time zone.
+
 ### The tour
 
 A player's cleared boards belong to the account, not to the phone they were cleared on. Two devices sync in
@@ -156,6 +182,15 @@ check on `progress` said 0..3 after the ladder grew a fifth step, Master (4), an
 board failed whole, from that device, every time, until `018_master_tier.sql` widened it. Nothing was lost —
 each device had kept everything — and the next push after the fix brought it all.
 
+A push keeps only ids that could be boards of the game (`levelIdOk`): a country from the file the server deals
+from (`PUZZLE_BOARDS_FILE`), or `d:<country>`, `f:<id>`, `n:<id>` and `s:<id>` with an optional `~<lap>`,
+checked by shape so a board the client ships first is never refused. An account holds at most 5,000 boards
+(`MAX_LEVEL_ROWS`; boards it has keep merging, new ones past the line are dropped), counts from at most 16
+devices (`MAX_STAT_DEVICES`; a new one replaces the one quietest longest), counts up to 10,000 a board and an
+hour a clear, 60 training puzzles per round per day (`MAX_SERIALS`), and a merged blob of at most 512 KB
+(`MAX_BLOB_BYTES`, the oldest days going first). Without those, every push could add 600 invented rows, and
+the answer to every push, all of them, could be grown until it ran the server out of memory.
+
 One rule lives in the client rather than the server, and only because the server cannot know it: a home
 country **guessed** from the connection is not the player's answer, so it never travels. Only one chosen in
 Settings does.
@@ -166,9 +201,11 @@ Every device counts what each tour board costs it — started, cleared, hearts r
 and seconds a clear took — on the phone, signed in or not, online or not, and posts the totals with the tour
 sync (`stats` and `device` on `POST /progress`). `level_stats` keeps a row per account and device, so two
 phones add up, and every count only grows, so a repeated post changes nothing. The `level_difficulty` view
-answers the question per board, anonymously: `GET /boards/difficulty` serves it, the `stats` mode of
+answers the question per board, anonymously: `GET /boards/difficulty` serves it (never fewer than three
+players behind a line, whatever `?min=` asks, and worked out at most every five minutes), the `stats` mode of
 puzzle-ops prints it on the VPS, and `games/puzzle/tools/hardest.py` prints it with the countries' names and
-a score (fail rate, plus a tenth of a point per hint and per heart an average clear costs).
+a score (fail rate, plus a tenth of a point per hint and per heart an average clear costs). The pace a result
+card shows (`/boards/pace`) counts only clears of at least 150 ms an arrow.
 
 ### The league
 
@@ -184,9 +221,19 @@ Three decisions hold it up:
   forth, because each pass would add to a total out of nothing; netting makes that pointless, since the pair
   together always nets zero. Signup gold, admin corrections and last week's prize are excluded, so a prize
   never feeds the next league. A week you lost on is a negative number and no placing at all.
+* **A win counts against the people who paid for it.** Netting stops a pair gaining together, but the table
+  ranks people one at a time, and each Google account brings gold of its own to lose. So in each match a
+  winner's gain is shared over the losers in proportion to what each lost, netted per pair of players over the
+  week, and capped per opponent (`PUZZLE_LEAGUE_OPPONENT_CAP`, 100,000); a loss always counts in full, and
+  gold whose loser has deleted their account (and with it their stake) is nobody's. A prize needs
+  `PUZZLE_LEAGUE_MIN_OPPONENTS` (3) different people played at started tables in the week; those lines rank
+  first, so the table's ranks are the prize places, and every row says `opponents` and `eligible`. A friends'
+  room counts, up to the cap. A match counts in the week its room was opened.
 * **The standings are a query, not a counter.** `gold_ledger` already records every movement with its time, so
   any week's table can be derived whenever it is asked for, and there is no second running total to drift away
-  from the balances. A partial index over the five play reasons serves the scan.
+  from the balances. `standings`, `placeOf` and `settleDue` all read one function (`table`), so they cannot
+  disagree; `/league` keeps it for 20 seconds (a result drops it) and writes nothing — the season's row is the
+  league timer's to make.
 * **A season is paid once.** The `league_seasons` row is taken with `FOR UPDATE SKIP LOCKED`, every prize is a
   gold movement keyed `league:<season>:<user>`, and `settled_at` is stamped in the same transaction. Two
   containers sweeping together, a restart mid-settlement or a plain retry all end with one payment. The
@@ -230,8 +277,11 @@ screen), `push` (their phone or browser will ring) or `none` (send the link). Th
 "are they racing", so a muted sender cannot learn that the muter is on a board; a full room answers
 `room_full` at the invitation rather than at the join; and "played together" (`havePlayedTogether`,
 `recentPlayers`) means a match that actually **started** — a room somebody sat in for a minute, or one the
-sweeper voided, gives nobody the right to ring a phone. A phone rings **once per room** (`rang:<user>:<code>`,
-an hour), however many times the same person is asked; and "online" means a socket open **and** the page in
+sweeper voided, gives nobody the right to ring a phone. A phone rings **once in ten minutes per sender**, and at
+most six times a day (`invring:<from>:<to>`, `invringday`), whatever room it is for — a room costs nothing to
+open and leave, so "once per room" let one sender ring somebody twenty times a minute; the card on an open
+screen is shown once per room a minute and five times in ten minutes per sender (`invpop`, `invpops`); with
+Redis away, nothing rings and nothing pops up. "Online" means a socket open **and** the page in
 front of them — the page sends `{type:'away', hidden}` on the socket when it is hidden or back
 (`online.away`, three hours), and an invitation to somebody hidden rings their phone instead.
 
@@ -263,6 +313,8 @@ in the path.
 | POST | `/progress` | push what a device has (`levels`, `state`, and the board counts as `stats` + `device`); the merged whole comes back |
 | GET | `/boards/difficulty` | per board, how often it beats people and what a clear costs; anonymous, `?min=` players |
 | GET | `/league` | this week's table, your place in it, the prizes, and last week's result |
+| POST | `/ads/start` | a ticket for one advertisement's gold, asked for before it is shown; `429 ad_cap` when the day is spent |
+| POST | `/ads/reward` | the gold, for `{ticket}`: once, and not sooner than an advertisement's length after the ticket |
 | GET | `/lobby` | the tables the server seats, and how many are waiting at each |
 | POST | `/matches` | open a room (`stake`, `open_to_all`, `tier`, `boards`) |
 | GET | `/matches/:code` | the room as you may see it |
@@ -270,7 +322,7 @@ in the path.
 | POST | `/matches/:code/start` | host starts an invite-only room |
 | POST | `/matches/:code/leave` | walk out, taking your stake |
 | POST | `/matches/:code/progress` | how far along you are |
-| POST | `/matches/:code/result` | your run is over |
+| POST | `/matches/:code/result` | your run is over; a clear sooner than the board could be cleared is `409 too_early`, to be sent again after `retry_after` |
 | GET | `/push/key` | whether notifications are on: the VAPID public key for a browser, and whether phones can be reached |
 | POST | `/push/subscribe` | a browser's push subscription, for this account |
 | POST | `/push/unsubscribe` | let it go |
@@ -297,6 +349,12 @@ never a dependency: if it cannot open, the client falls back to polling and the 
 from PostgreSQL. A phone that lost signal mid-race asks once and is back in step. It never replays missed
 events and never trusts what the client remembered.
 
+**What a socket may ask**: ten messages a second with bursts of twenty (a message over it is dropped, and a
+socket far past it is closed with 1008), six sockets per account in a process (the seventh is refused at the
+upgrade with 429), `watch` only for a room that is open or playing (a finished one is answered
+`{type:'closed'}`) and nothing when it is the room already watched, and a `resync` answered at most once in
+two seconds, the last ask of a burst at the end of them.
+
 ### Authentication
 
 One model, two transports. A long random opaque token, stored only as a SHA-256 hash.
@@ -310,21 +368,29 @@ to wait out.
 
 ### Rate limits
 
-Per endpoint, counted in Redis, `429` with `Retry-After` when exceeded. If Redis is unreachable the limiter
-allows the request and says so loudly in the log: a game that stops letting people in because a cache is down
-has turned a degraded service into an outage.
+Per endpoint, counted in Redis, `429` with `Retry-After` when exceeded. An address is counted as itself for
+IPv4 and by its **/64** for IPv6, which one connection can pick a fresh address from for every request. If
+Redis is unreachable the limiter allows the request and says so in the log (once in half a minute per limit):
+a game that stops letting people in because a cache is down has turned a degraded service into an outage. The
+limits marked strict guard gold, a new account or somebody's phone, and those are counted in the process
+instead while Redis is away.
 
 | Limit | Allowance | Counted by |
 |---|---|---|
-| `auth_signin` | 10 / 5 min | IP |
+| `auth_signin` | 10 / 5 min | IP (strict) |
 | `auth_read` | 120 / min | IP |
 | `auth_write` | 20 / 5 min | account |
-| `account_delete` | 5 / hour | account |
+| `account_delete` | 5 / hour | account (strict) |
+| `account_delete_ip` | 5 / hour | IP (strict) |
+| `account_create` | 10 / hour, sign-ins that would make an account | IP (strict) |
+| `ad_start`, `ad_reward` | 20 / 10 min each | account (strict) |
+| `match_invite` | 20 / min | account (strict) |
+| `push_write` | 10 / min | account (strict) |
 | `match_create` | 20 / min | account |
 | `match_join` | 40 / min | account |
 | `match_read` | 240 / min | IP |
 | `match_progress` | 120 / min | account |
-| `match_result` | 20 / min | account |
+| `match_result` | 20 / min | account (strict) |
 | `lobby_read` | 120 / min | IP |
 | `league_read` | 90 / min | IP |
 | `progress_read` | 60 / min | account |

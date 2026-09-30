@@ -2,7 +2,7 @@
    Scope is the whole origin (it has to be, to control the game page), but the fetch
    handler only ever answers for the game's own files; every other request on the
    site is left to the network exactly as if no worker were installed. */
-const VERSION = 'ptw-cache-v151';
+const VERSION = 'ptw-cache-v152';
 const GAME_FILES = new Set([
   '/piece-the-world.html', '/css/style.css', '/css/piece-the-world.css',
   '/js/piece-the-world.js', '/js/site-nav.js', '/js/site-footer.js',
@@ -59,6 +59,7 @@ self.addEventListener('fetch', event => {
     return;
   }
   if (!GAME_FILES.has(path)) return;
+  if (req.mode === 'navigate' && (path === '/puzzle' || path === '/puzzle/')) { event.respondWith(openGame(event)); return; }
   // Page, CSS, JS: network first so a deploy shows up immediately; cache is the offline fallback.
   event.respondWith(caches.open(VERSION).then(async cache => {
     // A server error is not a newer copy of the game: the cached one is served over a 5xx, the same as
@@ -66,15 +67,51 @@ self.addEventListener('fetch', event => {
     try {
       const res = await fetch(req);
       if (res.ok) { cache.put(req, res.clone()); return res; }
-      if (res.status >= 500) { const hit = await cache.match(req, { ignoreSearch: true }); if (hit) return hit; }
+      if (res.status >= 500) { const hit = await matchBest(cache, req); if (hit) return hit; }
       return res;
     } catch (err) {
-      const hit = await cache.match(req, { ignoreSearch: true });
+      const hit = await matchBest(cache, req);
       if (hit) return hit;
       throw err;
     }
   }));
 });
+
+/* The copy of exactly this address first (the script of this very version, the page the app opens), and only
+   then any copy of the same path: with ignoreSearch alone the first one stored wins, which is the unversioned
+   copy fetched at install -- an old script beside a new page. */
+async function matchBest(cache, req) {
+  return (await cache.match(req)) || cache.match(req, { ignoreSearch: true });
+}
+
+/* Opening the game: the network if it answers in time, the copy already here if it does not.
+
+   Network first with no limit meant that on a connection that is up but barely moving -- a train, a basement,
+   the last bar of signal -- a returning player sat on the app's splash (or a blank tab) until the request gave
+   up, which can be most of a minute, with a perfectly good game in the cache the whole time. So the network
+   gets NAV_WAIT_MS. An answer inside that is used exactly as before (a new deploy shows up at once, a 5xx falls
+   back to the cache). After it, the cached page is served, and the network's answer, whenever it comes, still
+   goes into the cache for next time. A first visit has nothing cached and simply waits for the network. */
+const NAV_WAIT_MS = 2000;
+function openGame(event) {
+  const req = event.request;
+  let saved = Promise.resolve();
+  const net = fetch(req).then(res => {
+    // Cloned here, before anybody can start reading the body: the page may be handed this same response.
+    if (res.ok) { const copy = res.clone(); saved = caches.open(VERSION).then(cache => cache.put(req, copy)).catch(() => {}); }
+    return res;
+  });
+  // The worker is kept alive until the late answer is stored, not only until the page has one.
+  event.waitUntil(net.then(() => saved, () => {}));
+  return (async () => {
+    const cached = () => caches.open(VERSION).then(cache => matchBest(cache, req));
+    const first = await Promise.race([net.catch(() => null), new Promise(r => setTimeout(r, NAV_WAIT_MS, null))]);
+    if (first && (first.ok || first.status < 500)) return first;
+    const hit = await cached();
+    if (hit) return hit;
+    return first || net;   // nothing cached: the network's answer after all, or its error
+  })();
+}
 
 /* ── Notifications ──────────────────────────────────────────────────────────────
    Two things in this game happen while nobody is looking at it: a friend asks you

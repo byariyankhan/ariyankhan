@@ -60,10 +60,11 @@ Lost, and these are real:
 | file | what it is |
 |---|---|
 | `app/src/main/java/.../MainActivity.java` | the shell: the WebView, its settings, the splash, insets, back, and the URL policy |
-| `app/src/main/res/layout/activity_main.xml` | three layers — padded content, the offline screen, the splash over both |
+| `app/src/main/res/layout/activity_main.xml` | the WebView and the offline screen over it; the splash is Android's own (below) |
 | `app/src/main/res/values/strings.xml` | the URL the app opens, the host it will keep in its own window, the offline copy |
 | `app/src/main/res/values/colors.xml` | the game's paper and ink; deliberately no `values-night` |
-| `app/src/main/res/values/themes.xml` | light always, because the game is |
+| `app/src/main/res/values/themes.xml` | light always, because the game is; the splash themes (paper, night, mint) |
+| `app/src/main/res/drawable/splash_mark*.xml` | the splash's brain, one per theme, written by `games/build-android-assets.mjs --splash` |
 | `app/build.gradle` | the app id, the versions, and the libraries |
 | `../.well-known/assetlinks.json` | what makes an invitation link open the app (see below) |
 
@@ -85,8 +86,40 @@ The protocol is one string in, one JSON object out:
 Where `WebViewFeature.WEB_MESSAGE_LISTENER` is missing — a System WebView older than about 2021 — no bridge is
 installed, nothing throws, and the page goes on saying sign-in is not in the app, which is then true.
 
-The game still learns it is *in* the app from a `PuzzleApp/1` suffix on the user agent, because that is true
-before the page has loaded and true even where the bridge is not.
+The game still learns it is *in* the app from a `PuzzleApp/<n>` suffix on the user agent, because that is true
+before the page has loaded and true even where the bridge is not. The number is the shell's build: `PuzzleApp/1`
+is every build before the splash below, `PuzzleApp/2` is the one with it. The page accepts any number as "the
+app"; the only thing it reads the number for is whether the splash was drawn in the player's theme.
+
+## The splash
+
+One brain, from the tap on the icon to the home screen. Android 12 and up draw a splash of their own whatever an
+app does; this app used to draw a second one over the WebView (an `ImageView` of `splash.png`), smaller and in a
+different place, and then the page drew a third. Now the splash is Android's own, set up with
+`androidx.core:core-splashscreen` (1.0.1, which also draws the same splash itself on Android 6 to 11):
+
+* **What is on it** — `Theme.App.Starting` in `themes.xml`, the activity's theme in the manifest: paper, and
+  `@drawable/splash_mark`, the game's brain in ink. Android gives a splash icon a 288 dp canvas and shows the
+  middle 192 dp; the drawable puts the brain's own 512-unit box in the middle **96 dp** of it. The web opening
+  (`#aaSplash`, `puzzle/index.html`) draws the same drawing 96 CSS px across in the middle of the page, and a
+  CSS pixel is a dp in the WebView, so when the page takes over the brain does not move.
+* **How long** — `installSplashScreen` in `onCreate`, before `super.onCreate`, with
+  `setKeepOnScreenCondition(() -> !pageShown)`. `pageShown` is set (`releaseSplash`) by `onPageCommitVisible`,
+  which in a WebView arrives when the page's first frame is ready and before it is drawn, so it works while the
+  splash is holding frames back; by `onPageFinished` (the game, an error page, or a page of our own); by a
+  main-frame `onReceivedError`; and after **4 s** whatever happens. There is no exit animation of our own: the
+  page's first frame is the same picture. (`setOnExitAnimationListener` is deliberately not used: on Android 12
+  the library's version of it resets `setDecorFitsSystemWindows`, which would undo edge-to-edge.)
+* **In which theme** — a player who chose night or mint in the game gets their splash in it on Android 13 and up:
+  `readThemeColour` (on every page load, on resume and on pause) remembers the theme and calls
+  `getSplashScreen().setSplashScreenTheme(...)` with `Theme.App.Starting.Night` / `.Mint` (or the manifest's own
+  for paper) when it changes. Android keeps that choice by the style's name and uses it from the next launch.
+  Android 12 and older have no such call and always show paper; the page knows (the user agent names the
+  Android version), starts its opening on paper and fades into the player's colours. The same remembered colour
+  goes behind the WebView and decides the bar icons before the page has loaded (`applyStartColour`).
+
+`res/raw/keep.xml` holds the three brains against the resource shrinker, and the CI build checks the bundle
+carries all three. To redraw them after the mark changes: `node games/build-android-assets.mjs --splash`.
 
 ## Sign-in
 
@@ -258,7 +291,7 @@ what the registration changes is who answers — AdMob's demand rather than AdSe
 arrangement Google's H5 guide calls policy compliant for a game embedded in an app you own. The ad unit ids
 travel the other way, from `meta[name=puzzle-ads]` in the page onto that tag as `data-admob-rewarded-slot`,
 and only when the page can see it is in the app. The debug build adds ` debug` to the agent string
-(`PuzzleApp/1 debug`), which is what lets the page's developer settings open: seven taps on the build line do
+(`PuzzleApp/2 debug`), which is what lets the page's developer settings open: seven taps on the build line do
 nothing in the release build. There is one unit, the rewarded one: nothing in this game
 shows an advertisement of its own accord, so there is no interstitial slot.
 

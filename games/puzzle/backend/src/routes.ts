@@ -7,23 +7,32 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { API_PREFIX, config } from './config.js';
 import { pool, query, tx } from './db.js';
 import * as R from './rooms.js';
-import { adClaim, balance } from './gold.js';
-import { deleteUser, endSession, googleVerify, handoffRedeem, handoffStart, providers, startSession, upsertUser, cleanName, validCode, validNonce, HANDOFF_SECONDS } from './auth.js';
+import { adClaim, adUsed, balance } from './gold.js';
+import { adLegacyOk, adTicketSpend, adTicketStart, AD_TICKET_SECONDS } from './adticket.js';
+import { deleteUser, endSession, googleVerify, handoffRedeem, handoffStart, providers, startSession, upsertUser, userExists, cleanName, validCode, validNonce, HANDOFF_SECONDS } from './auth.js';
 import { publish, publishToUser } from './events.js';
-import { boardPace, cleanDevice, cleanLevels, cleanState, cleanStats, difficulty, mergeLevels, mergeStats, mergeState, PROGRESS_BODY_LIMIT, readAll } from './progress.js';
+import { boardPace, cleanDevice, cleanLevels, cleanState, cleanStats, difficulty, levelIdOk, mergeLevels, mergeStats, mergeState, PROGRESS_BODY_LIMIT, readAll, type Difficulty } from './progress.js';
 import * as L from './league.js';
 import { liveProgress, online, roomPresence } from './presence.js';
-import { havePlayedTogether, isMuted, isRacing, mute, mutedList, recentPlayers, unmute } from './players.js';
+import { havePlayedTogether, invitePopsUp, inviteRings, isMuted, isRacing, mute, mutedList, recentPlayers, unmute } from './players.js';
 import * as push from './push.js';
 import { body, caller, clearSessionCookie, limited, noStore, setSessionCookie, shapeUser, type Caller } from './httpkit.js';
 import { log } from './log.js';
-import { k, redis, soft } from './redis.js';
 
 /** A tier is one of the five, as a whole number; anything else is the client's mistake, not a 500. */
 const tierOf = (v: unknown): number | null => {
   const t = v === undefined || v === null ? 2 : Number(v);
   return Number.isInteger(t) && t >= 0 && t <= 4 ? t : null;
 };
+/** A yes from JSON: true itself. Boolean("false") is true, and a room asked for as private must stay private. */
+const yes = (v: unknown): boolean => v === true || v === 'true' || v === 1;
+/**
+ * A browser's push keys: the P-256 public key (65 bytes, 87 characters of base64url) and the auth secret (16
+ * bytes, 22). Kept only when they look like that -- they are stored and handed to the encryption on every
+ * send, and nothing else of that size or alphabet is a key.
+ */
+const pushKeysOk = (p256dh: string, auth: string): boolean =>
+  /^[A-Za-z0-9_+/-]{80,100}={0,2}$/.test(p256dh) && /^[A-Za-z0-9_+/-]{16,32}={0,2}$/.test(auth);
 /** A push endpoint is kept only when it points at a push service browsers use: this service will call it. */
 const pushHostOk = (endpoint: string): boolean => {
   let host: string;
@@ -32,6 +41,10 @@ const pushHostOk = (endpoint: string): boolean => {
 };
 
 type Req = FastifyRequest; type Res = FastifyReply;
+
+const DIFFICULTY_MIN_PLAYERS = 3;
+const DIFFICULTY_TTL_MS = 5 * 60_000;
+const difficultyCache = new Map<number, { at: number; boards: Difficulty[] }>();
 
 const codeOf = (req: Req): string => {
   const p = (req.params ?? {}) as { code?: string };
@@ -75,19 +88,22 @@ const H = {
     const credential = String(body(req).credential ?? '');
     const claims = await googleVerify(credential, clientId);
     if (!claims) { await noStore(res).code(401).send({ error: 'bad_token' }); return; }
+    // A sign-in that makes a new account is counted against the address as well: the welcome gold is once per
+    // Google account, and this bounds how many new Google accounts one connection can bring in an hour.
+    if (!(await userExists(pool, 'google', claims.sub)) && !(await limited('account_create', req, res, null))) return;
 
     // An app asks for the token in the body; a browser gets it as a cookie and never sees it in JavaScript.
     const wantsToken = me.client === 'app' || body(req).client === 'app';
     const out = await tx(async c => {
-      const { user, created } = await upsertUser(c, 'google', claims);
+      const { user, created, granted } = await upsertUser(c, 'google', claims);
       const token = await startSession(c, user.id, wantsToken ? 'app' : 'web');
-      return { user, created, token };
+      return { user, created, granted, token };
     });
     if (!wantsToken) setSessionCookie(res, out.token);
-    log.info('signed in', { user_id: out.user.id, created: out.created, client: wantsToken ? 'app' : 'web' });
+    log.info('signed in', { user_id: out.user.id, created: out.created, granted: out.granted, client: wantsToken ? 'app' : 'web' });
     await noStore(res).send({
       user: shapeUser(out.user),
-      gold_granted: out.created ? config.game.signupGold : 0,
+      gold_granted: out.granted,
       ...(wantsToken ? { token: out.token, expires_in_days: config.auth.sessionDays } : {}),
     });
   },
@@ -143,6 +159,8 @@ const H = {
   async destroy(req: Req, res: Res, me: Caller) {
     if (!me.user) { await noStore(res).code(401).send({ error: 'signed_out' }); return; }
     if (!(await limited('account_delete', req, res, me.user.id))) return;
+    // and by address: every account deleted and made again is a new id, so the line above never sees one twice
+    if (!(await limited('account_delete_ip', req, res, null))) return;
     await deleteUser(me.user.id, R.releasePlayer);
     clearSessionCookie(res);
     log.info('account deleted', { user_id: me.user.id });
@@ -157,12 +175,11 @@ const H = {
   async league(req: Req, res: Res, me: Caller) {
     if (!(await limited('league_read', req, res, me.user?.id ?? null))) return;
     const season = L.seasonAt();
-    await L.ensureSeason(pool, season);
-    const [top, mine, last] = await Promise.all([
-      L.standings(pool, season, L.TABLE_SIZE),
-      me.user ? L.placeOf(pool, season, me.user.id) : Promise.resolve(null),
-      L.lastSettled(pool),
-    ]);
+    // A read writes nothing: the season's row is the league timer's to make (leagueSweep, every minute and at
+    // boot), and the table is worked out once for everybody asking in the next few seconds.
+    const [rows, last] = await Promise.all([L.tableCached(pool, season), L.lastSettled(pool)]);
+    const top = rows.slice(0, L.TABLE_SIZE);
+    const mine = me.user ? L.lineOf(rows, me.user.id) : null;
     await noStore(res).send({
       season: {
         key: season.key,
@@ -197,28 +214,44 @@ const H = {
   // Push what this device has, get back the merged whole. One call rather than a read and a write, because a
   // device that has just been handed the truth should adopt it in the same breath as it offers its own.
   // Which boards are hard, from play. Public and anonymous: counts and averages per board, never a person.
+  // Never fewer than three players behind a board's line, whatever is asked: one or two people's counts are
+  // those people, not the board. And worked out at most every five minutes, since it reads every row there is.
   async difficulty(req: Req, res: Res, _me: Caller) {
     if (!(await limited('progress_read', req, res, null))) return;
-    const min = Math.max(1, Math.min(1000, Number((req.query as Record<string, unknown>).min ?? 3) || 3));
-    await res.header('Cache-Control', 'public, max-age=300').send({ boards: await difficulty(pool, min) });
+    const min = Math.max(DIFFICULTY_MIN_PLAYERS, Math.min(1000, Number((req.query as Record<string, unknown>).min ?? 3) || 3));
+    let hit = difficultyCache.get(min);
+    if (!hit || Date.now() - hit.at > DIFFICULTY_TTL_MS) {
+      if (difficultyCache.size > 50) difficultyCache.clear();
+      hit = { at: Date.now(), boards: await difficulty(pool, min) };
+      difficultyCache.set(min, hit);
+    }
+    await res.header('Cache-Control', 'public, max-age=300').send({ boards: hit.boards });
   },
 
   async progressPush(req: Req, res: Res, me: Caller) {
     if (!me.user) { await noStore(res).code(401).send({ error: 'signed_out' }); return; }
     if (!(await limited('progress_write', req, res, me.user.id))) return;
     const b = body(req);
-    const levels = cleanLevels(b.levels);
+    // Only ids that could be boards of this game: invented ones were rows without end, on the account and in
+    // the public difficulty table alike.
+    const countries = await R.boardIdSet();
+    const known = (id: string) => levelIdOk(id, countries);
+    const levels = cleanLevels(b.levels, known);
     const state = cleanState(b.state);
     // What the boards cost this device, if it counted: per device, so two phones on one account add up.
-    const stats = cleanStats(b.stats), device = cleanDevice(b.device);
+    const stats = cleanStats(b.stats, known), device = cleanDevice(b.device);
     const userId = me.user.id;
     const merged = await tx(async c => {
-      await mergeLevels(c, userId, levels);
-      if (state) await mergeState(c, userId, state);
-      if (device && Object.keys(stats).length) await mergeStats(c, userId, device, stats);
-      // A board posted is a player playing: the evening nudge leaves alone anyone seen in the last few hours.
+      const moved = await mergeLevels(c, userId, levels);
+      const played = state ? await mergeState(c, userId, state) : false;
+      const counted = device && Object.keys(stats).length ? await mergeStats(c, userId, device, stats) : 0;
+      // A board posted is a player playing: the evening nudge leaves alone anyone seen in the last few hours,
+      // and counts the days away from it (reminder.ts). Only a push that brought something new -- a board, a
+      // count, a round, a streak day -- is play: the app syncs on every open, and opening it is not playing.
       // Written at most once in ten minutes, so a busy session is not a write per level.
-      await query(c, `UPDATE users SET last_played_at = now() WHERE id = $1 AND last_played_at < now() - interval '10 minutes'`, [userId]);
+      if (moved > 0 || played || counted > 0) {
+        await query(c, `UPDATE users SET last_played_at = now() WHERE id = $1 AND last_played_at < now() - interval '10 minutes'`, [userId]);
+      }
       return readAll(c, userId);
     });
     await noStore(res).send(merged);
@@ -229,6 +262,24 @@ const H = {
   // The client cannot be trusted with this and is not asked to be: it reports that an ad finished, and the
   // server decides what that is worth, how often, and whether it counts at all. The rule itself lives beside
   // the ledger in gold.ts, where it can be tested without a web server.
+  //
+  // A claim needs the ticket asked for before the advertisement was shown (adticket.ts): single use, one open
+  // at a time, and not spendable until an advertisement's length after it was issued. A page from before the
+  // ticket existed sends none, and is told no_ticket -- a 4xx it already answers with "try again".
+  async adStart(req: Req, res: Res, me: Caller) {
+    if (!me.user) { await noStore(res).code(401).send({ error: 'signed_out' }); return; }
+    if (!(await limited('ad_start', req, res, me.user.id))) return;
+    const amount = Math.max(0, Math.round(config.game.adGold));
+    const perDay = Math.max(0, Math.round(config.game.adGoldPerDay));
+    if (amount <= 0 || perDay <= 0) { await noStore(res).code(503).send({ error: 'ads_off' }); return; }
+    // The day's allowance spent: said now, before the player sits through an advertisement that pays nothing.
+    const { used } = await adUsed(pool, me.user.id);
+    if (used >= perDay) { await noStore(res).code(429).send({ error: 'ad_cap', gold: await balance(pool, me.user.id), left: 0, per_day: perDay }); return; }
+    const ticket = await adTicketStart(me.user.id);
+    if (!ticket) { await noStore(res).code(503).send({ error: 'unavailable' }); return; }
+    await noStore(res).send({ ticket, expires_in: AD_TICKET_SECONDS, min_seconds: config.game.adMinSeconds, left: perDay - used, per_day: perDay, amount });
+  },
+
   async adReward(req: Req, res: Res, me: Caller) {
     if (!me.user) { await noStore(res).code(401).send({ error: 'signed_out' }); return; }
     if (!(await limited('ad_reward', req, res, me.user.id))) return;
@@ -236,6 +287,17 @@ const H = {
     const perDay = Math.max(0, Math.round(config.game.adGoldPerDay));
     if (amount <= 0 || perDay <= 0) { await noStore(res).code(503).send({ error: 'ads_off' }); return; }
 
+    // A page from before tickets sends none at all (not even the key); for a while it is still paid (adLegacyOk).
+    const legacy = !('ticket' in body(req)) && await adLegacyOk(me.user.id);
+    const spent = legacy ? { ok: true as const } : await adTicketSpend(me.user.id, String(body(req).ticket ?? ''));
+    if (!spent.ok) {
+      if (spent.why === 'too_early') {
+        const secs = Math.max(1, Math.ceil(spent.retryMs / 1000));
+        await noStore(res).code(409).header('Retry-After', String(secs)).send({ error: 'too_early', retry_after: secs, retry_after_ms: spent.retryMs });
+      } else if (spent.why === 'unavailable') await noStore(res).code(503).send({ error: 'unavailable' });
+      else await noStore(res).code(400).send({ error: 'no_ticket' });
+      return;
+    }
     const out = await tx(c => adClaim(c, me.user!.id, amount, perDay));
     if (out.capped) { await noStore(res).code(429).send({ error: 'ad_cap', gold: out.gold, left: 0, per_day: perDay }); return; }
     await noStore(res).send({ gold: out.gold, granted: out.granted, left: out.left, per_day: perDay, amount });
@@ -249,7 +311,7 @@ const H = {
     const levelId = String(q.level_id ?? '').slice(0, 64);
     const tier = Number(q.tier ?? NaN);
     const ms = Number(q.ms ?? NaN);
-    if (!levelId || !Number.isInteger(tier) || tier < 0 || tier > 3
+    if (!levelId || !Number.isInteger(tier) || tier < 0 || tier > 4   // five tiers: Master is 4
         || !Number.isFinite(ms) || ms <= 0 || ms > 86_400_000) {
       await noStore(res).code(400).send({ error: 'bad_board' });
       return;
@@ -336,7 +398,7 @@ const H = {
     const auth = String(sub.keys?.auth ?? '').trim();
     // An endpoint is a URL at the browser's own push service and nowhere else: this service will make a
     // request to whatever is stored here, so it is checked before it is kept, not before it is used.
-    if (!/^https:\/\/[^\s]+$/i.test(endpoint) || endpoint.length > 1000 || !p256dh || !auth || !pushHostOk(endpoint)) {
+    if (!/^https:\/\/[^\s]+$/i.test(endpoint) || endpoint.length > 1000 || !pushKeysOk(p256dh, auth) || !pushHostOk(endpoint)) {
       await noStore(res).code(400).send({ error: 'bad_subscription' }); return;
     }
     await push.saveSubscription(pool, me.user?.id ?? null, { endpoint, keys: { p256dh, auth } }, String(req.headers['user-agent'] ?? ''), push.cleanTz(b.tz), b.reminder !== false);
@@ -376,9 +438,13 @@ const H = {
     // notification this game must never send; it can be sent again in a minute, when their board is over.
     if (await isRacing(pool, to)) { await noStore(res).code(409).send({ error: 'in_a_match' }); return; }
 
-    await publishToUser(to, 'invited', {
-      code: m.code, stake: m.stake, from: me.user.name, from_id: me.user.id, pic: me.user.pic ?? '',
-    });
+    // The card on their screen: once per room within a minute, and a few times in ten minutes from any one
+    // sender, however many rooms the sender opens and leaves to ask again (players.ts, invitePopsUp).
+    if (await invitePopsUp(me.user.id, to, m.code)) {
+      await publishToUser(to, 'invited', {
+        code: m.code, stake: m.stake, from: me.user.name, from_id: me.user.id, pic: me.user.pic ?? '',
+      });
+    }
     // What the sender is told is where the invitation went: onto a screen that has the game open, to a phone
     // or a browser that will ring, or nowhere -- in which case the link is the way. A socket that opens a
     // second later still gets nothing, and saying so is kinder than a silent wait.
@@ -387,15 +453,14 @@ const H = {
     const here = (await online.is(to)) && !(await online.isAway(to));
     // Somebody with the game open in front of them already has the invitation on their screen and does not
     // need it twice; anybody else has their phone told, because the room will be gone in a few minutes --
-    // told once per room: a phone that rang for this room does not ring for it again because the sender
-    // kept tapping, however many times they are asked (the ask itself is not refused, and reads the same).
+    // told at most once in ten minutes by any one sender, and a few times a day, whatever room it is for: a
+    // phone that rang does not ring again because the sender kept tapping, or kept opening new rooms to tap
+    // in (the ask itself is not refused, and reads the same). With Redis away nothing rings at all.
     let reach: 'live' | 'push' | 'none' = 'live';
     if (!here) {
       reach = (await push.hasSubscription(pool, to)) ? 'push' : 'none';
-      if (reach === 'push') {
-        const first = await soft(() => redis.set(k('rang', to, m.code), '1', 'EX', 3600, 'NX'), 'OK');
-        if (first === 'OK') void push.sendToUser(to, push.invitedNote(me.user.name, m.stake, m.code));
-      }
+      // a phone that was not rung this time (told a few minutes ago, or the day's rings spent) is not said to be
+      if (reach === 'push') { if (await inviteRings(me.user.id, to)) void push.sendToUser(to, push.invitedNote(me.user.name, m.stake, m.code)); else reach = 'none'; }
     }
     await noStore(res).send({ ok: true, delivered: here, reach });
   },
@@ -431,7 +496,7 @@ const H = {
     // How long: the client sends what it offered, and the server checks it against its own list.
     const tier = tierOf(b.tier);
     if (tier === null) { await noStore(res).code(400).send({ error: 'bad_tier' }); return; }
-    const made = await R.createMatch(me.user, Number(b.stake ?? 0), Boolean(b.open_to_all), tier, b.boards === undefined ? 1 : Number(b.boards));
+    const made = await R.createMatch(me.user, Number(b.stake ?? 0), yes(b.open_to_all), tier, b.boards === undefined ? 1 : Number(b.boards));
     if (!made.ok) {
       // Already in one: 409, and the code, because the only useful answer to "you are already in a match" is
       // the way back to it. The client turns this into a tap rather than a dead end.
@@ -550,15 +615,25 @@ const H = {
     const seats = await R.room(pool, code);
     if (!seats.some(p => p.user_id === me.user!.id)) { await noStore(res).code(403).send({ error: 'not_yours' }); return; }
     if (m.state !== 'playing') { await replyMatch(res, code, me); return; }
-    // A race finished is a player playing, the same as a board posted: the evening nudge leaves them alone.
-    await query(pool, `UPDATE users SET last_played_at = now() WHERE id = $1 AND last_played_at < now() - interval '10 minutes'`, [me.user.id]);
 
     const b = body(req);
-    const settled = await tx(async c => {
+    const out = await tx(async c => {
       // gave_up separates the two ways a run ends without the board: the player walked out, or the board won.
-      await R.submitResult(c, code, me.user!.id, Number(b.ms ?? -1), b.cleared === true, b.gave_up === true);
-      return R.settleMatch(c, code);
+      const verdict = await R.submitResult(c, code, me.user!.id, Number(b.ms ?? -1), b.cleared === true, b.gave_up === true);
+      return verdict.ok ? { verdict, settled: await R.settleMatch(c, code) } : { verdict, settled: null };
     });
+    // A clear sooner than the board could have been cleared: nothing was written, and the client is told when
+    // to send it again (rooms.ts, submitResult). It is the one refusal an honest client can meet -- a clock
+    // fast by a few seconds -- so it is a wait, never an error the player sees.
+    if (!out.verdict.ok) {
+      const secs = Math.max(1, Math.ceil(out.verdict.retryMs / 1000));
+      await noStore(res).code(409).header('Retry-After', String(secs)).send({ error: 'too_early', retry_after: secs, retry_after_ms: out.verdict.retryMs });
+      return;
+    }
+    const settled = out.settled;
+    // A race finished is a player playing, the same as a board posted: the evening nudge leaves them alone.
+    await query(pool, `UPDATE users SET last_played_at = now() WHERE id = $1 AND last_played_at < now() - interval '10 minutes'`, [me.user.id]);
+    L.forgetTable();                        // the week's table has just changed
     await publish(code, 'player_finished', { user_id: me.user.id, name: me.user.name, cleared: b.cleared === true });
     if (settled?.state === 'done') { await publish(code, 'match_finished', { winner_id: settled.winner_id }); await liveProgress.clear(code); }
     await replyMatch(res, code, me);
@@ -588,6 +663,7 @@ export function registerRoutes(app: FastifyInstance): void {
 
   app.get(`${v1}/boards/pace`, withCaller(H.pace));
 
+  app.post(`${v1}/ads/start`, withCaller(H.adStart));
   app.post(`${v1}/ads/reward`, withCaller(H.adReward));
 
   app.get(`${v1}/league`, withCaller(H.league));

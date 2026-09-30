@@ -43,45 +43,90 @@
     <meta name="puzzle-ads" content="h5" data-give="ad" data-give-web="free" data-client="ca-pub-1570944160084395"
           data-admob-rewarded="ca-app-pub-1570944160084395/3154222428" />
     <!-- Google Analytics is loaded by the game (analyticsOn in js/puzzle.js): only once the Terms and Privacy
-         gate below has been accepted, and never inside the Android app. -->
+         on the opening below have been accepted, and never inside the Android app. -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
 
     <!-- SEO -->
-    <title>Puzzle – Train Your Brain – Daily Brain Training &amp; Puzzle Games on Real Country Maps</title>
+    <!-- Every self-reference is https://ariyankhan.com/puzzle/ with the slash: the bare /puzzle is a redirect
+         (.htaccess), and a canonical that redirects is two signals pointing different ways. The words below name
+         the four Daily Training rounds as TRAIN_ROUNDS in js/puzzle.js names them; tests/puzzle-seo.test.mjs
+         holds the two together. -->
+    <title>Puzzle – Train Your Brain: Free Daily Brain Training Games</title>
     <meta
       name="description"
-      content="Puzzle – Train Your Brain is a free brain training game on real country maps: a daily training of three short rounds with a Brain Score, arrow puzzles on 197 countries, flag memory and capital sprint. Adaptive difficulty, no sign-up to play, works offline."
+      content="Free daily brain training on real paintings: Restore the Canvas, The Forgery, Gallery Memory and The Curator’s Eye, plus arrow puzzles on 197 countries."
     />
     <meta name="author" content="Ariyan Khan" />
-    <meta name="keywords" content="brain training, daily brain training, brain score, memory game, puzzle, train your brain, brain games, arrow puzzle, arrow game, tap away arrow puzzle, arrow puzzle game online, free arrow game, geography puzzle game, country map puzzle, brain teaser, focus game" />
+    <meta name="keywords" content="brain training, daily brain training, memory game, art memory game, spot the difference, arrow puzzle, logic puzzle" />
     <meta name="application-name" content="Puzzle" />
     <meta name="robots" content="index, follow, max-image-preview:large" />
     <meta name="theme-color" content="#F4EDE0" />
-    <link rel="canonical" href="https://ariyankhan.com/puzzle" />
-    <link rel="alternate" hreflang="en-US" href="https://ariyankhan.com/puzzle" />
-    <link rel="alternate" hreflang="x-default" href="https://ariyankhan.com/puzzle" />
+    <!-- The opening, decided before anything is painted. It has to be here, above the stylesheets: the first
+         frame must already be the opening (the brain where the app's own splash left it, in the right colours)
+         and not the home screen that the game's 418 KB script would otherwise cover a moment later. It reads
+         what this device remembers -- the theme, whether the terms were accepted, the day the quote was last
+         typed -- and every read is guarded, so a browser that refuses storage opens like a first visit.
+         The rest of the opening is the script after #aaSplash below and "The opening" in js/puzzle.js. -->
+    <script>
+    (function () {
+      var root = document.documentElement, ua = navigator.userAgent, o = window.aaOpening = { plan: null };
+      function get(k) { try { var v = localStorage.getItem('aa:v1:' + k); return v == null ? null : JSON.parse(v); } catch (e) { return null; } }
+      function set(k, v) { try { localStorage.setItem('aa:v1:' + k, JSON.stringify(v)); } catch (e) { /* private mode: nothing is remembered */ } }
+      // What the opening is. A first open always gets the terms; the line is typed unless a link brought the
+      // player (it is somewhere to go, not a moment to set), the page was only reloaded, or motion is turned down
+      // (then the whole block at once). Later opens: the quote once a day, the tagline otherwise, and nothing at
+      // all for a link, a reload in the same session, or reduced motion. A warm resume never reloads the page.
+      function openingPlan(s) {
+        if (!s.welcomed) return { show: true, first: true, line: s.deep || s.seen ? '' : 'quote', typing: !(s.deep || s.seen || s.calm) };
+        if (s.deep || s.seen || s.calm) return { show: false, first: false, line: '', typing: false };
+        return { show: true, first: false, line: s.quoteDay === s.day ? 'tagline' : 'quote', typing: true };
+      }
+      var seen = false, calm = false, now = new Date(), day = now.getFullYear() + '-' + (now.getMonth() + 1) + '-' + now.getDate();
+      try { seen = sessionStorage.getItem('aa:splash') === '1'; sessionStorage.setItem('aa:splash', '1'); } catch (e) { /* no session storage: every load is a new session */ }
+      try { calm = matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { /* no media queries: motion as usual */ }
+      var deep = /^#(level-\d+|b-[\w:~]+|daily|league|m=[A-Za-z0-9]+|handoff=[a-f0-9]+)$/.test(location.hash) || /[?&]handoff=/.test(location.search);
+      var plan = o.plan = openingPlan({ welcomed: !!get('welcomed'), deep: deep, seen: seen, calm: calm, day: day, quoteDay: get('quoteDay') });
+      // The theme from the first frame, so a night or mint player never sees paper and then their colours. The
+      // app draws its own splash before this page, though: build 1 always on paper, build 2 in the player's theme
+      // where Android lets it (13 and up). The opening starts on whatever was on the glass a moment ago, and a
+      // player whose splash was paper gets their theme as the opening fades into home.
+      var theme = get('theme'), app = / PuzzleApp\/(\d+)/.exec(ua), android = /Android (\d+)/.exec(ua);
+      if (theme !== 'night' && theme !== 'mint') theme = 'paper';
+      var themedSplash = !!app && +app[1] >= 2 && !!android && +android[1] >= 13;
+      root.setAttribute('data-theme', theme);
+      var meta = document.querySelector('meta[name="theme-color"]');
+      var paperFirst = plan.show && !!app && !themedSplash && theme !== 'paper';
+      // on a paper opening the bars stay paper too (the app reads this colour for its bar icons); the game sets
+      // the player's colour when the opening fades into home
+      if (meta) meta.setAttribute('content', paperFirst ? '#F4EDE0' : { paper: '#F4EDE0', night: '#0E0E10', mint: '#E6F2EC' }[theme]);
+      if (plan.show) root.className += ' is-opening' + (plan.first ? ' is-first' : '') + (paperFirst ? ' is-paper-first' : '');
+      if (plan.line === 'quote') { var n = +get('launches') || 0; o.quote = n; set('launches', n + 1); set('quoteDay', day); }
+    })();
+    </script>
+    <link rel="canonical" href="https://ariyankhan.com/puzzle/" />
 
     <!-- OPEN GRAPH -->
     <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://ariyankhan.com/puzzle" />
-    <meta property="og:title" content="Puzzle – Train Your Brain – Daily Brain Training &amp; Puzzle Games on Real Country Maps" />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:url" content="https://ariyankhan.com/puzzle/" />
+    <meta property="og:title" content="Puzzle – Train Your Brain: Daily Brain Training &amp; Arrow Puzzles" />
     <meta
       property="og:description"
-      content="Tap arrows to clear a board shaped like a real country, keep your hearts and reveal the country. 197 countries, free, no sign-up to play, in your browser."
+      content="Four free brain-training rounds a day on real paintings – Restore the Canvas, The Forgery, Gallery Memory, The Curator’s Eye – plus arrow logic puzzles on 197 countries."
     />
     <meta property="og:image" content="https://ariyankhan.com/images/puzzle-og.jpg" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
-    <meta property="og:image:alt" content="Puzzle – Train Your Brain, a free arrow puzzle game on real country maps" />
+    <meta property="og:image:alt" content="Puzzle – Train Your Brain: the game’s logo, a brain drawn out of arrows, beside the line: four brain games a day on real paintings, and arrow puzzles on 197 countries" />
     <meta property="og:site_name" content="Puzzle – Train Your Brain by Ariyan Khan" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Puzzle – Train Your Brain – Daily Brain Training &amp; Puzzle Games on Real Country Maps" />
+    <meta name="twitter:title" content="Puzzle – Train Your Brain: Daily Brain Training &amp; Arrow Puzzles" />
     <meta
       name="twitter:description"
-      content="Tap arrows to clear a country-shaped board, keep your hearts and reveal the country. 197 countries, free."
+      content="Four daily brain-training rounds on real paintings, a Brain Score and a streak, plus arrow puzzles on 197 countries. Free, in your browser."
     />
     <meta name="twitter:image" content="https://ariyankhan.com/images/puzzle-og.jpg" />
-    <meta name="twitter:image:alt" content="Puzzle – Train Your Brain, a free arrow puzzle game on real country maps" />
+    <meta name="twitter:image:alt" content="Puzzle – Train Your Brain: the game’s logo, a brain drawn out of arrows, beside the line: four brain games a day on real paintings, and arrow puzzles on 197 countries" />
 
     <!-- FAVICON / PWA -->
     <!-- The game's own icon, not the site's. Installing this page put a photograph of the person who built it
@@ -101,7 +146,7 @@
          set these two when the backend moves to a host of its own and the client follows without a change:
          <meta name="puzzle-api" content="https://api.example.com" />
          <meta name="puzzle-ws"  content="wss://api.example.com" /> -->
-    <link rel="stylesheet" href="/css/puzzle.css?v=66" />
+    <link rel="stylesheet" href="/css/puzzle.css?v=67" />
     <link rel="preload" href="/games/data/puzzle.json?v=11" as="fetch" crossorigin="anonymous" />
 
     <!-- SCHEMA -->
@@ -111,65 +156,73 @@
       "@graph": [
         {
           "@type": "WebPage",
-          "@id": "https://ariyankhan.com/puzzle#webpage",
-          "url": "https://ariyankhan.com/puzzle",
-          "name": "Puzzle – Train Your Brain – Free Arrow Puzzle Game on Real Country Maps",
-          "primaryImageOfPage": { "@type": "ImageObject", "url": "https://ariyankhan.com/images/puzzle-og.jpg", "width": 1200, "height": 630 },
-          "description": "Free arrow puzzle game played on real country maps. Tap arrows to shoot them off the board, keep your four hearts, and see how well you focused. 197 countries on a world tour.",
+          "@id": "https://ariyankhan.com/puzzle/#webpage",
+          "url": "https://ariyankhan.com/puzzle/",
+          "name": "Puzzle – Train Your Brain: Free Daily Brain Training Games",
+          "description": "Free daily brain training on real paintings: Restore the Canvas, The Forgery, Gallery Memory and The Curator’s Eye, plus arrow puzzles on 197 countries.",
           "inLanguage": "en-US",
+          "primaryImageOfPage": { "@type": "ImageObject", "url": "https://ariyankhan.com/images/puzzle-og.jpg", "width": 1200, "height": 630 },
           "datePublished": "2026-09-15",
-          "dateModified": "2026-09-15",
+          "dateModified": "2026-09-24",
           "author": { "@id": "https://ariyankhan.com/about.html#person" },
-          "mainEntity": { "@id": "https://ariyankhan.com/puzzle#game" },
-          "breadcrumb": { "@id": "https://ariyankhan.com/puzzle#breadcrumb" }
+          "mainEntity": { "@id": "https://ariyankhan.com/puzzle/#game" },
+          "breadcrumb": { "@id": "https://ariyankhan.com/puzzle/#breadcrumb" }
         },
         {
           "@type": ["VideoGame", "WebApplication"],
-          "@id": "https://ariyankhan.com/puzzle#game",
+          "@id": "https://ariyankhan.com/puzzle/#game",
           "name": "Puzzle – Train Your Brain",
-          "alternateName": ["Puzzle Train Your Brain", "Brain puzzle game", "Arrow Puzzle on country maps", "Tap Away Arrow Puzzle", "Country Map Arrow Game"],
-          "keywords": "arrow puzzle, arrow game, tap away, arrow puzzle game, free arrow game online, geography puzzle, country map puzzle, focus game",
+          "alternateName": ["Puzzle Train Your Brain", "Arrow Atlas"],
+          "url": "https://ariyankhan.com/puzzle/",
           "image": "https://ariyankhan.com/images/puzzle-og.jpg",
-          "screenshot": "https://ariyankhan.com/images/puzzle-og.jpg",
-          "potentialAction": { "@type": "PlayAction", "target": "https://ariyankhan.com/puzzle" },
-          "url": "https://ariyankhan.com/puzzle",
-          "description": "A tap-away arrow puzzle where every board is a real country. Tap an arrow to shoot it off the board if its path is clear; a blocked tap costs one of four hearts. Clear the board to reveal the country, learn what it was, and collect it on a 197-country world tour. Difficulty ramps automatically as the tour goes on.",
-          "genre": ["Puzzle", "Casual", "Educational", "Geography", "Relaxation"],
+          "description": "A free brain-training game that plays in the browser. Daily Training is four short rounds every day on public-domain paintings: Restore the Canvas (memorise a painting, then rebuild it from its pieces), The Forgery (spot the differences in a forged copy), Gallery Memory (re-hang paintings in the order they hung) and The Curator’s Eye (pick the close-up that came from the painting you saw). Each round is scored out of 100 and the day’s Brain Score is their average. The arrow puzzle: tap an arrow to send it off the board if its path is clear; a blocked tap costs a heart. Over 400 boards, the outlines of all 197 countries with picture boards between them, make a world tour whose difficulty, from Easy to Master, follows how well you play.",
+          "genre": ["Puzzle", "Brain training", "Memory game", "Logic puzzle", "Educational"],
+          "keywords": "brain training, daily brain training, memory game, art memory game, painting puzzle, spot the difference, arrow puzzle, logic puzzle, geography puzzle",
           "gamePlatform": "Web browser",
-          "playMode": "SinglePlayer",
-          "numberOfPlayers": { "@type": "QuantitativeValue", "minValue": 1, "maxValue": 1 },
           "applicationCategory": "GameApplication",
           "applicationSubCategory": "Puzzle",
-          "operatingSystem": "Any — runs in a modern web browser",
+          "operatingSystem": "Any (runs in a modern web browser)",
           "browserRequirements": "Requires JavaScript",
+          "playMode": ["SinglePlayer", "MultiPlayer"],
           "isAccessibleForFree": true,
           "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
           "featureList": [
-            "197 country boards on a world tour: every country in the world, from Italy and Bangladesh to Luxembourg and Vanuatu",
-            "Tap-away mechanic: shoot arrows off the board when their path is clear",
-            "4 hearts per level; a blocked arrow costs one",
-            "Over 450 levels: every country is followed by a board shaped like its animal, its bird or a landmark, with scene boards between them. Difficulty that follows you, not the level number: Easy, Normal, Hard, Expert and Master boards from about 20 arrows to 80 and more; a flawless, fast clear steps the boards up at once, two first-try clears in a row step them up too, two losses in a row ease them off; milestones every 10 levels; win streaks; combo counter; daily bonus board",
-            "Board clears reveal the country shape and its name",
-            "Country facts on every clear: capital, population, region",
-            "Stars, best times and tour progress saved in your browser",
-            "A tour that starts from your home country and spreads out, at a difficulty that follows your form",
-            "Works on phones and desktops, installable as an app, solo play needs no account"
+            "Daily Training: four free brain-training rounds every day, each scored 0 to 100, with a daily Brain Score, a seven-day chart and a streak",
+            "Restore the Canvas: a painting hangs whole for a few seconds, then falls into 9 to 25 pieces to put back",
+            "The Forgery: tap the patches of a forged copy that are mirrored, recoloured or taken from elsewhere in the painting",
+            "Gallery Memory: paintings hang in a numbered row for a few seconds; hang them back in the same order",
+            "The Curator’s Eye: look at one painting, then pick which of four close-ups came from it",
+            "247 public-domain paintings from The Metropolitan Museum of Art’s Open Access collection, each credited",
+            "Difficulty that follows how well you play: every training round has five steps, and the arrow boards go from Easy to Master",
+            "Arrow logic puzzle on over 400 boards: the outlines of all 197 countries, with animal, bird, landmark and picture boards between them",
+            "Hearts per board (four on Easy and Normal, fewer on the harder levels), hints and combos",
+            "Country facts when a country is cleared: capital, population and region",
+            "Play with Friends: online matches and a weekly league, with Google sign-in",
+            "Solo play needs no account, can be added to the home screen, and its boards work offline once loaded"
           ],
-          "author": {
-            "@id": "https://ariyankhan.com/about.html#person",
-            "@type": "Person",
-            "name": "Ariyan Khan",
-            "jobTitle": "Freelance Video Editor",
-            "url": "https://ariyankhan.com/about.html",
-            "sameAs": ["https://www.youtube.com/@ariyankhan"]
-          }
+          "potentialAction": { "@type": "PlayAction", "target": "https://ariyankhan.com/puzzle/" },
+          "author": { "@id": "https://ariyankhan.com/about.html#person", "@type": "Person", "name": "Ariyan Khan" },
+          "publisher": { "@id": "https://ariyankhan.com/about.html#person" }
+        },
+        {
+          "@type": "FAQPage",
+          "@id": "https://ariyankhan.com/puzzle/#faq",
+          "isPartOf": { "@id": "https://ariyankhan.com/puzzle/#webpage" },
+          "mainEntity": [
+            { "@type": "Question", "name": "Is Puzzle – Train Your Brain free?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. The four Daily Training rounds are free every day, and the arrow puzzle tour is free to play. Nothing in the game can be bought: there are no in-app purchases, and gold is only a number in the game. Any advertisement is optional and rewarded: you choose to watch one, for an extra hint, heart, gold or a new puzzle." } },
+            { "@type": "Question", "name": "Do I need to download anything or sign up?", "acceptedAnswer": { "@type": "Answer", "text": "No. Puzzle plays in your web browser on phones, tablets and computers, and you can add it to your home screen. Playing on your own needs no account; signing in with Google is only for Play with Friends and the weekly league." } },
+            { "@type": "Question", "name": "What are the Daily Training games?", "acceptedAnswer": { "@type": "Answer", "text": "Four short rounds on real paintings: Restore the Canvas (rebuild a painting from its pieces), The Forgery (spot what is wrong in a forged copy), Gallery Memory (re-hang paintings in the order they hung) and The Curator’s Eye (pick the detail that came from the painting you saw)." } },
+            { "@type": "Question", "name": "How is the Brain Score worked out?", "acceptedAnswer": { "@type": "Answer", "text": "Each round is scored from 0 to 100, and the day’s Brain Score is the average of the rounds you played that day. Play at least one round a day to keep your streak going. A round gets harder after a day you score 85 or more in it, and easier after a day under 50." } },
+            { "@type": "Question", "name": "How does the arrow puzzle work?", "acceptedAnswer": { "@type": "Answer", "text": "Every arrow slides the way it points. Tap an arrow and, if its path is clear, it flies off the board; if another arrow blocks it, you lose a heart (four on Easy and Normal, fewer on the harder levels). Clear every arrow to finish the board. A country board then tells you which country it was, with its capital, population and region." } },
+            { "@type": "Question", "name": "Where do the paintings come from?", "acceptedAnswer": { "@type": "Answer", "text": "They are 247 public-domain works from The Metropolitan Museum of Art’s Open Access collection, and every round credits the paintings it used." } }
+          ]
         },
         {
           "@type": "BreadcrumbList",
-          "@id": "https://ariyankhan.com/puzzle#breadcrumb",
+          "@id": "https://ariyankhan.com/puzzle/#breadcrumb",
           "itemListElement": [
             { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://ariyankhan.com/" },
-            { "@type": "ListItem", "position": 2, "name": "Puzzle – Train Your Brain", "item": "https://ariyankhan.com/puzzle" }
+            { "@type": "ListItem", "position": 2, "name": "Puzzle – Train Your Brain", "item": "https://ariyankhan.com/puzzle/" }
           ]
         }
       ]
@@ -177,40 +230,137 @@
     </script>
   </head>
   <body class="aa-body">
-    <!-- ── FIRST OPEN: welcome and terms ── -->
-    <div class="aa-gate" id="aaGate" hidden>
-      <div class="aa-gate-inner">
-        <h2 class="aa-gate-title">Welcome to<br />Puzzle</h2>
-        <!-- The game's own mark, the brain drawn out of arrows: the same one the splash, the buttons and the icon carry. -->
-        <img class="aa-gate-art" src="/images/puzzle-brain-mark-rose.svg?v=1" alt="" width="220" height="220" />
-        <p class="aa-gate-text">Please read and accept our <a href="/puzzle/terms.html">Terms of Service</a> and <a href="/puzzle/privacy.html">Privacy Policy</a>.</p>
-        <button type="button" class="aa-btn aa-gate-accept" id="aaAccept">Accept</button>
-      </div>
-    </div>
-    <!-- ── LAUNCH: logo and a line to set the mood ── -->
-    <div class="aa-splash" id="aaSplash" hidden>
-      <div class="aa-splash-inner">
-        <!-- The game's own mark. This used to be three coloured arrows left over from the name before this one. -->
-        <div class="aa-splash-logo" aria-hidden="true">
-          <img src="/images/puzzle-brain-mark-rose.svg?v=1" alt="" width="116" height="116" />
+    <!-- ── THE OPENING: the brain, a line typed out, and on a first open the terms ──
+         One surface from the first frame to home. It used to be up to three: a welcome gate with a big rose brain,
+         then a splash with a smaller one higher up, each after a flash of the home screen. It is shown by the
+         class the script in <head> puts on <html>, never by the game's script, which arrives later. The brain is
+         drawn inline so it is there in that first frame, 96 px in the middle of the screen: the size and the place
+         the app's own splash draws it, in the same ink, so the handover from the phone to this page is not seen. -->
+    <div class="aa-splash" id="aaSplash" data-nosnippet>
+      <div class="aa-splash-stage" id="aaSplashStage">
+        <svg class="aa-splash-mark" viewBox="0 0 512 512" width="96" height="96" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="5.95" stroke-linecap="round" stroke-linejoin="round"><path d="M84.9,203.9L114.7,203.9L114.7,129.6L144.4,129.6L144.4,189.1L189.1,189.1L189.1,114.7L214.6,114.7M337.8,397.3L293.2,397.3L293.2,337.8L278.3,337.8L278.3,308.1L352.7,308.1L352.7,248.6L282.6,248.6M397.3,367.6L397.3,322.9L427.1,322.9L427.1,233.7L352.7,233.7L352.7,144.4L278.3,144.4L278.3,214.6M293.2,114.7L337.8,114.7L337.8,99.8L278.3,99.8L278.3,129.6L367.6,129.6L367.6,218.8L393.1,218.8M322.9,218.8L337.8,218.8L337.8,174.2L308.1,174.2L308.1,203.9L293.2,203.9L293.2,233.7L333.6,233.7M337.8,382.4L308.1,382.4L308.1,337.8L352.7,337.8L352.7,322.9L382.4,322.9L382.4,397.3L356.9,397.3M159.3,129.6L159.3,114.7L148.7,114.7M412.2,248.6L412.2,293.2L382.4,293.2L382.4,248.6L367.6,248.6L367.6,288.9M189.1,382.4L233.7,382.4L233.7,337.8L189.1,337.8L189.1,367.6L218.8,367.6L218.8,352.7L208.2,352.7M397.3,189.1L397.3,203.9L427.1,203.9L427.1,218.8L416.4,218.8M174.2,203.9L233.7,203.9L233.7,233.7L174.2,233.7L174.2,278.3L218.8,278.3L218.8,248.6L193.3,248.6M144.4,367.6L99.8,367.6L99.8,382.4L159.3,382.4L159.3,412.2L144.4,412.2L144.4,427.1L214.6,427.1M114.7,263.4L144.4,263.4L144.4,322.9L84.9,322.9L84.9,278.3L129.6,278.3L129.6,308.1L104.1,308.1M293.2,159.3L333.6,159.3M233.7,293.2L189.1,293.2L189.1,322.9L159.3,322.9L159.3,267.7M174.2,218.8L99.8,218.8L99.8,263.4L55.2,263.4L55.2,233.7L84.9,233.7L84.9,248.6L74.3,248.6M441.9,293.2L441.9,252.8M159.3,203.9L129.6,203.9L129.6,163.6M203.9,144.4L203.9,174.2L233.7,174.2L233.7,99.8L203.9,99.8L203.9,84.9L229.4,84.9M218.8,189.1L208.2,189.1M70.1,322.9L70.1,337.8L159.3,337.8L159.3,367.6L174.2,367.6L174.2,342.1M203.9,218.8L214.6,218.8M218.8,412.2L189.1,412.2L189.1,397.3L233.7,397.3L233.7,441.9L208.2,441.9M174.2,159.3L174.2,174.2L159.3,174.2L159.3,144.4L174.2,144.4L174.2,118.9M189.1,263.4L199.7,263.4M99.8,189.1L99.8,148.7M144.4,233.7L159.3,233.7L159.3,248.6L114.7,248.6L114.7,233.7L125.3,233.7M337.8,352.7L322.9,352.7L322.9,367.6L367.6,367.6L367.6,342.1M278.3,382.4L278.3,356.9M84.9,218.8L70.1,218.8L70.1,208.2M278.3,397.3L278.3,427.1L337.8,427.1L337.8,412.2L297.4,412.2M427.1,159.3L427.1,189.1L412.2,189.1L412.2,144.4L382.4,144.4L382.4,199.7M308.1,263.4L337.8,263.4L337.8,293.2L293.2,293.2L293.2,263.4L278.3,263.4L278.3,288.9M322.9,441.9L278.3,441.9L278.3,456.8L303.8,456.8M352.7,412.2L378.2,412.2M99.8,352.7L140.2,352.7M322.9,203.9L322.9,193.3M218.8,144.4L218.8,155.1M174.2,412.2L174.2,386.7M412.2,382.4L412.2,342.1M218.8,322.9L203.9,322.9L203.9,308.1L233.7,308.1L233.7,318.7M322.9,278.3L312.3,278.3M397.3,278.3L397.3,252.8M322.9,322.9L297.4,322.9M397.3,397.3L397.3,386.7M397.3,174.2L397.3,163.6M218.8,129.6L208.2,129.6M144.4,397.3L133.8,397.3M233.7,248.6L233.7,274.1M397.3,308.1L407.9,308.1M352.7,99.8L352.7,110.4M278.3,84.9L318.7,84.9M382.4,308.1L371.8,308.1M99.8,293.2L110.4,293.2M456.8,278.3L456.8,267.7M174.2,308.1L174.2,297.4"/></g><path fill="currentColor" d="M221.5,114.7L214.6,118.6L214.6,110.8ZM275.6,248.6L282.6,244.7L282.6,252.4ZM278.3,221.5L274.4,214.6L282.2,214.6ZM400.0,218.8L393.1,222.7L393.1,214.9ZM340.5,233.7L333.6,237.6L333.6,229.8ZM350.0,397.3L356.9,393.4L356.9,401.2ZM141.7,114.7L148.7,110.8L148.7,118.6ZM367.6,295.9L363.7,288.9L371.4,288.9ZM201.2,352.7L208.2,348.8L208.2,356.6ZM409.5,218.8L416.4,214.9L416.4,222.7ZM186.4,248.6L193.3,244.7L193.3,252.4ZM221.5,427.1L214.6,430.9L214.6,423.2ZM97.1,308.1L104.1,304.2L104.1,311.9ZM340.5,159.3L333.6,163.2L333.6,155.4ZM159.3,260.7L163.2,267.7L155.4,267.7ZM67.4,248.6L74.3,244.7L74.3,252.4ZM441.9,245.9L445.8,252.8L438.1,252.8ZM129.6,156.6L133.4,163.6L125.7,163.6ZM236.4,84.9L229.4,88.8L229.4,81.1ZM201.2,189.1L208.2,185.2L208.2,192.9ZM174.2,335.1L178.1,342.1L170.3,342.1ZM221.5,218.8L214.6,222.7L214.6,214.9ZM201.2,441.9L208.2,438.1L208.2,445.8ZM174.2,112.0L178.1,118.9L170.3,118.9ZM206.6,263.4L199.7,267.3L199.7,259.6ZM99.8,141.7L103.7,148.7L95.9,148.7ZM132.3,233.7L125.3,237.6L125.3,229.8ZM367.6,335.1L371.4,342.1L363.7,342.1ZM278.3,350.0L282.2,356.9L274.4,356.9ZM70.1,201.2L73.9,208.2L66.2,208.2ZM290.5,412.2L297.4,408.3L297.4,416.1ZM382.4,206.6L378.6,199.7L386.3,199.7ZM278.3,295.9L274.4,288.9L282.2,288.9ZM310.8,456.8L303.8,460.7L303.8,452.9ZM385.1,412.2L378.2,416.1L378.2,408.3ZM147.1,352.7L140.2,356.6L140.2,348.8ZM322.9,186.4L326.8,193.3L319.1,193.3ZM218.8,162.0L214.9,155.1L222.7,155.1ZM174.2,379.7L178.1,386.7L170.3,386.7ZM412.2,335.1L416.1,342.1L408.3,342.1ZM233.7,325.6L229.8,318.7L237.6,318.7ZM305.4,278.3L312.3,274.4L312.3,282.2ZM397.3,245.9L401.2,252.8L393.4,252.8ZM290.5,322.9L297.4,319.1L297.4,326.8ZM397.3,379.7L401.2,386.7L393.4,386.7ZM397.3,156.6L401.2,163.6L393.4,163.6ZM201.2,129.6L208.2,125.7L208.2,133.4ZM126.9,397.3L133.8,393.4L133.8,401.2ZM233.7,281.0L229.8,274.1L237.6,274.1ZM414.9,308.1L407.9,311.9L407.9,304.2ZM352.7,117.4L348.8,110.4L356.6,110.4ZM325.6,84.9L318.7,88.8L318.7,81.1ZM364.9,308.1L371.8,304.2L371.8,311.9ZM117.4,293.2L110.4,297.1L110.4,289.3ZM456.8,260.7L460.7,267.7L452.9,267.7ZM174.2,290.5L178.1,297.4L170.3,297.4Z"/></svg>
+        <div class="aa-splash-copy" id="aaSplashCopy">
+          <p class="aa-splash-quote" id="aaSplashQuote"></p>
+          <p class="aa-splash-by" id="aaSplashBy"></p>
+          <div class="aa-splash-terms">
+            <p class="aa-splash-legal">Please read and accept our <a href="/puzzle/terms.html">Terms of Service</a> and <a href="/puzzle/privacy.html">Privacy Policy</a>.</p>
+            <button type="button" class="aa-btn aa-splash-accept" id="aaAccept">Accept</button>
+          </div>
         </div>
-        <p class="aa-splash-quote" id="aaSplashQuote"></p>
-        <p class="aa-splash-by">— Puzzle</p>
       </div>
     </div>
+    <!-- The typing. It runs here, as soon as the opening exists, and not in the game's script: that is 418 KB
+         which a first open is still downloading. Every letter is its own span, already laid out and invisible,
+         and a CSS delay shows each one at its moment, so the line keeps its pace on the compositor while the
+         main thread is busy with the game. The keys are the game's to play (SFX.key in js/puzzle.js), scheduled
+         on the audio clock against the same moments; where they can be heard -- in the app, which allows sound
+         from the first frame -- the typing waits up to 0.6 s for the game, so the first letter has its key. -->
+    <script>
+    (function () {
+      var o = window.aaOpening, plan = o && o.plan;
+      if (!plan || !plan.show) return;
+      var QUOTES = [
+        'Endless scrolling has shrunk your attention span? Play 30 minutes a day for 21 days and watch your focus come back.',
+        'Your brain has learned to skim. Teach it to look again: one board, one right move at a time.',
+        '21 days. 30 minutes a day. One country at a time. That is how focus is rebuilt.',
+        'No feed, no noise, no timer. Just you, a map and the next clear move.',
+        'Attention is a muscle. Every board you clear is one more rep.',
+        'Cannot sit with one thing for ten minutes any more? Start with one board tonight.',
+        'Play a board before bed instead of the feed. Wind down, then sleep well.',
+        'Look before you tap. Patience clears more boards than speed.'
+      ];
+      // Every duration in the opening, in ms. A later open never takes longer than the 2.64 s the old splash
+      // held the screen for: cap + fade for the quote, capShort + fade for the tagline, the waits included.
+      var T = o.T = { first: 1800, quote: 1500, tagline: 400, hold: 650, holdShort: 250, cap: 2440, capShort: 1100, fade: 200, terms: 250, font: 250, js: 600, home: 1500 };
+      // When each character appears, and which of them click. About 34 ms a letter and a breath after
+      // punctuation, squeezed to fit the budget; a key at most every 45 ms and never on a space; the return
+      // before "— Puzzle" is a softer thud, and a small bell when the line is done. Motion turned down: one step.
+      function typeSchedule(text, opt) {
+        var at = [], clicks = [], n = text.length, t = 0, raw = 0, last = -1e9, i;
+        var pause = function (ch) { return ch === '\n' ? 220 : /[.!?]/.test(ch) ? 160 : /[,;:—]/.test(ch) ? 90 : 0; };
+        if (opt.calm || !n) { for (i = 0; i < n; i++) at.push(0); return { at: at, clicks: clicks, end: 0 }; }
+        for (i = 0; i < n - 1; i++) raw += opt.step + pause(text[i]);
+        var k = raw > opt.budget ? Math.max(0, opt.budget) / raw : 1;
+        for (i = 0; i < n; i++) {
+          var ms = Math.floor(t), kind = text[i] === '\n' ? 'space' : text[i] === ' ' ? '' : 'key';
+          at.push(ms);
+          if (kind && ms - last >= opt.gap) { clicks.push({ kind: kind, i: i, at: ms }); last = ms; }
+          t += (opt.step + pause(text[i])) * k;
+        }
+        clicks.push({ kind: 'ding', i: n, at: at[n - 1] + 120 });
+        return { at: at, clicks: clicks, end: at[n - 1] };
+      }
+      var root = document.documentElement, splash = document.getElementById('aaSplash');
+      if (plan.line === 'tagline') splash.classList.add('is-tagline');   // three words sit under the brain, not off to one side
+      var text = plan.line === 'quote' ? QUOTES[(o.quote || 0) % QUOTES.length] + '\n— Puzzle' : plan.line === 'tagline' ? 'Train your brain.' : '';
+      var boxes = [document.getElementById('aaSplashQuote'), document.getElementById('aaSplashBy')], letters = [];
+      if (text) text.split('\n').forEach(function (part, b) {
+        var sr = document.createElement('span'), line = document.createElement('span');
+        sr.className = 'aa-sr'; sr.textContent = part;           // what a screen reader reads: the line, not its letters
+        line.className = 'aa-splash-type'; line.setAttribute('aria-hidden', 'true');
+        for (var j = 0; j < part.length; j++) {
+          if (part[j] === ' ') { line.appendChild(document.createTextNode(' ')); letters.push(null); continue; }
+          var s = document.createElement('span'); s.textContent = part[j]; line.appendChild(s); letters.push(s);
+        }
+        letters.push(null);                                      // the line break
+        boxes[b].appendChild(sr); boxes[b].appendChild(line);
+      });
+      var muted = false, allowed = false, app = / PuzzleApp\/\d/.test(navigator.userAgent);
+      try { muted = JSON.parse(localStorage.getItem('aa:v1:muted')) === true; } catch (e) { /* no storage: sound as usual */ }
+      try { allowed = navigator.getAutoplayPolicy('audiocontext') === 'allowed'; } catch (e) { /* only Firefox can say */ }
+      o.t0 = performance.now(); o.startedAt = 0; o.done = false; o.claimed = false;
+      o.sound = plan.typing && !muted && (app || allowed);
+      // The app's WebView lets sound start without a tap; a browser does not, until one. Made now so it is
+      // running by the time the first key is due. The game adopts it as its own.
+      if (o.sound) { try { o.audio = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { o.sound = false; } }
+      var waiting = [], fontIn = !plan.typing, gameIn = !o.sound;
+      function start() {
+        if (o.startedAt || o.done) return;
+        // Late (a slow font, a slow game) is taken out of the typing, never added to the opening.
+        var budget = plan.line === 'tagline' ? T.tagline : plan.first ? T.first : T.quote;
+        if (!plan.first) budget = Math.min(budget, (plan.line === 'tagline' ? T.capShort - T.holdShort : T.cap - T.hold) - (performance.now() - o.t0));
+        var s = o.schedule = typeSchedule(text, { budget: budget, step: plan.line === 'tagline' ? 22 : 34, gap: 45, calm: !plan.typing });
+        for (var i = 0; i < letters.length; i++) if (letters[i]) letters[i].style.setProperty('--d', s.at[i] + 'ms');
+        o.startedAt = performance.now(); o.typedAt = o.startedAt + s.end;
+        splash.classList.add(plan.typing ? 'is-typing' : 'is-typed');
+        while (waiting.length) waiting.shift()();
+      }
+      function go() { if (fontIn && gameIn) start(); }
+      o.whenStarted = function (fn) { if (o.startedAt) fn(); else waiting.push(fn); };
+      o.ready = function () { o.claimed = true; gameIn = true; go(); };        // the game's script has arrived
+      o.finish = function () { if (o.done) return; start(); o.done = true; splash.classList.add('is-typed'); };
+      // The line is laid out before it is typed, so a web font arriving halfway through would move every letter
+      // already on the screen. It is waited for, a quarter of a second at most.
+      function fontReady() { fontIn = true; go(); }
+      if (!fontIn) {
+        setTimeout(fontReady, T.font);
+        try { document.fonts.load('700 21px Nunito', text).then(fontReady, fontReady); } catch (e) { fontReady(); }
+      }
+      if (!gameIn) setTimeout(function () { gameIn = true; go(); }, T.js);
+      go();
+      // The game's script never came, or an older copy of it did (which knows nothing of this): let the page be
+      // seen rather than hold the brain up for ever.
+      window.addEventListener('load', function () { if (!o.claimed) { root.classList.remove('is-opening', 'is-first', 'is-paper-first'); var sp = document.getElementById('aaSplash'); if (sp) sp.hidden = true; } });   // a game script that never took the opening over (failed, or an old copy) must not leave it covering the page
+    })();
+    </script>
     <main class="aa-app" id="aaApp"><span id="top"></span>
       <!-- ── HOME ── -->
       <section class="aa-screen aa-home" id="aaSelect" aria-label="Home">
         <header class="aa-home-top">
           <span class="aa-chip aa-chip--purse" id="aaPurse" hidden title="Your gold"><img class="aa-coin" src="/images/puzzle-coin.png?v=1" alt="" width="128" height="128" decoding="async"><b id="aaPurseNo">0</b><button type="button" class="aa-purse-add" id="aaGoldAd" hidden aria-label="More gold">+</button></span>
+          <!-- The streak: days in a row with a board cleared or a training round scored, rose while today is
+               still to play; the freezes held beside it (renderStreak). Hidden with no streak to show. -->
+          <button type="button" class="aa-chip aa-chip--streak" id="aaStreak" hidden aria-label="Your streak"><svg class="aa-flame" viewBox="0 0 24 24" aria-hidden="true"><path d="M12.2 2c.7 3.3-1.3 5.2-3 7.1C7.6 10.9 6 12.8 6 15.6 6 19.2 8.7 22 12 22s6-2.7 6-6.3c0-2.6-1.2-4.6-2.8-6.2-.1 1.6-.8 2.8-2 3.4.6-3.9 0-7.5-1-10.9z"/></svg><b id="aaStreakNo">0</b><span class="aa-streak-fz" id="aaStreakFz" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18M4.2 7.5l15.6 9M4.2 16.5l15.6-9M9.5 4.5 12 7l2.5-2.5M9.5 19.5 12 17l2.5 2.5"/></svg><b id="aaStreakFzNo">0</b></span></button>
           <button type="button" class="aa-icon aa-train-ico" id="aaTrainBtn" aria-label="Daily brain training"><img class="aa-play-mark" src="/images/puzzle-brain-mark-rose.svg?v=1" alt="" width="30" height="30" /><span class="aa-train-pill is-dot" id="aaTrainPill"></span></button>
           <button type="button" class="aa-chip aa-chip--league" id="aaLeague" hidden aria-label="This week's league"><span aria-hidden="true">🏆</span><b id="aaLeagueEnds"></b></button>
           <button type="button" class="aa-icon" id="aaSettings" aria-label="Settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5 19.4 7.7v8.6L12 20.5 4.6 16.3V7.7z"/><circle cx="12" cy="12" r="3"/></svg></button>
         </header>
 
         <div class="aa-hero">
-          <h1 class="aa-title">Puzzle<span class="aa-tagline" id="aaTagline">Train your brain.</span></h1>
+          <h1 class="aa-title">Puzzle<span class="aa-tagline" id="aaTagline"> Train your brain.</span></h1>
         </div>
+        <!-- Only for a browser with script off (and a crawler that reads without running it): what the game is. -->
+        <noscript><p class="aa-loading">Puzzle needs JavaScript to play. It is a free brain-training game: four daily rounds on real paintings (Restore the Canvas, The Forgery, Gallery Memory and The Curator’s Eye) and an arrow logic puzzle on 197 countries.</p></noscript>
 
         <!-- One card at a time: the brain, then the world map. Swipe, tap a dot, or leave it alone and it
              turns itself. Two things side by side asked the player to choose what to look at; one asks nothing.
@@ -288,9 +438,12 @@
       <div class="aa-coach" id="aaCoach" hidden>
         <div class="aa-coach-spot" id="aaCoachSpot"></div>
         <div class="aa-coach-card" role="dialog" aria-modal="false" aria-labelledby="aaCoachTitle" aria-describedby="aaCoachBody">
-          <p class="aa-coach-step" id="aaCoachStep"></p>
-          <h3 id="aaCoachTitle"></h3>
-          <p id="aaCoachBody"></p>
+          <!-- read out when a step changes: the focus is on Next, and Next says nothing about the step -->
+          <div class="aa-coach-text" aria-live="polite" aria-atomic="true">
+            <p class="aa-coach-step" id="aaCoachStep"></p>
+            <h3 id="aaCoachTitle"></h3>
+            <p id="aaCoachBody"></p>
+          </div>
           <div class="aa-coach-actions"><button type="button" class="aa-linkbtn" id="aaCoachSkip">Skip</button><button type="button" class="aa-btn aa-btn--primary" id="aaCoachNext">Next</button></div>
         </div>
       </div>
@@ -310,7 +463,7 @@
         <div id="aaTrainBody"></div>
       </div>
     </div>
-    <div class="aa-sheet" id="aaSignInSheet" hidden>
+    <div class="aa-sheet" id="aaSignInSheet" hidden data-nosnippet>
       <div class="aa-sheet-panel" role="dialog" aria-label="Sign in">
         <div class="aa-sheet-head"><h2>Sign in</h2><button type="button" class="aa-icon" data-close-sheet aria-label="Close">✕</button></div>
         <p class="aa-sheet-note">Playing with friends needs an account, so your friends know it is really you and your progress follows you to your phone, tablet and computer. Playing on your own never needs one.</p>
@@ -392,12 +545,50 @@
 
         <p class="aa-cap">Help</p>
         <div class="aa-group">
-          <button type="button" class="aa-row aa-row--link" id="aaCoachAgain"><span class="aa-row-ico">🎓</span><span class="aa-row-label">Show the tutorial again<small>On your next board</small></span><span class="aa-row-chev">›</span></button>
+          <!-- The home tour runs by itself once, in the app, on a phone that has played nothing; here it is for
+               anybody, on the site too. The other two bring back what a board and a round teach the first time. -->
+          <button type="button" class="aa-row aa-row--link" id="aaTourAgain"><span class="aa-row-ico">🧭</span><span class="aa-row-label">Tour of the app<small>What is where on the home screen</small></span><span class="aa-row-chev">›</span></button>
+          <button type="button" class="aa-row aa-row--link" id="aaCoachAgain"><span class="aa-row-ico">🎓</span><span class="aa-row-label">Show the arrow tutorial again<small>On your next board</small></span><span class="aa-row-chev">›</span></button>
+          <button type="button" class="aa-row aa-row--link" id="aaTipsAgain"><span class="aa-row-ico">🧠</span><span class="aa-row-label">Show the Daily Training tips again<small>The next time you open each round</small></span><span class="aa-row-chev">›</span></button>
           <a class="aa-row aa-row--link" href="/#contact"><span class="aa-row-ico">💬</span><span class="aa-row-label">Feedback</span><span class="aa-row-chev">›</span></a>
         </div>
 
         <p class="aa-cap">About</p>
         <div class="aa-group">
+          <!-- What the game is, in words. Static HTML, so every crawler reads it without running script; folded shut
+               like Credits below, so no player scrolls past it and nothing sits under the game. The FAQPage in the
+               head quotes the Questions here word for word: change one, change the other
+               (tests/puzzle-seo.test.mjs holds them together). -->
+          <details class="aa-about-credit aa-about-game" id="aaAboutGame">
+            <summary class="aa-row aa-row--link"><span class="aa-row-ico">🧠</span><span class="aa-row-label">About Puzzle &amp; FAQ</span><span class="aa-row-chev">›</span></summary>
+            <div class="aa-about-credit-text aa-about-game-text">
+              <h3>Free daily brain training on real paintings</h3>
+              <p>Daily Training is four short games, free every day, played on public-domain paintings from The Metropolitan Museum of Art’s Open Access collection. Every round is scored out of 100, and together they make the day’s Brain Score.</p>
+              <ul>
+                <li><b>Restore the Canvas</b>: the painting hangs whole for a few seconds, then falls into pieces. Drag every piece back to its place.</li>
+                <li><b>The Forgery</b>: spot the differences. Patches of a forged copy are mirrored, recoloured or taken from elsewhere in the painting; tap them.</li>
+                <li><b>Gallery Memory</b>: paintings hang on the wall, numbered, for a moment. Hang them back in the same order.</li>
+                <li><b>The Curator’s Eye</b>: look at one painting, then, several times, pick which of four close-ups came from it.</li>
+              </ul>
+              <h3>An arrow logic puzzle on 197 countries</h3>
+              <p>Tap an arrow to send it off the board. Over 400 boards make a world tour that starts from your home country: the outlines of all 197 countries, with animal, bird, landmark and picture boards between them. Clearing a country tells you its capital, population and region, and the difficulty, from Easy to Master, follows how well you play.</p>
+              <h3>Play with friends</h3>
+              <p>Sign in with Google to race friends and other players online and to play in the weekly league. Playing on your own never needs an account.</p>
+              <h3>Questions</h3>
+              <h4>Is Puzzle – Train Your Brain free?</h4>
+              <p>Yes. The four Daily Training rounds are free every day, and the arrow puzzle tour is free to play. Nothing in the game can be bought: there are no in-app purchases, and gold is only a number in the game. Any advertisement is optional and rewarded: you choose to watch one, for an extra hint, heart, gold or a new puzzle.</p>
+              <h4>Do I need to download anything or sign up?</h4>
+              <p>No. Puzzle plays in your web browser on phones, tablets and computers, and you can add it to your home screen. Playing on your own needs no account; signing in with Google is only for Play with Friends and the weekly league.</p>
+              <h4>What are the Daily Training games?</h4>
+              <p>Four short rounds on real paintings: Restore the Canvas (rebuild a painting from its pieces), The Forgery (spot what is wrong in a forged copy), Gallery Memory (re-hang paintings in the order they hung) and The Curator’s Eye (pick the detail that came from the painting you saw).</p>
+              <h4>How is the Brain Score worked out?</h4>
+              <p>Each round is scored from 0 to 100, and the day’s Brain Score is the average of the rounds you played that day. Play at least one round a day to keep your streak going. A round gets harder after a day you score 85 or more in it, and easier after a day under 50.</p>
+              <h4>How does the arrow puzzle work?</h4>
+              <p>Every arrow slides the way it points. Tap an arrow and, if its path is clear, it flies off the board; if another arrow blocks it, you lose a heart (four on Easy and Normal, fewer on the harder levels). Clear every arrow to finish the board. A country board then tells you which country it was, with its capital, population and region.</p>
+              <h4>Where do the paintings come from?</h4>
+              <p>They are 247 public-domain works from The Metropolitan Museum of Art’s Open Access collection, and every round credits the paintings it used.</p>
+            </div>
+          </details>
           <a class="aa-row aa-row--link" href="/puzzle/privacy.html"><span class="aa-row-ico">🔒</span><span class="aa-row-label">Privacy Policy</span><span class="aa-row-chev">›</span></a>
           <a class="aa-row aa-row--link" href="/puzzle/terms.html"><span class="aa-row-ico">📄</span><span class="aa-row-label">Terms of Service</span><span class="aa-row-chev">›</span></a>
           <!-- one row like the others; the licence text opens under it when tapped (a native details, so no script) -->
@@ -412,7 +603,7 @@
         <div class="aa-group" id="aaMutedGroup" hidden></div>
 
         <p class="aa-cap" id="aaSessionCap" hidden>Leaving</p>
-        <div class="aa-group" id="aaSessionGroup" hidden>
+        <div class="aa-group" id="aaSessionGroup" hidden data-nosnippet>
           <button type="button" class="aa-row aa-row--link" id="aaSignOut"><span class="aa-row-ico">🚪</span><span class="aa-row-label">Sign out<small>Your tour and gold stay on the account</small></span><span class="aa-row-chev">›</span></button>
           <button type="button" class="aa-row aa-row--link aa-row--danger" id="aaDeleteAcc" hidden><span class="aa-row-ico">⚠️</span><span class="aa-row-label">Delete account<small>Removes it, and everything you have played, for good</small></span><span class="aa-row-chev">›</span></button>
         </div>
@@ -421,7 +612,7 @@
              that a player cannot reach by accident and, more to the point, that nobody can be sent in a link:
              the URL parameter that used to be the only way in needs an address bar, and the app has none. -->
         <p class="aa-cap" id="aaDevCap" hidden>Developer</p>
-        <div class="aa-group" id="aaDevGroup" hidden>
+        <div class="aa-group" id="aaDevGroup" hidden data-nosnippet>
           <div class="aa-row aa-row--col">
             <span class="aa-row-label">Advertisements<small class="aa-row-sub" id="aaDevAdsNote"></small></span>
             <div class="aa-dev" id="aaDevAds"></div>
@@ -440,6 +631,6 @@
       </div>
     </div>
 
-    <script src="/js/puzzle.js?v=98"></script>
+    <script src="/js/puzzle.js?v=99"></script>
   </body>
 </html>

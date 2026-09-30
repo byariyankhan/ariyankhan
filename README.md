@@ -85,7 +85,10 @@ address is the `Reply-To`, so replying to an enquiry goes to them and not to thi
 **Proxy note:** `.htaccess` forces HTTPS via `%{HTTPS}` *or*
 `X-Forwarded-Proto`, so any proxy that sets that header (all of them do) works
 without a redirect loop. `RedirectMatch 404 ^/(deploy|tests)` keeps the tooling
-directories unreachable over the web.
+directories unreachable over the web. Behind that proxy Apache only sees plain
+HTTP, so its own slash redirect for a folder (mod_dir) answers `http://`: the
+game's bare `/puzzle` therefore has a rule of its own that goes straight to
+`https://…/puzzle/`, one hop, like the old `/arrow-atlas*.html` addresses.
 
 ---
 
@@ -524,20 +527,30 @@ same shell we will wrap for Android/iOS (TWA / Capacitor). Each level is a
 country's outline filled with arrows; tap an arrow to shoot it off the board if its
 run to the edge is clear, a blocked tap costs one heart, no clock (time is still recorded for the result card), 4 hearts and 3 hints per
 level on Easy and Normal, 3 hearts and 2 hints on Hard, 2 hearts and 2 hints on Expert, 2 hearts and 1 hint on Master (`LIVES_OF`, `HINTS_OF`: the top tiers are meant to be lost and taken again), difficulty that follows the player and never the level number (one
-tier 0 Easy / 1 Normal / 2 Hard / 3 Expert / 4 Master lives in `aa:v1:form` as
-`{tier, wins, losses}`; `nextForm` moves it on form alone: a cleared board earns
-`clearPoints` towards the next step, 2 for a flawless fast first-try clear (no
-heart, no hint, ≤ `FAST_SEC_PER_ARROW` 1.2 s per arrow) so a strong player steps
-up after a single level, 1 for any other first-try clear so two in a row step up
-whatever hearts and hints were spent, 0 after a retry (resets); two lost boards
-in a row step it down;
-`TIER_OF()`; Try again keeps the same board, New layout takes the new tier; the
+grade 0–14 lives in `aa:v1:form` as `{grade, tier}`: three grades a tier (0 Easy / 1 Normal /
+2 Hard / 3 Expert / 4 Master, `tier = floor(grade / 3)`, written alongside for an older client),
+and within the tier which of the board's candidate deals is dealt (`grade % 3`: 0 the widest, 1 the
+middle one, 2 the narrowest, `bestBoard(mask, tier, seed, pick)`); `nextForm` moves it on every tour
+board: `clearPoints` is +2 for a flawless fast first-try clear (no heart, no hint, ≤
+`FAST_SEC_PER_ARROW` 1.2 s per arrow), +1 for any other first-try clear, 0 for a scrappy one (two
+hearts or two hints gone) or a clear after a retry, and every heart-out is −3 (`GRADE_DOWN`): a
+weighted staircase that settles near three clears in four, where the old two-up/two-down rule on the
+hardest deal settled near a coin flip (`tests/puzzle-habits.test.mjs` simulates both for three
+kinds of player: 37–46 % of tries failed before, about 21 % now). A form from before grades is read
+as its tier's hardest deal (`gradeOf`: `tier * 3 + 2`). A new player is never dealt past Normal before
+5 boards are cleared nor past Hard before 12 (`GRADE_CAP`, on `boardsDone()`), and the ladder itself
+is held there (a higher grade from elsewhere — the account, the old ladder — is left as it is by a win
+under the ceiling). A race and the daily board are always the hardest deal, so a shared board is the same
+board for everyone, and the pace line is shown only for a hardest deal. A board left mid-play is dealt
+again at the deal its kept run was played at (`keptDeal`), whatever the ladder did since, so a heart-out,
+a free life and leaving still carry on where they were;
+`TIER_OF()`; Try again keeps the same board, New layout takes the new grade; the
 tier is never explained on the win card, only shown on the Next button and in
 the start toast), combo counter (taps within 1.8 s), a win streak (still counted, no longer
 announced on the card), milestones every 10 levels, a Today's Country bonus board (date-seeded, same for
 everyone, reached by `#daily` rather than from Settings), and clearing the board reveals the country for a
 3-option quiz plus capital/population/region. 197-country World Tour (every UN member state, plus Palestine, the Vatican, Kosovo and Taiwan: world-atlas 110m plus the 29 small states from the 10m file, minus dependencies and disputed areas) with sequential
-unlock (skip allowed after two fails), stars, best times and progress in
+unlock (Skip for now from the third heart-out on a board), stars, best times and progress in
 `localStorage` (`aa:v1:*`) and, once signed in, on the account as well, so a new
 phone picks the tour up where the last one left it; share text, `#level-N` deep
 links.
@@ -642,10 +655,11 @@ links.
   title and the two buttons have had theirs" — which is what keeps the whole home
   screen on one screen from a 360×560 phone to a tablet, and the two buttons at
   the bottom where a thumb is. The three tiles under the map (boards, countries,
-  day streak — days this player cleared any board, not days they opened the daily
-  board, which is what it counted at first and why somebody a hundred boards in
-  was told zero; it counts only while it is alive, played today or yesterday,
-  because nothing decays the stored record; all three counted in
+  day streak — the one streak, days with a board cleared or a training round
+  scored, not days they opened the daily board, which is what it counted at first
+  and why somebody a hundred boards in was told zero; it counts only while it is
+  alive, played today or yesterday (or the day before, with a freeze to cover
+  yesterday: `streakNow`), because nothing decays the stored record; all three counted in
   `renderHomeStats` so a map that failed to load does not leave a hundred-board
   player looking at three zeroes) are the win card's own
   tiles. Clearing a board sets `showBrainNext`, so the player comes home to the
@@ -678,13 +692,23 @@ links.
   rank is, the brain itself shows, and the card after a board says what it added
   or cost. The rank is the headline and it is not the level — a level says where
   a player is on the tour, a rank says what they have done. **A rank is earned
-  and lost:** a board cleared adds its arrows, a board lost (hearts gone) takes
-  the arrows still on it, never below zero. What was taken is kept per device
+  and lost:** a board cleared adds its arrows — the most it has ever paid, so a
+  replay at a lower tier takes nothing away (`recordFor`; the server keeps
+  `GREATEST(arrows)` too) — and a board lost (hearts gone) takes some of the arrows
+  still on it (`lossFor`): only on the first loss since the board was started fresh
+  (a retry of a board being fought for costs nothing more), never on a board already
+  cleared, never on the daily board or in a race, at most half the board and never
+  more than the rank holds (`loseArrows` clamps, so nobody owes arrows). The loss is
+  **held** while the card still offers a free life (`holdLoss`, `lossHeld`): "Get a
+  free life" carries the board on and gives the arrows back (`forgiveLoss`); Try
+  again, another board or home takes them (`settleLoss`, also at the next start if
+  the app was closed on the card). Held rather than taken and given back, because
+  what was taken is kept per device
   (`loss`: device id → arrows, `lossMap`/`loseArrows`) and synced in the state
   blob: a device's own count only grows, so devices merge by the larger per
   device (`adoptTour`) and the total is the sum — a single shared number could
-  not have been merged. The out-of-hearts card says `−N arrows · Rank` or
-  `Rank down: …`; a race costs nothing. Offline play counts the same and goes
+  not have been merged, and a refund would be undone by the next sync. The
+  out-of-hearts card says `−N arrows · Rank` or `Rank down: …`. Offline play counts the same and goes
   up with the next sync once the player is online and signed in. The result card
   carries a line too (`.aa-card-rank`): `+N arrows · Rank · M to Next`, or `New
   rank: …` when the board moved it; a race has none. The share text names the rank.
@@ -803,14 +827,31 @@ links.
   pinch, the confetti canvas); distances did not, because a quarter turn does not
   change one.
 
-- **SEO**: title/description/keywords around "puzzle", "train your brain", "arrow puzzle" and
-  "arrow game"; Open Graph/Twitter card `images/puzzle-og.jpg` (1200×630,
-  drawn by `games/build-puzzle-og.mjs`; the app icon by `games/build-puzzle-icon.mjs`); schema.org WebPage +
-  VideoGame/WebApplication (alternateNames, keywords, image, PlayAction) +
-  BreadcrumbList + FAQPage; the About / how-to / FAQ copy is a visible
-  `#aaAbout` section under the app (the settings "How to play" and "About"
-  rows scroll to it); the homepage has a "Games" section linking both games
-  with keyword anchor text; sitemap priority 1.0 with an image entry.
+- **SEO**: the head names what the game is today: Daily Training's four rounds by
+  their names in `TRAIN_ROUNDS` (Restore the Canvas, The Forgery, Gallery Memory,
+  The Curator's Eye) and the arrow puzzle on 197 countries. Title at most 60
+  characters, description at most 160, a short keywords list of real phrases, Open
+  Graph/Twitter card `images/puzzle-og.jpg` (1200×630, drawn by
+  `games/build-puzzle-og.mjs`; the app icon by `games/build-puzzle-icon.mjs`).
+  Every self-reference is `https://ariyankhan.com/puzzle/` **with the slash**
+  (canonical, og:url, every JSON-LD `@id`, the breadcrumb, the sitemap), and the
+  root `.htaccess` sends the bare `/puzzle` there in one https hop (mod_dir's own
+  slash redirect answered `http://` from behind the proxy). No hreflang: one language.
+  One JSON-LD block: WebPage, VideoGame + WebApplication (SinglePlayer and
+  MultiPlayer, "over 400 boards", no ratings), FAQPage and BreadcrumbList. There is
+  no MobileApplication node and no "Android app" wording until the Play listing is
+  public. The words a crawler reads are in the static HTML but nothing sits under the
+  game: Settings > About has an **"About Puzzle & FAQ"** row, a native `<details>`
+  folded shut like Credits (`#aaAboutGame`), with what Daily Training and the arrow
+  puzzle are and six questions. The FAQPage quotes those questions and answers word
+  for word, and `tests/puzzle-seo.test.mjs` fails if they drift apart, if a round is
+  renamed in `TRAIN_ROUNDS` without the page following, or if a removed round comes
+  back in the copy. A `<noscript>` line says the same in one sentence. The gate, the
+  splash, the sign-in sheet and the session and developer groups carry
+  `data-nosnippet`, so interface text is never the search snippet. The homepage has a
+  "Games" section linking both games; `llms.txt` and `llms-full.txt` describe the
+  game; sitemap priority 1.0. No hidden text, no bot-only markup, no health or
+  memory-improvement claims: the Brain Score is a game score.
 - **Scale and feel** (matched to the reference apps): boards are at most 32 cells
   across on Easy to Hard (46 tall / 38 wide for elongated shapes) and up to 36/40
   on Expert/Master (`MAX_DIM_OF`, `MAX_TALL_OF`, `MAX_WIDE_OF`; `TARGETS` 110/240/400/540/680
@@ -876,10 +917,40 @@ links.
   reference pages: a tall shape filled edge to edge with long winding arrows. In the
   game one is `{ id: 's:<id>', name, d, k, scene: true }`; `tourFor` puts one after
   every fourth country (`SCENE_EVERY`), in order, and it is played **one tier
-  harder** than the player's form (`clampTier(TIER_OF() + 1)`), so a Hard player
+  harder** than the player's form (`gradeFor`: three grades up, the same deal within the tier), so a Hard player
   meets The Tower at Expert (~140 arrows) and an Expert player Twin Towers at Master
-  (~160). The result card has no fact box and no YouTube line, as on focus boards,
-  and the HUD reads `Level N · The Tower`.
+  (~160); it says so as it starts ("One step harder: this scene is Expert."), and the
+  board after it, cleared or skipped, is a **breather**: the easiest deal of the
+  player's own tier (store `breather`, spent by the next new clear). There are 49 scene slots and 12 scenes, so the list comes round again, and
+  **every lap is a board of its own**: the first lap keeps `s:<id>` (the clears already
+  made stay valid), later laps are `s:<id>~2`, `s:<id>~3`, … (`sceneLevelFor`). One id in
+  four slots used to count one clear as four levels and leave every scene slot after
+  country 48 already cleared. Whatever looks the board up — its shape (`maskFor`), its
+  stats (`countBoard`), the pace comparison, a shared `#b-` link — drops the lap
+  (`baseId`); the record keeps the full id, and a `#b-s:<id>~N` link a tour does not
+  have opens the scene itself. `tests/puzzle-levels.test.mjs` replays `tourFor` on the
+  data files and checks every id is unique. The result card has no fact box and no
+  YouTube line, as on focus boards, and the HUD reads `Level N` with `The Tower · Expert`
+  on the line under it (in the big type the name was wider than a phone).
+- **The board flow** (September 2026): a win is kept the moment the last arrow goes
+  (`winLevel` → `keepWin`: the record, the ladder, the stats, the streak, the sync and
+  a race's time); only the card waits the 700 ms of confetti (`showResult(run)`, drawn
+  from that snapshot, on `state.resultTimer`, which `clearRun` and `startLevel`
+  cancel). Back during the confetti used to save a 0-second, 0-arrow clear, step the
+  ladder up for it and drop a race's time. A replay never promotes the ladder
+  (`learnFrom` is told the board was cleared before). A board's record is its best
+  run's time, stars and tier, the most arrows it ever paid, and its first clear's
+  time (`recordFor`, and `mergeRec` for what a sync brings back). **A tour board is
+  kept as it is played** (`keepRun` on every move, `run:<id>`: tier, seed, arrows gone,
+  hearts, hints, checks, clock, retries): leaving it or the app being killed carries
+  on from there when the same board is dealt at the same tier and seed (`resumeRun`;
+  anything else is stale and deleted), so leaving on the last heart no longer
+  refills them; a lost board's run goes (the free life keeps it again), Try again
+  starts fresh, and the daily board, races and replays are not kept. The leave
+  question says so. A board the generator cannot draw is drawn from the next seed,
+  then a tier down, and then a card says so with a Back button (`dealSafe`,
+  `boardFailed`); the last board drawn is kept, so Try again does not draw it again
+  (`dealBoard`, a copy per deal). The pace comparison takes Master too (tier 0–4).
 - **Expert and Master are harder** than they were: snakes run to 14 and 16 cells
   (`MAXLEN_OF`), nearly every arrow points far (`FAR_OF` 0.85/0.95), runs are
   straighter and longer (`RAIL_OF`), and the country outline is rasterised on a
@@ -925,23 +996,59 @@ links.
   its purple is gone: `--accent2` is the brain's rose `#DB3A5E` (the arrows that light the brain up on the
   home card, the slogan's colour), the Hard tier is magenta rather than purple, the primary buttons wear
   the same rose-to-coral gradient, a faint rose brain sits behind the home screen in every theme, and the
-  splash mark is the rose one (`images/puzzle-brain-mark-rose.svg`) everywhere but Night. There is no
+  opening's brain turns to the rose (`--mark-to`) as its line types, everywhere but Night. There is no
   separate Brain theme: the brain is in Paper.
-- **The out-of-hearts card, as drawn:** "Get a free life" first and biggest, orange with the play icon
+- **The out-of-hearts card, as drawn:** how close it was, honestly — a bar and "91% cleared · 12 arrows
+  to go" from the board's own counts, rounded down (`.aa-fail-bar`, `.aa-fail-lead`); then "Get a free life"
+  first and biggest, orange with the play icon
   and an AD pill on the right when it is a real advertisement (no pill in free mode); "Try again" under it
-  in a soft rose tint; nothing under them (`.aa-actions--out`, `.aa-btn--big`, `.aa-btn--soft`,
-  `.aa-ad-pill`): the corner arrow is the way back to the tour. A challenge keeps "Give the board up". The
-  home buttons carry no subtitle: the icon says it.
+  in a soft rose tint (`.aa-actions--out`, `.aa-btn--big`, `.aa-btn--soft`, `.aa-ad-pill`). On a tour
+  board, from the second heart-out on it, **New layout** (the `shuffle` action: the same board dealt anew at
+  the grade the ladder has just stepped down to, its tier named under it), and from the third **Skip for
+  now** (the `skip` action: the slot after it opens, the board stays on the map to come back to), side by
+  side under them (`.aa-actions--alt`); the corner arrow is the way back to the tour. A challenge keeps
+  "Give the board up". The home buttons carry no subtitle: the icon says it.
 - **The tutorial** (`COACH_STEPS`, `coachStart`, `#aaCoach`): on the first board somebody opens, five
   things one at a time, each under a spotlight cut out of a dark scrim by one enormous box-shadow, with a card
-  pinned to the bottom and Skip on every step. Step one glows a free arrow (`.is-coach`, the hint's glow) and
+  at the bottom and Skip on every step. Step one glows a free arrow (`.is-coach`, the hint's glow) and
   waits for the tap (`coachShot` from `shoot`); then the hearts and what a blocked arrow costs, the lamp, the
   press-and-hold check, and what clearing the board does. The layer lets taps through, so the board is playable
-  under it. Shown once (`coached`), never in a race or on the daily board, closed by winning, losing or
-  leaving the board, and Settings → Help → "Show the tutorial again" brings it back on the next board.
+  under it. The numbers are the board's own (`livesFor`/`hintsFor` of its tier, `CHECKS_PER_LEVEL`: "Two
+  hearts on this board" on Expert), and the last step calls the lifeline an ad only where one plays
+  (`ads.isAd()`: "take a free life" on the site, nothing at all where the offer is off). Step one's arrow is
+  a free one clear of the card (`coachPick`; failing that the card moves to the top), and the hole is cut round
+  the arrow's own cells, not the lane it flies out along (`pieceRect`). Shown once (`coached`), and counted as
+  seen only when it is finished, skipped (Skip, Back, Escape) or the board is cleared under it: a board lost or
+  left with it open brings it back on the next one. Never in a race or on the daily board. Settings → Help →
+  "Show the arrow tutorial again" brings it back on the next board; "Show the Daily Training tips again" sets
+  every round's `trainHow:<id>` to 0.
+- **Every tutorial card, shared rules** (`spotOn`, `closeTutorial`, `toast`): the spotlight and the card are
+  measured in the page's own frame (`rectOf`), so a phone browser held sideways — the page turned back upright
+  — gets the hole on the thing; they are placed again a frame after a resize or a turn, after a zoom or a pan
+  on the board, and after a scroll. The card is at the bottom unless that covers the thing, then at whichever
+  end covers less (`.aa-coach.is-top`), and on a short screen (under 640px) it is a little smaller. Android's
+  Back and Escape close an open card first — the home tour, the board's, a Daily Training round's — the way
+  Skip does, before any sheet, "Leave this board?" or "Leave this round?". A toast raised while a card is open
+  goes over it (`.aa-toast.is-over`, z-index 116, under a question's 120), at the other end of the screen. The
+  step text is a polite live region and Next takes the focus. A sync that brings cleared boards to a phone
+  marks the arrow tutorial seen, and a round with a score its tips (`adoptSeen`), unless they were asked for
+  again in Settings.
+- **The home tour** (`HOME_TOUR`, `tourStart`/`Show`/`Next`/`Place`/`End`, `.aa-home-tour`): the first time
+  the app is opened on a phone that has played nothing (no `lv:`, `skip:`, `daily:` or `train:` record), the
+  home screen is walked round once in the same spotlight and card: the brain, the world tour (the deck turned
+  to each, and held still meanwhile), Daily Training, the league chip when it is showing, Play with Friends,
+  Settings, and Play & Discover, whose "Let's play" starts the first board, where the arrow tutorial takes
+  over. Its own layer on `document.body`, like the training coach. Only in the app (`shell.on`) on its own;
+  Settings → Help → "Tour of the app" replays it anywhere, the website too (on a board it says it will start
+  back on the home screen, and does). It waits for the opening to be over: the `aa:opened` event, or a poll
+  every 400 ms for up to 30 s (a clock that stands still while the terms or the phone's notification
+  question, `push.asking`, are open) for a drawn home screen with nothing over it (`homeFree`, which also asks
+  the page what is under the header). Once (`homeTour: 'done'`): finished, skipped, Back, or walked out of
+  into a sheet or a board. A header that changes under it (the league chip, the purse, a face) moves the
+  spotlight (a `MutationObserver`), and on a short screen the page is scrolled by as little as clears the card.
 - **The brain has a rank** (`RANKS`, `arrowsShot`, `rankOf`, `loseArrows`, `.aa-card-rank`): Newbie to
-  GOAT at 6,236 arrows, fourteen steps, earned by the arrows on cleared boards and lost by the arrows left
-  on lost ones, synced with the account, and separate from the level — see "The brain on the home screen"
+  GOAT at 6,236 arrows, fourteen steps, earned by the arrows on cleared boards and lost by some of the arrows
+  left on lost ones (the first loss of a fresh start, at most half the board, given back by a free life), synced with the account, and separate from the level — see "The brain on the home screen"
   above. Under the brain: the rank and `Level n`, nothing else.
 - **The home corner is the player** (`renderHomeCorner`, `.aa-home-face`): signed in, the settings button
   in the top-right corner shows the player's own picture (their initial without one) and still opens
@@ -951,10 +1058,13 @@ links.
 - **Every button is the brain's colour** (`.aa-btn`: the rose-to-coral gradient of Play & Discover, white
   text), the table tiles (`.aa-stake`) carry the same rose in their wash and edge, and the dashboard header
   is one row: the picture, the name, the gold to its right (`.aa-me-id`). "Get a free life" stays orange.
-- **The app asks for notifications on first open** (`notifyFirstAsk`): the phone's own dialog the moment
-  the app is up, once (`pushAsked`); the answer is kept, and the switch in Settings stays. Browsers are
-  never asked unprompted. **No card before a system dialog**, in the app or the browser: the switch is the
-  question.
+- **The app asks for notifications once** (`notifyFirstAsk`): the phone's own dialog, once (`pushAsked`);
+  the answer is kept, and the switch in Settings stays. Never on the way in: it used to be the moment the app
+  was up (Accept, and a timer at boot), over the opening; see "The opening". It is asked **after the first
+  result** instead (`askAfterResult`: 1.2 s after a board's result card or a training round's result, and
+  only while that result is still on screen), the first moment a reminder has something to remind about.
+  Browsers are never asked unprompted. **No card before a system dialog**, in the app or the browser: the
+  switch is the question.
 - **Buttons carry the logo's brain** (`.aa-btn::after`: the white mark, faint, on the right, as Play &
   Discover does). **The home brain's arrows are always the rose** — GOAT is the whole brain lit, not a
   green one — and **lit arrows keep moving** (`aabrainflow`: a small step along each arrow's own direction
@@ -971,21 +1081,26 @@ links.
   consecutive days that round was played, ending today or yesterday), a bar under the round in the list. The
   painting's credit after a round sits behind a `?` (`data-train-info`), and so does the sheet's own
   explanation (`data-train-about`). The rounds are cards with **drawn icons** (`TRAIN_ICON`: line marks in the
-  brain's colour, no emoji). **Every round is taught the way the board is** (`TRAIN_COACH`, `trainCoachStart`/`Show`/`Place`/`Event`/`End`): the first time a round is opened, a spotlight (`.aa-coach-spot`) sits on the thing to touch, a one-sentence card sits under it, and where the move is a drag a hand (`.aa-hand`, Web Animations) makes the move over and over until the player does; each step clears itself on the move it asked for (`wait`: `placed`, `found`, `play`, `ask`) or on Next; once through or skipped it is not shown again (`trainHow:<id>`). The three-step text stays behind the `?` in the round's bar (`trainHowCard`). **Restore the Canvas is drag and drop** (`canvasDragWire`, `canvasDrop`: pointer events, a carried copy `.aa-art-drag`, the slot under the finger lit `.is-over`, a swap when dropped on a full slot from another slot, `touch-action:none` so a drag never turns into a scroll; a piece dragged out of the frame goes back to the tray. Dragging is the only way a piece moves — the tap-then-tap way is gone, so there is one thing to learn; Gallery Memory is wired through the same `trainDragWire`, and its coach shows the hand carrying the first painting to place 1). **Every round is free once a day** (`trainPlay`, `trainFree`, `train:<day>.pp` counted when a round
-  starts). Once a round is scored its card, and its result, offer two things: **Play again**, the same puzzle
+  brain's colour, no emoji). **Every round is taught the way the board is** (`TRAIN_COACH`, `trainCoachStart`/`Show`/`Place`/`Event`/`End`): the first time a round is opened, a spotlight (`.aa-coach-spot`) sits on the thing to touch, a one-sentence card sits by it, and where the move is a drag a hand (`.aa-hand`, Web Animations) makes the move over and over until the player does; each step clears itself on the move it asked for (`wait`: `placed`, `found`, `answer`; such a step has no Next, only Skip) or on Next. The coach starts when the round's play does -- after Go and after the look, which is not spent reading -- and its numbers are the round's own level's (`p`, `tierParams`: "Three patches", "time past 1:30", "Three times over"). The card sits at the bottom unless what it points at reaches down into it, then at the top just under the sheet's head, so ← is never under it; a piece being carried sees through it (`body.aa-dragging`). A round played to its end counts as learned, whatever card was up; once through or skipped it is not shown again (`trainHow:<id>`). The three-step text stays behind the `?` beside the round's name (`trainHowCard`; the round holds while it is open, and Back or Escape close it first). **Restore the Canvas is drag and drop** (`canvasDragWire`, `canvasDrop`: pointer events, a carried copy `.aa-art-drag`, the slot under the finger lit `.is-over`, a swap when dropped on a full slot from another slot, `touch-action:none` so a drag never turns into a scroll; a piece dragged out of the frame goes back to the tray. Dragging is the only way a piece moves — the tap-then-tap way is gone, so there is one thing to learn; Gallery Memory is wired through the same `trainDragWire`, and its coach shows the hand carrying the first painting to place 1). **Every round is free once a day** (`trainPlay`, `trainFree`, `train:<day>.pp` counted once the round
+  is on the screen, `trainBegun`). Once a round is scored its card, and its result, offer two things: **Play again**, the same puzzle
   for nothing, as often as the player likes, and **Play next**, a new puzzle of the same round (a new painting,
-  a new deal: `train:<day>.nx` per round is the serial folded into `artPicks` and every round's day seed
-  through `train.serial`) for an advertisement the player chooses each time (`adOffer('trainplay')`); where
-  advertising is off (the site) Play next is simply free and nothing says AD. Before a round is scored its
-  card has one chip, Play (`trainCardState`, `.aa-train-cta`, `chipAgain`/`chipNext`); the card itself is a
+  a new deal: `train:<day>.nx` per round is the serial, moved on once the new puzzle is on the screen) for an
+  advertisement the player chooses each time (`adOffer('trainplay')`); where advertising is off (the site) Play
+  next is simply free and nothing says AD. An advertisement watched for a puzzle that never came -- the player
+  went back or closed the sheet while it played, or the paintings would not load -- starts nothing behind their
+  back and is owed (`train.owed`, `trainOwed`): that round's next Play next that day is free and says so. An
+  advertisement that did not come says "No advertisement right now. Play again is free."
+  Before a round is scored its card has one chip, Play (`trainCardState`, `.aa-train-cta`, `chipAgain`/`chipNext`); the card itself is a
   div with role button, the chips are buttons inside it carrying `data-train-mode`. The line above the list
   (`trainTally`) is "Four rounds, free every day", then "2 of 4 done today · 3 days in a row" -- never "done
   for today" while a round is still to play -- and with all four "Congratulations! Today's brain training is
   done. You can keep training by watching an ad." (on the site, where Play next is free: "…with Play next");
   the result says the same in short ("✓ 1 of 4 done today", "✓ Congratulations! Today's brain training is
   done."), and "Brain Score today" once there are two. With a streak alive and nothing played yet it says "3
-  days in a row · play today" in rose. The streak counts a day with one round scored (`trainDone`); `trainAll`
-  is the bonus of all four; the per-round bar counts days that round was played, in all (`trainRun`: cumulative). The home pill is
+  days in a row · play today" in rose. The streak is **the game's one streak** (`playStreak`, `streakNow`):
+  a round scored counts its day (`trainSave` → `bumpDay`) exactly as a board cleared does, so the sheet and
+  the flame on the home screen say the same number; `trainAll` is the bonus of all four, and the first time
+  all four are scored in a day it earns a streak freeze; the per-round bar counts days that round was played, in all (`trainRun`: cumulative). The home pill is
   a dot until something is scored, then the day's Brain Score. In a round and on its result the corner button
   is ← back to the list (`trainScreen`, a capture-phase handler before `closeSheets`; the phone's back button
   does the same in `backPressed`); on the list it is ✕. **The round marks
@@ -1002,48 +1117,91 @@ links.
   scrolls, and a hundred Mughal, Deccani, Bengal, Rajput, Pahari, Jain, Persian, Ottoman, Tibetan, Nepalese
   and Burmese works, so the gallery has something near for most of the world, listed with title, painter, date and source in `games/data/art.json` (fetched once,
   `ART_VERSION`, `loadArt`) and kept resized (≤ 800 px, ~13 MB in all, fetched a painting at a time) in `images/art/`, cached forever by
-  the worker. The day's works are the same for everybody (`artPicks`, seeded by the day). Every round fits the screen (`trainFit`, run when a round draws and on resize): what a round draws under its line gets the room left below it, read from the layout (offsets up to the sheet, the panel's bottom padding, and a further safe strip, `TRAIN_SAFE`, 24 px, for a gesture bar or a toolbar coming back), and the paintings are as big as that room allows and no bigger, so both halves of the Forgery, the whole frame with its tray (the tray takes five to ten columns, whichever leaves the frame widest, then the pieces biggest, with a 30 px floor under a piece and 36 px under a place in the frame: where even that leaves no room for the whole frame the frame gives way, not the pieces, and on the shortest screens the tray's last row scrolls), the Curator's painting and then its four details are on the glass together, nothing to scroll for. **Restore the
+  the worker. **No painting hangs twice in a day** while the gallery has one not yet seen (`artDay`,
+  `artMains`, `artOthers`): the day has one order of works -- the player's window shuffled by the day, then the
+  works past it, nearest first -- and each puzzle of the day (a serial) takes the next ones in a fixed order
+  (the canvas, the forgery, the curator's painting, the gallery's wall), so a puzzle hangs the same paintings
+  whenever it is played and later puzzles reach past the window; the Curator's other details come from works not
+  yet shown whole that day. Same home country, same day, same history: same paintings. **Every round starts with
+  a count-in** (`trainCount`, `trainVeil`, `.aa-train-count`, `TRAIN_COUNT`): once its paintings are fetched and
+  decoded (`artReady`: `new Image()` and `decode()`, at most `ART_WAIT_MS` 7 s, "Hanging the paintings…" while it
+  waits -- so no look or clock runs over an empty frame, and the Curator's four details all arrive before its
+  painting is shown, where on a slow line the right one used to appear first), an opaque veil over the round's
+  own box counts 3, 2, 1, Go with the online room's sounds (`SFX.tick` on each number, `SFX.go` and a buzz at Go)
+  and a line saying what is coming, built from the round's level ("Five paintings, 5 seconds. Remember the
+  order."); the number pops, not under reduced motion. The painting and the hint are under the veil, the sheet's
+  ← and ? above it, and nothing of the round runs until Go. **A round holds** (`trainHold`/`trainRelease`, a set
+  of reasons behind `train.paused`: the Leave question, the `?` card, a hint's advertisement, the app or tab in
+  the background, the count-in): its timers skip, the count-in waits, and when the last hold comes off the look's
+  end and the play clock move on by the time held, so nothing is counted that was not played. Going into the
+  background veils the round at once ("Paused"); coming back runs the count-in again, then the music. Every start
+  carries a token (`train.run`) checked after each wait, so a round left while its paintings loaded never runs
+  behind the list, and a second finger or a round left mid-drag leaves no carried copy on the glass
+  (`train.drag`, `trainDragClear`, `lostpointercapture`). Drags, flights and the coach read the page's own
+  coordinates (`ptOf`, `rectOf`), so they are right in a phone browser held sideways. **The round's bar**
+  (`trainHud`, `trainStat`) is the level chip, then what is happening now with its mark -- an eye and "Look 3s"
+  with a bar draining under the row (`trainLook`), a clock against the allowance ("0:12 / 1:30", `trainClock`),
+  "2 of 5 placed", "Question 1 of 3" -- and the Hint, which looks disabled (`aria-disabled`, `trainHintSync`)
+  whenever it could do nothing; the round's name and its `?` are the sheet's head (`trainHead`). Every round fits the screen (`trainFit`, run when a round draws and on resize): what a round draws under its line gets the room left below it, read from the layout (offsets up to the sheet, the panel's bottom padding, and a further safe strip, `TRAIN_SAFE`, 24 px, for a gesture bar or a toolbar coming back), and the paintings are as big as that room allows and no bigger, so both halves of the Forgery, the whole frame with its tray (the tray takes five to ten columns, whichever leaves the frame widest, then the pieces biggest, with a 30 px floor under a piece and 36 px under a place in the frame: where even that leaves no room for the whole frame the frame gives way, not the pieces, and on the shortest screens the tray's last row scrolls), the Curator's painting and then its four details are on the glass together, nothing to scroll for. **Restore the
   Canvas** (`canvasStart`) cuts one painting into pieces (`.aa-art-tile`, the picture as a background
-  at n × 100 %): the painting hangs whole in the frame for four seconds (`CANVAS_LOOK`, a countdown in the
-  bar, no dragging, the coach's first step), then it comes apart and the pieces tumble into the tray
+  at n × 100 %): after Go the painting hangs whole in the frame for four seconds (`CANVAS_LOOK`, "Look 4s"
+  draining in the bar, no dragging), then it comes apart and the pieces tumble into the tray
   (`canvasScatter`, `trainFly`: each piece flies from the slot it hung in to its place in the tray, one after
   another with a small tumble, `SFX.scatter`, nothing under reduced motion) and the clock starts; drag each
-  piece home; scored on wrong tries and time over the allowance. **The Forgery**
+  piece home; scored on wrong tries and time over the allowance. A full frame with pieces out of place marks
+  them (`.aa-art-slot.is-wrong`) and charges each wrong placing once, the first time the frame is full with it
+  (`trainCharge`), so finding them costs nothing more. **The Forgery**
   (`forgeryStart`) shows the painting and a copy with patches wrong in it (`artPatch`: mirrored,
-  recoloured, taken from elsewhere in the same work, cycling); tap them in the copy, under the original or beside it,
+  recoloured, taken from elsewhere in the same work, cycling), each placed where it shows (`forgeLies`,
+  `lieSeen`: the decoded painting read small into a canvas, and a spot refused where the copy would differ from
+  the original by less than `LIE_SEEN` -- about the flattest fifth of the gallery's spots of each kind -- and a
+  patch "from elsewhere" taken at least 1.5 patches away); the clock starts at Go, and finds in a row climb in
+  pitch (`SFX.cheer`); tap them in the copy, under the original or beside it,
   whichever leaves the two bigger on that screen (`trainFit` decides and the line says which). **Gallery Memory**
   (`galleryStart`) hangs the paintings numbered for a few seconds, takes them down (the same `trainFly`
   flight, each painting falling from where it hung to where it lands in the tray, `SFX.scatter`), and deals
   them into a tray: the player **drags each one back to its number** (`galleryDragWire`, `galleryDrop`, `galleryDraw`,
   through the same `trainDragWire` as the canvas; a piece dropped on a full place swaps with it, one dragged
   out goes back to the tray). When every place is filled the wrong ones are outlined (`.is-wrong`,
-  `galleryCheck`, ten points each) and the round goes on until all hang right; the hint hangs the first
+  `galleryCheck`, ten points for each wrong placing, charged once) and the round goes on until all hang right; the hint hangs the first
   wrong one where it belongs and locks it. **Leaving a round is asked about** (`trainBack`, from the corner
-  arrow and the app's Back): "Leave this round? It is not scored, and it starts again from the beginning next
-  time." -- Leave the round / Keep playing, the game's own `ask` dialog, as leaving a board is; the round's
-  clock does not count the time the question was open; from a result there is no question. **The Curator's Eye** (`curatorStart`) shows one painting for a
-  few seconds, then, several times, four details — which is from it? **Every round gets harder the way the
+  arrow, the app's Back, Escape, and a tap in the margin beside a round on a wide screen): "Leave this round? It
+  is not scored, and it starts again from the beginning next time." -- Leave the round / Keep playing, the game's
+  own `ask` dialog, as leaving a board is; the round holds while the question is open; from a result there is
+  no question. **The Curator's Eye** (`curatorStart`) shows one painting for a
+  few seconds, then, several times, four details — which is from it? Each detail is a square of its painting as
+  it hangs (`curatorPatch`, `artPatch` with its own vertical fraction), so a wide or tall work is not squashed,
+  and somewhere with something in it (`DETAIL_SEEN`); right answers in a row climb in pitch. **Every round gets harder the way the
   board does** (`TRAIN_TIERS`, `trainTier`, `TIER_OF_ROUND`, `tierParams`): five difficulty steps per round,
   not shown -- a player plays for levels, and those are the main count's, below; a day scored 85 or more takes
   the round up a step, a day under 50 takes it down, read off the days before today so the step holds still
-  within a day and every device with the same history agrees. Step 1 → 5: the canvas 3×3 → 5×5 pieces
+  within a day and every device with the same history agrees, and off each day's first finish of its free
+  puzzle (`train:<day>.f1`, `trainFirst`), not its best, so a puzzle replayed until it is known by heart cannot
+  climb it; a day kept before first scores were is read by its best. Step 1 → 5: the canvas 3×3 → 5×5 pieces
   (allowance 90 s → 200 s), the forgery 3 → 5 patches, smaller and closer in colour, the gallery 5 → 8
   paintings shown for 5 → 4 seconds, the curator 3 → 5 questions with smaller details after 6 → 4 seconds.
   **Every training puzzle finished is a level on the main count** -- the same count as the home card's "Level
   N" and the boards' numbers (`levelNo`): a puzzle is a round's serial of the day (0 the free one, then each
-  Play next), its first finish is kept with its time (`train:<day>.cl`, round → serial → when; `trainSave`,
-  `trainCleared`) and takes its place among the boards by that time (`trainClearTimes`); Play again replays the
-  same serial, so it is never a second level. A round scored before clears were kept counts its free puzzle,
+  Play next), its first clear is kept with its time (`train:<day>.cl`, round → serial → when; `trainSave`,
+  `trainCleared`) and takes its place among the boards by that time (`trainClearTimes`). A clear asks for a
+  score of 50 (`TRAIN_PASS`): a round finished under it keeps its score but is no level, and its result says
+  "Score 50 or more to clear this puzzle" with Play again first. Play again replays the same serial, so it is
+  never a second level, and deals it anew (`trainSalt`: a new shuffle, new lies, new options, a new order on the
+  wall, salted with the round's starts that day). A round scored before clears were kept counts its free puzzle,
   at the day's last save. The round's bar shows the level finishing it will be (`levelChip`, `.aa-train-lv`,
   nothing on a replay), the result the level it was. The clears sync with the rest of the day (the server keeps
-  the union, the earliest time of each: `cleanTrainDay`, `mergeTrainDay`). Every round ends with the work's credit (`artCredit`, behind the `?`). Every round has a **Hint**
-  (`trainHint`): one free a day (`TRAIN_FREE_HINTS`, `train:<day>.h`), then an advertisement the player
-  chooses (`adOffer('trainhint')`, free where advertising is off); a hint costs ten points of that round
+  the union, the earliest time of each: `cleanTrainDay`, `mergeTrainDay`; the first scores `f1` by the lower per
+  round, on the account and on the device, `trainMergeF1`). Every round ends with the work's credit (`artCredit`, behind the `?`). Every round has a **Hint**
+  (`trainHint`): one free a day (`TRAIN_FREE_HINTS`, `train:<day>.h`, counted on the round's own day), then an
+  advertisement the player chooses (`adOffer('trainhint')`, free where advertising is off; the round holds while
+  it plays); only when it would do something (`g.canHint`, each round's `hint()` answering whether it acted), so
+  a press before Go, in a look or with nothing left to show spends nothing; a hint costs ten points of that round
   (a piece put home and locked, a lie circled, the next painting marked, one more short look). Kept per day
   as `train:<day>` (best of the day per round, `h` hints used, `p` rounds played), pushed in the state blob
   as `train` and merged by the better score per round and the larger `h`/`p`, on the account
   (`combineState`) and on the device (`adoptTour`), so a round played on the phone shows on the website and a
-  second device gets no second free round; the streaks merge as runs of days (`mergeStreak`), and a push carries
+  second device gets no second free round; the streaks merge as runs of days (`mergeStreak`; the freezes held
+  are the later day's, the more of the two on the same day), and a push carries
   the last 120 days (`STATE_SEND_DAYS`), 400 after a long gap; the sheet shows the score, seven days of bars and the streak of days
   done. The page's title, description and keywords say brain training first.
 - **A sweep for dead and doubled code** (September 2026): gone from `js/puzzle.js` are three icons nothing
@@ -1065,9 +1223,9 @@ links.
   nothing to anything else answering the scheme. One button: the app's own way first, the browser by itself
   when that fails. The first notification ask no longer bails on "not granted", which on Android 13+ is
   what a permission never asked for looks like.
-  The welcome screen shows the brain mark instead of the old arrows, and **the app asks for notifications the
-  moment Accept is tapped** (`notifyFirstAsk` waits for `welcomed`, signed in or not: `notifyInitApp` no
-  longer needs an account).
+  The welcome screen shows the brain mark instead of the old arrows, and **the app asked for notifications the
+  moment Accept was tapped** (`notifyFirstAsk` waits for `welcomed`, signed in or not: `notifyInitApp` no
+  longer needs an account). No longer on the way in: see "The opening".
 - **The invite flow, audited** (September 2026). Fixed: signing in from a challenge link now brings the
   lobby socket up too (`signedIn` calls `authLoad(true)` on both paths), so later invitations reach that
   player; the challenge link survives the app's browser sign-in, which comes back as a fresh page
@@ -1088,11 +1246,35 @@ links.
 - **The evening nudge needs no account.** Notifications are offered signed out too (`renderNotify` no
   longer waits for `auth.user`); a token or subscription is posted with no user, with the device's own
   nudge answer (`remindOn()`, `reminder` in the post, `store 'remind'`), and the 7 pm sweep reaches those
-  rows by zone with a note that carries no name (`deviceTargets`, `dailyNote('')` → "It's time to train
-  your brain"). Signing in posts the same token again and the row takes the account; signing out posts it
+  rows by zone with a note that carries no name (`deviceTargets`, `dailyNote('')`). Signing in posts the same token again and the row takes the account; signing out posts it
   again with none (`notifyRelease`), so the nudge keeps coming while the account's invitations and league
   stop. Backend: migration `017_anon_push.sql` (nullable `user_id`, `reminder` per row), `/push/*` routes
   open to strangers under the address limit, `/push/reminder` by token or endpoint when signed out.
+- **The evening nudge fits the evening** (`reminder.ts`, `push.ts`). Nobody who has played today is told
+  (`targets`: no `playStreak.last` and no training round scored on the zone's date, from `users.state`).
+  What it says fits where they are: a streak still alive (played yesterday, or the day before with a freeze
+  to cover it: `aliveStreak`) hears "Your N-day streak ends at midnight"; anyone else what is waiting
+  ("Today's four rounds are ready"), never that a streak they no longer have is at stake (`dailyNote(name,
+  {kind, streak, tmpl})`, five wordings of each, `NUDGES`, taken in turn per player: the last one used is
+  kept in Redis, `tmpl:<id>`, `nextTemplate`). It backs off (`nudgeKind`, counted from the last day played:
+  the latest of the streak's day, the last training day and `last_played_at`; for a device with no account,
+  the day it last opened the game): every evening for the first three days away, then every third day, one
+  last "We'll stop reminding you" note at 15–21 days (once an absence, `nudgebye:<id>:<day>`), then nothing
+  until the player plays again. `last_played_at` moves only when a push brought something new — a board, a
+  count, a training round, a streak day (`mergeLevels`/`mergeStats` rows moved, `playedIn`) — not on the
+  sync every open of the app makes; a delivered push no longer counts as the device being seen.
+- **One streak, with freezes** (`bumpDay`, `stepStreak`, `streakNow`, `playStreak`): a day counts when a
+  board is cleared (`keepWin`) or a training round is scored (`trainSave`, the round's own day), one number
+  for the home screen, the training sheet and the evening nudge. `playStreak` is `{count, last, freeze}`:
+  0–2 streak freezes held, earned by the first time all four rounds are scored in a day and by every seventh
+  day of a streak, never bought, spent by themselves when the player comes back after exactly one missed day
+  (the covered day counts, so the run stays one stretch of the calendar and two devices' runs still join);
+  a second missed day ends the streak and keeps the freeze. A **flame and the count** sit in the home bar
+  (`#aaStreak`, `renderStreak`), rose while today is still to play, the freezes on its corner; a tap says the
+  rule. The result card and the training result say a milestone (3, 7, 14, 30, 50, 100 days) and a freeze
+  spent or earned (`streakNews`). Merged on both sides (`mergeStreak`): the freezes are the later day's, the
+  more of the two on the same day; commutative and idempotent. On a crowded phone bar (signed in, a streak and
+  the league, under 420 px) the gaps close and the league chip shows its trophy only.
 - **The build line is hidden where players are.** "Build N" under the credit shows only on localhost or
   in the debug app (`el.build.hidden = !devAllowed()`), the same places the seven taps work; a player's
   Settings ends at the credit line.
@@ -1139,32 +1321,52 @@ links.
   cut out of the **shape** — two rings with a gap — rather than masked out of the
   grid afterwards, so the split is there at every size, the home screen's outline
   included. In the game one is `{ id:
-  'f:<id>', name, d, k, focus: true }`. `tourFor` puts the whole block at the
-  **frontier**, in front of the first board the player has not cleared: a new
-  player's level 1 is the brain, and a player who has already cleared a hundred
-  countries meets them next rather than never (appending) or behind a wall
-  (putting them first would lock the country they were on). Their progress stays
+  'f:<id>', name, d, k, focus: true }`. `tourFor` starts them at the
+  **frontier**, right after the last board the player has cleared (`frontierOf`;
+  not in front of the first board without a record, which for a player who had
+  passed the scene slots added behind them was a hole a hundred levels back), and
+  **deals them in among the tour**, one after every two tour boards, until they run
+  out: a new player plays the brain, then the home country and its discovery board,
+  then the next focus board, and so on (26 abstract shapes in a row used to keep a new
+  player off the map and the countries' discoveries for an hour). The ones already
+  cleared stay together behind the frontier, so a player who has passed them all
+  meets the tour exactly as before. The list is built again on every load and sync, so
+  where the rhythm stands is read off the first-clear times (the tour boards cleared
+  since the last focus board), and the next board is the same before and after a
+  reload; a focus board put off with Skip for now (`focusLater`) comes after the rest. Their progress stays
   on the device (`isLocalOnly`): the account's progress is a list of country ids
   and a board that is not a country has no place in it. They are counted out of
   "N countries discovered" on the map, and the win card gives them **no facts
   line and no YouTube line** — a country has something to tell you when you clear
   it and a lightbulb has not. **Level numbers are the player's own progress**
-  (`levelNo`): cleared boards ranked by clear time, then the board in hand is
-  cleared-count + 1. The list only decides what comes next; a player who cleared
+  (`levelNo`): cleared boards ranked by the time of their first clear (a replay
+  keeps it), each id counted once, then the board in hand is cleared-count + 1.
+  The list only decides what comes next; a player who cleared
   63 countries before the discovery boards existed is on level 65, not back on
-  level 4 because Bhutan's animal sits fourth in their list. Milestones (every
-  10th) and the share text use that number; `#level-n` (position in the list)
-  is still read for old links. The win card is deliberately short: kicker, name,
+  level 4 because Bhutan's animal sits fourth in their list. A board already
+  cleared reads **`Replay`** in the header, with its name under it, never the number
+  it was cleared at; a new board reads `Level N` with N the same number as the home
+  screen and the training chip (`levelNo(-1)`). A sync that brings clears from
+  another device (training included) re-maps the board in hand in the rebuilt list
+  and redraws the header at once (`adoptTour`). A board is a milestone when the count
+  passes a multiple of ten (`crossedTen`), and the share text uses the number;
+  `#level-n` (position in the list) is still read for old links. The win card is deliberately short: kicker, name,
   the subtitle under it (what the find is, or capital, population and region for
   a country, and nothing at all on a focus board), stars, the four stats, the fact box on discovery boards, then Next,
   Play again and Share. No World Tour button: the back arrow in the HUD already
   leads there. The best-time line and
   the paragraph explaining what the player's form did to the next tier were both
   dropped as noise; the record is still kept and the tier still shows on the
-  Next button. The result card's Next button and Skip go to the
-  next *open* board (`nextOpen`: first uncleared, unlocked level further down
-  the list, else from the top), never to a replay of a cleared one. The boards file is loaded with the level
-  data, not in the background. The HUD says only `Level n`; the start toast
+  Next button, which names the tier the next board is really dealt at (`tierFor`,
+  the rule `startLevel` deals by). Play & Discover, the map's marker and the result
+  card's Next all go to the next *open* board **forward from the frontier**
+  (`nextOpen`: the first uncleared, unlocked board at or after the slot after the
+  last clear, and only when nothing is left ahead the first open one anywhere),
+  never to a replay of a cleared one; open boards behind the frontier (scene slots
+  added after the player passed them) wait until then. After a win the address
+  moves to that next board, so an Android relaunch does not reopen the board just
+  cleared. The boards file is loaded with the level
+  data, not in the background. The HUD says only `Level n` (or `Replay`); the start toast
   ("Bangladesh's animal · 104 arrows · what is it?") is the one hint. No quiz after a
   discovery board (a quiz after every board wears thin, and guessing "Karabakh
   horse" from a horse silhouette is unfair): the card says what it was and why
@@ -1198,8 +1400,11 @@ links.
   account is in the dashboard because Google Play requires it. A new account is
   created with `PUZZLE_SIGNUP_GOLD` (10,000), written as a `signup` row in
   the gold ledger, so the welcome purse lands exactly once: signing out and back
-  in never tops it up. The balance rides along in every `user` object and shows
-  on the dashboard.
+  in never tops it up, and neither does deleting the account and signing in
+  again — a deletion leaves a one-way hash of the Google id in
+  `account_tombstones`, and the account made later starts with 0 gold (the
+  delete confirmation and the privacy policy both say so). The balance rides
+  along in every `user` object and shows on the dashboard.
   `games/puzzle/tests/` covers the security-critical half against a real
   PostgreSQL: which ID tokens are accepted (audience, issuer, expiry, unverified
   accounts, junk answers), that one Google account makes exactly one player, that
@@ -1291,9 +1496,14 @@ links.
   **The room answers back** (`SFX`): every button in the game plays a short `tap`
   on `pointerdown` (one delegated listener; the board's arrows are not buttons,
   so they keep their own shot), a player arriving plays `join` and a buzz, one
-  leaving plays `left`, the last three seconds of the clock `tick`, and the board
-  being dealt plays `go`. All of it goes through the same `beep`, so the sound
-  switch silences the lot. The countdown is counted down on the device between
+  leaving plays `left`, the last three seconds of the clock `tick` (and pop), and
+  the board being dealt plays `go`. The ticks come from whichever clock gets to a
+  number first, the one counted here or the server's `countdown_tick` over the
+  socket (`fillShow`, `state.ticked`: one number never ticks twice), and at nought
+  the card says "Get ready…" while the server's sweep starts the room; `go` is a
+  race starting, not a player coming back onto one already run (`playMatch`). The
+  same two sounds count in every Daily Training round. All of it goes through the
+  same `beep`, so the sound switch silences the lot. The countdown is counted down on the device between
   polls and pulled back to the server's number whenever the two drift two seconds
   apart, which is what a backgrounded tab does to it.
   **Coming back to a race board puts the player back in the match**, not just back
@@ -1310,7 +1520,16 @@ links.
   asking again cannot change that answer — and the card now names the real reason
   (signed out, not your match, gone) instead of blaming the network for
   everything. The server takes the first result per player and no other, so
-  sending it twice is safe.
+  sending it twice is safe. It also takes a clear only once the match has run,
+  on its own clock, as long as the fastest honest clear of its boards takes
+  (`PUZZLE_MIN_BOARD_MS` a board); sooner it answers `too_early` with when, and
+  `sendResult` waits that long and sends it again — the result is kept on the
+  device before it is sent, so a reload in the middle still sends it.
+  **Gold for an advertisement** (`adOffer`, `adTicket`, `adClaimGold`) asks the
+  server for a ticket before anything is shown and claims with it; no ticket (the
+  day spent, or the server unreachable) means no advertisement for gold, and the
+  toast says why. Without advertising (the web's free lifeline) the gold arrives
+  after the few seconds the server holds every ticket for, and the toast says so.
   **Faces** (`faceInner`, `faceClass`, `wireFaces`): a player is their Google
   profile picture where there is one, and their initial on one of eight colours
   picked from a hash of their name where there is not — two players called Ariyan
@@ -1426,10 +1645,44 @@ links.
   permissions, children, playing without an account), linked from the welcome gate
   and Settings. Clearing the site data wipes every `aa:v1:*` key; Settings →
   Delete account removes the account copy.
-- **First open / launch**: `#aaGate` (welcome, Terms + Privacy links, Accept,
-  stored in `aa:v1:welcomed`), then `#aaSplash` (logo + one line from `QUOTES`,
-  rotating per launch in `aa:v1:launches`, tap or 2.4 s to dismiss, skipped for
-  `#level-N`/`#daily` deep links and once per browser session).
+- **The opening** (`#aaSplash`; the inline scripts in `puzzle/index.html` and "The opening" in
+  `js/puzzle.js`): one surface from the first frame to home, where there used to be a welcome gate, a flash
+  of the home screen and a 2.64 s splash with a second, differently placed brain.
+  - **The first frame is the opening.** An inline script at the top of `<head>`, before any stylesheet,
+    decides it (`openingPlan`: first open, later open, or none) and sets `html.is-opening` (`is-first`) and
+    the theme from `localStorage`, every read guarded; `#aaSplash` is shown by that class, never `hidden` in
+    the markup, and the home screen is never painted before it.
+  - **The brain is the app's splash, continued**: drawn inline, 96 px, dead centre of the layer, in the ink the
+    app's splash uses (`--mark`), so the phone's splash hands over to the page without a visible change
+    (android/README.md, "The splash"). While the line types it turns the rose of the brain (not with reduced
+    motion).
+  - **The line types itself**, letter by letter (`typeSchedule` in the second inline script: about 34 ms a
+    letter and a breath after punctuation, squeezed into a budget). Every letter is its own span, laid out from
+    the start and shown by a CSS delay, so it runs on the compositor while the game's 418 KB script loads; it
+    waits for the web font (0.25 s at most). The keys are `SFX.key` (pitch nudged letter by letter), `SFX.space`
+    for the return before "— Puzzle" and `SFX.ding` at the end, all quieter than a tap, all put on the audio
+    clock at once against the letters' moments, at most one every 45 ms and none on a space. In the app, whose
+    WebView lets sound play without a tap, the typing waits up to 0.6 s for the game script so the first
+    letter has its key; on the website the typing is silent until a gesture (`soundLive()` never makes a
+    context there before one, and never lets a key play late).
+  - **First open**: a quote from `QUOTES` (rotating by `aa:v1:launches`) and "— Puzzle" type in 1.8 s at
+    most, then the Terms and Privacy sentence and Accept fade in under them on the same surface (on a small
+    phone the stage slides up to make room). Accept (`aa:v1:welcomed`) fades straight into home. A tap or a
+    key finishes the typing and shows the terms at once. Through a link: the terms, nothing typed, and
+    Accept goes straight to what the link opened.
+  - **Later opens**: the quote once a day (`aa:v1:quoteDay`), "Train your brain." otherwise; into home once
+    the line has been read and home is drawn, never later than 2.64 s (the quote) or 1.3 s (the tagline),
+    waits included. A tap or a key goes to home at once. `resumeLive` still cuts it short for a match.
+  - **No opening** for a link (`#level-N`, `#b-…`, `#daily`, `#league`, `#m=…`, `#handoff=…`, `?handoff=`),
+    a reload in the same session (`sessionStorage aa:splash`), a warm resume (the page is not reloaded), or
+    reduced motion (whose first open shows the whole block at once, without typing or keys).
+  - **Themes**: night and mint open in their own colours from the first frame, except where the phone's own
+    splash was paper (app build 1, and build 2 on Android 12 and older): there the opening stays on that paper
+    (`is-paper-first`) and fades into the player's colours.
+  - `aa:opened` is dispatched on `window` once, when home is what is on the screen (after the fade, or, with no
+    opening, once home is drawn); `#aaSplash` is `hidden` from then on. No notification permission is asked on
+    the way in.
+  - **The home tour** follows in the app, on a phone that has played nothing (see "The home tour").
 - **Data**: `games/data/puzzle.json` (112 KB for 168 countries) built by
   `games/build-puzzle-boards.mjs` from world-atlas 110m + Natural Earth 50m
   properties: per country the outline (`d`, in a 100×100 box) and five tier
@@ -1445,7 +1698,9 @@ links.
 - **Adding countries**: append to `TOUR` and `CAPITALS`, rebuild, bump
   `DATA_VERSION`. Tiers by level index are in `TIER_OF` in the JS.
 - **PWA**: `puzzle/app.webmanifest` (and `games/arrow-atlas.webmanifest`, kept so copies installed under the old name update in place); the shared worker
-  `piece-the-world-sw.js` also caches this game's files.
+  `piece-the-world-sw.js` also caches this game's files. Opening the game (`openGame`) gives the network 2 s:
+  an answer in time is used as before, and after that the cached page is served while the network's answer
+  still goes into the cache, so a connection that is up but barely moving no longer holds the app's splash.
 - **Tests**: `node tests/puzzle.test.mjs` runs the production `generate()` on
   every level (and 100 random seeds on the hardest tier), checks solvability, full
   coverage, determinism and data shape.

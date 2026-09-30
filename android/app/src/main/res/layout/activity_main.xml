@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Three layers, and the order matters.
+<!-- The WebView, and the offline screen over it.
 
-     #content is padded by the window insets, so the game never draws under the clock or the navigation bar.
-     Android 16 makes the window edge-to-edge and offers no way out of it, so the padding is how the old
-     status-bar colour is reproduced: the root is the game's paper, the content stops short of the bars, and
-     what shows through behind the clock is that same paper.
+     Both fill the whole window, bars included: Android 16 makes every window edge-to-edge with no way out, and
+     the page is written for it (viewport-fit=cover, env(safe-area-inset-*) on all four edges), so it is the
+     page that keeps the game clear of the clock and the navigation bar. The offline screen is the one piece of
+     native UI, and MainActivity pads it by the insets itself.
 
-     #splash sits outside #content on purpose. It is the only thing that should reach the screen edges, it
-     covers the moment between the icon being tapped and the board being painted, and it is faded out by
-     MainActivity the first time the page commits a frame. -->
+     There is no splash view here any more. The splash is Android's own (Theme.App.Starting, installSplashScreen
+     in MainActivity), held until the page has painted; it used to be an ImageView over both layers, faded out
+     the first time the page committed a frame. -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/root"
     android:layout_width="match_parent"
@@ -66,13 +66,4 @@
         </LinearLayout>
     </FrameLayout>
 
-    <ImageView
-        android:id="@+id/splash"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:background="@color/paper"
-        android:padding="72dp"
-        android:scaleType="centerInside"
-        android:importantForAccessibility="no"
-        android:src="@drawable/splash" />
 </FrameLayout>

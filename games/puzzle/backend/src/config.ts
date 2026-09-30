@@ -81,6 +81,14 @@ export const config = {
     // a signup grant -- so the faucet cannot inflate an economy whose top table is 10,000,000.
     adGold: num('PUZZLE_AD_GOLD', 500),
     adGoldPerDay: num('PUZZLE_AD_GOLD_PER_DAY', 10),
+    // The least time between asking for an advertisement ticket and claiming its gold. The web's rewarded
+    // advertisements cannot be verified, so this is a bound rather than proof: ten claims take a script at least
+    // this long each, and no claim can come without a ticket asked for first. Fifteen seconds is shorter than
+    // the rewarded advertisements the networks serve, so a player who watched one through never waits on it.
+    adMinSeconds: num('PUZZLE_AD_MIN_SECONDS', 15),
+    // Until this moment a claim with no ticket at all -- from a page opened before tickets existed -- is still
+    // paid, one per adMinSeconds, under the daily cap (adticket.ts, adLegacyOk). Two weeks after the change.
+    adLegacyUntil: str('PUZZLE_AD_LEGACY_UNTIL', '2026-10-08T00:00:00Z'),
     // The tables a player can sit at. Five of them, three orders of magnitude apart at the top, so a new
     // account and one that has been winning for a month both have somewhere to play.
     stakes: str('PUZZLE_STAKES', '500,1000,10000,1000000,10000000').split(',').map(s => Number(s.trim())).filter(n => n > 0),
@@ -96,6 +104,13 @@ export const config = {
     // last sign of life a seat is treated as empty, and the account freed to play again. Twenty-four hours
     // was the only answer before, which is the rest of the day to a player who shut a tab by mistake.
     idleMinutes: num('PUZZLE_IDLE_MINUTES', 10),
+    // The fastest a board can honestly be cleared, on the server's own clock. A result that says "cleared" is
+    // counted only once now - started_at is at least this times the number of boards; earlier, it is answered
+    // 409 too_early and the client sends it again when told to. The easiest board the game deals has about 22
+    // arrows (ARROWS_GUESS in the client), and finding and tapping one free arrow takes a very quick human a
+    // quarter of a second at the least, so six seconds is under the fastest believable clear rather than near a
+    // normal one. It is a floor on the server's clock, so lag only ever makes a result later, never too early.
+    minBoardMs: num('PUZZLE_MIN_BOARD_MS', 6_000),
     // The board list the server picks from, so no client can choose an easy country.
     boardsFile: str('PUZZLE_BOARDS_FILE', '/srv/puzzle/site/games/data/puzzle.json'),
   },
@@ -110,6 +125,14 @@ export const config = {
     hours: num('PUZZLE_LEAGUE_HOURS', 168),      // 168 = one week
     ranks: num('PUZZLE_LEAGUE_RANKS', 10),
     baseGold: num('PUZZLE_LEAGUE_BASE_GOLD', 10_000),   // what last place in the prizes is paid
+    // What one player's week can take from any single opponent, netted over the week. Without it a prize could
+    // be bought with accounts: open a friends' room with a second account and let it lose. A hundred thousand
+    // is ten signup grants -- ten straight wins at the 10,000 table against the same person -- so honest
+    // play between friends still counts, and the rest of a big week has to be won from other people.
+    opponentCap: num('PUZZLE_LEAGUE_OPPONENT_CAP', 100_000),
+    // And a prize needs at least this many different people played in the week, so a week of two accounts
+    // passing gold back and forth is a place on the board and never a payment.
+    minOpponents: num('PUZZLE_LEAGUE_MIN_OPPONENTS', 3),
   },
 
   // ── Reaching a player who is not looking at the game ──

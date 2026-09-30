@@ -5,8 +5,8 @@
 // account that is signed in on it, disposable — and the words a notification arrives with.
 import { createVerify, generateKeyPairSync } from 'node:crypto';
 import { pool, query } from '../backend/src/db.js';
-import { appEnabled, cleanTz, dailyNote, dropSubscription, dropToken, hasSubscription, invitedNote, leagueNote, saveSubscription, saveToken, setDeviceReminder, setReminder } from '../backend/src/push.js';
-import { deviceTargets, isDue, localClock, reminderSweep, targets } from '../backend/src/reminder.js';
+import { appEnabled, cleanTz, dailyNote, dropSubscription, dropToken, hasSubscription, invitedNote, leagueNote, nextTemplate, NUDGES, saveSubscription, saveToken, setDeviceReminder, setReminder } from '../backend/src/push.js';
+import { aliveStreak, daysBetween, deviceTargets, isDue, localClock, nudgeKind, planFor, reminderSweep, targets } from '../backend/src/reminder.js';
 import { k, redis } from '../backend/src/redis.js';
 import { assertion, enabled as fcmEnabled, messageFor, parseAccount } from '../backend/src/fcm.js';
 import { eq, finish, ok, player, reset, section } from './helpers.js';
@@ -187,11 +187,11 @@ section('Seven in the evening, wherever the phone is');
   ok(!isDue({ date: '2026-09-22', hour: 19, minute: 10 }), 'ten past is not: the evening is missed, not sent late');
   ok(!isDue({ date: '2026-09-22', hour: 7, minute: 0 }), 'and seven in the morning is a different seven');
 
-  const n = dailyNote('Ariyan');
+  const n = dailyNote('Ariyan', { kind: 'back', tmpl: 1 });
   eq(n.kind, 'daily', 'the nudge is its own kind, so the app can give it its own channel');
   ok(n.title.startsWith('Hey Ariyan,') && /train your brain/.test(n.title), 'and it says who it is talking to');
   eq(n.url, '/puzzle/', 'and lands on the game');
-  eq(dailyNote('   ').title, 'It\u2019s time to train your brain', 'no name, no greeting: a device with no account is not called "there"');
+  eq(dailyNote('   ', { kind: 'back', tmpl: 1 }).title, 'It\u2019s time to train your brain', 'no name, no greeting: a device with no account is not called "there"');
 
   // Who is told: an account with a device in the zone, the nudge on, and no board in the last few hours.
   const a = await player('nudge-a'), b = await player('nudge-b'), c = await player('nudge-c'), d = await player('nudge-d');
@@ -257,6 +257,107 @@ section('A phone with no account is nudged too');
   eq((await tokensFor(e.id)), [], 'dropped by the phone, with no account in hand');
   await dropSubscription(pool, null, sub(31).endpoint);
   eq((await query(pool, `SELECT 1 FROM push_subscriptions WHERE endpoint = $1`, [sub(31).endpoint])).rowCount, 0, 'and so can a browser');
+}
+
+section('What the evening says: the streak it would end, or what is waiting');
+{
+  const s = dailyNote('Ariyan', { kind: 'streak', streak: 12 });
+  eq(s.title, 'Your 12-day streak ends at midnight', 'a streak still alive: its count, and when it ends');
+  eq(dailyNote('', { kind: 'back' }).title, 'Today’s four rounds are ready', 'a streak gone: what is waiting, not a streak at stake');
+  eq(dailyNote('Ariyan', { kind: 'streak', streak: 0 }).title, 'Today’s four rounds are ready', 'a streak kind with no streak says nothing about one');
+  eq(dailyNote('', { kind: 'final' }).title, 'We’ll stop reminding you', 'the last note says so');
+  ok(NUDGES.streak.length >= 4 && NUDGES.streak.length <= 6 && NUDGES.back.length >= 4 && NUDGES.back.length <= 6, 'four to six wordings of each');
+  for (const kind of ['streak', 'back', 'final'] as const) {
+    NUDGES[kind].forEach((_, i) => {
+      for (const name of ['Ariyan', '']) {
+        const x = dailyNote(name, { kind, streak: 9, tmpl: i });
+        ok(x.title.length > 0 && x.title.length <= 60 && x.body.length > 0 && x.body.length <= 160 && !/undefined|NaN|^,|\s,/.test(x.title + x.body), `${kind} ${i}${name ? '' : ' (no name)'}: "${x.title}" / "${x.body}"`);
+        if (kind === 'streak') ok(/midnight|9 days|make it 10|Day 10/.test(x.title + x.body), `${kind} ${i}: it is about this streak`);
+        if (!name) ok(!/Hey|^,/.test(x.title), `${kind} ${i}: no greeting for nobody`);
+      }
+    });
+  }
+  // taken in turn: the next of the same kind, the first of another
+  eq(nextTemplate('streak', null), 0, 'the first wording first'); eq(nextTemplate('streak', 'streak:0'), 1, 'then the next'); eq(nextTemplate('streak', `streak:${NUDGES.streak.length - 1}`), 0, 'round again');
+  eq(nextTemplate('back', 'streak:3'), 0, 'another kind starts at its first'); eq(nextTemplate('back', 'junk'), 0, 'junk remembered: the first'); eq(nextTemplate('final', 'final:0'), 0, 'the last note has one wording');
+}
+
+section('The evening backs off: three evenings, then every third, a last note at a fortnight, then quiet');
+{
+  eq(daysBetween('2026-09-20', '2026-09-23'), 3, 'days between two dates'); eq(daysBetween('2026-02-27', '2026-03-01'), 2, 'across a month'); ok(Number.isNaN(daysBetween('', '2026-09-23')), 'and none from no date');
+  const plan = Array.from({ length: 30 }, (_, d) => nudgeKind(d, false) ?? '-');
+  eq(plan.join(' '), '- back back back - - back - - back - - back - - final final final final final final final - - - - - - - -',
+    'days away 0-29: nothing today, daily for three, every third day, the last note in its window, then nothing');
+  eq([1, 2, 3].map(d => nudgeKind(d, true)), ['streak', 'streak', 'streak'], 'a streak alive is what the first evenings are about');
+  eq(nudgeKind(6, true), 'back', 'after that there is none');
+  eq(aliveStreak({ count: 5, last: '2026-09-22' }, '2026-09-23'), 5, 'played yesterday: alive');
+  eq(aliveStreak({ count: 5, last: '2026-09-21', freeze: 1 }, '2026-09-23'), 6, 'the day before, with a freeze to cover yesterday: alive, the covered day counted');
+  eq(aliveStreak({ count: 5, last: '2026-09-21' }, '2026-09-23'), 0, 'without one: gone');
+  eq(aliveStreak(undefined, '2026-09-23'), 0, 'no streak: none to lose');
+  eq(planFor({ id: 1, name: '', streak: { count: 5, last: '2026-09-21', freeze: 1 }, lastDay: '2026-09-21' }, '2026-09-23'), { kind: 'streak', streak: 6, since: '2026-09-21' }, 'the plan: a streak of six to keep, for the absence since the 21st');
+  eq(planFor({ id: 1, name: '', streak: undefined, lastDay: '2026-09-18' }, '2026-09-23'), null, 'five days away: a quiet evening');
+}
+
+section('The sweep: nobody who played today, the back-off, the wording in turn, one last note');
+{
+  const zoneDay = '2026-09-10', at = new Date('2026-09-10T13:00:30Z'), next = new Date('2026-09-11T13:00:30Z');   // 19:00 in Dhaka
+  const make = async (name: string, state: Record<string, unknown>) => {
+    const u = await player(name);
+    await saveToken(pool, u.id, fcmToken(name.slice(-1)).replace('fcm:', `fcm${name}:`), 'app', 'Asia/Dhaka');
+    await query(pool, `UPDATE users SET state = $2::jsonb, last_played_at = '2026-08-01T00:00:00Z' WHERE id = $1`, [u.id, JSON.stringify(state)]);
+    return u.id;
+  };
+  const alive = await make('sw-alive', { playStreak: { count: 5, last: '2026-09-09' } });
+  const today = await make('sw-today', { playStreak: { count: 5, last: zoneDay } });
+  const trained = await make('sw-trained', { train: { [zoneDay]: { r: 44, p: 1 } } });
+  const opened = await make('sw-opened', { playStreak: { count: 2, last: '2026-09-04' }, train: { [zoneDay]: { pp: { r: 1 } } } });
+  const five = await make('sw-five', { playStreak: { count: 2, last: '2026-09-05' } });
+  const bye = await make('sw-bye', { train: { '2026-08-26': { g: 70 } } });
+  const gone = await make('sw-gone', { playStreak: { count: 9, last: '2026-08-10' } });
+  const frozen = await make('sw-frozen', { playStreak: { count: 4, last: '2026-09-08', freeze: 1 } });
+  const who = (await targets('Asia/Dhaka', undefined, zoneDay)).map(u => u.id);
+  ok(who.includes(alive) && !who.includes(today) && !who.includes(trained), 'a streak day or a round scored today: not a target');
+  ok(who.includes(opened), 'a round started and not finished is not a round scored');
+  const t = (await targets('Asia/Dhaka', undefined, zoneDay)).find(u => u.id === bye);
+  eq(t?.lastDay, '2026-08-26', 'the last day played is the latest of the streak, the training and the last board');
+  const ids = [alive, today, trained, opened, five, bye, gone, frozen];
+  const clear = async () => { await redis.del(k('reminder', 'Asia/Dhaka', zoneDay), k('reminder', 'Asia/Dhaka', '2026-09-11'), ...ids.map(id => k('reminded', id))); };
+  await redis.del(...ids.map(id => k('tmpl', id)), ...ids.map(id => k('nudgebye', id, '2026-08-26')));
+  await clear();
+  eq((await reminderSweep(at)).map(z => z.zone), ['Asia/Dhaka'], 'the sweep runs at seven in Dhaka');
+  const tmpl = async (id: number) => redis.get(k('tmpl', id));
+  const marked = async (id: number) => (await redis.exists(k('reminded', id))) === 1;
+  eq(await tmpl(alive), 'streak:0', 'a streak alive: told it ends at midnight, the first wording');
+  eq(await tmpl(frozen), 'streak:0', 'a freeze that will cover yesterday: still a streak to keep');
+  eq(await tmpl(opened), 'back:0', 'six days away: an evening for it');
+  ok(!(await marked(five)) && (await tmpl(five)) === null, 'five days away: a quiet evening, nothing sent, nothing marked');
+  ok(!(await marked(today)) && !(await marked(trained)), 'nobody who played today');
+  eq(await tmpl(bye), 'final:0', 'fifteen days away: the last note');
+  ok((await redis.exists(k('nudgebye', bye, '2026-08-26'))) === 1, 'remembered for the whole absence');
+  ok(!(await marked(gone)) && (await tmpl(gone)) === null, 'a month away: silence');
+  await clear();
+  await reminderSweep(next);
+  eq(await tmpl(alive), 'back:0', 'the next evening the streak is gone: what is waiting, from the first wording of that kind');
+  eq(await tmpl(bye), 'final:0', 'and the last note is not sent twice');
+  ok(!(await marked(opened)), 'seven days away: quiet again');
+  await clear();
+  await reminderSweep(new Date('2026-09-12T13:00:30Z'));
+  eq(await tmpl(alive), 'back:1', 'the evening after: the next wording');
+  await clear(); await redis.del(k('reminder', 'Asia/Dhaka', '2026-09-12'));
+  // a device with no account counts its days from the last time it opened the game
+  const tok6 = fcmToken('6').replace('fcm:', 'fcmdev6:'), tok5 = fcmToken('5').replace('fcm:', 'fcmdev5:');
+  await saveToken(pool, null, tok6, 'app', 'Asia/Dhaka'); await saveToken(pool, null, tok5, 'app', 'Asia/Dhaka');
+  await query(pool, `UPDATE push_tokens SET seen_at = '2026-09-04T12:00:00+06' WHERE token = $1`, [tok6]);
+  await query(pool, `UPDATE push_tokens SET seen_at = '2026-09-05T12:00:00+06' WHERE token = $1`, [tok5]);
+  const rows = (await deviceTargets('Asia/Dhaka')).tokens;
+  const r6 = rows.find(r => r.token === tok6), r5 = rows.find(r => r.token === tok5);
+  eq([r6?.seen_on, r5?.seen_on], ['2026-09-04', '2026-09-05'], 'the day it last opened, in its own zone');
+  await redis.del(k('tmpl', 'tok', r6!.id), k('tmpl', 'tok', r5!.id), k('reminded', 'tok', r6!.id), k('reminded', 'tok', r5!.id));
+  await reminderSweep(at);
+  eq(await redis.get(k('tmpl', 'tok', r6!.id)), 'back:0', 'six days since it opened: told');
+  eq(await redis.get(k('tmpl', 'tok', r5!.id)), null, 'five: not');
+  await clear();
+  await dropToken(pool, null, tok6); await dropToken(pool, null, tok5);
 }
 
 await finish();

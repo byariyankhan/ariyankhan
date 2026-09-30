@@ -76,65 +76,135 @@ export interface Standing {
   name: string;
   pic: string;
   earning: number;
+  /** how many different people this player sat at a started table with this week */
+  opponents: number;
+  /** whether this line can be paid a prize: in front on the week, and against enough different people */
+  eligible: boolean;
 }
 
 /**
- * The table for one season.
+ * The whole table for one season, every player in order. standings() is its first page, placeOf() one line
+ * of it, settleDue() pays from it, so the three can never disagree.
  *
  * Everyone who played is in it. Playing a gold match is what puts you on the board — a friend's room counts
  * the same as a room filled from the world, because both stake gold and both pay a pot — and a week you are
  * down on is a place near the bottom rather than no place at all. A table you fall out of the moment you lose
  * is a table nobody can read their own progress in.
  *
+ * **What a week earns is gold taken from other people, and only so much from any one of them.** Netting alone
+ * (see the top of this file) stops two accounts gaining together, but the table ranks people one at a time:
+ * the account that loses does not care that it lost. So a win is credited against the opponents who paid for
+ * it. In each match every winner's gain is shared out over the losers in proportion to what each lost; per
+ * pair of players those amounts are netted over the week; and what one player can take from any single
+ * opponent is capped (config.league.opponentCap). A loss always counts in full. Gold whose loser no longer
+ * exists -- an account deleted, its stake gone from the ledger with it -- was paid by nobody, and is not
+ * credited to anybody.
+ *
+ * A match counts in the week it started, whole, so one played across midnight on a Monday is not a stake in
+ * one week and a pot in the next; a room that never started moved no gold that stays (every stake came back),
+ * and does not count at all. settleDue waits for the matches started in a week to finish before it pays it.
+ * A seat that left before the start (its stake refunded) was nobody's opponent.
+ *
  * What losing does cost is the prize: settleDue pays only the players who are in front (see below), so a
- * quiet week still cannot pay five million gold to whoever lost the least.
+ * quiet week still cannot pay five million gold to whoever lost the least, and only players who have played at
+ * least config.league.minOpponents different people -- so a prize cannot be two accounts and a friends' room.
+ * The lines that can be paid are ranked first, so the ranks 1, 2, 3 on the table are the prize places, the
+ * same numbers settlement pays; then everybody else by earning.
  *
  * The tie-break is who got there first — equal earnings, and the one who stopped earlier is ahead — then the
  * older account, so the order is total and the same every time it is asked for.
  */
-export async function standings(sql: Sql, s: Season, limit = 100): Promise<Standing[]> {
-  const r = await query<{ user_id: number; name: string; pic: string; earning: number }>(sql, `
-    SELECT g.user_id, u.name, u.pic, SUM(g.delta)::bigint AS earning
-      FROM gold_ledger g
-      JOIN users u ON u.id = g.user_id
-     WHERE g.created_at >= $1 AND g.created_at < $2
-       AND g.reason = ANY($3::text[])
-     GROUP BY g.user_id, u.name, u.pic
-     ORDER BY SUM(g.delta) DESC, MAX(g.created_at) ASC, g.user_id ASC
-     LIMIT $4`,
-    [s.startsAt, s.endsAt, PLAY_REASONS, Math.max(1, Math.min(500, limit))]);
+export async function table(sql: Sql, s: Season): Promise<Standing[]> {
+  const { opponentCap, minOpponents } = config.league;
+  const r = await query<{ user_id: number; name: string; pic: string; earning: string; opponents: number; eligible: boolean }>(sql, `
+    WITH rows AS (
+      SELECT g.user_id, g.match_code AS mk, g.delta, g.created_at, true AS played, g.reason = 'leave_refund' AS gone
+        FROM gold_ledger g JOIN matches m ON m.code = g.match_code
+       WHERE m.started_at >= $1 AND m.started_at < $2 AND g.reason = ANY($3::text[])
+      UNION ALL
+      -- play with no room to it (nothing writes one now) stands alone: its loss counts, and a gain is nobody's
+      SELECT g.user_id, 'row:' || g.id, g.delta, g.created_at, false, false
+        FROM gold_ledger g
+       WHERE g.match_code IS NULL AND g.created_at >= $1 AND g.created_at < $2 AND g.reason = ANY($3::text[])
+    ), net AS (
+      SELECT user_id, mk, SUM(delta)::numeric AS n, MAX(created_at) AS last_at, bool_or(played) AS played, bool_or(gone) AS gone
+        FROM rows GROUP BY user_id, mk
+    ), side AS (
+      SELECT mk, COALESCE(SUM(n) FILTER (WHERE n > 0), 0) AS won, COALESCE(-SUM(n) FILTER (WHERE n < 0), 0) AS lost
+        FROM net GROUP BY mk
+    ), flow AS (
+      SELECT w.user_id AS p, l.user_id AS o, w.n * (-l.n) / GREATEST(s.won, s.lost) AS a
+        FROM net w JOIN side s ON s.mk = w.mk JOIN net l ON l.mk = w.mk AND l.n < 0
+       WHERE w.n > 0
+    ), pair AS (
+      SELECT p, o, SUM(a) AS a FROM (SELECT p, o, a FROM flow UNION ALL SELECT o, p, -a FROM flow) x GROUP BY p, o
+    ), credit AS (
+      SELECT p AS user_id, SUM(LEAST(a, $4)) AS c FROM pair GROUP BY p
+    ), stray AS (
+      -- a loss nobody still here won: a match not over yet, or a winner since deleted
+      SELECT n.user_id, SUM(-n.n * GREATEST(s.lost - s.won, 0) / s.lost) AS lost
+        FROM net n JOIN side s ON s.mk = n.mk WHERE n.n < 0 GROUP BY n.user_id
+    ), foes AS (
+      SELECT a.user_id, COUNT(DISTINCT b.user_id)::int AS n
+        FROM net a JOIN net b ON b.mk = a.mk AND b.user_id <> a.user_id AND NOT b.gone
+       WHERE a.played AND NOT a.gone GROUP BY a.user_id
+    ), line AS (
+      SELECT p.user_id, MAX(p.last_at) AS last_at FROM net p GROUP BY p.user_id
+    ), scored AS (
+      SELECT l.user_id, u.name, u.pic, l.last_at,
+             ROUND(COALESCE(c.c, 0) - COALESCE(st.lost, 0))::bigint AS earning,
+             COALESCE(f.n, 0) AS opponents
+        FROM line l JOIN users u ON u.id = l.user_id
+        LEFT JOIN credit c ON c.user_id = l.user_id
+        LEFT JOIN stray st ON st.user_id = l.user_id
+        LEFT JOIN foes f ON f.user_id = l.user_id
+    )
+    SELECT user_id, name, pic, earning, opponents, (earning > 0 AND opponents >= $5) AS eligible
+      FROM scored
+     ORDER BY (earning > 0 AND opponents >= $5) DESC, earning DESC, last_at ASC, user_id ASC`,
+    [s.startsAt, s.endsAt, PLAY_REASONS, Math.max(0, opponentCap), Math.max(0, minOpponents)]);
   return r.rows.map((row, i) => ({ rank: i + 1, ...row, earning: Number(row.earning) }));
 }
+
+/** The first `limit` lines of the table. */
+export async function standings(sql: Sql, s: Season, limit = 100): Promise<Standing[]> {
+  return (await table(sql, s)).slice(0, Math.max(1, Math.min(500, limit)));
+}
+
+export interface Place { rank: number | null; earning: number; opponents: number; eligible: boolean }
+/** One player's line in a table already read: no rank and nothing earned if they have not played this week. */
+export const lineOf = (rows: Standing[], userId: number): Place => {
+  const row = rows.find(r => r.user_id === userId);
+  return row ? { rank: row.rank, earning: row.earning, opponents: row.opponents, eligible: row.eligible }
+             : { rank: null, earning: 0, opponents: 0, eligible: false };
+};
 
 /**
  * One player's own line. Counted over the whole season rather than over the page of the table they can see,
  * so somebody in 340th place is still told where they stand and what they have won.
  *
  * A rank at all means they played this week: a player who has not staked gold since the season opened has no
- * place, and everybody else has one, whichever side of even they are on. The ordering is the same as the
- * table's, so the number here and the row there are always the same number.
+ * place, and everybody else has one, whichever side of even they are on. It is read from the same table, so
+ * the number here and the row there are always the same number.
  */
-export async function placeOf(sql: Sql, s: Season, userId: number): Promise<{ rank: number | null; earning: number }> {
-  const r = await query<{ rank: number | null; earning: number }>(sql, `
-    WITH play AS (
-      SELECT user_id, SUM(delta) AS earning, MAX(created_at) AS last_at
-        FROM gold_ledger
-       WHERE created_at >= $1 AND created_at < $2 AND reason = ANY($3::text[])
-       GROUP BY user_id
-    ), mine AS (SELECT * FROM play WHERE user_id = $4)
-    SELECT COALESCE((SELECT earning FROM mine), 0)::bigint AS earning,
-           CASE WHEN EXISTS (SELECT 1 FROM mine) THEN (
-             SELECT 1 + count(*) FROM play p, mine m
-              WHERE p.earning > m.earning
-                 OR (p.earning = m.earning AND (p.last_at < m.last_at
-                 OR (p.last_at = m.last_at AND p.user_id < m.user_id)))
-           ) END::int AS rank`,
-    [s.startsAt, s.endsAt, PLAY_REASONS, userId]);
-  const row = r.rows[0];
-  return { rank: row?.rank ?? null, earning: Number(row?.earning ?? 0) };
+export async function placeOf(sql: Sql, s: Season, userId: number): Promise<Place> {
+  return lineOf(await table(sql, s), userId);
 }
 
-/** The season row has to exist before it can be settled. Cheap, idempotent, called from the sweep and the read. */
+// The table a screen reads, kept for a few seconds. Working it out reads the whole week's play, and the league
+// screen is open to anybody, signed in or not: without this, every visitor was a full scan of the ledger. A
+// result changes what the table says, so the result route drops it (forgetTable) and the next read is fresh.
+const TABLE_TTL_MS = 20_000;
+let cached: { key: string; at: number; rows: Standing[] } | null = null;
+export async function tableCached(sql: Sql, s: Season, now = Date.now()): Promise<Standing[]> {
+  if (cached && cached.key === s.key && now - cached.at < TABLE_TTL_MS) return cached.rows;
+  const rows = await table(sql, s);
+  cached = { key: s.key, at: now, rows };
+  return rows;
+}
+export const forgetTable = (): void => { cached = null; };
+
+/** The season row has to exist before it can be settled. Cheap, idempotent, called from the league's timer. */
 export async function ensureSeason(sql: Sql, s: Season = seasonAt()): Promise<void> {
   await query(sql,
     `INSERT INTO league_seasons (key, starts_at, ends_at) VALUES ($1, $2, $3) ON CONFLICT (key) DO NOTHING`,
@@ -202,15 +272,23 @@ export async function settleDue(now: Date = new Date()): Promise<SettledSeason |
        ORDER BY ends_at ASC LIMIT 1 FOR UPDATE SKIP LOCKED`, [now]);
     const row = due.rows[0];
     if (!row) return null;
+    // A match started in the week still being played counts in that week (table above): the week waits for it,
+    // up to the longest a match can run, so its pot is not left out of every week.
+    const late = new Date(row.ends_at.getTime() + (config.game.matchHours + 1) * 3600_000);
+    if (now < late) {
+      const busy = await query(c, `SELECT 1 FROM matches WHERE state = 'playing' AND started_at >= $1 AND started_at < $2 LIMIT 1`,
+        [row.starts_at, row.ends_at]);
+      if (busy.rowCount) return null;
+    }
 
     const season: Season = { key: row.key, startsAt: row.starts_at, endsAt: row.ends_at };
-    // The table now holds everyone who played, so the prizes take only the part of it that is in front: a
-    // week you ended down on is a place on the board, never a payment. Losing rows sort below winning ones,
-    // so dropping them leaves the ranks running 1, 2, 3 with nothing missing from the middle.
-    const table = (await standings(c, season, config.league.ranks)).filter(p => p.earning > 0);
+    // The table now holds everyone who played, so the prizes take only the part of it that can be paid: in
+    // front on the week, against enough different people. Those lines sort first, so dropping the rest leaves
+    // the ranks running 1, 2, 3 with nothing missing from the middle -- the ranks the table showed all week.
+    const paying = (await standings(c, season, config.league.ranks)).filter(p => p.eligible);
     const paid: SettledSeason['paid'] = [];
 
-    for (const p of table) {
+    for (const p of paying) {
       const gold = prizeFor(p.rank);
       if (gold <= 0) continue;
       const moved = await give(c, p.user_id, gold, 'league', idem.league(season.key, p.user_id));

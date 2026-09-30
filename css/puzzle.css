@@ -9,18 +9,23 @@
   --ink:#3A2A1C; --muted:#8C7A66; --accent:#D9782A; --accent2:#DB3A5E; --accent-ink:#fff;
   --hard:#B23A8A; --expert:#D9782A; --master:#C7342F; --heart:#E8565A; --good:#3AA66B; --bad:#C7342F;
   --outline:rgba(91,63,38,.09); --card:#FFFFFF; --shadow:0 10px 30px rgba(60,40,20,.12);
+  /* the brain on the opening: the ink the app's own splash draws it in (android/app/src/main/res/values/colors.xml),
+     turning to the rose of the brain everywhere else while the line types */
+  --mark:#2E2016; --mark-to:#D93A5C;
 }
 :root[data-theme="night"]{
   --bg:#0E0E10; --bg2:#141416; --panel:#17171A; --line:#F2F2EE; --line-soft:rgba(242,242,238,.35);
   --ink:#F4F4F1; --muted:#9A9A94; --accent:#FFED54; --accent2:#9B6BFF; --accent-ink:#111;
   --hard:#B08BFF; --expert:#FFB347; --master:#FF6B6B; --heart:#FF5C61; --good:#5FE08F; --bad:#FF6B6B;
   --outline:rgba(255,237,84,.06); --card:#1E1E22; --shadow:0 12px 34px rgba(0,0,0,.5);
+  --mark:#F4F4F1; --mark-to:#F4F4F1;
 }
 :root[data-theme="mint"]{
   --bg:#E6F2EC; --bg2:#D9EAE1; --panel:#F3FAF6; --line:#17423A; --line-soft:rgba(23,66,58,.35);
   --ink:#12332D; --muted:#5F7F76; --accent:#1F8A70; --accent2:#2F6BD8; --accent-ink:#fff;
   --hard:#2F6BD8; --expert:#D9782A; --master:#C7342F; --heart:#E8565A; --good:#1F8A70; --bad:#C7342F;
   --outline:rgba(23,66,58,.08); --card:#FFFFFF; --shadow:0 10px 30px rgba(20,60,50,.12);
+  --mark:#12332D; --mark-to:#D93A5C;
 }
 /* the brain feel, in every theme: a faint brain of arrows behind the home screen, and the primary button in
    the same rose-to-coral as the big one */
@@ -127,6 +132,15 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-card-rank.is-up{ font-size:16px; color:var(--ink); animation:aapop .45s ease-out; }
 .aa-card-rank.is-down{ font-size:15px; color:var(--ink); }
 .aa-card-rank.is-down b{ color:var(--bad); }
+/* what the day did to the streak: a milestone, a freeze spent or earned (streakNews) */
+.aa-streak-news{ margin:8px 0 0; font-size:13px; font-weight:800; line-height:1.45; color:var(--muted); text-align:center; }
+.aa-streak-news b{ color:var(--ink); font-weight:900; }
+.aa-streak-news .aa-flame{ width:17px; height:17px; margin-right:4px; vertical-align:-3px; }
+.aa-train-res .aa-streak-news{ margin:6px 0 10px; }
+/* the out-of-hearts card: how much of the board went, as a bar and in words */
+.aa-fail-bar{ --at:0%; position:relative; height:8px; margin:6px 12px 8px; border-radius:999px; background:var(--bg2); overflow:hidden; }
+.aa-fail-bar i{ position:absolute; inset:0 auto 0 0; width:var(--at); border-radius:999px; background:var(--accent2); }
+.aa-fail-lead{ font-variant-numeric:tabular-nums; }
 /* the home corner: the player's own face once signed in, in place of the settings mark */
 .aa-icon.has-face{ padding:3px; }
 .aa-home-face{ width:36px; height:36px; font-size:16px; box-shadow:0 1px 3px rgba(0,0,0,.18); }
@@ -173,6 +187,17 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-about-credit[open] > summary .aa-row-chev{ transform:rotate(90deg); }
 .aa-about-credit-text{ margin:-6px 0 0; padding:0 0 16px 42px; font-size:13px; font-weight:700; line-height:1.55; color:var(--muted); text-align:left; }
 .aa-about-credit-text a{ color:inherit; text-decoration:underline; text-underline-offset:3px; }
+/* Settings > About > About Puzzle & FAQ: folded like Credits, with some structure inside it. It is the first
+   row of its group, so the row after it needs the divider that .aa-row + .aa-row would have drawn. */
+.aa-about-credit + .aa-row{ border-top:1px solid var(--bg2); }
+.aa-about-game-text{ padding-right:4px; }
+.aa-about-game-text h3{ font-size:14px; font-weight:900; color:var(--ink); margin:14px 0 4px; }
+.aa-about-game-text h3:first-child{ margin-top:0; }
+.aa-about-game-text h4{ font-size:13px; font-weight:900; color:var(--ink); margin:10px 0 2px; }
+.aa-about-game-text p{ margin:0 0 6px; }
+.aa-about-game-text ul{ margin:4px 0 8px; padding-left:18px; }
+.aa-about-game-text li{ margin:0 0 4px; }
+.aa-about-game-text b{ color:var(--ink); }
 #aaHomeSheet{ z-index:51; }   /* opened from Settings, so it must paint over it */
 .aa-row-go{ color:var(--muted); font-size:24px; font-weight:900; line-height:1; padding-right:4px; }
 .aa-search{ font:inherit; font-weight:700; font-size:15px; color:var(--ink); background:var(--bg2); border:none; border-radius:14px; padding:12px 14px; width:100%; margin:0 0 12px; box-sizing:border-box; -webkit-appearance:none; appearance:none; }
@@ -237,7 +262,9 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-ranks--card{ position:static; justify-content:center; margin:0 0 10px; }
 .aa-wait{ display:flex; align-items:center; justify-content:center; gap:10px; margin:0 0 14px; font-weight:800; color:var(--muted); }
 .aa-wait::before{ content:''; width:18px; height:18px; border-radius:50%; border:3px solid var(--line-soft); border-top-color:var(--accent); animation:aaspin 1s linear infinite; }
-.aa-wait b{ color:var(--ink); font-variant-numeric:tabular-nums; }
+.aa-wait b{ display:inline-block; color:var(--ink); font-variant-numeric:tabular-nums; }
+.aa-wait b.is-pop{ animation:aapop .45s ease-out; }   /* each of the last three, as it ticks */
+@media(prefers-reduced-motion:reduce){ .aa-wait b.is-pop{ animation:none; } }
 @keyframes aaspin{ to{ transform:rotate(360deg); } }
 /* the three stakes side by side, each its own coin */
 /* Five tables now, so the row wraps rather than squeezing: three across a phone, all five on a wide panel. */
@@ -290,6 +317,28 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
   font-weight:900; font-size:13px; font-variant-numeric:tabular-nums; transition:transform .12s, filter .15s; }
 .aa-chip--league:hover{ filter:brightness(1.04); }
 .aa-chip--league:active{ transform:scale(.95); }
+/* The streak in the home bar: a flame and the count, lit once today is played, rose (the colour of the training
+   dot still to do) while it is not; the freezes held sit on its corner in ice blue, as the training pill sits
+   on its button, so they take no room. Compact: the bar still has to hold the purse and the league. */
+.aa-chip--streak{ position:relative; display:inline-flex; align-items:center; gap:2px; border:none; cursor:pointer; color:var(--ink); font-weight:900; font-size:15px; line-height:1; padding:7px 10px 7px 6px; font-variant-numeric:tabular-nums; flex:none; }
+.aa-chip--streak:active{ transform:scale(.95); }
+.aa-flame{ width:19px; height:19px; fill:var(--expert); flex:none; }
+.aa-chip--streak.is-due .aa-flame{ fill:var(--accent2); }
+.aa-streak-fz{ position:absolute; right:-5px; top:-10px; display:inline-flex; align-items:center; gap:1px; height:16px; padding:0 4px 0 3px; border-radius:8px; background:#3B8FD6; color:#fff; font-size:10px; box-shadow:0 0 0 2px var(--bg); }
+.aa-streak-fz svg{ width:10px; height:10px; fill:none; stroke:currentColor; stroke-width:2.6; stroke-linecap:round; stroke-linejoin:round; }
+/* A full bar -- signed in (the purse) and a streak beside the league -- on a phone: the gaps close up and the
+   league chip keeps its trophy and says its name in its label only, so the row still fits from 320 pixels up. */
+@media (max-width:420px){
+  .aa-home-top:has(#aaPurse:not([hidden])):has(#aaStreak:not([hidden])){ gap:5px; }
+  .aa-home-top:has(#aaPurse:not([hidden])):has(#aaStreak:not([hidden])) .aa-chip--league{ padding:9px 10px; }
+  .aa-home-top:has(#aaPurse:not([hidden])):has(#aaStreak:not([hidden])) #aaLeagueEnds{ display:none; }
+}
+@media (max-width:360px){
+  .aa-home-top:has(#aaPurse:not([hidden])):has(#aaStreak:not([hidden])){ gap:4px; }
+  .aa-home-top:has(#aaPurse:not([hidden])):has(#aaStreak:not([hidden])) .aa-chip--streak{ padding:7px 8px 7px 5px; }
+  .aa-home-top:has(#aaPurse:not([hidden])):has(#aaStreak:not([hidden])) .aa-chip--purse{ padding:8px 9px; gap:4px; }
+  .aa-home-top:has(#aaPurse:not([hidden])):has(#aaStreak:not([hidden])) .aa-purse-add{ margin-left:2px; }
+}
 .aa-lg-cta{ margin:0 0 14px; text-align:center; }
 /* One line at the top: the week's clock, where you stand, and the way to last week's result. */
 .aa-lg-bar{ display:flex; align-items:center; gap:10px; margin:2px 0 12px; padding:0 2px; }
@@ -369,9 +418,12 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 /* ── Game ── */
 .aa-gamescreen{ gap:6px; }
 .aa-gbar{ display:flex; align-items:center; gap:6px; padding-bottom:8px; border-bottom:2px solid var(--bg2); }
-.aa-gtitle{ flex:1; display:flex; flex-direction:column; align-items:center; line-height:1.05; }
-.aa-glevel{ font-size:26px; font-weight:900; color:var(--accent); white-space:nowrap; }
-.aa-hud-diff{ font-size:15px; font-weight:900; color:var(--muted); }
+.aa-gtitle{ flex:1; min-width:0; display:flex; flex-direction:column; align-items:center; line-height:1.05; }
+.aa-glevel{ font-size:26px; font-weight:900; color:var(--accent); white-space:nowrap; max-width:100%; overflow:hidden; text-overflow:ellipsis; }
+.aa-hud-diff{ font-size:15px; font-weight:900; color:var(--muted); display:flex; max-width:100%; white-space:nowrap; }
+/* a scene's or a replay's name, before the difficulty: a long one gives way, the difficulty never does */
+.aa-hud-name{ min-width:0; overflow:hidden; text-overflow:ellipsis; color:var(--ink); }
+.aa-hud-tier{ flex:none; }
 .aa-hud-diff--hard{ color:var(--hard); }
 .aa-hud-diff--expert{ color:var(--expert); }
 .aa-hud-diff--master{ color:var(--master); }
@@ -516,6 +568,19 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-coach-card p{ margin:0; font-size:15px; line-height:1.4; color:var(--muted); }
 .aa-coach-actions{ display:flex; justify-content:space-between; align-items:center; gap:10px; margin-top:12px; }
 .aa-coach-actions .aa-btn{ padding:11px 20px; }
+/* The card goes to the top when the thing it is about is at the bottom (spotOn in js/puzzle.js decides, by
+   measuring): the Play buttons on the home screen, a glowing arrow low on the board. */
+.aa-coach.is-top .aa-coach-card{ top:calc(16px + env(safe-area-inset-top, 0px)); bottom:auto; }
+/* A short screen (a 320x568 phone) has room for the card or for the brain above it, not both at full size:
+   the card gives back what it can, so the card on the home screen and the Play buttons stay clear of it.
+   The board's tutorial and the home tour; a Daily Training round fits its own coach. */
+@media (max-height:640px){
+  .aa-coach:not(.aa-train-coach) .aa-coach-card{ padding:12px 14px 10px; }
+  .aa-coach:not(.aa-train-coach) .aa-coach-card h3{ font-size:18px; margin-bottom:4px; }
+  .aa-coach:not(.aa-train-coach) .aa-coach-card p{ font-size:14px; line-height:1.35; }
+  .aa-coach:not(.aa-train-coach) .aa-coach-actions{ margin-top:8px; }
+  .aa-coach:not(.aa-train-coach) .aa-coach-actions .aa-btn{ padding:9px 18px; }
+}
 @media(prefers-reduced-motion:reduce){ .aa-coach-spot{ transition:none; } .aa-piece.is-coach .aa-track{ animation:none; } }
 .aa-piece.is-shake .aa-track, .aa-piece.is-shake .aa-head{ animation:aa-shake .3s; }
 @keyframes aa-shake{ 0%,100%{ opacity:1; } 30%,70%{ opacity:.25; } }
@@ -538,35 +603,63 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-toast--hint{ background:var(--accent); color:var(--accent-ink); }
 .aa-toast--hard{ background:var(--hard); color:#fff; font-size:16px; letter-spacing:1px; }
 .aa-toast--combo{ background:var(--accent2); color:#fff; font-size:16px; }
-/* ── First-open gate and launch splash ── */
-.aa-gate, .aa-splash{ position:fixed; inset:0; z-index:60; background:var(--bg); display:flex; align-items:center; justify-content:center; padding:24px calc(16px + env(safe-area-inset-left, 0px)) calc(24px + env(safe-area-inset-bottom, 0px)); text-align:center; }
-.aa-gate-inner, .aa-splash-inner{ width:100%; max-width:400px; display:flex; flex-direction:column; align-items:center; }
-.aa-gate-inner{ gap:26px; }
+/* A toast raised while a tutorial card is open (toast in js/puzzle.js): over every coach layer (the board's
+   110, a round's 115) and under a question (.aa-ask, 120), at the top when the card is at the bottom and at
+   the bottom when it is at the top. */
+.aa-toast.is-over, .aa-toast.is-over-low{ z-index:116; }
+.aa-toast.is-over{ top:calc(16px + env(safe-area-inset-top, 0px)); bottom:auto; }
+/* ── Signed in, back to the app ── (handoffFinish in js/puzzle.js: the browser tab a sign-in from the app ends in) */
+.aa-gate{ position:fixed; inset:0; z-index:60; background:var(--bg); display:flex; align-items:center; justify-content:center; padding:24px calc(16px + env(safe-area-inset-left, 0px)) calc(24px + env(safe-area-inset-bottom, 0px)); text-align:center; }
+.aa-gate-inner{ width:100%; max-width:400px; display:flex; flex-direction:column; align-items:center; gap:26px; }
 .aa-gate-title{ font-size:clamp(34px,9.5vw,46px); font-weight:900; margin:0; color:var(--line); line-height:1.08; letter-spacing:-.3px; }
 .aa-gate-art{ width:min(58vw,220px); height:auto; }
 .aa-gate-text{ font-size:17px; line-height:1.45; color:var(--muted); margin:0; }
 .aa-gate-text a{ color:var(--accent); font-weight:900; text-decoration:underline; text-underline-offset:3px; }
 .aa-gate-accept{ width:100%; max-width:360px; padding:17px 22px; font-size:22px; border-radius:20px; margin-top:6px; }
-.aa-splash{ cursor:pointer; user-select:none; -webkit-user-select:none; animation:aa-in .3s ease-out; }
-.aa-splash.is-out{ animation:aa-out .25s ease-in forwards; }
-.aa-splash-inner{ gap:36px; max-width:360px; }
-/* The mark sits on its own card. The three-colour arrow rules that used to be here went with the three arrows. */
-/* The mark sits on the page, not on a card.
+/* ── The opening: one surface from the first frame to home ──
+   Shown by the class the inline script in puzzle/index.html puts on <html> before anything paints
+   (is-opening; is-first on a first open), so the home screen is never seen before it, and faded into home by
+   js/puzzle.js (is-leaving). It replaced a welcome gate and a launch splash, each with a brain of its own.
 
-   It used to be a white rounded square with a shadow — an app icon, drawn inside an app that was already
-   open. On the website it was merely odd; in the Android app it was a flash of white, because the app's own
-   splash is the same brain on the same cream with nothing behind it, so the moment the page painted, a white
-   tile appeared under the logo and then vanished again. Two splashes that look alike hand over invisibly.
-   It was also hardcoded #fff, which would have been a white tile on black once the night theme was on. */
-.aa-splash-logo{ width:116px; height:116px; display:grid; place-items:center; }
-.aa-splash-logo img{ width:104px; height:104px; display:block; }
-/* The mark is one colour, #2E2016, which the white card used to sit behind. Without the card it is a dark
-   drawing on a dark screen once the night theme is on, and all but invisible. Inverting flips its lightness
-   and the hue rotation puts the warmth back, so it lands near the night theme's own off-white rather than on
-   the pale blue a bare invert would give. Only night needs it: paper and mint are both light. */
-:root[data-theme="night"] .aa-splash-logo img{ filter:invert(1) hue-rotate(180deg); }
-.aa-splash-quote{ font-size:21px; line-height:1.4; color:var(--muted); margin:16px 0 0; width:100%; text-align:left; font-weight:700; }
-.aa-splash-by{ font-size:17px; color:var(--muted); margin:-22px 0 0; width:100%; text-align:right; font-weight:700; }
+   The brain is the app's splash, continued. The app draws it 96 dp across in the middle of the whole window,
+   in ink on paper (android/app/src/main/res/drawable/splash_mark.xml, and the 512 px splash.png of build 1 at
+   xxhdpi before it); a CSS pixel is a dp in the WebView, so this draws it 96 px across in the middle of the
+   whole layer, in the same ink, and the moment the phone hands over to the page cannot be seen. Nothing in the
+   layer is allowed to move it: the words hang below it, positioned on their own. The padding is not layout
+   (everything inside is positioned against the whole layer); it is where js/puzzle.js reads the safe area. */
+.aa-splash{ display:none; position:fixed; inset:0; z-index:60; background:var(--bg); overflow:hidden; cursor:pointer; user-select:none; -webkit-user-select:none; padding:env(safe-area-inset-top, 0px) 0 env(safe-area-inset-bottom, 0px); }
+html.is-opening .aa-splash, html.is-leaving .aa-splash{ display:block; }
+html.is-opening, html.is-leaving{ overflow:hidden; }
+html.is-leaving .aa-splash{ animation:aa-out .2s ease-in forwards; pointer-events:none; }
+html.is-first .aa-splash{ cursor:auto; }
+/* A night or mint player whose phone drew its splash on paper (build 1 of the app, or Android 12 and older):
+   the opening stays on that paper, and their own colours come in as it fades into home. */
+html.is-paper-first .aa-splash{ --bg:#F4EDE0; --ink:#3A2A1C; --muted:#8C7A66; --mark:#2E2016; --mark-to:#D93A5C; }
+.aa-splash-stage{ position:absolute; inset:0; transform:translateY(var(--lift, 0px)); transition:transform .35s ease; }
+.aa-splash.is-tall{ overflow-y:auto; }
+.aa-splash-mark{ position:absolute; left:50%; top:50%; width:96px; height:96px; margin:-48px 0 0 -48px; display:block; color:var(--mark); transition:color 1.2s ease; }
+.aa-splash.is-typing .aa-splash-mark{ color:var(--mark-to); }
+.aa-splash-copy{ position:absolute; left:0; right:0; top:calc(50% + 70px); width:min(360px, calc(100% - 32px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px))); margin:0 auto; padding-bottom:16px; }
+.aa-splash-quote{ font-size:clamp(17px, 5.2vw, 21px); line-height:1.4; color:var(--muted); margin:0; text-align:left; font-weight:700; }
+.aa-splash.is-tagline .aa-splash-quote{ text-align:center; }
+.aa-splash-by{ font-size:clamp(15px, 4.4vw, 17px); color:var(--muted); margin:6px 0 0; text-align:right; font-weight:700; }
+.aa-splash-by:empty{ display:none; }
+/* The typing: every letter is laid out from the start and shown at its own moment (--d, set by the inline
+   script), an opacity animation the compositor runs even while the game's script keeps the page busy. */
+.aa-splash-type > span{ opacity:0; }
+.aa-splash.is-typing .aa-splash-type > span{ animation:aa-key .05s linear both; animation-delay:var(--d, 0ms); }
+.aa-splash.is-typed .aa-splash-type > span{ animation:none; opacity:1; }
+@keyframes aa-key{ from{ opacity:0; } to{ opacity:1; } }
+/* A first open: the terms and Accept, under the line once it is typed. They are laid out (and measured) from
+   the start and only shown then; on a small phone the whole stage slides up to make room (--lift). */
+.aa-splash-terms{ display:none; }
+html.is-first .aa-splash-terms{ display:flex; flex-direction:column; align-items:center; gap:14px; margin-top:22px; visibility:hidden; opacity:0; transition:opacity .18s ease-out, visibility 0s linear .18s; }
+html.is-first .aa-splash.is-terms .aa-splash-terms{ visibility:visible; opacity:1; transition:opacity .18s ease-out; }
+.aa-splash-legal{ font-size:clamp(15px, 4.4vw, 17px); line-height:1.45; color:var(--muted); margin:0; text-align:center; }
+.aa-splash-legal a{ color:var(--accent); font-weight:900; text-decoration:underline; text-underline-offset:3px; }
+.aa-splash-accept{ width:100%; max-width:360px; padding:15px 22px; font-size:21px; border-radius:20px; }
+/* Read by screen readers, not seen: the typed line whole, rather than letter by letter. */
+.aa-sr{ position:absolute; width:1px; height:1px; margin:-1px; padding:0; border:0; overflow:hidden; clip:rect(0 0 0 0); clip-path:inset(50%); white-space:nowrap; }
 /* ── Sideways ──────────────────────────────────────────────────────────────────────────────────────
    The game is a column and stays one, however the phone is held. It used to say so and stop: a notice asking
    for the phone back, which is the wrong answer for somebody lying on their side — they did not turn the
@@ -592,7 +685,7 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 }
 @keyframes aa-in{ from{ opacity:0; } to{ opacity:1; } }
 @keyframes aa-out{ from{ opacity:1; } to{ opacity:0; } }
-@media(prefers-reduced-motion:reduce){ .aa-splash, .aa-splash.is-out{ animation:none; } }
+@media(prefers-reduced-motion:reduce){ html.is-leaving .aa-splash, .aa-splash-stage, .aa-splash-mark, html.is-first .aa-splash-terms, html.is-first .aa-splash.is-terms .aa-splash-terms{ animation:none; transition:none; } }
 .aa-overlay{ position:absolute; inset:0; z-index:5; display:flex; align-items:center; justify-content:center; padding:12px; background:color-mix(in srgb, var(--bg) 70%, transparent); backdrop-filter:blur(3px); }
 .aa-card{ width:min(100%,440px); background:var(--card); border-radius:24px; padding:24px 20px; text-align:center; box-shadow:var(--shadow); max-height:100%; overflow:auto; }
 .aa-card h3{ font-size:28px; font-weight:900; margin:0 0 6px; line-height:1.05; color:var(--ink); }
@@ -651,6 +744,12 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 /* the out-of-hearts card, as drawn: the free life first and biggest, Try again under it in a soft tint, and the
    rest as links -- one decision on top, the others a glance below */
 .aa-actions--out{ grid-template-columns:1fr; gap:10px; }
+/* under them, from the second heart-out on one board: a new layout, and from the third, leaving it for later */
+.aa-actions--alt{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:10px; }
+.aa-actions--alt .aa-btn{ width:100%; min-width:0; padding:12px 8px; gap:6px; font-size:14px; white-space:normal; line-height:1.2; }
+.aa-actions--alt .aa-btn:only-child{ grid-column:1 / -1; }
+.aa-alt-label{ display:inline-flex; flex-direction:column; align-items:flex-start; line-height:1.15; text-align:left; }
+.aa-alt-label small{ font-size:11px; font-weight:800; letter-spacing:.3px; opacity:.72; }
 .aa-btn--big{ grid-column:1 / -1; position:relative; padding:16px 44px !important; font-size:18px; border-radius:18px; }
 .aa-actions .aa-btn--soft{ background:color-mix(in srgb, var(--accent2) 12%, var(--card)); color:var(--accent2); box-shadow:none; }
 .aa-ad-pill{ position:absolute; right:14px; top:50%; transform:translateY(-50%); background:rgba(255,255,255,.88); color:var(--accent); font-size:11px; font-weight:900; letter-spacing:.6px; padding:3px 9px; border-radius:999px; }
@@ -791,8 +890,6 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-train-howcard-in{ width:100%; max-width:440px; background:var(--card); color:var(--ink); border-radius:20px; padding:18px 18px 16px; box-shadow:var(--shadow); margin-bottom:env(safe-area-inset-bottom, 0px); }
 .aa-train-howcard-in h3{ margin:0 0 10px; font-size:20px; font-weight:900; }
 .aa-train-howcard-in .aa-btn{ width:100%; }
-.aa-train-hud .aa-train-info{ margin-left:auto; }
-.aa-train-hud .aa-train-info + .aa-train-hint{ margin-left:0; }
 /* the chip at the end of a card: filled rose = do this one, rose with the video mark = a short advertisement,
    green with the tick above = done today, play again free; grey never, every card is tappable */
 .aa-train-got{ flex:none; display:inline-flex; align-items:center; justify-content:center; gap:5px; min-width:48px; padding:7px 10px; border-radius:12px; font-size:13px; font-weight:900; white-space:nowrap; background:color-mix(in srgb, var(--accent2) 12%, transparent); color:var(--accent2); }
@@ -829,18 +926,47 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 /* a round is a game: the whole screen, the lobby gone, the way out in the corner */
 .aa-sheet.is-playing .aa-sheet-panel{ padding-bottom:calc(32px + env(safe-area-inset-bottom, 0px)); }
 .aa-sheet.is-playing .aa-sheet-head h2{ font-size:18px; color:var(--muted); }
+/* in a round the head is the round's name, then the ? with its rules; a long name gives way before the ? does */
+.aa-sheet.is-playing .aa-sheet-head h2.is-round{ min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; color:var(--ink); }
+.aa-sheet-head [data-train-how]{ flex:none; margin-left:0; }
 .aa-train-info{ display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; margin-left:6px; border:none; border-radius:50%; background:color-mix(in srgb, var(--accent2) 14%, transparent); color:var(--accent2); font:inherit; font-size:13px; font-weight:900; vertical-align:middle; cursor:pointer; }
 .aa-train-info[aria-expanded="true"]{ background:var(--accent2); color:#fff; }
-.aa-train-hud{ display:flex; justify-content:space-between; align-items:center; gap:12px; font-size:14px; font-weight:900; color:var(--muted); margin:0 0 12px; font-variant-numeric:tabular-nums; }
+.aa-train-hud{ position:relative; display:flex; justify-content:space-between; align-items:center; gap:10px; font-size:14px; font-weight:900; color:var(--muted); margin:0 0 12px; font-variant-numeric:tabular-nums; }
+/* what is happening now, with its mark: the look's seconds, the clock against its allowance, how far along */
+.aa-train-stat{ display:inline-flex; align-items:center; gap:5px; min-width:0; white-space:nowrap; color:var(--muted); }
+.aa-train-hud .aa-train-stat > span{ color:var(--muted); }
+.aa-train-stat b{ color:var(--ink); }
+.aa-train-stat .aa-bi{ flex:none; width:16px; height:16px; color:var(--accent2); }
+/* the look, draining: a thin bar under the row, gone once the look is */
+.aa-train-drain{ position:absolute; left:0; right:0; bottom:-7px; height:3px; border-radius:2px; overflow:hidden; background:color-mix(in srgb, var(--muted) 18%, transparent); }
+.aa-train-drain i{ display:block; height:100%; width:100%; border-radius:2px; background:var(--accent2); transition:width .2s linear; }
+@media(prefers-reduced-motion:reduce){ .aa-train-drain i{ transition:none; } }
+/* 3, 2, 1, Go: an opaque veil over the round's box only (the painting and the hint under it, the head's ← and ?
+   above it), the number popping as it ticks. Also "Paused" when the app comes back from the background. */
+#aaTrainGame{ position:relative; }
+.aa-train-count{ position:absolute; inset:-6px -2px 0; z-index:6; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; min-height:280px; padding:24px 12px; background:var(--bg); text-align:center; }
+.aa-train-count-n{ display:block; min-height:1em; font-size:clamp(76px, 26vw, 132px); font-weight:900; line-height:1; color:var(--accent2); font-variant-numeric:tabular-nums; }
+.aa-train-count-n.is-word{ font-size:clamp(40px, 13vw, 64px); }
+.aa-train-count-n.is-pop{ animation:aapop .45s ease-out; }
+.aa-train-count-t{ font-size:12px; font-weight:900; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); }
+.aa-train-count-cue{ max-width:300px; margin:6px 0 0; font-size:15px; font-weight:800; line-height:1.4; color:var(--ink); }
+.aa-train-count-cue:empty{ display:none; }
+.aa-train-count.is-out{ animation:aa-out .3s ease-in forwards; }
+@media(prefers-reduced-motion:reduce){ .aa-train-count-n.is-pop, .aa-train-count.is-out{ animation:none; } }
 .aa-train-hud span:first-child{ color:var(--ink); }
 .aa-train-res{ text-align:center; padding:6px 0 2px; }
 .aa-train-big{ margin:4px 0; font-size:64px; font-weight:900; line-height:1; color:var(--accent2); font-variant-numeric:tabular-nums; }
 .aa-train-sub{ margin:6px 0; font-size:15px; font-weight:800; color:var(--muted); }
 .aa-train-sub b{ color:var(--ink); }
+/* a round finished under the pass: kept, not cleared, and the way on said plainly */
+.aa-train-big.is-short{ color:var(--muted); }
+.aa-train-short{ color:var(--ink); }
 
 /* the hint button every round carries */
 .aa-train-hud .aa-train-hint{ margin-left:auto; border:none; background:color-mix(in srgb, var(--accent2) 12%, transparent); color:var(--accent2); font:inherit; font-size:13px; font-weight:900; padding:6px 10px; border-radius:12px; cursor:pointer; }
 .aa-train-hud .aa-train-hint:active{ transform:scale(.96); }
+.aa-train-hud .aa-train-hint[aria-disabled="true"]{ opacity:.45; cursor:default; }   /* nothing a hint could do yet */
+.aa-train-hud .aa-train-hint[aria-disabled="true"]:active{ transform:none; }
 /* the gallery rounds: real paintings, each drawn as a background so a piece, a patch or a whole work is one box */
 /* what a round draws is sized to the room under its line (trainFit sets the widths); what it shrinks sits centred */
 .aa-art{ display:block; width:100%; margin:0 auto; border-radius:14px; background:var(--bg2) center/cover no-repeat; overflow:hidden; }
@@ -856,9 +982,17 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-art-piece.is-ghost{ opacity:.25; }
 .aa-art-piece.is-flying, .aa-gal-piece.is-flying{ position:relative; z-index:3; pointer-events:none; }
 .aa-art-slot.is-over{ border-color:var(--accent2); border-style:solid; background:color-mix(in srgb, var(--accent2) 16%, var(--card)); }
+/* a full frame with pieces out of place: those are marked, as the gallery marks its own */
+.aa-art-slot.is-wrong{ border-color:var(--bad); border-style:solid; animation:aashake .3s; }
+.aa-art-slot.is-wrong .aa-art-piece{ outline:2px solid var(--bad); outline-offset:-2px; }
+@media(prefers-reduced-motion:reduce){ .aa-art-slot.is-wrong{ animation:none; } }
 .aa-art-drag{ position:fixed; left:0; top:0; z-index:120; pointer-events:none; border-radius:8px; overflow:hidden; box-shadow:0 12px 28px rgba(0,0,0,.35); will-change:transform; }
 /* the rounds' coach: the same spotlight and card as the board's, and a hand that shows the move */
 .aa-train-coach{ z-index:115; }
+/* the card goes to the top when what it points at is at the bottom; and a piece being carried sees through it */
+.aa-train-coach .aa-coach-card.is-top{ top:calc(16px + env(safe-area-inset-top, 0px)); bottom:auto; }
+.aa-train-coach .aa-coach-step[hidden], .aa-train-coach [data-tc][hidden]{ display:none; }   /* one step; a step that waits for the move */
+body.aa-dragging .aa-train-coach .aa-coach-card{ pointer-events:none; opacity:.35; }
 .aa-hand{ position:absolute; left:0; top:0; width:40px; height:40px; pointer-events:none; will-change:transform; }
 .aa-hand svg{ width:40px; height:40px; fill:none; stroke:#fff; stroke-width:3; }
 .aa-hand svg circle:last-child{ fill:var(--accent2); stroke:none; }
@@ -888,7 +1022,7 @@ html, body{ touch-action:manipulation; overscroll-behavior:none; }
 .aa-gal-piece.is-ghost{ opacity:.25; }
 .aa-gal-slots, .aa-gal-tray, .aa-gal-piece{ touch-action:none; -webkit-user-select:none; user-select:none; }
 .aa-train-lv{ display:inline-block; margin-right:6px; padding:1px 6px; border-radius:7px; font-size:11px; font-weight:900; color:var(--accent2); background:color-mix(in srgb, var(--accent2) 12%, transparent); vertical-align:middle; }
-.aa-train-hud .aa-train-lv{ margin:0 0 0 6px; }
+.aa-train-hud .aa-train-lv{ flex:none; margin:0; }
 .aa-art-thumb{ display:block; width:100%; aspect-ratio:1; border-radius:8px; background:var(--bg2) center/cover no-repeat; }
 .aa-art.is-peek{ outline:3px solid var(--accent2); outline-offset:2px; }
 .aa-curator-opts{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:0 auto; }

@@ -83,12 +83,34 @@ export async function googleVerify(
 // ── Accounts ──
 
 /**
+ * The one-way key a deleted account leaves in account_tombstones: the provider and its id, hashed with a fixed
+ * prefix and nothing secret. Enough to know the same Google account when it signs in again; not the id.
+ * gold.ts's subHashSql is the same function in SQL.
+ */
+export const tombstoneHash = (provider: string, sub: string): string =>
+  createHash('sha256').update(`puzzle-tombstone:${provider}:${sub}`).digest('hex');
+
+/** Has an account on this provider id been deleted before? Then it has had its welcome gold. */
+export async function hasTombstone(c: PoolClient, provider: string, sub: string): Promise<boolean> {
+  const r = await query(c, 'SELECT 1 FROM account_tombstones WHERE provider = $1 AND sub_hash = $2', [provider, tombstoneHash(provider, sub)]);
+  return (r.rowCount ?? 0) > 0;
+}
+
+/** Is there an account on this provider id now? Asked before a sign-in that would make one is let through. */
+export async function userExists(c: PoolClient | typeof pool, provider: string, sub: string): Promise<boolean> {
+  const r = await query(c, 'SELECT 1 FROM users WHERE provider = $1 AND sub = $2', [provider, sub]);
+  return (r.rowCount ?? 0) > 0;
+}
+
+/**
  * One account per provider id. Creates the row the first time someone signs in and grants the welcome gold
  * through the ledger, so signing in again can never top it up: the idempotency key is the account itself.
+ * Once per Google account, not once per account row: an id that had an account before, deleted since, comes
+ * back with a new account and no gold (`granted` 0), or deleting and signing in again would print money.
  */
-export async function upsertUser(c: PoolClient, provider: string, claims: GoogleClaims): Promise<{ user: User; created: boolean }> {
+export async function upsertUser(c: PoolClient, provider: string, claims: GoogleClaims): Promise<{ user: User; created: boolean; granted: number }> {
   const found = await query<{ id: number }>(c, 'SELECT id FROM users WHERE provider = $1 AND sub = $2', [provider, claims.sub]);
-  let id: number, created = false;
+  let id: number, created = false, granted = 0;
 
   if (found.rowCount) {
     id = found.rows[0]!.id;
@@ -104,13 +126,16 @@ export async function upsertUser(c: PoolClient, provider: string, claims: Google
     if (ins.rowCount) {
       id = ins.rows[0]!.id;
       created = true;
-      await give(c, id, config.game.signupGold, 'signup', idem.signup(id));
+      if (!(await hasTombstone(c, provider, claims.sub))) {
+        const moved = await give(c, id, config.game.signupGold, 'signup', idem.signup(id));
+        granted = moved?.applied ? config.game.signupGold : 0;
+      }
     } else {
       id = (await query<{ id: number }>(c, 'SELECT id FROM users WHERE provider = $1 AND sub = $2', [provider, claims.sub])).rows[0]!.id;
     }
   }
   const row = await query<User>(c, 'SELECT id, name, provider, pic, gold, reminder FROM users WHERE id = $1', [id]);
-  return { user: row.rows[0]!, created };
+  return { user: row.rows[0]!, created, granted };
 }
 
 /**
@@ -185,10 +210,33 @@ export async function pruneSessions(): Promise<number> {
  * Rooms that have not started are left properly first, which hands the stake back and passes the crown on; the
  * cascades then take the sessions, the seats and the ledger. A match already being played keeps its stakes_in,
  * so the winner is still paid the pot that was actually staked into it.
+ *
+ * One thing stays: a tombstone, a one-way hash of the provider's id (see tombstoneHash), so the same Google
+ * account signing in again is not handed the welcome gold a second time, and the advertisements it claimed
+ * today still count against today's cap.
  */
 export async function deleteUser(userId: number, releaseRooms: (c: PoolClient, userId: number) => Promise<void>): Promise<void> {
   await tx(async c => {
     await releaseRooms(c, userId);
+    const who = await query<{ provider: string; sub: string; ads: string }>(c,
+      `SELECT provider, sub, (SELECT count(*) FROM gold_ledger
+                                WHERE user_id = $1 AND reason = 'ad_reward'
+                                  AND created_at >= date_trunc('day', now(), 'UTC')) AS ads
+         FROM users WHERE id = $1`, [userId]);
+    const u = who.rows[0];
+    if (u) {
+      // Today's claims are added to what the tombstone already carries for today: an account deleted, made
+      // again and deleted again the same day has had both lots.
+      await query(c,
+        `INSERT INTO account_tombstones (provider, sub_hash, deleted_at, ads_day, ads_used)
+              VALUES ($1, $2, now(), (now() AT TIME ZONE 'utc')::date, $3)
+         ON CONFLICT (provider, sub_hash) DO UPDATE
+               SET deleted_at = now(),
+                   ads_used = CASE WHEN account_tombstones.ads_day = EXCLUDED.ads_day
+                                   THEN account_tombstones.ads_used + EXCLUDED.ads_used ELSE EXCLUDED.ads_used END,
+                   ads_day = EXCLUDED.ads_day`,
+        [u.provider, tombstoneHash(u.provider, u.sub), Number(u.ads)]);
+    }
     await query(c, 'DELETE FROM users WHERE id = $1', [userId]);
   });
 }

@@ -17,6 +17,7 @@
 import type { Sql } from './db.js';
 import { query } from './db.js';
 import { online } from './presence.js';
+import { redis, k, soft } from './redis.js';
 
 export interface RecentPlayer {
   id: number;
@@ -102,6 +103,44 @@ export async function isRacing(sql: Sql, userId: number): Promise<boolean> {
 }
 
 export type InviteVerdict = { ok: true } | { ok: false; why: 'too_soon' | 'enough_today'; retryAfter: number };
+
+// ── How often one person can reach another ──
+//
+// Asking is never refused (see the invite route): what is bounded is how often the asking lands on somebody.
+// It used to be bounded per room, and a room costs nothing -- open one, invite, leave with the stake, open the
+// next -- so a single sender could ring a phone twenty times a minute. Both limits are per sender and
+// recipient now, whatever room it is for, and both fail closed: with Redis away nothing rings and nothing
+// pops up, which is a missed invitation rather than a flood nobody can stop.
+export const RING_EVERY_SECONDS = 600;       // a phone rings at most once in ten minutes for one sender
+export const RINGS_PER_DAY = 6;              // and at most this many times a day
+export const POPS_PER_TEN_MINUTES = 5;       // a card on an open screen, a few times in ten minutes
+
+/** May this invitation ring the recipient's phone? Counts the ring when it may. */
+export async function inviteRings(from: number, to: number): Promise<boolean> {
+  const first = await soft(() => redis.set(k('invring', from, to), '1', 'EX', RING_EVERY_SECONDS, 'NX'), null);
+  if (first !== 'OK') return false;
+  const day = new Date().toISOString().slice(0, 10);
+  const n = await soft(async () => {
+    const [[, count]] = await redis.multi().incr(k('invringday', from, to, day)).expire(k('invringday', from, to, day), 86_400 + 60).exec() as [[Error | null, number], unknown];
+    return Number(count);
+  }, Infinity);
+  return n <= RINGS_PER_DAY;
+}
+
+/**
+ * May this invitation pop up on the recipient's open screen? The same room again within a minute is the same
+ * card already showing, and a sender gets a few cards in ten minutes, not one for every room they can open.
+ */
+export async function invitePopsUp(from: number, to: number, code: string): Promise<boolean> {
+  const fresh = await soft(() => redis.set(k('invpop', from, to, code), '1', 'EX', 60, 'NX'), null);
+  if (fresh !== 'OK') return false;
+  const n = await soft(async () => {
+    const key = k('invpops', from, to);
+    const [[, count]] = await redis.multi().incr(key).expire(key, 600, 'NX').exec() as [[Error | null, number], unknown];
+    return Number(count);
+  }, Infinity);
+  return n <= POPS_PER_TEN_MINUTES;
+}
 
 /** Seconds until the day's count starts over, which is midnight UTC: a plain answer to "when can I ask again". */
 // ── Muting ──

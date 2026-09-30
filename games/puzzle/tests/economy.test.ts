@@ -2,9 +2,11 @@
 import { pool, query, tx } from '../backend/src/db.js';
 import { config } from '../backend/src/config.js';
 import * as R from '../backend/src/rooms.js';
-import { adClaim, give, idem, move } from '../backend/src/gold.js';
-import { deleteUser } from '../backend/src/auth.js';
-import { eq, finish, goldOf, ok, player, reset, section, stake } from './helpers.js';
+import { adClaim, give, idem, move, subHashSql } from '../backend/src/gold.js';
+import { deleteUser, tombstoneHash, upsertUser } from '../backend/src/auth.js';
+import { adTicketSpend, adTicketStart } from '../backend/src/adticket.js';
+import { k, redis } from '../backend/src/redis.js';
+import { begun, eq, finish, goldOf, ok, player, reset, section, stake } from './helpers.js';
 
 
 await reset();
@@ -29,6 +31,7 @@ section('Two players, one winner, one pot');
   await tx(c => R.joinRoomTx(c, b.id, made.code, 2));
   const goldA = await goldOf(a.id), goldB = await goldOf(b.id);
   await tx(c => R.startRoom(c, made.code));
+  await begun(made.code);                 // past the floor on how fast a board can be cleared
 
   await tx(async c => { await R.submitResult(c, made.code, b.id, 4_000, true); await R.settleMatch(c, made.code); });
   eq(await goldOf(b.id), goldB + S * 2, 'the first to clear it takes the whole pot at once');
@@ -51,6 +54,7 @@ section('A result that arrives twice pays once');
   const made = await R.createMatch(a, S, false, 2) as { ok: true; code: string };
   await tx(c => R.joinRoomTx(c, b.id, made.code, 2));
   await tx(c => R.startRoom(c, made.code));
+  await begun(made.code);                 // past the floor on how fast a board can be cleared
   const goldB = await goldOf(b.id);
   for (let i = 0; i < 5; i++) {
     await tx(async c => { await R.submitResult(c, made.code, b.id, 3_000, true); await R.settleMatch(c, made.code); });
@@ -69,6 +73,7 @@ section('Three at a table: first takes the rest, second its stake back, third a 
   await tx(c => R.joinRoomTx(c, c3.id, made.code, 2));
   const g = { a: await goldOf(a.id), b: await goldOf(b.id), c: await goldOf(c3.id) };
   await tx(c => R.startRoom(c, made.code));
+  await begun(made.code);                 // past the floor on how fast a board can be cleared
 
   const third = Math.floor(S / 10);
   await tx(async c => { await R.submitResult(c, made.code, a.id, 4_000, true); await R.settleMatch(c, made.code); });
@@ -96,6 +101,7 @@ section('A place nobody claims goes to first, and only once the room has closed'
   await tx(c => R.joinRoomTx(c, c3.id, made.code, 2));
   const g = { a: await goldOf(a.id), b: await goldOf(b.id), c: await goldOf(c3.id) };
   await tx(c => R.startRoom(c, made.code));
+  await begun(made.code);                 // past the floor on how fast a board can be cleared
 
   const third = Math.floor(S / 10);
   await tx(async c => { await R.submitResult(c, made.code, a.id, 4_000, true); await R.settleMatch(c, made.code); });
@@ -119,6 +125,7 @@ section('Two players is still a duel: the winner takes everything');
   await tx(c => R.joinRoomTx(c, b.id, made.code, 2));
   const g = { a: await goldOf(a.id), b: await goldOf(b.id) };
   await tx(c => R.startRoom(c, made.code));
+  await begun(made.code);                 // past the floor on how fast a board can be cleared
   await tx(async c => { await R.submitResult(c, made.code, a.id, 4_000, true); await R.settleMatch(c, made.code); });
   eq(await goldOf(a.id), g.a + S * 2, 'first takes the whole pot');
   await tx(async c => { await R.submitResult(c, made.code, b.id, 7_000, true); await R.settleMatch(c, made.code); });
@@ -131,6 +138,7 @@ section('Two settlements racing pay one pot');
   const made = await R.createMatch(a, S, false, 2) as { ok: true; code: string };
   await tx(c => R.joinRoomTx(c, b.id, made.code, 2));
   await tx(c => R.startRoom(c, made.code));
+  await begun(made.code);                 // past the floor on how fast a board can be cleared
   const goldB = await goldOf(b.id);
   await tx(c => R.submitResult(c, made.code, b.id, 2_500, true));
   // the same settlement from two connections at once, which is what two API containers would do
@@ -149,6 +157,7 @@ section('Nobody clears it: every stake goes back');
   await tx(c => R.joinRoomTx(c, b.id, made.code, 2));
   const goldA = await goldOf(a.id), goldB = await goldOf(b.id);
   await tx(c => R.startRoom(c, made.code));
+  await begun(made.code);                 // past the floor on how fast a board can be cleared
   await tx(async c => { await R.submitResult(c, made.code, a.id, -1, false); await R.settleMatch(c, made.code); });
   await tx(async c => { await R.submitResult(c, made.code, b.id, -1, false); await R.settleMatch(c, made.code); });
   const end = (await R.matchRow(pool, made.code))!;
@@ -270,6 +279,7 @@ section('A winner who deletes their account does not hand the pot to somebody el
   await tx(t => R.joinRoomTx(t, b.id, made.code, 2));
   await tx(t => R.joinRoomTx(t, c2.id, made.code, 2));
   await tx(t => R.startRoom(t, made.code));
+  await begun(made.code);                 // past the floor on how fast a board can be cleared
 
   const goldA = await goldOf(a.id);
   await tx(async t => { await R.submitResult(t, made.code, a.id, 2_000, true); await R.settleMatch(t, made.code); });
@@ -313,6 +323,7 @@ section('A finished match remembers who won it after they leave');
   const made = await R.createMatch(a, S, false, 2) as { ok: true; code: string };
   await tx(t => R.joinRoomTx(t, b.id, made.code, 2));
   await tx(t => R.startRoom(t, made.code));
+  await begun(made.code);                 // past the floor on how fast a board can be cleared
   await tx(async t => { await R.submitResult(t, made.code, a.id, 1_500, true); await R.settleMatch(t, made.code); });
   await tx(async t => { await R.submitResult(t, made.code, b.id, -1, false); await R.settleMatch(t, made.code); });
   await deleteUser(a.id, R.releasePlayer);
@@ -372,6 +383,100 @@ section('Gold for an advertisement is bounded, not trusted');
     `SELECT count(*) AS n FROM gold_ledger
       WHERE user_id = $1 AND reason IN ('stake', 'payout', 'leave_refund', 'expire_refund', 'draw_refund')`, [c2.id]);
   eq(Number(asPlay.rows[0]!.n), 0, 'and none of it counts as a match played');
+}
+
+section('A clear sooner than the board could be cleared is not a clear yet');
+{
+  // The fault: the client's word decides the pot, and "cleared" posted the instant the board was dealt took it
+  // from everybody at the table. A clear is now believed only once the server's own clock says the match has
+  // run for as long as the fastest honest clear takes -- and until then nothing at all is written.
+  eq(R.clearFloorMs(1), config.game.minBoardMs, 'the floor is the fastest believable clear of one board');
+  eq(R.clearFloorMs(3), 3 * config.game.minBoardMs, 'and of three boards, three of them');
+  const a = await player('floor-a'), b = await player('floor-b');
+  const made = await R.createMatch(a, S, false, 2, 3) as { ok: true; code: string };
+  await tx(c => R.joinRoomTx(c, b.id, made.code, 2));
+  await tx(c => R.startRoom(c, made.code));
+  const g = { a: await goldOf(a.id), b: await goldOf(b.id) };
+
+  const early = await tx(async c => R.submitResult(c, made.code, a.id, 1, true));
+  eq(early.ok, false, 'a clear the moment the match starts is refused');
+  ok(!early.ok && early.why === 'too_early' && early.retryMs > 2 * config.game.minBoardMs && early.retryMs <= 3 * config.game.minBoardMs,
+    `with how long until it would count (${!early.ok ? early.retryMs : 0} ms of a ${3 * config.game.minBoardMs} ms floor)`);
+  const seat = await query<{ ms: number | null; finished_at: Date | null }>(pool,
+    `SELECT ms, finished_at FROM match_players WHERE code = $1 AND user_id = $2`, [made.code, a.id]);
+  eq([seat.rows[0]!.ms, seat.rows[0]!.finished_at], [null, null], 'and nothing is written: the seat is still racing');
+  await tx(c => R.settleMatch(c, made.code));
+  eq([await goldOf(a.id), await goldOf(b.id)], [g.a, g.b], 'nobody is paid');
+
+  // A loss is a loss at any moment: running out of hearts in the first second is a thing that happens.
+  const out = await tx(c => R.submitResult(c, made.code, b.id, -1, false));
+  eq(out.ok, true, 'a board lost is taken at once');
+
+  await begun(made.code, Math.ceil(R.clearFloorMs(3) / 1000) + 1);
+  const later = await tx(async c => { const v = await R.submitResult(c, made.code, a.id, 1, true); await R.settleMatch(c, made.code); return v; });
+  eq(later.ok, true, 'the same clear, sent again once the floor has passed, counts');
+  eq(await goldOf(a.id), g.a + S * 2, 'and wins the pot');
+}
+
+section('Deleting an account and signing in again is not a second welcome');
+{
+  // The fault: a deletion cascaded away every ledger row, so nothing remembered that the Google account had
+  // been paid its welcome gold. Delete, sign in, repeat -- ten thousand gold a time.
+  const claims = { sub: 'google-sub-1234567890123456789', name: 'Tomb Stone', pic: '' };
+  const first = await tx(c => upsertUser(c, 'google', claims));
+  eq([first.created, first.granted], [true, config.game.signupGold], 'a new Google account is welcomed with gold');
+  eq(await goldOf(first.user.id), config.game.signupGold, 'and holds it');
+  const again = await tx(c => upsertUser(c, 'google', claims));
+  eq([again.created, again.granted, again.user.id], [false, 0, first.user.id], 'signing in again is the same account, and no more gold');
+
+  // Three advertisements claimed today, then the account goes.
+  for (let i = 0; i < 3; i++) await tx(c => adClaim(c, first.user.id, 500, 3));
+  await deleteUser(first.user.id, R.releasePlayer);
+  const stones = await query<{ provider: string; sub_hash: string; ads_used: number }>(pool, `SELECT provider, sub_hash, ads_used FROM account_tombstones WHERE provider = 'google'`);
+  eq(stones.rows.length, 1, 'the deletion leaves one tombstone for the Google account');
+  eq(stones.rows[0]!.sub_hash, tombstoneHash('google', claims.sub), 'holding a one-way hash of the Google id');
+  ok(!JSON.stringify(stones.rows).includes(claims.sub), 'and not the id itself');
+  const inSql = await query<{ h: string }>(pool, `SELECT ${subHashSql('$1::text', '$2::text')} AS h`, ['google', claims.sub]);
+  eq(inSql.rows[0]!.h, stones.rows[0]!.sub_hash, 'the SQL that looks it up computes the same hash as the code that wrote it');
+  eq(stones.rows[0]!.ads_used, 3, 'and the advertisements claimed today');
+
+  const back = await tx(c => upsertUser(c, 'google', claims));
+  eq(back.created, true, 'signing in afterwards makes a new account');
+  eq(back.granted, 0, 'with no welcome gold');
+  eq(await goldOf(back.user.id), 0, 'so it starts with nothing');
+  const cap = await tx(c => adClaim(c, back.user.id, 500, 3));
+  eq(cap.capped, true, 'and today’s advertisements are still spent: a new account is not a new day');
+
+  // Deleted and made again twice in a day: the tombstone adds the second account's claims to the first's.
+  await deleteUser(back.user.id, R.releasePlayer);
+  eq((await query<{ n: number }>(pool, `SELECT ads_used AS n FROM account_tombstones WHERE provider = 'google'`)).rows[0]!.n, 3, 'a second deletion keeps the day’s count');
+  const other = await tx(c => upsertUser(c, 'google', { ...claims, sub: 'google-sub-somebody-else-000000' }));
+  eq(other.granted, config.game.signupGold, 'and somebody else’s Google account is still welcomed');
+}
+
+section('Gold for an advertisement needs a ticket asked for first');
+{
+  const MIN = config.game.adMinSeconds * 1000;
+  const a = await player('ticket-a');
+  const t0 = Date.now();
+  const ticket = await adTicketStart(a.id, t0);
+  ok(typeof ticket === 'string' && ticket.length >= 16, 'a ticket is handed out');
+  eq((await adTicketSpend(a.id, 'x'.repeat(32), MIN, t0 + MIN)).ok, false, 'a ticket nobody was given is refused');
+  eq((await adTicketSpend(a.id, '', MIN, t0 + MIN)).ok, false, 'and so is none at all, which is what a page from before tickets sends');
+  const early = await adTicketSpend(a.id, ticket!, MIN, t0 + 1_000);
+  ok(!early.ok && early.why === 'too_early' && early.retryMs === MIN - 1_000, 'spent before an advertisement could have run, it is too early, with how long to wait');
+  eq((await adTicketSpend(a.id, ticket!, MIN, t0 + MIN)).ok, true, 'once the wait is over it is spent');
+  const twice = await adTicketSpend(a.id, ticket!, MIN, t0 + MIN);
+  ok(!twice.ok && twice.why === 'no_ticket', 'and a ticket spent is gone');
+
+  const one = await adTicketStart(a.id, t0), two = await adTicketStart(a.id, t0);
+  ok(!(await adTicketSpend(a.id, one!, MIN, t0 + MIN)).ok, 'one ticket open at a time: asking again replaces the first');
+  eq((await adTicketSpend(a.id, two!, MIN, t0 + MIN)).ok, true, 'and the new one is the one that counts');
+
+  const b = await player('ticket-b');
+  const theirs = await adTicketStart(b.id, t0);
+  ok(!(await adTicketSpend(a.id, theirs!, MIN, t0 + MIN)).ok, 'a ticket is its own account’s and nobody else’s');
+  ok(((await redis.ttl(k('adticket', b.id))) ?? 0) > 500, 'and it lapses by itself, ten minutes on');
 }
 
 await finish();
