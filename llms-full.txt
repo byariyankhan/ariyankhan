@@ -141,7 +141,7 @@ Fill out the contact form at https://ariyankhan.com/#contact with your project d
   close-ups came from the painting). Each round is scored 0-100 and gets harder or easier with your
   scores; the day's average is the Brain Score, and playing every day builds a streak. The arrow logic
   puzzle: tap an arrow to send it off the board if its path is clear, a blocked tap costs a heart
-  (four on Easy and Normal, fewer higher up). Over 400 boards shaped like all 197 countries, with animal, bird, landmark and picture boards
+  (four on Easy and Normal, fewer higher up). Nearly 300 boards shaped like all 197 countries, with animal, bird, landmark and picture boards
   between them, make a world tour from your home country; hints, difficulty from Easy to Master that
   follows your play, and country facts (capital, population, region) on every country cleared. Optional
   Google sign-in adds online matches with friends and a weekly league. No in-app purchases; any

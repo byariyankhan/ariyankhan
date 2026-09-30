@@ -795,7 +795,7 @@ links.
   root `.htaccess` sends the bare `/puzzle` there in one https hop (mod_dir's own
   slash redirect answered `http://` from behind the proxy). No hreflang: one language.
   One JSON-LD block: WebPage, VideoGame + WebApplication (SinglePlayer and
-  MultiPlayer, "over 400 boards", no ratings) and BreadcrumbList. There is
+  MultiPlayer, "nearly 300 boards", no ratings) and BreadcrumbList. There is
   no MobileApplication node and no "Android app" wording until the Play listing is
   public. The words a crawler reads are in the static HTML but nothing sits under the
   game: Settings > About links two pages of their own, laid out like the policies:

@@ -118,11 +118,18 @@
   // every heart-out is three grades down. Three down for one up is a staircase that settles where about three
   // tries in four are cleared -- the old rule (two up, two down, always the hardest deal) settled near a coin
   // flip, and players spent close to half their tries losing.
-  const GRADE_UP = 1, GRADE_UP_CLEAN = 2, GRADE_DOWN = 3, GRADES = 15;
+  //
+  // The result card shows the run as a Focus bar out of 100 (focusOf). A clear it reads as "Locked in" (85 and
+  // up) is a whole tier: players who cleared a board at 90 and were then handed an Easy one -- because a heart-out
+  // earlier had taken them down three grades and a clear only ever brought back one -- rightly read that as the
+  // game not watching. And a board cleared on its retry used to hold the grade whatever the retry was like; a
+  // Locked-in retry is a step up now (the loss before it has already cost its three).
+  const GRADE_UP = 1, GRADE_UP_CLEAN = 2, GRADE_UP_TIER = 3, GRADE_DOWN = 3, GRADES = 15;
+  const LOCKED_IN = 85;             // the Focus reading that is a whole tier (FOCUS_BANDS: "Locked in")
   const FAST_SEC_PER_ARROW = 1.2;   // level 1 (~22 arrows) in under ~26 s counts as fast
   const clampTier = t => Math.max(0, Math.min(4, t));
   const clampGrade = g => Math.max(0, Math.min(GRADES - 1, Math.round(g) || 0));
-  const clearPoints = ({ firstTry, heartsLost, hints, secPerArrow }) => !firstTry || heartsLost >= 2 || hints >= 2 ? 0 : heartsLost === 0 && hints === 0 && secPerArrow <= FAST_SEC_PER_ARROW ? GRADE_UP_CLEAN : GRADE_UP;
+  const clearPoints = ({ firstTry, heartsLost, hints, secPerArrow, focus = 0 }) => !firstTry ? (focus >= LOCKED_IN ? GRADE_UP : 0) : heartsLost >= 2 || hints >= 2 ? 0 : focus >= LOCKED_IN ? GRADE_UP_TIER : heartsLost === 0 && hints === 0 && secPerArrow <= FAST_SEC_PER_ARROW ? GRADE_UP_CLEAN : GRADE_UP;
   // form = { grade, tier }: the tier rides along (floor(grade / 3)) for a device still on the old rule, which
   // reads only the tier. A form from before grades, or one such a device has written since, is taken at the
   // hardest deal of its tier: exactly what that device was dealing.
@@ -1067,11 +1074,23 @@
   }
   // The tour: every country in the player's order, each followed by its discovery board, one numbered list.
   // More kinds of board later simply mean more levels.
+  //
+  // No board comes round twice. The discovery boards are drawn from 59 shapes for 197 countries -- the bird
+  // alone is 22 of them, the leopard 15 -- and the 12 scenes came round again every 48 countries: players
+  // saw the same board every few levels and said so. So a discovery board is dealt only for the first country
+  // in the player's order whose find has that shape, and the scenes go round once. A board already cleared
+  // stays where it is, lap or repeat, so no level count goes down; one not dealt is never a hole in the count,
+  // because the count is of boards cleared (levelNo). The find of a country whose board is not dealt is still
+  // told, on that country's own card (showResult).
   function tourFor(d, home) {
     let nth = 0;
-    const tour = orderFor(d, home).flatMap((C, k) => [C, discLevelFor(C), (k + 1) % SCENE_EVERY === 0 ? sceneLevelFor(nth++) : null].filter(Boolean));
+    const order = orderFor(d, home), lv = L => store.get('lv:' + L.id);
     // discovery clears were briefly kept under dv:<id> before the boards became levels of their own
-    for (const L of tour) if (L.disc && !store.get('lv:' + L.id)) { const v = store.get('dv:' + L.country.id); if (v) store.set('lv:' + L.id, v); }
+    for (const C of order) { const D = discLevelFor(C); if (D && !lv(D)) { const v = store.get('dv:' + C.id); if (v) store.set('lv:' + D.id, v); } }
+    const shapes = new Set(order.map(discLevelFor).filter(D => D && lv(D)).map(D => D.hex));
+    const disc = C => { const D = discLevelFor(C); if (!D || lv(D)) return D; if (shapes.has(D.hex)) return null; shapes.add(D.hex); return D; };
+    const scene = () => { const S = sceneLevelFor(nth++); return S && (!S.lap || lv(S)) ? S : null; };
+    const tour = order.flatMap((C, k) => [C, disc(C), (k + 1) % SCENE_EVERY === 0 ? scene() : null].filter(Boolean));
     // The focus boards start at the frontier -- right after the last board the player has cleared (frontierOf).
     // For a new player that is the very start, which is the point: the game is called Train Your Brain and the
     // first thing it hands you is a brain. Not in front of the first board without a record: a scene added behind
@@ -1564,14 +1583,14 @@
   }
   const sceneCache = new Map();
   const SCENE_EVERY = 4;
-  // There are fewer scenes than scene slots, so the list comes round again. Every lap is a board of its own:
-  // one id shared by four slots made one clear count as four levels, and after the first lap every scene slot
-  // was already cleared. The first lap keeps the bare id, so the clears already made stay where they are.
+  // There are fewer scenes than scene slots. The list used to come round again, every lap a board of its own
+  // (one id shared by four slots made one clear count as four levels); it goes round once now (tourFor), and a
+  // later lap is dealt only where it was cleared already. The first lap keeps the bare id.
   function sceneLevelFor(n) {
     const list = Array.isArray(SCENES?.boards) ? SCENES.boards : [];
     if (!list.length) return null;
     const b = list[n % list.length], lap = Math.floor(n / list.length), id = 's:' + b.id + (lap ? '~' + (lap + 1) : '');
-    if (!sceneCache.has(id)) sceneCache.set(id, { id, name: b.name, d: b.d, k: b.k, scene: true });
+    if (!sceneCache.has(id)) sceneCache.set(id, { id, name: b.name, d: b.d, k: b.k, scene: true, lap });
     return sceneCache.get(id);
   }
 
@@ -2387,7 +2406,7 @@
     // A replay never moves the ladder up: a board already cleared is known, often by heart, and a quick clean
     // clear of it says nothing about the next new one. Two taps of Play again used to take Easy to Hard.
     if (won && run.replay) return { before, after: before, points: 0 };
-    const r = { firstTry: won && run.fails === 0, heartsLost: run.lost, hints: run.hints, secPerArrow: run.t / 1000 / Math.max(1, run.arrows) };
+    const r = { firstTry: won && run.fails === 0, heartsLost: run.lost, hints: run.hints, secPerArrow: run.t / 1000 / Math.max(1, run.arrows), focus: won ? focusOf(run.t, run.arrows, run.lost, run.hints) : 0 };
     // A grade above the ceiling did not come from play under it -- it is the account's, from another device, or
     // the old ladder's -- and a win under the ceiling says nothing about it: it stays. A loss is a loss at the
     // grade dealt, and steps down from there.
@@ -2565,7 +2584,8 @@
       run.replay = !!prev;
       run.learn = learnFrom(true, run);
       // a scene cleared: the next board is a breather (gradeFor). Any other new clear has had its breather.
-      if (!prev) { if (L.scene) store.set('breather', true); else store.del('breather'); }
+      // A scene cleared Locked in has earned no rest: the next board is dealt at the player's grade.
+      if (!prev) { if (L.scene && !(run.learn?.points >= GRADE_UP_TIER)) store.set('breather', true); else store.del('breather'); }
       countBoard(baseId(lid), { c: 1, h: run.hints, l: run.lost, ms: run.t });
       const rec = recordFor(prev, now);
       store.set('lv:' + lid, rec); dropRun(lid); forgetNums(); pushOne(lid, rec); showBrainNext = true;
@@ -2604,6 +2624,10 @@
     // its size and its region; a discovery board has what the find is to that country; a focus board is a brain
     // or a lightbulb and has nothing of the kind, so it is given nothing and the line is left out altogether.
     const facts = D ? escapeHtml(D.rel.charAt(0).toUpperCase() + D.rel.slice(1)) : (L.focus || L.scene) ? '' : [L.cap ? `Capital: <b>${L.cap}</b>` : '', L.pop ? `Population: <b>${fmtPop(L.pop)}</b>` : '', L.sub ? `Region: <b>${L.sub}</b>` : ''].filter(Boolean).join(' · ');
+    // A country whose discovery board is not dealt (another country's find has its shape, tourFor) still has
+    // its find: it is told here, under the country's own facts.
+    const F = !D && isCountry(L) ? discLevelFor(L) : null;
+    const find = F && !DATA.levels.includes(F) ? `${escapeHtml(F.name)}: ${escapeHtml(F.rel)}. ${escapeHtml(F.fact)}` : '';
     const nj = nextOpen(i), last = nj < 0;
     // The reading. It is shown, not described: a bar under a caption, with the comparison against everybody
     // else added underneath only when the server has enough players to make it true.
@@ -2620,6 +2644,7 @@
       <p class="aa-card-kicker">${milestone ? `Milestone · level ${n} · ` : ''}You cleared</p>
       <h3>${escapeHtml(L.name)}</h3>
       ${facts ? `<p class="aa-facts">${facts}</p>` : ''}
+      ${find ? `<p class="aa-facts aa-facts--find">${find}</p>` : ''}
       <p class="aa-stars" aria-label="${s} of 3 stars">${'★'.repeat(s)}${'☆'.repeat(3 - s)}</p>
       <div class="aa-stats"><span><b>${fmtTime(t, true)}</b>time</span><span><b>${run.lost}</b>hearts lost</span><span><b>${run.hints}</b>hints</span><span><b>x${run.combo}</b>best combo</span></div>
       ${rankLine}
@@ -2762,6 +2787,12 @@
     try { keys = Object.keys(localStorage).filter(k => k.startsWith(STORE + 'train:') && k !== STORE + today).map(k => k.slice(STORE.length + 6)).sort(); } catch { /* none */ }
     let t = 0;
     for (const d of keys) { const v = trainFirst(trainDay(d), id); if (typeof v !== 'number') continue; if (v >= 85) t = Math.min(TRAIN_TIERS - 1, t + 1); else if (v < 50) t = Math.max(0, t - 1); }
+    // Today counts too, and only upward: a round scored 85 or more today makes its next puzzle today a level
+    // harder. Waiting for tomorrow read to players as the game ignoring a 90. It is today's best (a Play again
+    // can push it up, but that only makes the next puzzle harder); from tomorrow the day is read by its first
+    // score, as every day before it.
+    const now = trainDay(today.slice(6))[id];
+    if (typeof now === 'number' && now >= 85) t = Math.min(TRAIN_TIERS - 1, t + 1);
     return t;
   }
   // what each level asks of each round
