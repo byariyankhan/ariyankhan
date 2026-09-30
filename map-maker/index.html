@@ -40,7 +40,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,600;0,9..144,700;1,9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="/css/map-maker.css?v=4" />
+    <link rel="stylesheet" href="/css/map-maker.css?v=5" />
     <link rel="preload" href="/js/vendor/countries-110m.json" as="fetch" crossorigin="anonymous" />
 
     <script type="application/ld+json">
@@ -163,6 +163,14 @@
             <p class="mm-hint">Click the map or search. Countries go into the <strong>active</strong> group (blue outline). Click a highlighted country again to remove it.</p>
             <div id="mmGroups"></div>
             <button type="button" class="mm-btn mm-btn--small" id="mmAddGroup">+ Add colour group</button>
+            <div class="mm-selbar" id="mmSelBar" hidden>
+              <p class="mm-hint">Tap the colour dot on a country to give it its own colour.</p>
+              <div class="mm-row">
+                <button type="button" class="mm-btn mm-btn--small" id="mmRandom">Random colours</button>
+                <button type="button" class="mm-btn mm-btn--small" id="mmResetColors">Reset colours</button>
+              </div>
+              <div class="mm-row"><label for="mmHiOpacity">Opacity</label><input type="range" id="mmHiOpacity" min="0.1" max="1" step="0.05" value="1" /><span class="mm-val" id="mmHiOpacityVal">100%</span></div>
+            </div>
           </div>
 
           <div class="mm-block">
@@ -194,6 +202,7 @@
                 <option value="21:9">21:9 · Ultrawide (2560×1080)</option>
               </select>
             </div>
+            <div class="mm-row"><label for="mmMapOpacity">Other countries</label><input type="range" id="mmMapOpacity" min="0" max="1" step="0.05" value="1" /><span class="mm-val" id="mmMapOpacityVal">100%</span></div>
             <div class="mm-presets">
               <button type="button" class="mm-preset" data-preset="dark">Dark</button>
               <button type="button" class="mm-preset" data-preset="light">Light</button>
@@ -204,6 +213,7 @@
           </div>
 
           <div class="mm-export">
+              <label class="mm-check mm-only"><input type="checkbox" id="mmOnlySel" /> Only the selected countries (cropped, transparent background)</label>
               <button type="button" class="mm-btn mm-btn--primary mm-btn--wide" id="mmDownloadPng">Download PNG</button>
               <p class="mm-export-dims"><span id="mmExportDims">3840 × 2160</span> px · nothing is uploaded</p>
           </div>
@@ -251,7 +261,7 @@
           <div class="mm-card"><h3>Maps for YouTube videos</h3><p>A 16:9 map with the countries of your story highlighted, exported as a 4K PNG that drops straight onto your timeline.</p></div>
           <div class="mm-card"><h3>Thumbnails and Shorts</h3><p>One bright country on a dark map for a thumbnail, or a 9:16 globe for a Short, Reel or TikTok.</p></div>
           <div class="mm-card"><h3>Slides and worksheets</h3><p>Clean maps for presentations and lessons, with labels and grid lines, as a PNG or a sharp SVG that prints at any size.</p></div>
-          <div class="mm-card"><h3>Comparison maps</h3><p>Up to six colour groups, for members and partners of an alliance, exporters and importers, or the countries a route crosses.</p></div>
+          <div class="mm-card"><h3>Comparison maps</h3><p>Up to six colour groups, or a colour of its own for every country, with random colours in one click and adjustable opacity, for alliances, trade partners or the countries a route crosses.</p></div>
         </div>
 
         <h2>Questions</h2>
@@ -262,7 +272,7 @@
           </details>
           <details>
             <summary>What sizes can I export?</summary>
-            <p>A PNG at 1×, 2× or 4× the canvas, up to 7680 × 4320 (8K) on 16:9, or an SVG that scales to any size. Canvases come in 16:9, 9:16, 1:1, 4:3 and 21:9.</p>
+            <p>A PNG at 1×, 2× or 4× the canvas, up to 7680 × 4320 (8K) on 16:9, or an SVG that scales to any size. Canvases come in 16:9, 9:16, 1:1, 4:3 and 21:9. Tick “Only the selected countries” to download just those countries, cropped with a margin on a transparent background, ready to place over footage.</p>
           </details>
           <details>
             <summary>Which projections can I use?</summary>
@@ -293,6 +303,6 @@
     <script src="/js/vendor/d3-geo.min.js"></script>
     <script src="/js/vendor/d3-geo-projection.min.js"></script>
     <script src="/js/vendor/topojson-client.min.js"></script>
-    <script src="/js/map-maker.js?v=6"></script>
+    <script src="/js/map-maker.js?v=7"></script>
   </body>
 </html>
