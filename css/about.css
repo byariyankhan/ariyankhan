@@ -688,3 +688,9 @@
   .about-cta-actions .about-primary-link,
   .about-cta-actions .about-secondary-link { width: auto; }
 }
+
+/* ── What I Make / Free Tools & Games: the values cards, with a link under the text ── */
+.about-value-body a, .about-section-text a{ color:var(--yellow, #F5C518); }
+.about-card-link{ display:inline-block; margin-top:10px; font-weight:700; font-size:14px; text-decoration:none; }
+.about-card-link:hover{ text-decoration:underline; }
+@media(min-width:900px){ .about-values-grid--three{ grid-template-columns:repeat(3, minmax(0,1fr)); } }

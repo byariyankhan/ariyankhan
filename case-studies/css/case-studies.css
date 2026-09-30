@@ -256,3 +256,19 @@
 @media (max-width: 780px) {
   .cs-page { padding-top: 66px; }
 }
+
+/* ── NOTES: what the case studies are, and what they share ── */
+.cs-notes { display: grid; gap: 34px; padding: clamp(44px, 6vw, 72px) 0; border-top: 1px solid var(--border); }
+@media (min-width: 900px) { .cs-notes { grid-template-columns: 1fr 1fr; gap: 44px 56px; } .cs-notes-col--wide { grid-column: 1 / -1; } }
+.cs-notes h2 { margin: 14px 0 14px; color: #fff; font-family: "Barlow Condensed", sans-serif; font-size: clamp(28px, 3.6vw, 38px); font-weight: 800; line-height: 1.08; }
+.cs-notes p, .cs-ideas li { color: var(--muted); font-size: 15.5px; line-height: 1.8; margin: 0 0 14px; }
+.cs-notes strong { color: #fff; }
+.cs-ideas { margin: 0; padding-left: 20px; }
+.cs-ideas li { margin-bottom: 10px; }
+.cs-covers { display: grid; gap: 18px; }
+@media (min-width: 780px) { .cs-covers { grid-template-columns: 1fr 1fr; } }
+.cs-covers > div { border: 1px solid var(--border); border-radius: 14px; padding: 20px; background: rgba(255,255,255,.02); }
+.cs-covers h3 { margin: 0 0 8px; font-size: 18px; }
+.cs-covers h3 a { color: #fff; text-decoration: none; }
+.cs-covers h3 a:hover { color: var(--yellow); }
+.cs-covers p { margin: 0; }
