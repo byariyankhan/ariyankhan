@@ -31,6 +31,10 @@
 #                  the checkout is what starts Apache. What to run when the site answers 500 on every page
 #                  because a recreate started Apache before the files were there and the modules .htaccess
 #                  needs were never enabled. Needs confirm=DEPLOY.
+#   web-prune      Deletes from the live document root the files listed in deploy/retired-files.txt, and only
+#                  those: web-revive copies over the root and never deletes, so a file removed from the
+#                  repository is still served until this runs. Refuses a path still in the checkout, a link, a
+#                  folder, or anything that is not a plain relative path. Needs confirm=DELETE.
 #   web-look       Reads. What ariyankhan-web is doing: its state, its mounts, what is actually in the document
 #                  root, what it answers on its own loopback, whether Apache accepts its configuration, and the
 #                  tail of its error log. For when the site answers an error and the reason is in a log nobody
@@ -112,7 +116,7 @@ on:
         type: choice
         required: true
         default: inspect
-        options: [inspect, logs, web-look, web-revive, git-access, git-sync, push-keys, fcm-key, backup-verify, cleanup, deploy, deploy-site, push-source, web-safe-fetch, rename-infra, finish-rename, rename-env, rename-paths, rename-nginx, drop-old-backup-dir, drop-old-volumes, drop-orphan-volumes, retire-site-data, web-drop-aa-mount, volumes, health, stats]
+        options: [inspect, logs, web-look, web-revive, web-prune, git-access, git-sync, push-keys, fcm-key, backup-verify, cleanup, deploy, deploy-site, push-source, web-safe-fetch, rename-infra, finish-rename, rename-env, rename-paths, rename-nginx, drop-old-backup-dir, drop-old-volumes, drop-orphan-volumes, retire-site-data, web-drop-aa-mount, volumes, health, stats]
       confirm:
         description: "Type DELETE for cleanup, DEPLOY for deploy, RENAME for rename-infra. Ignored by the read-only modes."
         required: false
@@ -136,7 +140,7 @@ jobs:
         run: |
           set -euo pipefail
           case "${{ inputs.mode }}" in
-            cleanup|drop-old-volumes|drop-orphan-volumes|retire-site-data|web-drop-aa-mount|drop-old-backup-dir) [ "${{ inputs.confirm }}" = "DELETE" ] || { echo "::error::${{ inputs.mode }} needs confirm=DELETE"; exit 1; } ;;
+            cleanup|drop-old-volumes|drop-orphan-volumes|retire-site-data|web-drop-aa-mount|drop-old-backup-dir|web-prune) [ "${{ inputs.confirm }}" = "DELETE" ] || { echo "::error::${{ inputs.mode }} needs confirm=DELETE"; exit 1; } ;;
             deploy|deploy-site|push-source|push-keys|fcm-key|web-safe-fetch|web-revive) [ "${{ inputs.confirm }}" = "DEPLOY" ] || { echo "::error::${{ inputs.mode }} needs confirm=DEPLOY"; exit 1; } ;;
             rename-infra|finish-rename|rename-env|rename-paths|rename-nginx) [ "${{ inputs.confirm }}" = "RENAME" ] || { echo "::error::${{ inputs.mode }} needs confirm=RENAME"; exit 1; } ;;
             *) echo "read-only mode, no confirmation needed" ;;
@@ -176,7 +180,7 @@ jobs:
       # is not, this connection is the way in. Everything but the working tree is left behind, and .git most
       # of all — the VPS has no business holding the history.
       - name: Send this checkout
-        if: inputs.mode == 'push-source' || inputs.mode == 'web-safe-fetch' || inputs.mode == 'web-drop-aa-mount' || inputs.mode == 'web-revive' || inputs.mode == 'rename-env'
+        if: inputs.mode == 'push-source' || inputs.mode == 'web-safe-fetch' || inputs.mode == 'web-drop-aa-mount' || inputs.mode == 'web-revive' || inputs.mode == 'web-prune' || inputs.mode == 'rename-env'
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}

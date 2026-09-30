@@ -71,7 +71,6 @@
     <a href="${root}ai-metadata-remover.html">AI Metadata Remover</a>
     <span class="footer-divider" aria-hidden="true">|</span>
     <a href="${root}map-maker.html">Map Maker</a>
-    <a href="${root}piece-the-world.html">Piece the World</a>
     <a href="${root}puzzle/">Puzzle – Train Your Brain</a>
     <span class="footer-divider" aria-hidden="true">|</span>
     <a href="${root}about.html">About</a>
