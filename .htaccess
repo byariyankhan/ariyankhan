@@ -85,7 +85,7 @@ RewriteRule ^puzzle$                     https://%{HTTP_HOST}/puzzle/ [R=301,L,N
 #    search engine the page is gone for good and not just missing, and is not sent to another page, which
 #    Google would read as a soft 404. The same list is deploy/retired-files.txt, which the web-prune ops
 #    mode deletes from the live document root; this rule still answers if a copy were ever put back.
-RewriteRule ^(?:piece-the-world\.html|css/piece-the-world\.css|js/piece-the-world\.js|games/piece-the-world\.webmanifest|games/data/(?:world|africa|asia|europe|north-america|oceania|south-america)\.json)$ - [G,L]
+RewriteRule ^(?:piece-the-world\.html|css/piece-the-world\.css|js/piece-the-world\.js|games/piece-the-world\.webmanifest|piece-the-world-sw\.js|games/data/(?:world|africa|asia|europe|north-america|oceania|south-america)\.json)$ - [G,L]
 
 # ── Never serve deploy/test tooling ──────────────
 RedirectMatch 404 ^/(deploy|tests)(/|$)
@@ -205,7 +205,7 @@ RewriteRule ^ - [R=404,L]
   </FilesMatch>
 
   # Service worker: browsers re-check it on every page load, so the edge must not pin it for a year
-  <Files "piece-the-world-sw.js">
+  <Files "sw.js">
     Header set Cache-Control "no-cache, must-revalidate"
   </Files>
 </IfModule>

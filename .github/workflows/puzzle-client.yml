@@ -8,9 +8,9 @@ name: Puzzle client
 on:
   push:
     branches: [main]
-    paths: ['js/puzzle.js', 'css/puzzle.css', 'puzzle/**', 'piece-the-world-sw.js', 'android/app/src/main/res/**', 'tests/puzzle*.test.mjs', '.github/workflows/puzzle-client.yml']
+    paths: ['js/puzzle.js', 'css/puzzle.css', 'puzzle/**', 'android/app/src/main/res/**', 'tests/puzzle*.test.mjs', '.github/workflows/puzzle-client.yml']
   pull_request:
-    paths: ['js/puzzle.js', 'css/puzzle.css', 'puzzle/**', 'piece-the-world-sw.js', 'android/app/src/main/res/**', 'tests/puzzle*.test.mjs', '.github/workflows/puzzle-client.yml']
+    paths: ['js/puzzle.js', 'css/puzzle.css', 'puzzle/**', 'android/app/src/main/res/**', 'tests/puzzle*.test.mjs', '.github/workflows/puzzle-client.yml']
   workflow_dispatch:
 
 permissions:

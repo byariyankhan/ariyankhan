@@ -7342,8 +7342,43 @@
     else if (location.hash === '#league') openLeague();
   }).catch(err => { el.loading.hidden = true; el.error.textContent = `Could not load the levels (${err.message}). Check your connection and tap Play again.`; el.error.hidden = false; homeShown(); });
 
+  // The worker lives with the game: /puzzle/sw.js, scope /puzzle/. It used to be /piece-the-world-sw.js at the
+  // root, scope the whole site, named for a game since removed; a device that had it keeps that registration
+  // until it is told to go, so it is unregistered here once the new one is in. A browser with notifications on
+  // had its subscription on the old worker, and a registration that goes takes its subscription with it: it is
+  // moved first -- subscribed again on the new worker with the same key, posted to the server, the old
+  // endpoint dropped -- so the switch stays on. If the move cannot be made, the switch reads off and one tap
+  // turns it on again.
+  const SW_URL = '/puzzle/sw.js', SW_SCOPE = '/puzzle/', SW_OLD = /\/piece-the-world-sw\.js$/;
+  const swActive = reg => reg.active ? Promise.resolve(true) : new Promise(resolve => {
+    const w = reg.installing || reg.waiting; if (!w) { resolve(false); return; }
+    const t = setTimeout(() => resolve(false), 15000);
+    w.addEventListener('statechange', () => { if (w.state === 'activated' || w.state === 'redundant') { clearTimeout(t); resolve(w.state === 'activated'); } });
+  });
+  async function swMovePush(reg, had) {
+    try {
+      if (Notification.permission !== 'granted' || !(await swActive(reg))) return false;
+      let key = had.options?.applicationServerKey;
+      if (!key) { const d = await pushApi('key'); if (!d.enabled || !d.key) return false; key = urlB64ToBytes(d.key); }
+      const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
+      const json = sub.toJSON();
+      await pushApi('subscribe', { endpoint: json.endpoint, keys: json.keys, tz: TZ, reminder: remindOn() });
+      if (had.endpoint !== json.endpoint) await pushApi('unsubscribe', { endpoint: had.endpoint }).catch(() => {});
+      return true;
+    } catch { return false; }
+  }
+  async function swStart() {
+    const reg = await navigator.serviceWorker.register(SW_URL, { scope: SW_SCOPE });
+    const old = (await navigator.serviceWorker.getRegistrations()).filter(r => r !== reg && SW_OLD.test((r.active || r.waiting || r.installing)?.scriptURL || ''));
+    for (const o of old) {
+      const had = await o.pushManager?.getSubscription().catch(() => null);
+      if (had && await swMovePush(reg, had)) push.on = true;
+      await o.unregister().catch(() => {});
+    }
+    if (old.length && push.checked) renderNotify();
+  }
   if ('serviceWorker' in navigator && window.isSecureContext) {
-    window.addEventListener('load', () => { navigator.serviceWorker.register('/piece-the-world-sw.js').catch(() => {}); });
+    window.addEventListener('load', () => { swStart().catch(() => {}); });
   }
 
   const root = document.getElementById('stars');

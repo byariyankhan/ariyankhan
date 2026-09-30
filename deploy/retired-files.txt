@@ -18,3 +18,6 @@ games/data/europe.json
 games/data/north-america.json
 games/data/oceania.json
 games/data/south-america.json
+
+# The service worker, moved to puzzle/sw.js with the scope /puzzle/ (js/puzzle.js unregisters the old one)
+piece-the-world-sw.js
