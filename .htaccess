@@ -54,6 +54,14 @@ RewriteRule ^(?:map-maker|ai-metadata-remover)(?:\.html)?$ - [E=TOOL_HOST:%1]
 RewriteRule ^map-maker(?:\.html)?$             https://%{ENV:TOOL_HOST}/map-maker/ [R=301,L,NE]
 RewriteRule ^ai-metadata-remover(?:\.html)?$   https://%{ENV:TOOL_HOST}/ai-metadata-remover/ [R=301,L,NE]
 
+# ── Two thin blog posts retired: each → the fuller article on the same question, in one hop ──
+#    Both were short sales pitches for hiring an editor, and "When to Hire a Video Editor for YouTube" covers
+#    the same ground in depth. Same canonical-host, https target as the rules above, so any variant is one hop.
+RewriteCond %{HTTP_HOST} ^(?:www\.|youtube\.)?(.+)$ [NC]
+RewriteRule ^blog/(?:what-you-get-when-you-hire-a-professional-video-editor|why-your-youtube-videos-need-a-professional-editor)\.html$ - [E=BLOG_HOST:%1]
+RewriteRule ^blog/what-you-get-when-you-hire-a-professional-video-editor\.html$ https://%{ENV:BLOG_HOST}/blog/when-should-you-hire-a-video-editor-for-youtube.html [R=301,L,NE]
+RewriteRule ^blog/why-your-youtube-videos-need-a-professional-editor\.html$     https://%{ENV:BLOG_HOST}/blog/when-should-you-hire-a-video-editor-for-youtube.html [R=301,L,NE]
+
 # ── Redirect www to non-www (checked before HTTPS so http://www.
 #    resolves in a single hop instead of http→https-www→https-apex) ──
 RewriteCond %{HTTP_HOST} ^www\.(.+)$ [NC]
