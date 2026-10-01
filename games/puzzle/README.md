@@ -224,11 +224,11 @@ Three decisions hold it up:
 * **A win counts against the people who paid for it.** Netting stops a pair gaining together, but the table
   ranks people one at a time, and each Google account brings gold of its own to lose. So in each match a
   winner's gain is shared over the losers in proportion to what each lost, netted per pair of players over the
-  week, and capped per opponent (`PUZZLE_LEAGUE_OPPONENT_CAP`, 100,000); a loss always counts in full, and
-  gold whose loser has deleted their account (and with it their stake) is nobody's. A prize needs
+  week, with no cap per opponent (a win counts as much as the loss it came from; the old 100,000 cap is gone),
+  and gold whose loser has deleted their account (and with it their stake) is nobody's. A prize needs
   `PUZZLE_LEAGUE_MIN_OPPONENTS` (3) different people played at started tables in the week; those lines rank
   first, so the table's ranks are the prize places, and every row says `opponents` and `eligible`. A friends'
-  room counts, up to the cap. A match counts in the week its room was opened.
+  room counts. A match counts in the week its room was opened.
 * **The standings are a query, not a counter.** `gold_ledger` already records every movement with its time, so
   any week's table can be derived whenever it is asked for, and there is no second running total to drift away
   from the balances. `standings`, `placeOf` and `settleDue` all read one function (`table`), so they cannot
