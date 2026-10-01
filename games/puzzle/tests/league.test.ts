@@ -294,24 +294,23 @@ section('The ledger refuses a second prize for the same season');
 // ── Whose gold a win was ──
 // Netting stops two accounts gaining together, but the table ranks people one at a time: the account that
 // loses does not care. Each Google account brings 10,000 gold, so a prize could be bought with accounts made
-// to lose to one player in a friends' room. What one opponent can hand over is capped, a prize needs several
-// different opponents, and gold whose loser no longer exists is nobody's to credit.
+// to lose to one player in a friends' room. A prize needs several different opponents, and gold whose loser no
+// longer exists is nobody's to credit. What one opponent hands over is not capped: a win counts as much as the loss.
 
-section('What one opponent can hand over in a week is capped');
+section('What one opponent hands over counts in full: no cap');
 {
   await reset();
-  const CAP = config.league.opponentCap;
   const mid = thisWeek.startsAt.getTime() + 2 * HOUR;
   const main = await player('cap-main'), feeder = await player('cap-feeder', 50_000_000), other = await player('cap-other');
-  // A friends' room, three times over: the feeder loses far more than the cap.
-  for (let i = 0; i < 3; i++) await match(main.id, [[feeder.id, CAP]], new Date(mid + i * 60_000), `cap-${i}`);
+  // Three big wins from the same person, then a small one from somebody else.
+  for (let i = 0; i < 3; i++) await match(main.id, [[feeder.id, 1_000_000]], new Date(mid + i * 60_000), `cap-${i}`);
   await match(main.id, [[other.id, 5_000]], new Date(mid + 5 * 60_000), 'cap-other');
   const me = await L.placeOf(pool, thisWeek, main.id);
-  eq(me.earning, CAP + 5_000, `three times the cap from one opponent counts as the cap (${CAP.toLocaleString('en-US')}), plus what came from somebody else`);
-  eq((await L.placeOf(pool, thisWeek, feeder.id)).earning, -3 * CAP, 'while every loss counts in full');
+  eq(me.earning, 3_000_000 + 5_000, 'three million won from one opponent counts as three million, plus what came from somebody else');
+  eq((await L.placeOf(pool, thisWeek, feeder.id)).earning, -3_000_000, 'the same as the loss it came from');
   eq(me.opponents, 2, 'and two different people were played');
 
-  // Friends who trade wins are netted pair by pair before the cap: up 50,000 and down 30,000 to the same person is 20,000.
+  // Friends who trade wins are netted pair by pair: up 50,000 and down 30,000 to the same person is 20,000.
   const f1 = await player('cap-friend-1'), f2 = await player('cap-friend-2');
   await match(f1.id, [[f2.id, 50_000]], new Date(mid + 10 * 60_000), 'friends-1');
   await match(f2.id, [[f1.id, 30_000]], new Date(mid + 11 * 60_000), 'friends-2');

@@ -125,12 +125,8 @@ export const config = {
     hours: num('PUZZLE_LEAGUE_HOURS', 168),      // 168 = one week
     ranks: num('PUZZLE_LEAGUE_RANKS', 10),
     baseGold: num('PUZZLE_LEAGUE_BASE_GOLD', 10_000),   // what last place in the prizes is paid
-    // What one player's week can take from any single opponent, netted over the week. Without it a prize could
-    // be bought with accounts: open a friends' room with a second account and let it lose. A hundred thousand
-    // is ten signup grants -- ten straight wins at the 10,000 table against the same person -- so honest
-    // play between friends still counts, and the rest of a big week has to be won from other people.
-    opponentCap: num('PUZZLE_LEAGUE_OPPONENT_CAP', 100_000),
-    // And a prize needs at least this many different people played in the week, so a week of two accounts
+    // There is no cap on what one opponent can hand over in a week (PUZZLE_LEAGUE_OPPONENT_CAP is gone): a win
+    // counts as much as the loss it came from. A prize needs at least this many different people played in the week, so a week of two accounts
     // passing gold back and forth is a place on the board and never a payment.
     minOpponents: num('PUZZLE_LEAGUE_MIN_OPPONENTS', 3),
   },

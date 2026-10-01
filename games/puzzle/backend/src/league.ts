@@ -91,12 +91,13 @@ export interface Standing {
  * down on is a place near the bottom rather than no place at all. A table you fall out of the moment you lose
  * is a table nobody can read their own progress in.
  *
- * **What a week earns is gold taken from other people, and only so much from any one of them.** Netting alone
+ * **What a week earns is gold taken from other people, all of it.** Netting alone
  * (see the top of this file) stops two accounts gaining together, but the table ranks people one at a time:
  * the account that loses does not care that it lost. So a win is credited against the opponents who paid for
- * it. In each match every winner's gain is shared out over the losers in proportion to what each lost; per
- * pair of players those amounts are netted over the week; and what one player can take from any single
- * opponent is capped (config.league.opponentCap). A loss always counts in full. Gold whose loser no longer
+ * it. In each match every winner's gain is shared out over the losers in proportion to what each lost, and per
+ * pair of players those amounts are netted over the week. There is no cap on what one opponent can hand over:
+ * a win counts as much as the loss it came from (the cap of 100,000 per opponent that used to be here showed a
+ * winner +100K beside a loser at -3M, which read as the table being wrong). Gold whose loser no longer
  * exists -- an account deleted, its stake gone from the ledger with it -- was paid by nobody, and is not
  * credited to anybody.
  *
@@ -115,7 +116,7 @@ export interface Standing {
  * older account, so the order is total and the same every time it is asked for.
  */
 export async function table(sql: Sql, s: Season): Promise<Standing[]> {
-  const { opponentCap, minOpponents } = config.league;
+  const { minOpponents } = config.league;
   const r = await query<{ user_id: number; name: string; pic: string; earning: string; opponents: number; eligible: boolean }>(sql, `
     WITH rows AS (
       SELECT g.user_id, g.match_code AS mk, g.delta, g.created_at, true AS played, g.reason = 'leave_refund' AS gone
@@ -139,7 +140,7 @@ export async function table(sql: Sql, s: Season): Promise<Standing[]> {
     ), pair AS (
       SELECT p, o, SUM(a) AS a FROM (SELECT p, o, a FROM flow UNION ALL SELECT o, p, -a FROM flow) x GROUP BY p, o
     ), credit AS (
-      SELECT p AS user_id, SUM(LEAST(a, $4)) AS c FROM pair GROUP BY p
+      SELECT p AS user_id, SUM(a) AS c FROM pair GROUP BY p
     ), stray AS (
       -- a loss nobody still here won: a match not over yet, or a winner since deleted
       SELECT n.user_id, SUM(-n.n * GREATEST(s.lost - s.won, 0) / s.lost) AS lost
@@ -159,10 +160,10 @@ export async function table(sql: Sql, s: Season): Promise<Standing[]> {
         LEFT JOIN stray st ON st.user_id = l.user_id
         LEFT JOIN foes f ON f.user_id = l.user_id
     )
-    SELECT user_id, name, pic, earning, opponents, (earning > 0 AND opponents >= $5) AS eligible
+    SELECT user_id, name, pic, earning, opponents, (earning > 0 AND opponents >= $4) AS eligible
       FROM scored
-     ORDER BY (earning > 0 AND opponents >= $5) DESC, earning DESC, last_at ASC, user_id ASC`,
-    [s.startsAt, s.endsAt, PLAY_REASONS, Math.max(0, opponentCap), Math.max(0, minOpponents)]);
+     ORDER BY (earning > 0 AND opponents >= $4) DESC, earning DESC, last_at ASC, user_id ASC`,
+    [s.startsAt, s.endsAt, PLAY_REASONS, Math.max(0, minOpponents)]);
   return r.rows.map((row, i) => ({ rank: i + 1, ...row, earning: Number(row.earning) }));
 }
 
