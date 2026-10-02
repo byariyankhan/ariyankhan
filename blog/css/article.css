@@ -625,3 +625,11 @@
 @media (prefers-reduced-motion: reduce) {
   .article-progress { transition: none; }
 }
+
+/* A YouTube Short is vertical: a 9:16 frame, centred, no wider than a phone. */
+.article-video--short {
+  aspect-ratio: 9 / 16;
+  max-width: 340px;
+  margin-left: auto;
+  margin-right: auto;
+}
