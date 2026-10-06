@@ -449,10 +449,10 @@ place, sit in two labelled boxes off the East Coast. The continents (`asia.html`
 territories and disputed places be marked on their own line; Turkey and Cyprus are on both the Europe and Asia
 maps. Countries too small to click at a map's scale get a dot (on the world map only the tiniest), so every
 listed place can be marked from the map except Tuvalu, which the 50m data cannot draw. Countries by region (`canada.html` 13, `australia.html` 8, `uk.html` 12 = England's nine
-regions plus Scotland, Wales and Northern Ireland, `germany.html` 16, `japan.html` 47) use Natural Earth 10m admin-1
+regions plus Scotland, Wales and Northern Ireland, `germany.html` 16, `japan.html` 47, `mexico.html` 32, `brazil.html` 27, `spain.html` 17 + Ceuta and Melilla on their own line (property `extra`), `italy.html` 20, `france.html` the 13 European regions) use Natural Earth 10m admin-1
 borders, filtered, dissolved and simplified with mapshaper into `js/data/admin1/<country>.json` (12–28 KB each,
 object `regions`, properties `id` and `name`); each page's table of regions is checked against the names in its
-file. India is left out for now: Natural Earth draws Kashmir along the line of control, not India's official
+file. The Canary Islands are moved closer in the data (+4° lon, +7° lat) and carry `inset`, which draws a dashed frame; Spain's file skips mapshaper's `-filter-slivers`, which would delete Ceuta and Melilla. India is left out for now: Natural Earth draws Kashmir along the line of control, not India's official
 border, which Indian readers and Indian law treat differently. A click marks a place Visited or Want to go; marks live in localStorage
 (`travel-map:v1`) and in the share link (`#r=us&v=06.36&w=02&t=Title&th=night`). Download makes a PNG card with
 the title, the count, a legend and `ariyankhan.com/travel-map`, sized 1080×1350, 1080×1920, 1080×1080 or

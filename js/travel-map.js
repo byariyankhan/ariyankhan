@@ -60,6 +60,12 @@
     uk: { label: 'the UK', unit: 'regions', one: 'region', total: 12, admin: true, file: '/js/data/admin1/uk.json', object: 'regions', size: [700, 1000] },
     germany: { label: 'Germany', unit: 'states', one: 'state', total: 16, admin: true, file: '/js/data/admin1/germany.json', object: 'regions', size: [760, 1000] },
     japan: { label: 'Japan', unit: 'prefectures', one: 'prefecture', total: 47, admin: true, file: '/js/data/admin1/japan.json', object: 'regions', size: [900, 900] },
+    mexico: { label: 'Mexico', unit: 'states', one: 'state', total: 32, admin: true, file: '/js/data/admin1/mexico.json', object: 'regions', size: [1000, 680] },
+    brazil: { label: 'Brazil', unit: 'states', one: 'state', total: 27, admin: true, file: '/js/data/admin1/brazil.json', object: 'regions', size: [900, 880] },
+    spain: { label: 'Spain', unit: 'autonomous communities', one: 'autonomous community', total: 17, admin: true, file: '/js/data/admin1/spain.json', object: 'regions', size: [1000, 820],
+      note: '* Ceuta and Melilla, Spain’s two autonomous cities in North Africa, can be marked and are counted on their own line. The Canary Islands are shown in the box.' },
+    italy: { label: 'Italy', unit: 'regions', one: 'region', total: 20, admin: true, file: '/js/data/admin1/italy.json', object: 'regions', size: [760, 1000] },
+    france: { label: 'France', unit: 'regions', one: 'region', total: 13, admin: true, file: '/js/data/admin1/france.json', object: 'regions', size: [900, 900] },
     parks: { label: 'National Parks', unit: 'parks', one: 'park', total: 63, file: '/js/vendor/us-states-10m.json', object: 'states', size: [975, 610] },
   };
   const THEMES = {
@@ -94,10 +100,12 @@
     const topo = await loadTopo(R.file);
     const fc = topojson.feature(topo, topo.objects[R.object]);
     if (R.admin) {
-      const features = fc.features.map(f => ({ ...f, id: f.properties.id, properties: { name: f.properties.name } }));
+      // extra: markable but counted on its own line (Spain's Ceuta and Melilla). inset: moved closer and boxed.
+      const features = fc.features.map(f => ({ ...f, id: f.properties.id, properties: { name: f.properties.name, extra: !!f.properties.extra, inset: !!f.properties.inset } }));
       const list = [...features].sort((a, b) => a.properties.name.localeCompare(b.properties.name));
       const ids = new Set(list.map(f => f.id));
-      return { key, features, list, byId: new Map(list.map(f => [f.id, f])), counted: ids, interactive: ids };
+      const counted = new Set(list.filter(f => !f.properties.extra).map(f => f.id));
+      return { key, features, list, byId: new Map(list.map(f => [f.id, f])), counted, interactive: ids };
     }
     const named = fc.features.map(f => {
       const raw = f.properties?.name || '';
@@ -179,7 +187,8 @@
     const all = { type: 'FeatureCollection', features: data.features };
     if (key === 'canada') return fit(d3.geoConicConformal().rotate([96, 0]).parallels([49, 77]), all);
     if (key === 'australia') return fit(d3.geoConicEqualArea().rotate([-134, 0]).parallels([-18, -36]), all);
-    if (key === 'uk' || key === 'germany') return fit(d3.geoMercator(), all);
+    if (key === 'uk' || key === 'germany' || key === 'spain' || key === 'italy' || key === 'france' || key === 'brazil') return fit(d3.geoMercator(), all);
+    if (key === 'mexico') return fit(d3.geoConicConformal().rotate([102, 0]).parallels([17.5, 29.5]), all);
     // Japan's remote Pacific islands would shrink the main islands to a corner: frame Okinawa to Hokkaido.
     if (key === 'japan') return fit(d3.geoMercator(), grid(123, 146, 24, 45));
     if (key === 'oceania') return fit(d3.geoMercator().rotate([-165, 0]), grid(112, 232, -48, 16));
@@ -201,6 +210,11 @@
         stroke: T.line, 'stroke-width': state.region === 'us' || REGIONS[state.region].admin ? 0.9 : 0.5, 'fill-opacity': outside && state.region !== 'parks' ? 0.45 : null,
       }, g);
       if (interactive && !outside) { p.classList.add('tvm-shape'); if (f.id === hoverId) p.classList.add('is-hover'); }
+    }
+    // An inset (the Canary Islands, moved closer in the data) gets a dashed frame, like Alaska and Hawaii.
+    for (const f of data.features) if (f.properties.inset) {
+      const [[x0, y0], [x1, y1]] = path.bounds(f), m = 10;
+      el('rect', { x: x0 - m, y: y0 - m, width: x1 - x0 + 2 * m, height: y1 - y0 + 2 * m, rx: 8, fill: 'none', stroke: T.muted, 'stroke-opacity': 0.6, 'stroke-dasharray': '4 4' }, g);
     }
     if (state.region === 'parks') drawParks(target, proj, T, interactive, W, H);
     else if (state.region !== 'us') drawSmall(target, path, proj, T, interactive);
@@ -292,8 +306,8 @@
     }
     listEl.appendChild(frag);
     $('#tvmListEmpty').hidden = items.length > 0;
-    $('#tvmListNote').hidden = state.region === 'us' || state.region === 'parks' || !!REGIONS[state.region].admin;
-    $('#tvmListNote').textContent = state.region === 'europe'
+    $('#tvmListNote').hidden = state.region === 'us' || state.region === 'parks' || (REGIONS[state.region].admin && !REGIONS[state.region].note);
+    $('#tvmListNote').textContent = REGIONS[state.region].note ? REGIONS[state.region].note : state.region === 'europe'
       ? '* Kosovo can be marked, but the count follows the 46 countries most travel lists use.'
       : '* Territories and places with disputed status can be marked; they are counted on their own line, not in the total.';
   }
