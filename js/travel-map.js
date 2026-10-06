@@ -86,6 +86,16 @@
     turkey: { label: 'Turkey', unit: 'provinces', one: 'province', total: 81, admin: true, file: '/js/data/admin1/turkey.json', object: 'regions', size: [1000, 480] },
     peru: { label: 'Peru', unit: 'regions', one: 'region', total: 26, admin: true, file: '/js/data/admin1/peru.json', object: 'regions', size: [760, 1000] },
     chile: { label: 'Chile', unit: 'regions', one: 'region', total: 16, admin: true, file: '/js/data/admin1/chile.json', object: 'regions', size: [760, 1000] },
+    belgium: { label: 'Belgium', unit: 'provinces', one: 'province', total: 11, admin: true, file: '/js/data/admin1/belgium.json', object: 'regions', size: [1000, 820] },
+    denmark: { label: 'Denmark', unit: 'regions', one: 'region', total: 5, admin: true, file: '/js/data/admin1/denmark.json', object: 'regions', size: [900, 760] },
+    'czech-republic': { label: 'the Czech Republic', unit: 'regions', one: 'region', total: 14, admin: true, file: '/js/data/admin1/czech-republic.json', object: 'regions', size: [1000, 600] },
+    hungary: { label: 'Hungary', unit: 'counties', one: 'county', total: 20, admin: true, file: '/js/data/admin1/hungary.json', object: 'regions', size: [1000, 640] },
+    croatia: { label: 'Croatia', unit: 'counties', one: 'county', total: 21, admin: true, file: '/js/data/admin1/croatia.json', object: 'regions', size: [900, 880] },
+    iceland: { label: 'Iceland', unit: 'regions', one: 'region', total: 8, admin: true, file: '/js/data/admin1/iceland.json', object: 'regions', size: [1000, 700] },
+    finland: { label: 'Finland', unit: 'regions', one: 'region', total: 19, admin: true, file: '/js/data/admin1/finland.json', object: 'regions', size: [600, 1000] },
+    romania: { label: 'Romania', unit: 'counties', one: 'county', total: 42, admin: true, file: '/js/data/admin1/romania.json', object: 'regions', size: [1000, 720] },
+    thailand: { label: 'Thailand', unit: 'provinces', one: 'province', total: 77, admin: true, file: '/js/data/admin1/thailand.json', object: 'regions', size: [620, 1000] },
+    ecuador: { label: 'Ecuador', unit: 'provinces', one: 'province', total: 24, admin: true, file: '/js/data/admin1/ecuador.json', object: 'regions', size: [1000, 780] },
     parks: { label: 'National Parks', unit: 'parks', one: 'park', total: 63, file: '/js/vendor/us-states-10m.json', object: 'states', size: [975, 610] },
   };
   const THEMES = {
@@ -213,6 +223,8 @@
     if (key === 'south-korea' || key === 'portugal' || key === 'netherlands' || key === 'switzerland' || key === 'austria' || key === 'poland' || key === 'ireland' || key === 'new-zealand' || key === 'colombia' || key === 'south-africa') return fit(d3.geoMercator(), all);
     if (key === 'greece' || key === 'turkey' || key === 'peru' || key === 'chile') return fit(d3.geoMercator(), all);
     if (key === 'norway') return fit(d3.geoConicConformal().rotate([-15, 0]).parallels([60, 70]), all);
+    if (['belgium', 'denmark', 'czech-republic', 'hungary', 'croatia', 'iceland', 'romania', 'thailand', 'ecuador'].includes(key)) return fit(d3.geoMercator(), all);
+    if (key === 'finland') return fit(d3.geoConicConformal().rotate([-26, 0]).parallels([61, 68]), all);
     if (key === 'sweden') return fit(d3.geoConicConformal().rotate([-16, 0]).parallels([57, 67]), all);
     if (key === 'mexico') return fit(d3.geoConicConformal().rotate([102, 0]).parallels([17.5, 29.5]), all);
     // Japan's remote Pacific islands would shrink the main islands to a corner: frame Okinawa to Hokkaido.
