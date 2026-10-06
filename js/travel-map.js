@@ -71,6 +71,15 @@
     argentina: { label: 'Argentina', unit: 'provinces', one: 'province', total: 24, admin: true, file: '/js/data/admin1/argentina.json', object: 'regions', size: [620, 1000] },
     portugal: { label: 'Portugal', unit: 'districts & regions', one: 'district or region', total: 20, admin: true, file: '/js/data/admin1/portugal.json', object: 'regions', size: [720, 1000] },
     france: { label: 'France', unit: 'regions', one: 'region', total: 13, admin: true, file: '/js/data/admin1/france.json', object: 'regions', size: [900, 900] },
+    netherlands: { label: 'the Netherlands', unit: 'provinces', one: 'province', total: 12, admin: true, file: '/js/data/admin1/netherlands.json', object: 'regions', size: [740, 1000] },
+    switzerland: { label: 'Switzerland', unit: 'cantons', one: 'canton', total: 26, admin: true, file: '/js/data/admin1/switzerland.json', object: 'regions', size: [1000, 660] },
+    austria: { label: 'Austria', unit: 'states', one: 'state', total: 9, admin: true, file: '/js/data/admin1/austria.json', object: 'regions', size: [1000, 540] },
+    poland: { label: 'Poland', unit: 'voivodeships', one: 'voivodeship', total: 16, admin: true, file: '/js/data/admin1/poland.json', object: 'regions', size: [1000, 940] },
+    ireland: { label: 'Ireland', unit: 'counties', one: 'county', total: 26, admin: true, file: '/js/data/admin1/ireland.json', object: 'regions', size: [780, 1000] },
+    sweden: { label: 'Sweden', unit: 'counties', one: 'county', total: 21, admin: true, file: '/js/data/admin1/sweden.json', object: 'regions', size: [520, 1000] },
+    'new-zealand': { label: 'New Zealand', unit: 'regions', one: 'region', total: 16, admin: true, file: '/js/data/admin1/new-zealand.json', object: 'regions', size: [760, 1000] },
+    colombia: { label: 'Colombia', unit: 'departments', one: 'department', total: 33, admin: true, file: '/js/data/admin1/colombia.json', object: 'regions', size: [760, 1000] },
+    'south-africa': { label: 'South Africa', unit: 'provinces', one: 'province', total: 9, admin: true, file: '/js/data/admin1/south-africa.json', object: 'regions', size: [1000, 860] },
     parks: { label: 'National Parks', unit: 'parks', one: 'park', total: 63, file: '/js/vendor/us-states-10m.json', object: 'states', size: [975, 610] },
   };
   const THEMES = {
@@ -195,7 +204,8 @@
     if (key === 'uk' || key === 'germany' || key === 'spain' || key === 'italy' || key === 'france' || key === 'brazil') return fit(d3.geoMercator(), all);
     if (key === 'china') return fit(d3.geoConicEqualArea().rotate([-105, 0]).parallels([25, 47]), all);
     if (key === 'argentina') return fit(d3.geoConicConformal().rotate([65, 0]).parallels([-25, -45]), all);
-    if (key === 'south-korea' || key === 'portugal') return fit(d3.geoMercator(), all);
+    if (key === 'south-korea' || key === 'portugal' || key === 'netherlands' || key === 'switzerland' || key === 'austria' || key === 'poland' || key === 'ireland' || key === 'new-zealand' || key === 'colombia' || key === 'south-africa') return fit(d3.geoMercator(), all);
+    if (key === 'sweden') return fit(d3.geoConicConformal().rotate([-16, 0]).parallels([57, 67]), all);
     if (key === 'mexico') return fit(d3.geoConicConformal().rotate([102, 0]).parallels([17.5, 29.5]), all);
     // Japan's remote Pacific islands would shrink the main islands to a corner: frame Okinawa to Hokkaido.
     if (key === 'japan') return fit(d3.geoMercator(), grid(123, 146, 24, 45));
