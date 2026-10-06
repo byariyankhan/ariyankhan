@@ -436,7 +436,7 @@ there and both learn it. Keep its wording honest: a clean result is "no AI metad
 
 **Travel Map** (`/travel-map/`; paper `#F7F3EA`, teal `#1E7A72`, coral; DM Serif Display + Inter;
 `css/travel-map.css`, `js/travel-map.js`) is a "states I've visited" map maker aimed at readers in the US and
-Europe. It has three map pages, each targeting its own search: `/travel-map/` (the 50 US states, AlbersUSA, from
+Europe. Every map is its own page, with no tabs or region switcher on it; a "More travel maps" block under each tool links to the most related maps (RELATED in the generator), which is how readers and search engines move between them. The first three pages, each targeting its own search, were: `/travel-map/` (the 50 US states, AlbersUSA, from
 `js/vendor/us-states-10m.json`, us-atlas, Census borders), `europe.html` (46 countries: the UN's 44 plus Cyprus
 and Turkey, with Kosovo markable but counted on its own line) and `world.html` (195: the 193 UN members, the
 Vatican and Palestine; territories and disputed places are markable and counted separately; Tuvalu is too small
@@ -444,7 +444,11 @@ for the 50m data and is list-only). `national-parks.html` tracks the 63 US natio
 US map, from `js/data/national-parks.json` (id, name, states, year, lat/lon, one-line "known for"); the same
 file builds the page's table of all 63 and its counts (most parks by state, oldest, newest), so the table,
 the map and the prose cannot drift apart. American Samoa and the Virgin Islands, which AlbersUSA cannot
-place, sit in two labelled boxes off the East Coast. A click marks a place Visited or Want to go; marks live in localStorage
+place, sit in two labelled boxes off the East Coast. The continents (`asia.html` 48, `africa.html` 54, `north-america.html` 23,
+`south-america.html` 12, `oceania.html` 14) count the countries in `CONTINENTS` in `js/travel-map.js` and let
+territories and disputed places be marked on their own line; Turkey and Cyprus are on both the Europe and Asia
+maps. Countries too small to click at a map's scale get a dot (on the world map only the tiniest), so every
+listed place can be marked from the map except Tuvalu, which the 50m data cannot draw. A click marks a place Visited or Want to go; marks live in localStorage
 (`travel-map:v1`) and in the share link (`#r=us&v=06.36&w=02&t=Title&th=night`). Download makes a PNG card with
 the title, the count, a legend and `ariyankhan.com/travel-map`, sized 1080×1350, 1080×1920, 1080×1080 or
 1920×1080. Keep the counts and their wording neutral: the totals are stated, never "all the countries".

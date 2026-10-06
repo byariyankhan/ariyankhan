@@ -40,7 +40,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="/css/travel-map.css?v=2" />
+    <link rel="stylesheet" href="/css/travel-map.css?v=3" />
 
     <script type="application/ld+json">
 {
@@ -170,9 +170,7 @@
           <summary aria-label="Menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5 19.4 7.7v8.6L12 20.5 4.6 16.3V7.7z"/><circle cx="12" cy="12" r="3"/></svg></summary>
           <nav aria-label="Travel Map">
             <a href="/travel-map/">States I’ve visited (USA)</a>
-            <a href="/travel-map/europe.html">Europe travel map</a>
             <a href="/travel-map/world.html">Countries I’ve visited</a>
-            <a href="/travel-map/national-parks.html" aria-current="page">National parks tracker</a>
             <a href="/travel-map/how-to-use.html">How to use</a>
             <a href="/travel-map/about.html">About &amp; FAQ</a>
             <a href="/travel-map/privacy.html">Privacy</a>
@@ -186,13 +184,6 @@
         <h1>Track the national parks <span>you’ve visited</span></h1>
         <p class="tvm-lede">Click the parks you have been to, from Acadia to Zion. See how many of the 63 you have seen, and save your map.</p>
       </header>
-
-      <nav class="tvm-tabs" aria-label="Choose a map">
-        <a class="tvm-tab" data-region="us" href="/travel-map/">USA</a>
-        <a class="tvm-tab" data-region="europe" href="/travel-map/europe.html">Europe</a>
-        <a class="tvm-tab" data-region="world" href="/travel-map/world.html">World</a>
-        <a class="tvm-tab is-on" data-region="parks" href="/travel-map/national-parks.html" aria-current="page">National Parks</a>
-      </nav>
 
       <section class="tvm-tool" id="tvmTool" aria-label="Travel map">
         <div class="tvm-stage" id="tvmStage">
@@ -246,6 +237,16 @@
           <button type="button" class="tvm-btn" id="tvmShare">Copy link</button>
         </div>
       </section>
+
+      <nav class="tvm-maps" aria-labelledby="tvm-maps-parks">
+        <h2 id="tvm-maps-parks">More travel maps</h2>
+        <div class="tvm-maps-grid">
+          <a class="tvm-more" href="/travel-map/"><b>USA states</b><span>The 50 states you have visited</span></a>
+          <a class="tvm-more" href="/travel-map/north-america.html"><b>North America</b><span>23 countries</span></a>
+          <a class="tvm-more" href="/travel-map/world.html"><b>World</b><span>195 countries</span></a>
+          <a class="tvm-more" href="/travel-map/south-america.html"><b>South America</b><span>12 countries</span></a>
+        </div>
+      </nav>
 
       <!-- Below the tool: what the page does, for people and for search -->
       <section class="tvm-explain" aria-labelledby="tvm-explain-parks">
@@ -375,6 +376,6 @@
     <script src="/js/vendor/d3-array.min.js"></script>
     <script src="/js/vendor/d3-geo.min.js"></script>
     <script src="/js/vendor/topojson-client.min.js"></script>
-    <script src="/js/travel-map.js?v=2"></script>
+    <script src="/js/travel-map.js?v=3"></script>
   </body>
 </html>
