@@ -80,6 +80,12 @@
     'new-zealand': { label: 'New Zealand', unit: 'regions', one: 'region', total: 16, admin: true, file: '/js/data/admin1/new-zealand.json', object: 'regions', size: [760, 1000] },
     colombia: { label: 'Colombia', unit: 'departments', one: 'department', total: 33, admin: true, file: '/js/data/admin1/colombia.json', object: 'regions', size: [760, 1000] },
     'south-africa': { label: 'South Africa', unit: 'provinces', one: 'province', total: 9, admin: true, file: '/js/data/admin1/south-africa.json', object: 'regions', size: [1000, 860] },
+    norway: { label: 'Norway', unit: 'counties', one: 'county', total: 15, admin: true, file: '/js/data/admin1/norway.json', object: 'regions', size: [760, 1000] },
+    greece: { label: 'Greece', unit: 'regions', one: 'region', total: 13, admin: true, file: '/js/data/admin1/greece.json', object: 'regions', size: [900, 860],
+      note: '* Mount Athos, the self-governing monastic state, can be marked and is counted on its own line.' },
+    turkey: { label: 'Turkey', unit: 'provinces', one: 'province', total: 81, admin: true, file: '/js/data/admin1/turkey.json', object: 'regions', size: [1000, 480] },
+    peru: { label: 'Peru', unit: 'regions', one: 'region', total: 26, admin: true, file: '/js/data/admin1/peru.json', object: 'regions', size: [760, 1000] },
+    chile: { label: 'Chile', unit: 'regions', one: 'region', total: 16, admin: true, file: '/js/data/admin1/chile.json', object: 'regions', size: [760, 1000] },
     parks: { label: 'National Parks', unit: 'parks', one: 'park', total: 63, file: '/js/vendor/us-states-10m.json', object: 'states', size: [975, 610] },
   };
   const THEMES = {
@@ -205,6 +211,8 @@
     if (key === 'china') return fit(d3.geoConicEqualArea().rotate([-105, 0]).parallels([25, 47]), all);
     if (key === 'argentina') return fit(d3.geoConicConformal().rotate([65, 0]).parallels([-25, -45]), all);
     if (key === 'south-korea' || key === 'portugal' || key === 'netherlands' || key === 'switzerland' || key === 'austria' || key === 'poland' || key === 'ireland' || key === 'new-zealand' || key === 'colombia' || key === 'south-africa') return fit(d3.geoMercator(), all);
+    if (key === 'greece' || key === 'turkey' || key === 'peru' || key === 'chile') return fit(d3.geoMercator(), all);
+    if (key === 'norway') return fit(d3.geoConicConformal().rotate([-15, 0]).parallels([60, 70]), all);
     if (key === 'sweden') return fit(d3.geoConicConformal().rotate([-16, 0]).parallels([57, 67]), all);
     if (key === 'mexico') return fit(d3.geoConicConformal().rotate([102, 0]).parallels([17.5, 29.5]), all);
     // Japan's remote Pacific islands would shrink the main islands to a corner: frame Okinawa to Hokkaido.
