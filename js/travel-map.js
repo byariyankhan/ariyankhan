@@ -54,6 +54,12 @@
     'south-america': { label: 'South America', unit: 'countries', one: 'country', total: 12, file: '/js/vendor/countries-50m.json', object: 'countries', size: [720, 900] },
     oceania: { label: 'Oceania', unit: 'countries', one: 'country', total: 14, file: '/js/vendor/countries-50m.json', object: 'countries', size: [1000, 640] },
     world: { label: 'World', unit: 'countries', one: 'country', total: 195, file: '/js/vendor/countries-50m.json', object: 'countries', size: [1000, 520] },
+    // Countries by their regions: Natural Earth admin-1 borders, one small TopoJSON per country (js/data/admin1/).
+    canada: { label: 'Canada', unit: 'provinces & territories', one: 'province or territory', total: 13, admin: true, file: '/js/data/admin1/canada.json', object: 'regions', size: [1000, 820] },
+    australia: { label: 'Australia', unit: 'states & territories', one: 'state or territory', total: 8, admin: true, file: '/js/data/admin1/australia.json', object: 'regions', size: [1000, 860] },
+    uk: { label: 'the UK', unit: 'regions', one: 'region', total: 12, admin: true, file: '/js/data/admin1/uk.json', object: 'regions', size: [700, 1000] },
+    germany: { label: 'Germany', unit: 'states', one: 'state', total: 16, admin: true, file: '/js/data/admin1/germany.json', object: 'regions', size: [760, 1000] },
+    japan: { label: 'Japan', unit: 'prefectures', one: 'prefecture', total: 47, admin: true, file: '/js/data/admin1/japan.json', object: 'regions', size: [900, 900] },
     parks: { label: 'National Parks', unit: 'parks', one: 'park', total: 63, file: '/js/vendor/us-states-10m.json', object: 'states', size: [975, 610] },
   };
   const THEMES = {
@@ -87,6 +93,12 @@
     const R = REGIONS[key];
     const topo = await loadTopo(R.file);
     const fc = topojson.feature(topo, topo.objects[R.object]);
+    if (R.admin) {
+      const features = fc.features.map(f => ({ ...f, id: f.properties.id, properties: { name: f.properties.name } }));
+      const list = [...features].sort((a, b) => a.properties.name.localeCompare(b.properties.name));
+      const ids = new Set(list.map(f => f.id));
+      return { key, features, list, byId: new Map(list.map(f => [f.id, f])), counted: ids, interactive: ids };
+    }
     const named = fc.features.map(f => {
       const raw = f.properties?.name || '';
       const id = f.id != null ? String(f.id) : 'x-' + raw.toLowerCase().replace(/[^a-z]+/g, '-');
@@ -164,6 +176,12 @@
     if (key === 'africa') return fit(d3.geoAzimuthalEqualArea().rotate([-17, -2]), grid(-25, 58, -35, 37));
     if (key === 'north-america') return fit(d3.geoConicEqualArea().rotate([96, 0]).parallels([20, 60]), grid(-168, -52, 7, 72));
     if (key === 'south-america') return fit(d3.geoConicEqualArea().rotate([60, 0]).parallels([-5, -42]), grid(-82, -34, -56, 13));
+    const all = { type: 'FeatureCollection', features: data.features };
+    if (key === 'canada') return fit(d3.geoConicConformal().rotate([96, 0]).parallels([49, 77]), all);
+    if (key === 'australia') return fit(d3.geoConicEqualArea().rotate([-134, 0]).parallels([-18, -36]), all);
+    if (key === 'uk' || key === 'germany') return fit(d3.geoMercator(), all);
+    // Japan's remote Pacific islands would shrink the main islands to a corner: frame Okinawa to Hokkaido.
+    if (key === 'japan') return fit(d3.geoMercator(), grid(123, 146, 24, 45));
     if (key === 'oceania') return fit(d3.geoMercator().rotate([-165, 0]), grid(112, 232, -48, 16));
     return d3.geoNaturalEarth1().fitExtent([[pad, pad], [W - pad, H - pad]], { type: 'FeatureCollection', features: data.features });
   }
@@ -180,7 +198,7 @@
       const outside = !data.interactive.has(f.id);
       const p = el('path', {
         d, fill: s === 'v' ? T.visited : s === 'w' ? T.want : T.land, 'data-id': interactive && !outside ? f.id : null,
-        stroke: T.line, 'stroke-width': state.region === 'us' ? 0.9 : 0.5, 'fill-opacity': outside && state.region !== 'parks' ? 0.45 : null,
+        stroke: T.line, 'stroke-width': state.region === 'us' || REGIONS[state.region].admin ? 0.9 : 0.5, 'fill-opacity': outside && state.region !== 'parks' ? 0.45 : null,
       }, g);
       if (interactive && !outside) { p.classList.add('tvm-shape'); if (f.id === hoverId) p.classList.add('is-hover'); }
     }
@@ -274,7 +292,7 @@
     }
     listEl.appendChild(frag);
     $('#tvmListEmpty').hidden = items.length > 0;
-    $('#tvmListNote').hidden = state.region === 'us' || state.region === 'parks';
+    $('#tvmListNote').hidden = state.region === 'us' || state.region === 'parks' || !!REGIONS[state.region].admin;
     $('#tvmListNote').textContent = state.region === 'europe'
       ? '* Kosovo can be marked, but the count follows the 46 countries most travel lists use.'
       : '* Territories and places with disputed status can be marked; they are counted on their own line, not in the total.';
@@ -330,7 +348,7 @@
     $('#tvmTitle').placeholder = defaultTitle();
     const R = REGIONS[state.region];
     $('#tvmSearch').placeholder = `Search ${R.unit}…`;
-    $('#tvmListHead').textContent = state.region === 'us' ? 'All 50 states' : state.region === 'parks' ? 'All 63 national parks' : state.region === 'world' ? 'Countries and territories' : `Countries of ${R.label}`;
+    $('#tvmListHead').textContent = state.region === 'us' ? 'All 50 states' : state.region === 'parks' ? 'All 63 national parks' : state.region === 'world' ? 'Countries and territories' : R.admin ? `All ${R.total} ${R.unit}` : `Countries of ${R.label}`;
   }
   function changed() { render(); renderCounter(); renderList(); store.save(); saveHash(); syncControls(); }
 
@@ -367,7 +385,7 @@
   /* ══════════════════════════════════════════════
      Export: the map on a card with a title, the count, a legend and the site's address
      ══════════════════════════════════════════════ */
-  const defaultTitle = () => state.region === 'us' ? 'States I’ve visited' : state.region === 'parks' ? 'National parks I’ve visited' : state.region === 'world' ? 'Countries I’ve visited' : `My ${REGIONS[state.region].label} travel map`;
+  const defaultTitle = () => state.region === 'us' ? 'States I’ve visited' : state.region === 'parks' ? 'National parks I’ve visited' : state.region === 'world' ? 'Countries I’ve visited' : REGIONS[state.region].admin ? `My ${REGIONS[state.region].label.replace(/^the /, '')} travel map` : `My ${REGIONS[state.region].label} travel map`;
   function exportSvg() {
     const [EW, EH] = FORMATS[state.format];
     const T = THEMES[state.theme], R = REGIONS[state.region], c = counts();
