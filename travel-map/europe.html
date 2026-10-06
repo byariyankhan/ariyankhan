@@ -40,7 +40,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="/css/travel-map.css?v=2" />
+    <link rel="stylesheet" href="/css/travel-map.css?v=3" />
 
     <script type="application/ld+json">
 {
@@ -121,7 +121,7 @@
           "name": "Can I mark the US states too?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Yes. Each map keeps its own marks: switch with the tabs above the map."
+            "text": "Yes. Each map keeps its own marks. Open the USA states map from the links under the map."
           }
         }
       ]
@@ -162,9 +162,7 @@
           <summary aria-label="Menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5 19.4 7.7v8.6L12 20.5 4.6 16.3V7.7z"/><circle cx="12" cy="12" r="3"/></svg></summary>
           <nav aria-label="Travel Map">
             <a href="/travel-map/">States I’ve visited (USA)</a>
-            <a href="/travel-map/europe.html" aria-current="page">Europe travel map</a>
             <a href="/travel-map/world.html">Countries I’ve visited</a>
-            <a href="/travel-map/national-parks.html">National parks tracker</a>
             <a href="/travel-map/how-to-use.html">How to use</a>
             <a href="/travel-map/about.html">About &amp; FAQ</a>
             <a href="/travel-map/privacy.html">Privacy</a>
@@ -178,13 +176,6 @@
         <h1>Map the countries of Europe <span>you’ve visited</span></h1>
         <p class="tvm-lede">Click the European countries you have been to, from Portugal to Russia, and save your map as an image.</p>
       </header>
-
-      <nav class="tvm-tabs" aria-label="Choose a map">
-        <a class="tvm-tab" data-region="us" href="/travel-map/">USA</a>
-        <a class="tvm-tab is-on" data-region="europe" href="/travel-map/europe.html" aria-current="page">Europe</a>
-        <a class="tvm-tab" data-region="world" href="/travel-map/world.html">World</a>
-        <a class="tvm-tab" data-region="parks" href="/travel-map/national-parks.html">National Parks</a>
-      </nav>
 
       <section class="tvm-tool" id="tvmTool" aria-label="Travel map">
         <div class="tvm-stage" id="tvmStage">
@@ -239,6 +230,16 @@
         </div>
       </section>
 
+      <nav class="tvm-maps" aria-labelledby="tvm-maps-europe">
+        <h2 id="tvm-maps-europe">More travel maps</h2>
+        <div class="tvm-maps-grid">
+          <a class="tvm-more" href="/travel-map/world.html"><b>World</b><span>195 countries</span></a>
+          <a class="tvm-more" href="/travel-map/asia.html"><b>Asia</b><span>48 countries</span></a>
+          <a class="tvm-more" href="/travel-map/africa.html"><b>Africa</b><span>54 countries</span></a>
+          <a class="tvm-more" href="/travel-map/north-america.html"><b>North America</b><span>23 countries</span></a>
+        </div>
+      </nav>
+
       <!-- Below the tool: what the page does, for people and for search -->
       <section class="tvm-explain" aria-labelledby="tvm-explain-europe">
         <h2 id="tvm-explain-europe">What you can do with this map</h2>
@@ -268,7 +269,7 @@
         </details>
         <details>
           <summary>Can I mark the US states too?</summary>
-          <p>Yes. Each map keeps its own marks: switch with the tabs above the map.</p>
+          <p>Yes. Each map keeps its own marks. Open the <a href="/travel-map/">USA states map</a> from the links under the map.</p>
         </details>
         </div>
         <p class="tvm-links"><a class="tvm-btn" href="/travel-map/how-to-use.html">How to use</a> <a class="tvm-btn" href="/travel-map/about.html">More questions</a></p>
@@ -290,6 +291,6 @@
     <script src="/js/vendor/d3-array.min.js"></script>
     <script src="/js/vendor/d3-geo.min.js"></script>
     <script src="/js/vendor/topojson-client.min.js"></script>
-    <script src="/js/travel-map.js?v=2"></script>
+    <script src="/js/travel-map.js?v=3"></script>
   </body>
 </html>

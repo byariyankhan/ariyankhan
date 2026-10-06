@@ -29,6 +29,17 @@
   };
   // The 44 countries the UN counts as Europe, plus Cyprus and Turkey, which most travel lists include.
   const EUROPE = new Set('008 020 040 112 056 070 100 191 196 203 208 233 246 250 276 300 348 352 372 380 428 438 440 442 470 498 492 499 528 807 578 616 620 642 643 674 688 703 705 724 752 756 804 826 336 792'.split(' '));
+  // Each continent: the countries it counts, and places that can be marked on its map but are counted on
+  // their own line (territories, and places whose status is disputed). Transcontinental Turkey and Cyprus
+  // appear on both the Europe and Asia maps, as most travel lists have them.
+  const CONTINENTS = {
+    europe: { counted: EUROPE, extra: ['x-kosovo'] },
+    asia: { counted: new Set('004 051 031 048 050 064 096 116 156 196 268 356 360 364 368 376 392 400 398 414 417 418 422 458 462 496 104 524 408 512 586 275 608 634 682 702 410 144 760 762 764 626 792 795 784 860 704 887'.split(' ')), extra: ['158', '344', '446', 'x-n-cyprus'] },
+    africa: { counted: new Set('012 024 204 072 854 108 132 120 140 148 174 178 180 384 262 818 226 232 748 231 266 270 288 324 624 404 426 430 434 450 454 466 478 480 504 508 516 562 566 646 678 686 690 694 706 710 728 729 834 768 788 800 894 716'.split(' ')), extra: ['732', 'x-somaliland', '654'] },
+    'north-america': { counted: new Set('028 044 052 084 124 188 192 212 214 222 308 320 332 340 388 484 558 591 659 662 670 780 840'.split(' ')), extra: ['304', '630', '060', '136', '796', '850', '092', '660', '500', '533', '531', '534', '652', '663', '666'] },
+    'south-america': { counted: new Set('032 068 076 152 170 218 328 600 604 740 858 862'.split(' ')), extra: ['238', '239'] },
+    oceania: { counted: new Set('036 242 296 584 583 520 554 585 598 882 090 776 798 548'.split(' ')), extra: ['540', '258', '316', '580', '016', '184', '570', '574', '612', '876'] },
+  };
   // Places on the world map that are not among the 195 countries counted (193 UN members, the Vatican and
   // Palestine): dependent territories and places whose status is disputed. They can still be marked, and
   // are counted on their own line.
@@ -37,6 +48,11 @@
   const REGIONS = {
     us: { label: 'USA', unit: 'states', one: 'state', total: 50, file: '/js/vendor/us-states-10m.json', object: 'states', size: [975, 610] },
     europe: { label: 'Europe', unit: 'countries', one: 'country', total: 46, file: '/js/vendor/countries-50m.json', object: 'countries', size: [900, 760] },
+    asia: { label: 'Asia', unit: 'countries', one: 'country', total: 48, file: '/js/vendor/countries-50m.json', object: 'countries', size: [1000, 720] },
+    africa: { label: 'Africa', unit: 'countries', one: 'country', total: 54, file: '/js/vendor/countries-50m.json', object: 'countries', size: [840, 860] },
+    'north-america': { label: 'North America', unit: 'countries', one: 'country', total: 23, file: '/js/vendor/countries-50m.json', object: 'countries', size: [1000, 820] },
+    'south-america': { label: 'South America', unit: 'countries', one: 'country', total: 12, file: '/js/vendor/countries-50m.json', object: 'countries', size: [720, 900] },
+    oceania: { label: 'Oceania', unit: 'countries', one: 'country', total: 14, file: '/js/vendor/countries-50m.json', object: 'countries', size: [1000, 640] },
     world: { label: 'World', unit: 'countries', one: 'country', total: 195, file: '/js/vendor/countries-50m.json', object: 'countries', size: [1000, 520] },
     parks: { label: 'National Parks', unit: 'parks', one: 'park', total: 63, file: '/js/vendor/us-states-10m.json', object: 'states', size: [975, 610] },
   };
@@ -52,7 +68,7 @@
   /* ══════════════════════════════════════════════
      State
      ══════════════════════════════════════════════ */
-  const blank = () => ({ us: { v: [], w: [] }, europe: { v: [], w: [] }, world: { v: [], w: [] }, parks: { v: [], w: [] } });
+  const blank = () => Object.fromEntries(Object.keys(REGIONS).map(k => [k, { v: [], w: [] }]));   // one slot per map
   const state = { region: 'us', mode: 'v', theme: 'atlas', format: 'post', title: '', marks: blank() };
   const cache = {};
   let data = null;         // { features (drawn), list (in the checklist), byId }
@@ -90,10 +106,13 @@
       features = named.filter(f => !US_SKIP.has(f.id));
       list = features;
       counted = new Set(list.map(f => f.id));
-    } else if (key === 'europe') {
+    } else if (CONTINENTS[key]) {
+      const C = CONTINENTS[key];
       features = named.filter(f => f.id !== '010');
-      list = features.filter(f => EUROPE.has(f.id) || f.id === 'x-kosovo');
-      counted = EUROPE;
+      const seen = new Set(); list = [];
+      for (const f of features) if ((C.counted.has(f.id) || C.extra.includes(f.id)) && !seen.has(f.id) && f.properties.name !== 'Ashmore and Cartier Islands') { seen.add(f.id); list.push(f); }
+      if (C.counted.has('798')) list.push({ id: '798', properties: { name: 'Tuvalu' }, geometry: null, listOnly: true });
+      counted = C.counted;
     } else {
       features = named.filter(f => f.id !== '010' && f.id !== 'x-siachen-glacier');
       // One entry per id (Ashmore and Cartier Islands share Australia's), and Tuvalu, which the map data
@@ -137,10 +156,15 @@
   function projectionFor(key, W, H) {
     const pad = 12;
     if (key === 'us' || key === 'parks') return d3.geoAlbersUsa().fitExtent([[pad, pad], [W - pad, H - pad]], { type: 'FeatureCollection', features: data.features });
-    if (key === 'europe') {
-      const pts = []; for (let x = -24; x <= 44; x += 4) for (let y = 35; y <= 71; y += 4) pts.push([x, y]);
-      return d3.geoConicConformal().rotate([-12, 0]).parallels([40, 64]).fitExtent([[pad, pad], [W - pad, H - pad]], { type: 'MultiPoint', coordinates: pts });
-    }
+    // Each continent is framed by a grid of points over its extent, in a projection suited to its shape.
+    const grid = (x0, x1, y0, y1) => { const pts = []; for (let x = x0; x <= x1; x += 2) for (let y = y0; y <= y1; y += 2) pts.push([x, y]); return { type: 'MultiPoint', coordinates: pts }; };
+    const fit = (p, box) => p.fitExtent([[pad, pad], [W - pad, H - pad]], box);
+    if (key === 'europe') return fit(d3.geoConicConformal().rotate([-12, 0]).parallels([40, 64]), grid(-24, 44, 35, 71));
+    if (key === 'asia') return fit(d3.geoConicConformal().rotate([-88, 0]).parallels([15, 45]), grid(26, 146, -10, 54));
+    if (key === 'africa') return fit(d3.geoAzimuthalEqualArea().rotate([-17, -2]), grid(-25, 58, -35, 37));
+    if (key === 'north-america') return fit(d3.geoConicEqualArea().rotate([96, 0]).parallels([20, 60]), grid(-168, -52, 7, 72));
+    if (key === 'south-america') return fit(d3.geoConicEqualArea().rotate([60, 0]).parallels([-5, -42]), grid(-82, -34, -56, 13));
+    if (key === 'oceania') return fit(d3.geoMercator().rotate([-165, 0]), grid(112, 232, -48, 16));
     return d3.geoNaturalEarth1().fitExtent([[pad, pad], [W - pad, H - pad]], { type: 'FeatureCollection', features: data.features });
   }
   // One function draws the live map and the exported one, so the download always matches the screen.
@@ -161,7 +185,22 @@
       if (interactive && !outside) { p.classList.add('tvm-shape'); if (f.id === hoverId) p.classList.add('is-hover'); }
     }
     if (state.region === 'parks') drawParks(target, proj, T, interactive, W, H);
+    else if (state.region !== 'us') drawSmall(target, path, proj, T, interactive);
     return [W, H];
+  }
+  // Countries too small to click at this scale (Vatican City, Malta, the island states of the Caribbean and
+  // the Pacific) also get a dot, so every place in the list can be marked from the map too.
+  function drawSmall(target, path, proj, T, interactive) {
+    const g = el('g', {}, target);
+    for (const f of data.list) {
+      if (!f.geometry || path.area(f) > (state.region === 'world' ? 4 : 30)) continue;   // the world map only dots the tiniest
+      const xy = proj(d3.geoCentroid(f)); if (!xy || !isFinite(xy[0])) continue;
+      const [W, H] = REGIONS[state.region].size; if (xy[0] < 0 || xy[1] < 0 || xy[0] > W || xy[1] > H) continue;
+      const s = statusOf(f.id);
+      const c = el('circle', { cx: xy[0].toFixed(1), cy: xy[1].toFixed(1), r: state.region === 'world' ? 3.5 : 4.5, 'data-id': interactive ? f.id : null,
+        fill: s === 'v' ? T.visited : s === 'w' ? T.want : T.land, stroke: T.muted, 'stroke-width': 1, 'stroke-opacity': 0.8 }, g);
+      if (interactive) { c.classList.add('tvm-shape', 'tvm-park'); if (f.id === hoverId) c.classList.add('is-hover'); }
+    }
   }
   // Parks are dots. AlbersUSA has no place for American Samoa or the US Virgin Islands, so those two sit in
   // labelled boxes in the open Atlantic east of the Carolinas, the way Alaska and Hawaii are inset on the left.
@@ -214,7 +253,7 @@
     $('#tvmBar').style.width = `${Math.min(100, c.pct)}%`;
     const bits = [];
     if (c.w) bits.push(`${c.w} on your wish list`);
-    if (c.extra) bits.push(state.region === 'europe' ? `+ Kosovo` : `+ ${c.extra} ${c.extra === 1 ? 'territory' : 'territories'}`);
+    if (c.extra) bits.push(state.region === 'europe' ? '+ Kosovo' : `+ ${c.extra} more ${c.extra === 1 ? 'place' : 'places'}`);
     $('#tvmSub').textContent = bits.join(' · ');
   }
   const listEl = $('#tvmList');
@@ -238,7 +277,7 @@
     $('#tvmListNote').hidden = state.region === 'us' || state.region === 'parks';
     $('#tvmListNote').textContent = state.region === 'europe'
       ? '* Kosovo can be marked, but the count follows the 46 countries most travel lists use.'
-      : '* Territories and places with disputed status can be marked, and are counted on their own line.';
+      : '* Territories and places with disputed status can be marked; they are counted on their own line, not in the total.';
   }
   listEl.addEventListener('click', e => { const b = e.target.closest('.tvm-item'); if (b) toggle(b.dataset.id); });
   $('#tvmSearch').addEventListener('input', renderList);
@@ -291,7 +330,7 @@
     $('#tvmTitle').placeholder = defaultTitle();
     const R = REGIONS[state.region];
     $('#tvmSearch').placeholder = `Search ${R.unit}…`;
-    $('#tvmListHead').textContent = state.region === 'us' ? 'All 50 states' : state.region === 'europe' ? 'Countries of Europe' : state.region === 'parks' ? 'All 63 national parks' : 'Countries and territories';
+    $('#tvmListHead').textContent = state.region === 'us' ? 'All 50 states' : state.region === 'parks' ? 'All 63 national parks' : state.region === 'world' ? 'Countries and territories' : `Countries of ${R.label}`;
   }
   function changed() { render(); renderCounter(); renderList(); store.save(); saveHash(); syncControls(); }
 
@@ -328,7 +367,7 @@
   /* ══════════════════════════════════════════════
      Export: the map on a card with a title, the count, a legend and the site's address
      ══════════════════════════════════════════════ */
-  const defaultTitle = () => state.region === 'us' ? 'States I’ve visited' : state.region === 'europe' ? 'My Europe travel map' : state.region === 'parks' ? 'National parks I’ve visited' : 'Countries I’ve visited';
+  const defaultTitle = () => state.region === 'us' ? 'States I’ve visited' : state.region === 'parks' ? 'National parks I’ve visited' : state.region === 'world' ? 'Countries I’ve visited' : `My ${REGIONS[state.region].label} travel map`;
   function exportSvg() {
     const [EW, EH] = FORMATS[state.format];
     const T = THEMES[state.theme], R = REGIONS[state.region], c = counts();

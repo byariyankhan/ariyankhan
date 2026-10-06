@@ -154,3 +154,14 @@ body.tvmk > main{ flex:1 0 auto; min-width:0; width:100%; }
   .tvm-tabs{ gap:2px; }
   .tvm-tab{ padding:8px 11px; font-size:13.5px; }
 }
+
+/* ── More travel maps: the related maps, right under the tool ── */
+.tvm-maps{ margin-top:22px; }
+.tvmk .tvm-maps h2{ font-size:clamp(22px,3.4vw,28px); margin:0 0 10px; }
+.tvm-maps-grid{ display:grid; gap:10px; grid-template-columns:repeat(auto-fill, minmax(170px, 1fr)); }
+.tvm-more{ display:flex; flex-direction:column; gap:2px; padding:13px 15px; border-radius:14px; background:var(--paper); border:1px solid var(--line); text-decoration:none; transition:border-color .15s, transform .15s; }
+.tvmk a.tvm-more{ color:var(--ink); }
+.tvm-more:hover{ border-color:var(--teal); transform:translateY(-1px); }
+.tvm-more b{ font-size:16px; }
+.tvm-more b::after{ content:' →'; color:var(--teal); }
+.tvm-more span{ font-size:13px; color:var(--muted); }
