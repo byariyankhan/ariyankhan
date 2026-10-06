@@ -96,6 +96,10 @@
     romania: { label: 'Romania', unit: 'counties', one: 'county', total: 42, admin: true, file: '/js/data/admin1/romania.json', object: 'regions', size: [1000, 720] },
     thailand: { label: 'Thailand', unit: 'provinces', one: 'province', total: 77, admin: true, file: '/js/data/admin1/thailand.json', object: 'regions', size: [620, 1000] },
     ecuador: { label: 'Ecuador', unit: 'provinces', one: 'province', total: 24, admin: true, file: '/js/data/admin1/ecuador.json', object: 'regions', size: [1000, 780] },
+    cuba: { label: 'Cuba', unit: 'provinces', one: 'province', total: 16, admin: true, file: '/js/data/admin1/cuba.json', object: 'regions', size: [1000, 480] },
+    'costa-rica': { label: 'Costa Rica', unit: 'provinces', one: 'province', total: 7, admin: true, file: '/js/data/admin1/costa-rica.json', object: 'regions', size: [900, 860] },
+    bolivia: { label: 'Bolivia', unit: 'departments', one: 'department', total: 9, admin: true, file: '/js/data/admin1/bolivia.json', object: 'regions', size: [860, 1000] },
+    malaysia: { label: 'Malaysia', unit: 'states & territories', one: 'state or territory', total: 16, admin: true, file: '/js/data/admin1/malaysia.json', object: 'regions', size: [1000, 500] },
     parks: { label: 'National Parks', unit: 'parks', one: 'park', total: 63, file: '/js/vendor/us-states-10m.json', object: 'states', size: [975, 610] },
   };
   const THEMES = {
@@ -224,6 +228,7 @@
     if (key === 'greece' || key === 'turkey' || key === 'peru' || key === 'chile') return fit(d3.geoMercator(), all);
     if (key === 'norway') return fit(d3.geoConicConformal().rotate([-15, 0]).parallels([60, 70]), all);
     if (['belgium', 'denmark', 'czech-republic', 'hungary', 'croatia', 'iceland', 'romania', 'thailand', 'ecuador'].includes(key)) return fit(d3.geoMercator(), all);
+    if (['cuba', 'costa-rica', 'bolivia', 'malaysia'].includes(key)) return fit(d3.geoMercator(), all);
     if (key === 'finland') return fit(d3.geoConicConformal().rotate([-26, 0]).parallels([61, 68]), all);
     if (key === 'sweden') return fit(d3.geoConicConformal().rotate([-16, 0]).parallels([57, 67]), all);
     if (key === 'mexico') return fit(d3.geoConicConformal().rotate([102, 0]).parallels([17.5, 29.5]), all);
