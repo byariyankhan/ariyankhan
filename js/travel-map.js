@@ -65,6 +65,11 @@
     spain: { label: 'Spain', unit: 'autonomous communities', one: 'autonomous community', total: 17, admin: true, file: '/js/data/admin1/spain.json', object: 'regions', size: [1000, 820],
       note: '* Ceuta and Melilla, Spain’s two autonomous cities in North Africa, can be marked and are counted on their own line. The Canary Islands are shown in the box.' },
     italy: { label: 'Italy', unit: 'regions', one: 'region', total: 20, admin: true, file: '/js/data/admin1/italy.json', object: 'regions', size: [760, 1000] },
+    china: { label: 'China', unit: 'provinces & regions', one: 'province or region', total: 31, admin: true, file: '/js/data/admin1/china.json', object: 'regions', size: [1000, 820],
+      note: '* Hong Kong and Macau, China’s two special administrative regions, can be marked and are counted on their own line.' },
+    'south-korea': { label: 'South Korea', unit: 'provinces & cities', one: 'province or city', total: 17, admin: true, file: '/js/data/admin1/south-korea.json', object: 'regions', size: [760, 1000] },
+    argentina: { label: 'Argentina', unit: 'provinces', one: 'province', total: 24, admin: true, file: '/js/data/admin1/argentina.json', object: 'regions', size: [620, 1000] },
+    portugal: { label: 'Portugal', unit: 'districts & regions', one: 'district or region', total: 20, admin: true, file: '/js/data/admin1/portugal.json', object: 'regions', size: [720, 1000] },
     france: { label: 'France', unit: 'regions', one: 'region', total: 13, admin: true, file: '/js/data/admin1/france.json', object: 'regions', size: [900, 900] },
     parks: { label: 'National Parks', unit: 'parks', one: 'park', total: 63, file: '/js/vendor/us-states-10m.json', object: 'states', size: [975, 610] },
   };
@@ -188,6 +193,9 @@
     if (key === 'canada') return fit(d3.geoConicConformal().rotate([96, 0]).parallels([49, 77]), all);
     if (key === 'australia') return fit(d3.geoConicEqualArea().rotate([-134, 0]).parallels([-18, -36]), all);
     if (key === 'uk' || key === 'germany' || key === 'spain' || key === 'italy' || key === 'france' || key === 'brazil') return fit(d3.geoMercator(), all);
+    if (key === 'china') return fit(d3.geoConicEqualArea().rotate([-105, 0]).parallels([25, 47]), all);
+    if (key === 'argentina') return fit(d3.geoConicConformal().rotate([65, 0]).parallels([-25, -45]), all);
+    if (key === 'south-korea' || key === 'portugal') return fit(d3.geoMercator(), all);
     if (key === 'mexico') return fit(d3.geoConicConformal().rotate([102, 0]).parallels([17.5, 29.5]), all);
     // Japan's remote Pacific islands would shrink the main islands to a corner: frame Okinawa to Hokkaido.
     if (key === 'japan') return fit(d3.geoMercator(), grid(123, 146, 24, 45));
