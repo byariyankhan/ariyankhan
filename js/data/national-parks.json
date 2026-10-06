@@ -1,0 +1,569 @@
+[
+{
+"id": "acadia",
+"name": "Acadia",
+"states": "ME",
+"year": 1919,
+"lat": 44.35,
+"lon": -68.21,
+"about": "Rocky Atlantic coastline and granite peaks on Mount Desert Island, including Cadillac Mountain."
+},
+{
+"id": "american-samoa",
+"name": "American Samoa",
+"states": "AS",
+"year": 1988,
+"lat": -14.25,
+"lon": -170.68,
+"about": "Rainforest, coral reefs and beaches in the South Pacific; the only US national park south of the equator."
+},
+{
+"id": "arches",
+"name": "Arches",
+"states": "UT",
+"year": 1971,
+"lat": 38.68,
+"lon": -109.57,
+"about": "More than 2,000 natural stone arches, including Delicate Arch."
+},
+{
+"id": "badlands",
+"name": "Badlands",
+"states": "SD",
+"year": 1978,
+"lat": 43.75,
+"lon": -102.5,
+"about": "Eroded buttes and pinnacles beside a wide mixed-grass prairie, rich in fossils."
+},
+{
+"id": "big-bend",
+"name": "Big Bend",
+"states": "TX",
+"year": 1944,
+"lat": 29.25,
+"lon": -103.25,
+"about": "Desert, mountains and the canyons of the Rio Grande on the border with Mexico."
+},
+{
+"id": "biscayne",
+"name": "Biscayne",
+"states": "FL",
+"year": 1980,
+"lat": 25.65,
+"lon": -80.08,
+"about": "Mostly underwater: coral reefs, keys and mangroves, best seen by boat or snorkel."
+},
+{
+"id": "black-canyon-of-the-gunnison",
+"name": "Black Canyon of the Gunnison",
+"states": "CO",
+"year": 1999,
+"lat": 38.57,
+"lon": -107.72,
+"about": "A deep, narrow, sheer-walled canyon carved by the Gunnison River."
+},
+{
+"id": "bryce-canyon",
+"name": "Bryce Canyon",
+"states": "UT",
+"year": 1928,
+"lat": 37.57,
+"lon": -112.18,
+"about": "Amphitheatres filled with hoodoos, the tall rock spires the park is famous for."
+},
+{
+"id": "canyonlands",
+"name": "Canyonlands",
+"states": "UT",
+"year": 1964,
+"lat": 38.2,
+"lon": -109.93,
+"about": "Canyons, mesas and buttes carved by the Colorado and Green rivers."
+},
+{
+"id": "capitol-reef",
+"name": "Capitol Reef",
+"states": "UT",
+"year": 1971,
+"lat": 38.2,
+"lon": -111.17,
+"about": "The Waterpocket Fold, a nearly 100-mile wrinkle in the Earth’s crust, and the orchards of Fruita."
+},
+{
+"id": "carlsbad-caverns",
+"name": "Carlsbad Caverns",
+"states": "NM",
+"year": 1930,
+"lat": 32.17,
+"lon": -104.44,
+"about": "More than 119 caves, including the vast Big Room, and summer evening bat flights."
+},
+{
+"id": "channel-islands",
+"name": "Channel Islands",
+"states": "CA",
+"year": 1980,
+"lat": 34.01,
+"lon": -119.42,
+"about": "Five islands off the California coast, known for sea caves, kelp forests and the island fox."
+},
+{
+"id": "congaree",
+"name": "Congaree",
+"states": "SC",
+"year": 2003,
+"lat": 33.78,
+"lon": -80.78,
+"about": "Old-growth bottomland forest with some of the tallest trees in eastern North America."
+},
+{
+"id": "crater-lake",
+"name": "Crater Lake",
+"states": "OR",
+"year": 1902,
+"lat": 42.94,
+"lon": -122.1,
+"about": "The deepest lake in the United States, filling the caldera of a collapsed volcano."
+},
+{
+"id": "cuyahoga-valley",
+"name": "Cuyahoga Valley",
+"states": "OH",
+"year": 2000,
+"lat": 41.24,
+"lon": -81.55,
+"about": "Forests, waterfalls and a scenic railroad along the Cuyahoga River between Cleveland and Akron."
+},
+{
+"id": "death-valley",
+"name": "Death Valley",
+"states": "CA · NV",
+"year": 1994,
+"lat": 36.24,
+"lon": -116.82,
+"about": "The hottest, driest and lowest national park, with Badwater Basin 282 feet below sea level."
+},
+{
+"id": "denali",
+"name": "Denali",
+"states": "AK",
+"year": 1917,
+"lat": 63.33,
+"lon": -150.5,
+"about": "Six million acres of wilderness around Denali, the highest peak in North America."
+},
+{
+"id": "dry-tortugas",
+"name": "Dry Tortugas",
+"states": "FL",
+"year": 1992,
+"lat": 24.63,
+"lon": -82.87,
+"about": "Seven small islands about 70 miles west of Key West, with the 19th-century Fort Jefferson."
+},
+{
+"id": "everglades",
+"name": "Everglades",
+"states": "FL",
+"year": 1934,
+"lat": 25.29,
+"lon": -80.9,
+"about": "The largest subtropical wilderness in the US, home to alligators, manatees and wading birds."
+},
+{
+"id": "gates-of-the-arctic",
+"name": "Gates of the Arctic",
+"states": "AK",
+"year": 1980,
+"lat": 67.78,
+"lon": -153.3,
+"about": "Roadless wilderness north of the Arctic Circle in the Brooks Range."
+},
+{
+"id": "gateway-arch",
+"name": "Gateway Arch",
+"states": "MO",
+"year": 2018,
+"lat": 38.63,
+"lon": -90.19,
+"about": "The 630-foot stainless-steel arch on the St. Louis riverfront."
+},
+{
+"id": "glacier",
+"name": "Glacier",
+"states": "MT",
+"year": 1910,
+"lat": 48.8,
+"lon": -114.0,
+"about": "Glacier-carved peaks and valleys crossed by the Going-to-the-Sun Road."
+},
+{
+"id": "glacier-bay",
+"name": "Glacier Bay",
+"states": "AK",
+"year": 1980,
+"lat": 58.5,
+"lon": -137.0,
+"about": "Tidewater glaciers, fjords and whales in southeast Alaska."
+},
+{
+"id": "grand-canyon",
+"name": "Grand Canyon",
+"states": "AZ",
+"year": 1919,
+"lat": 36.06,
+"lon": -112.14,
+"about": "A mile-deep canyon carved by the Colorado River."
+},
+{
+"id": "grand-teton",
+"name": "Grand Teton",
+"states": "WY",
+"year": 1929,
+"lat": 43.73,
+"lon": -110.8,
+"about": "The jagged Teton Range rising above Jackson Hole and its lakes."
+},
+{
+"id": "great-basin",
+"name": "Great Basin",
+"states": "NV",
+"year": 1986,
+"lat": 38.98,
+"lon": -114.3,
+"about": "Lehman Caves, ancient bristlecone pines and Wheeler Peak in eastern Nevada."
+},
+{
+"id": "great-sand-dunes",
+"name": "Great Sand Dunes",
+"states": "CO",
+"year": 2004,
+"lat": 37.73,
+"lon": -105.51,
+"about": "The tallest sand dunes in North America, below the Sangre de Cristo Mountains."
+},
+{
+"id": "great-smoky-mountains",
+"name": "Great Smoky Mountains",
+"states": "NC · TN",
+"year": 1934,
+"lat": 35.68,
+"lon": -83.53,
+"about": "Forested mountains on the North Carolina–Tennessee border; the most visited national park."
+},
+{
+"id": "guadalupe-mountains",
+"name": "Guadalupe Mountains",
+"states": "TX",
+"year": 1966,
+"lat": 31.92,
+"lon": -104.87,
+"about": "Guadalupe Peak, the highest point in Texas, and the remains of an ancient reef."
+},
+{
+"id": "haleakala",
+"name": "Haleakalā",
+"states": "HI",
+"year": 1961,
+"lat": 20.72,
+"lon": -156.17,
+"about": "The vast summit crater of a dormant volcano on Maui, famous for its sunrises."
+},
+{
+"id": "hawaii-volcanoes",
+"name": "Hawaiʻi Volcanoes",
+"states": "HI",
+"year": 1916,
+"lat": 19.38,
+"lon": -155.2,
+"about": "Kīlauea and Mauna Loa, two of the world’s most active volcanoes."
+},
+{
+"id": "hot-springs",
+"name": "Hot Springs",
+"states": "AR",
+"year": 1921,
+"lat": 34.51,
+"lon": -93.05,
+"about": "Historic Bathhouse Row and the natural thermal springs of the town of Hot Springs."
+},
+{
+"id": "indiana-dunes",
+"name": "Indiana Dunes",
+"states": "IN",
+"year": 2019,
+"lat": 41.65,
+"lon": -87.05,
+"about": "Sand dunes, beaches and wetlands along the southern shore of Lake Michigan."
+},
+{
+"id": "isle-royale",
+"name": "Isle Royale",
+"states": "MI",
+"year": 1940,
+"lat": 48.1,
+"lon": -88.55,
+"about": "A remote island in Lake Superior, known for its wolves and moose."
+},
+{
+"id": "joshua-tree",
+"name": "Joshua Tree",
+"states": "CA",
+"year": 1994,
+"lat": 33.79,
+"lon": -115.9,
+"about": "Where the Mojave and Colorado deserts meet, with Joshua trees and giant boulders."
+},
+{
+"id": "katmai",
+"name": "Katmai",
+"states": "AK",
+"year": 1980,
+"lat": 58.5,
+"lon": -155.0,
+"about": "Brown bears catching salmon at Brooks Falls, and the Valley of Ten Thousand Smokes."
+},
+{
+"id": "kenai-fjords",
+"name": "Kenai Fjords",
+"states": "AK",
+"year": 1980,
+"lat": 59.92,
+"lon": -149.65,
+"about": "The Harding Icefield and the glaciers that flow from it into coastal fjords."
+},
+{
+"id": "kings-canyon",
+"name": "Kings Canyon",
+"states": "CA",
+"year": 1940,
+"lat": 36.8,
+"lon": -118.55,
+"about": "Giant sequoias, including the General Grant Tree, and one of the deepest canyons in the US."
+},
+{
+"id": "kobuk-valley",
+"name": "Kobuk Valley",
+"states": "AK",
+"year": 1980,
+"lat": 67.55,
+"lon": -159.28,
+"about": "Arctic sand dunes and the migration route of the Western Arctic caribou herd."
+},
+{
+"id": "lake-clark",
+"name": "Lake Clark",
+"states": "AK",
+"year": 1980,
+"lat": 60.97,
+"lon": -153.42,
+"about": "Volcanoes, lakes and coastal brown bears southwest of Anchorage."
+},
+{
+"id": "lassen-volcanic",
+"name": "Lassen Volcanic",
+"states": "CA",
+"year": 1916,
+"lat": 40.49,
+"lon": -121.51,
+"about": "All four types of volcano, plus boiling mudpots and steaming vents."
+},
+{
+"id": "mammoth-cave",
+"name": "Mammoth Cave",
+"states": "KY",
+"year": 1941,
+"lat": 37.18,
+"lon": -86.1,
+"about": "The longest known cave system in the world."
+},
+{
+"id": "mesa-verde",
+"name": "Mesa Verde",
+"states": "CO",
+"year": 1906,
+"lat": 37.18,
+"lon": -108.49,
+"about": "Cliff dwellings built by the Ancestral Puebloans, including Cliff Palace."
+},
+{
+"id": "mount-rainier",
+"name": "Mount Rainier",
+"states": "WA",
+"year": 1899,
+"lat": 46.85,
+"lon": -121.75,
+"about": "An active, glacier-covered volcano ringed by wildflower meadows."
+},
+{
+"id": "new-river-gorge",
+"name": "New River Gorge",
+"states": "WV",
+"year": 2020,
+"lat": 38.07,
+"lon": -81.08,
+"about": "A deep river gorge known for whitewater rafting, climbing and its high bridge."
+},
+{
+"id": "north-cascades",
+"name": "North Cascades",
+"states": "WA",
+"year": 1968,
+"lat": 48.7,
+"lon": -121.2,
+"about": "Jagged peaks with more than 300 glaciers in northern Washington."
+},
+{
+"id": "olympic",
+"name": "Olympic",
+"states": "WA",
+"year": 1938,
+"lat": 47.97,
+"lon": -123.5,
+"about": "Temperate rainforest, glaciated mountains and wild Pacific coastline in one park."
+},
+{
+"id": "petrified-forest",
+"name": "Petrified Forest",
+"states": "AZ",
+"year": 1962,
+"lat": 35.07,
+"lon": -109.78,
+"about": "Fossilized logs and the colourful badlands of the Painted Desert."
+},
+{
+"id": "pinnacles",
+"name": "Pinnacles",
+"states": "CA",
+"year": 2013,
+"lat": 36.48,
+"lon": -121.16,
+"about": "Rock spires and talus caves, and a release site for the endangered California condor."
+},
+{
+"id": "redwood",
+"name": "Redwood",
+"states": "CA",
+"year": 1968,
+"lat": 41.3,
+"lon": -124.0,
+"about": "Coast redwoods, the tallest trees on Earth, along the northern California coast."
+},
+{
+"id": "rocky-mountain",
+"name": "Rocky Mountain",
+"states": "CO",
+"year": 1915,
+"lat": 40.4,
+"lon": -105.58,
+"about": "High peaks crossed by Trail Ridge Road, the highest continuous paved road in the US."
+},
+{
+"id": "saguaro",
+"name": "Saguaro",
+"states": "AZ",
+"year": 1994,
+"lat": 32.25,
+"lon": -110.5,
+"about": "Forests of giant saguaro cacti on both sides of Tucson."
+},
+{
+"id": "sequoia",
+"name": "Sequoia",
+"states": "CA",
+"year": 1890,
+"lat": 36.43,
+"lon": -118.68,
+"about": "The General Sherman Tree, the largest tree on Earth by volume."
+},
+{
+"id": "shenandoah",
+"name": "Shenandoah",
+"states": "VA",
+"year": 1935,
+"lat": 38.53,
+"lon": -78.35,
+"about": "The Blue Ridge Mountains and Skyline Drive."
+},
+{
+"id": "theodore-roosevelt",
+"name": "Theodore Roosevelt",
+"states": "ND",
+"year": 1978,
+"lat": 46.97,
+"lon": -103.45,
+"about": "The North Dakota badlands where Theodore Roosevelt ranched, with bison and wild horses."
+},
+{
+"id": "virgin-islands",
+"name": "Virgin Islands",
+"states": "VI",
+"year": 1956,
+"lat": 18.33,
+"lon": -64.73,
+"about": "Beaches, coral reefs and trails covering much of the island of St. John."
+},
+{
+"id": "voyageurs",
+"name": "Voyageurs",
+"states": "MN",
+"year": 1975,
+"lat": 48.5,
+"lon": -92.88,
+"about": "Lakes and islands on the Canadian border, best explored by boat."
+},
+{
+"id": "white-sands",
+"name": "White Sands",
+"states": "NM",
+"year": 2019,
+"lat": 32.78,
+"lon": -106.17,
+"about": "The world’s largest gypsum dunefield."
+},
+{
+"id": "wind-cave",
+"name": "Wind Cave",
+"states": "SD",
+"year": 1903,
+"lat": 43.57,
+"lon": -103.48,
+"about": "One of the longest caves in the world, known for its boxwork, beneath a prairie."
+},
+{
+"id": "wrangell-st-elias",
+"name": "Wrangell–St. Elias",
+"states": "AK",
+"year": 1980,
+"lat": 61.0,
+"lon": -142.0,
+"about": "The largest national park in the US, at more than 13 million acres."
+},
+{
+"id": "yellowstone",
+"name": "Yellowstone",
+"states": "WY · MT · ID",
+"year": 1872,
+"lat": 44.6,
+"lon": -110.5,
+"about": "The world’s first national park, with Old Faithful and more than half the world’s geysers."
+},
+{
+"id": "yosemite",
+"name": "Yosemite",
+"states": "CA",
+"year": 1890,
+"lat": 37.83,
+"lon": -119.5,
+"about": "Granite cliffs such as El Capitan and Half Dome, waterfalls and giant sequoias."
+},
+{
+"id": "zion",
+"name": "Zion",
+"states": "UT",
+"year": 1919,
+"lat": 37.3,
+"lon": -113.05,
+"about": "Towering sandstone cliffs and hikes such as Angels Landing and The Narrows."
+}
+]

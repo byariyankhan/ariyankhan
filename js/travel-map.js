@@ -38,6 +38,7 @@
     us: { label: 'USA', unit: 'states', one: 'state', total: 50, file: '/js/vendor/us-states-10m.json', object: 'states', size: [975, 610] },
     europe: { label: 'Europe', unit: 'countries', one: 'country', total: 46, file: '/js/vendor/countries-50m.json', object: 'countries', size: [900, 760] },
     world: { label: 'World', unit: 'countries', one: 'country', total: 195, file: '/js/vendor/countries-50m.json', object: 'countries', size: [1000, 520] },
+    parks: { label: 'National Parks', unit: 'parks', one: 'park', total: 63, file: '/js/vendor/us-states-10m.json', object: 'states', size: [975, 610] },
   };
   const THEMES = {
     atlas:  { name: 'Atlas',  bg: '#F7F3EA', land: '#E2DACB', visited: '#1E7A72', want: '#E9A23B', line: '#FFFFFF', ink: '#1D2B2A', muted: '#6B746F' },
@@ -51,7 +52,7 @@
   /* ══════════════════════════════════════════════
      State
      ══════════════════════════════════════════════ */
-  const blank = () => ({ us: { v: [], w: [] }, europe: { v: [], w: [] }, world: { v: [], w: [] } });
+  const blank = () => ({ us: { v: [], w: [] }, europe: { v: [], w: [] }, world: { v: [], w: [] }, parks: { v: [], w: [] } });
   const state = { region: 'us', mode: 'v', theme: 'atlas', format: 'post', title: '', marks: blank() };
   const cache = {};
   let data = null;         // { features (drawn), list (in the checklist), byId }
@@ -76,6 +77,15 @@
       return { ...f, id, properties: { name: NAME_FIX[raw] || raw } };
     });
     let features, list, counted;
+    if (key === 'parks') {
+      // The 63 national parks are points on the US map; the states are only the background.
+      const parks = await loadTopo('/js/data/national-parks.json');
+      features = named.filter(f => !US_SKIP.has(f.id));
+      list = parks.map(p => ({ id: p.id, park: p, properties: { name: p.name, sub: `${p.states} · est. ${p.year}` } }));
+      counted = new Set(list.map(f => f.id));
+      list.sort((a, b) => a.properties.name.localeCompare(b.properties.name));
+      return { key, features, list, byId: new Map(list.map(f => [f.id, f])), counted, interactive: counted };
+    }
     if (key === 'us') {
       features = named.filter(f => !US_SKIP.has(f.id));
       list = features;
@@ -126,7 +136,7 @@
   }
   function projectionFor(key, W, H) {
     const pad = 12;
-    if (key === 'us') return d3.geoAlbersUsa().fitExtent([[pad, pad], [W - pad, H - pad]], { type: 'FeatureCollection', features: data.features });
+    if (key === 'us' || key === 'parks') return d3.geoAlbersUsa().fitExtent([[pad, pad], [W - pad, H - pad]], { type: 'FeatureCollection', features: data.features });
     if (key === 'europe') {
       const pts = []; for (let x = -24; x <= 44; x += 4) for (let y = 35; y <= 71; y += 4) pts.push([x, y]);
       return d3.geoConicConformal().rotate([-12, 0]).parallels([40, 64]).fitExtent([[pad, pad], [W - pad, H - pad]], { type: 'MultiPoint', coordinates: pts });
@@ -146,11 +156,34 @@
       const outside = !data.interactive.has(f.id);
       const p = el('path', {
         d, fill: s === 'v' ? T.visited : s === 'w' ? T.want : T.land, 'data-id': interactive && !outside ? f.id : null,
-        stroke: T.line, 'stroke-width': state.region === 'us' ? 0.9 : 0.5, 'fill-opacity': outside ? 0.45 : null,
+        stroke: T.line, 'stroke-width': state.region === 'us' ? 0.9 : 0.5, 'fill-opacity': outside && state.region !== 'parks' ? 0.45 : null,
       }, g);
       if (interactive && !outside) { p.classList.add('tvm-shape'); if (f.id === hoverId) p.classList.add('is-hover'); }
     }
+    if (state.region === 'parks') drawParks(target, proj, T, interactive, W, H);
     return [W, H];
+  }
+  // Parks are dots. AlbersUSA has no place for American Samoa or the US Virgin Islands, so those two sit in
+  // labelled boxes in the open Atlantic east of the Carolinas, the way Alaska and Hawaii are inset on the left.
+  const INSETS = { 'virgin-islands': [W => W - 143, H => H - 250, 'U.S. Virgin Islands'], 'american-samoa': [W => W - 143, H => H - 202, 'American Samoa'] };
+  function drawParks(target, proj, T, interactive, W, H) {
+    const g = el('g', {}, target);
+    const r = 7.5;
+    for (const f of data.list) {
+      const p = f.park; let xy = proj([p.lon, p.lat]);
+      if (!xy && INSETS[p.id]) {
+        const [fx, fy, label] = INSETS[p.id]; xy = [fx(W), fy(H)];
+        el('rect', { x: xy[0] - 18, y: xy[1] - 18, width: 160, height: 36, rx: 8, fill: 'none', stroke: T.muted, 'stroke-opacity': 0.5, 'stroke-dasharray': '3 3' }, g);
+        const t = el('text', { x: xy[0] + 16, y: xy[1] + 5, fill: T.muted, 'font-family': "'Helvetica Neue', Arial, sans-serif", 'font-size': 13 }, g); t.textContent = label;
+      }
+      if (!xy) continue;
+      const s = statusOf(f.id);
+      const c = el('circle', {
+        cx: xy[0].toFixed(1), cy: xy[1].toFixed(1), r, 'data-id': interactive ? f.id : null,
+        fill: s === 'v' ? T.visited : s === 'w' ? T.want : T.bg, stroke: s ? T.line : T.muted, 'stroke-width': s ? 2 : 1.6,
+      }, g);
+      if (interactive) { c.classList.add('tvm-shape', 'tvm-park'); if (f.id === hoverId) c.classList.add('is-hover'); }
+    }
   }
   const svg = $('#tvmMap');
   function render() {
@@ -197,11 +230,12 @@
       b.setAttribute('aria-pressed', s ? 'true' : 'false');
       b.innerHTML = `<span class="tvm-dot" aria-hidden="true"></span><span class="tvm-name"></span>${s ? `<span class="tvm-tag">${s === 'v' ? 'Visited' : 'Want to go'}</span>` : ''}`;
       b.querySelector('.tvm-name').textContent = f.properties.name + (data.counted.has(f.id) ? '' : ' *');
+      if (f.properties.sub) { const sm = document.createElement('small'); sm.textContent = f.properties.sub; b.querySelector('.tvm-name').appendChild(sm); }
       frag.appendChild(b);
     }
     listEl.appendChild(frag);
     $('#tvmListEmpty').hidden = items.length > 0;
-    $('#tvmListNote').hidden = state.region === 'us';
+    $('#tvmListNote').hidden = state.region === 'us' || state.region === 'parks';
     $('#tvmListNote').textContent = state.region === 'europe'
       ? '* Kosovo can be marked, but the count follows the 46 countries most travel lists use.'
       : '* Territories and places with disputed status can be marked, and are counted on their own line.';
@@ -213,14 +247,15 @@
      Map interaction
      ══════════════════════════════════════════════ */
   const tip = $('#tvmTip');
-  svg.addEventListener('click', e => { const p = e.target.closest('path[data-id]'); if (p) toggle(p.dataset.id); });
+  svg.addEventListener('click', e => { const p = e.target.closest('[data-id]'); if (p) toggle(p.dataset.id); });
   svg.addEventListener('mousemove', e => {
-    const p = e.target.closest('path[data-id]');
+    const p = e.target.closest('[data-id]');
     const id = p ? p.dataset.id : null;
     if (id !== hoverId) { $$('.tvm-shape.is-hover', svg).forEach(x => x.classList.remove('is-hover')); hoverId = id; if (p) p.classList.add('is-hover'); }
     if (p) {
       const s = statusOf(id);
-      tip.textContent = data.byId.get(id).properties.name + (s ? (s === 'v' ? ' · visited' : ' · want to go') : '');
+      const it = data.byId.get(id).properties;
+      tip.textContent = it.name + (it.sub ? ` · ${it.sub}` : '') + (s ? (s === 'v' ? ' · visited' : ' · want to go') : '');
       tip.hidden = false;
       const r = $('#tvmStage').getBoundingClientRect();
       tip.style.left = `${e.clientX - r.left + 14}px`; tip.style.top = `${e.clientY - r.top + 14}px`;
@@ -256,7 +291,7 @@
     $('#tvmTitle').placeholder = defaultTitle();
     const R = REGIONS[state.region];
     $('#tvmSearch').placeholder = `Search ${R.unit}…`;
-    $('#tvmListHead').textContent = state.region === 'us' ? 'All 50 states' : state.region === 'europe' ? 'Countries of Europe' : 'Countries and territories';
+    $('#tvmListHead').textContent = state.region === 'us' ? 'All 50 states' : state.region === 'europe' ? 'Countries of Europe' : state.region === 'parks' ? 'All 63 national parks' : 'Countries and territories';
   }
   function changed() { render(); renderCounter(); renderList(); store.save(); saveHash(); syncControls(); }
 
@@ -293,7 +328,7 @@
   /* ══════════════════════════════════════════════
      Export: the map on a card with a title, the count, a legend and the site's address
      ══════════════════════════════════════════════ */
-  const defaultTitle = () => state.region === 'us' ? 'States I’ve visited' : state.region === 'europe' ? 'My Europe travel map' : 'Countries I’ve visited';
+  const defaultTitle = () => state.region === 'us' ? 'States I’ve visited' : state.region === 'europe' ? 'My Europe travel map' : state.region === 'parks' ? 'National parks I’ve visited' : 'Countries I’ve visited';
   function exportSvg() {
     const [EW, EH] = FORMATS[state.format];
     const T = THEMES[state.theme], R = REGIONS[state.region], c = counts();
