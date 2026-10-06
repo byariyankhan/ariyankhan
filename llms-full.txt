@@ -134,7 +134,7 @@ Fill out the contact form at https://ariyankhan.com/#contact with your project d
   pixel-level watermarks such as Google SynthID, cannot fool pixel-based AI detectors and handles still
   images only (no video). Built by Ariyan Khan for his own thumbnail / B-roll workflow.
 - AI Image Checker: https://ariyankhan.com/ai-image-checker/
-- Travel Map (states and countries visited): https://ariyankhan.com/travel-map/
+- Travel Map (countries, states and regions visited): https://ariyankhan.com/travel-map/
   Free, browser-only companion to the remover: it reads an image’s metadata and reports what it says about
   how the image was made (AI generators named in it, C2PA Content Credentials, the IPTC AI source type,
   Stable Diffusion prompts, camera, date and GPS). Nothing is uploaded; a clean result is not proof an image is real.
@@ -177,7 +177,7 @@ Practical articles on hiring, cost, and working with a video editor.
 - About: https://ariyankhan.com/about.html
 - AI Metadata Remover (free tool): https://ariyankhan.com/ai-metadata-remover/
 - AI Image Checker (free tool): https://ariyankhan.com/ai-image-checker/
-- Travel Map (free tool): https://ariyankhan.com/travel-map/ · Europe: https://ariyankhan.com/travel-map/europe.html · World: https://ariyankhan.com/travel-map/world.html · National parks: https://ariyankhan.com/travel-map/national-parks.html · Asia, Africa, North America, South America, Oceania: https://ariyankhan.com/travel-map/asia.html, /africa.html, /north-america.html, /south-america.html, /oceania.html
+- Travel Map (free tool): https://ariyankhan.com/travel-map/ (all maps) · USA: /travel-map/usa.html · National parks: /travel-map/national-parks.html · World: /travel-map/world.html · Europe, Asia, Africa, North America, South America, Oceania: /travel-map/<continent>.html · Canada, Australia, UK, Germany, Japan: /travel-map/canada.html, /australia.html, /uk.html, /germany.html, /japan.html
 - Puzzle – Train Your Brain (free daily brain training and arrow puzzle game): https://ariyankhan.com/puzzle/
 - About Puzzle & FAQ: https://ariyankhan.com/puzzle/about.html
 - How to play Puzzle: https://ariyankhan.com/puzzle/how-to-play.html

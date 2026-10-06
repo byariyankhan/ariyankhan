@@ -14,7 +14,7 @@ const TOOLS = [
   { dir: 'map-maker', css: 'css/map-maker.css', js: 'js/map-maker.js', body: 'mmk' },
   { dir: 'ai-metadata-remover', css: 'css/ai-metadata-remover.css', js: 'js/ai-metadata-remover.js', body: 'amrk' },
   { dir: 'ai-image-checker', css: 'css/ai-image-checker.css', js: 'js/ai-image-checker.js', body: 'aick' },
-  { dir: 'travel-map', css: 'css/travel-map.css', js: 'js/travel-map.js', body: 'tvmk' },
+  { dir: 'travel-map', css: 'css/travel-map.css', js: 'js/travel-map.js', body: 'tvmk', tool: 'usa' },   // its index is the hub of all maps
 ];
 const PAGES = ['index', 'how-to-use', 'about', 'privacy'];
 const ht = read('.htaccess');
@@ -44,7 +44,7 @@ for (const t of TOOLS) {
     }
     ok(sitemap.includes(`<loc>${url}</loc>`), `${f}: listed in the sitemap`);
   }
-  const index = read(`${t.dir}/index.html`);
+  const index = read(`${t.dir}/${t.tool || 'index'}.html`);
   ok(index.includes(`src="/${t.js}?v=`), `the tool page loads /${t.js}`);
   ok(!/<[a-z][^>]*\sstyle="/i.test(PAGES.map(p => read(`${t.dir}/${p}.html`)).join('')), 'no inline style attribute (the CSP refuses them)');
   ok(!/<[a-z][^>]*\sstyle="/i.test(read(t.js)), `${t.js} writes no style="" into markup either`);
