@@ -440,7 +440,11 @@ Europe. It has three map pages, each targeting its own search: `/travel-map/` (t
 `js/vendor/us-states-10m.json`, us-atlas, Census borders), `europe.html` (46 countries: the UN's 44 plus Cyprus
 and Turkey, with Kosovo markable but counted on its own line) and `world.html` (195: the 193 UN members, the
 Vatican and Palestine; territories and disputed places are markable and counted separately; Tuvalu is too small
-for the 50m data and is list-only). A click marks a place Visited or Want to go; marks live in localStorage
+for the 50m data and is list-only). `national-parks.html` tracks the 63 US national parks as dots on the
+US map, from `js/data/national-parks.json` (id, name, states, year, lat/lon, one-line "known for"); the same
+file builds the page's table of all 63 and its counts (most parks by state, oldest, newest), so the table,
+the map and the prose cannot drift apart. American Samoa and the Virgin Islands, which AlbersUSA cannot
+place, sit in two labelled boxes off the East Coast. A click marks a place Visited or Want to go; marks live in localStorage
 (`travel-map:v1`) and in the share link (`#r=us&v=06.36&w=02&t=Title&th=night`). Download makes a PNG card with
 the title, the count, a legend and `ariyankhan.com/travel-map`, sized 1080×1350, 1080×1920, 1080×1080 or
 1920×1080. Keep the counts and their wording neutral: the totals are stated, never "all the countries".
