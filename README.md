@@ -409,8 +409,8 @@ before touching avatar/ring CSS:**
 
 ## Two tools with identities of their own
 
-Map Maker (`/map-maker/`), AI Metadata Remover (`/ai-metadata-remover/`) and AI
-Image Checker (`/ai-image-checker/`) are built like Puzzle: each is its own product, not a page of the portfolio. Each
+Map Maker (`/map-maker/`), AI Metadata Remover (`/ai-metadata-remover/`), AI
+Image Checker (`/ai-image-checker/`) and Travel Map (`/travel-map/`) are built like Puzzle: each is its own product, not a page of the portfolio. Each
 folder holds the tool, a How to use guide, About & FAQ and Privacy; each has its
 own logo (`icon.svg`, also the favicon), share image (`og.png`), colours, fonts,
 header and footer, and loads only its own stylesheet. **The home page is the tool and
@@ -433,6 +433,17 @@ Content Credentials (and the app in their `claim_generator`), the IPTC AI source
 prompts, and EXIF camera, date and GPS. It loads `js/ai-metadata-remover.js` first and uses its parsers and
 `SIGNATURES` through `window.AMRCore`, so the two tools always agree on what a file holds; add a generator
 there and both learn it. Keep its wording honest: a clean result is "no AI metadata found", never "real".
+
+**Travel Map** (`/travel-map/`; paper `#F7F3EA`, teal `#1E7A72`, coral; DM Serif Display + Inter;
+`css/travel-map.css`, `js/travel-map.js`) is a "states I've visited" map maker aimed at readers in the US and
+Europe. It has three map pages, each targeting its own search: `/travel-map/` (the 50 US states, AlbersUSA, from
+`js/vendor/us-states-10m.json`, us-atlas, Census borders), `europe.html` (46 countries: the UN's 44 plus Cyprus
+and Turkey, with Kosovo markable but counted on its own line) and `world.html` (195: the 193 UN members, the
+Vatican and Palestine; territories and disputed places are markable and counted separately; Tuvalu is too small
+for the 50m data and is list-only). A click marks a place Visited or Want to go; marks live in localStorage
+(`travel-map:v1`) and in the share link (`#r=us&v=06.36&w=02&t=Title&th=night`). Download makes a PNG card with
+the title, the count, a legend and `ariyankhan.com/travel-map`, sized 1080×1350, 1080×1920, 1080×1080 or
+1920×1080. Keep the counts and their wording neutral: the totals are stated, never "all the countries".
 
 The old `map-maker.html` and `ai-metadata-remover.html` (and the bare folder
 names) 301 to the folders in one hop from the top of `.htaccess`. Script, data
