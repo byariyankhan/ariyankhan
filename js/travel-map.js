@@ -110,6 +110,7 @@
     guatemala: { label: 'Guatemala', unit: 'departments', one: 'department', total: 22, admin: true, file: '/js/data/admin1/guatemala.json', object: 'regions', size: [880, 900] },
     'sri-lanka': { label: 'Sri Lanka', unit: 'districts', one: 'district', total: 25, admin: true, file: '/js/data/admin1/sri-lanka.json', object: 'regions', size: [640, 1000] },
     jordan: { label: 'Jordan', unit: 'governorates', one: 'governorate', total: 12, admin: true, file: '/js/data/admin1/jordan.json', object: 'regions', size: [640, 1000] },
+    bangladesh: { label: 'Bangladesh', unit: 'districts', one: 'district', total: 64, admin: true, file: '/js/data/admin1/bangladesh.json', object: 'regions', size: [760, 1000] },
     parks: { label: 'National Parks', unit: 'parks', one: 'park', total: 63, file: '/js/vendor/us-states-10m.json', object: 'states', size: [975, 610] },
   };
   const THEMES = {
@@ -240,6 +241,7 @@
     if (['belgium', 'denmark', 'czech-republic', 'hungary', 'croatia', 'iceland', 'romania', 'thailand', 'ecuador'].includes(key)) return fit(d3.geoMercator(), all);
     if (['cuba', 'costa-rica', 'bolivia', 'malaysia'].includes(key)) return fit(d3.geoMercator(), all);
     if (['slovakia', 'bulgaria', 'lithuania', 'estonia', 'uruguay', 'paraguay', 'dominican-republic', 'guatemala', 'sri-lanka', 'jordan'].includes(key)) return fit(d3.geoMercator(), all);
+    if (key === 'bangladesh') return fit(d3.geoMercator(), all);
     if (key === 'finland') return fit(d3.geoConicConformal().rotate([-26, 0]).parallels([61, 68]), all);
     if (key === 'sweden') return fit(d3.geoConicConformal().rotate([-16, 0]).parallels([57, 67]), all);
     if (key === 'mexico') return fit(d3.geoConicConformal().rotate([102, 0]).parallels([17.5, 29.5]), all);
