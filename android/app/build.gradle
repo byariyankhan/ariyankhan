@@ -18,9 +18,10 @@ android {
 
     defaultConfig {
         applicationId 'com.ariyankhan.puzzle'
-        // 23 is what the shell needs: WebViewClient.onPageCommitVisible, which is how the splash knows the
-        // game has painted, arrived there. Everything below it is older than the WebView the game expects.
-        minSdk 23
+        // 24 (Android 7.0) is what Google Play's automatic protection asks of a bundle: it refused one built
+        // for 23 at upload. The shell itself needs 23 (WebViewClient.onPageCommitVisible, which is how the
+        // splash knows the game has painted); Android 6 phones are the only ones this leaves out.
+        minSdk 24
         targetSdk 36
         // Play refuses a versionCode it has already seen, and 1 is spent. CI passes the next one in; a build
         // run by hand keeps 1, which is fine for looking at the app and wrong for uploading it.

@@ -96,7 +96,7 @@ app"; the only thing it reads the number for is whether the splash was drawn in 
 One brain, from the tap on the icon to the home screen. Android 12 and up draw a splash of their own whatever an
 app does; this app used to draw a second one over the WebView (an `ImageView` of `splash.png`), smaller and in a
 different place, and then the page drew a third. Now the splash is Android's own, set up with
-`androidx.core:core-splashscreen` (1.0.1, which also draws the same splash itself on Android 6 to 11):
+`androidx.core:core-splashscreen` (1.0.1, which also draws the same splash itself on Android 7 to 11):
 
 * **What is on it** — `Theme.App.Starting` in `themes.xml`, the activity's theme in the manifest: paper, and
   `@drawable/splash_mark`, the game's brain in ink. Android gives a splash icon a 288 dp canvas and shows the
